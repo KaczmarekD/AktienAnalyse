@@ -1,0 +1,3 @@
+# DEPRECATED: nutze stattdessen `make lock` oder pip-compile direkt.
+# Pfade in Dockerfile/Makefile zeigen auf requirements.lock.
+-r requirements.lock

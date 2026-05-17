@@ -1,0 +1,5 @@
+# m h dom mon dow  command
+# Samstag 07:30 Europe/Berlin
+30 7 * * 6 root . /app/.env.cron && cd /app && /usr/local/bin/python -m src.main >> /var/log/cron.log 2>&1
+# Leerzeile am Ende ist Pflicht fuer cron
+

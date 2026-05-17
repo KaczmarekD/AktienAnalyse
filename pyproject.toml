@@ -1,0 +1,117 @@
+[project]
+name = "value-analyzer"
+version = "0.2.0"
+description = "Batchweise Value-Aktien-Analyse fuer DAX und MDAX mit wochentlichem E-Mail-Versand"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Dennis" }]
+license = { text = "Proprietary" }
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# ----------------------------------------------------------------------------
+# Ruff: Linting + Formatting (ersetzt black/isort/flake8/pyupgrade)
+# ----------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["data", "logs", ".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",      # pycodestyle
+    "F",           # pyflakes
+    "I",           # isort
+    "B",           # bugbear
+    "UP",          # pyupgrade
+    "SIM",         # simplify
+    "PL",          # pylint subset
+    "RUF",         # ruff specific
+    "TCH",         # type-checking
+    "PT",          # pytest style
+    "RET",         # return statements
+    "C4",          # comprehensions
+    "ARG",         # unused arguments
+    "PTH",         # use pathlib
+]
+ignore = [
+    "E501",        # line too long (formatter handles)
+    "TC003",       # stdlib import in TYPE_CHECKING block - kosmetisch
+    "TC001",       # first-party import in TYPE_CHECKING block - kosmetisch
+    "PLR0913",     # too many arguments
+    "PLR2004",     # magic value comparison (too noisy in tests)
+    "PLR0912",     # too many branches
+    "PLR0915",     # too many statements
+    "B008",        # function call in default arg (Depends pattern)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests duerfen "dict(...)" verwenden, lokale Imports nutzen, etc.
+"tests/**/*.py" = [
+    "ARG", "PLR2004", "S101",
+    "C408",         # dict(...) statt {} - lesbarer in Mock-Daten
+    "PT018",        # compound asserts
+    "B007",         # unused loop variable
+    "RUF059",       # unused tuple unpacking
+    "PLC0415",      # local import in test methods OK
+]
+"src/data_fetcher.py" = ["TC001", "TC003"]  # Ticker/Path werden zur Laufzeit gebraucht
+"src/healthcheck.py" = ["TC002"]
+"src/mailer.py" = ["TC001", "TC003"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ----------------------------------------------------------------------------
+# Pytest
+# ----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:yfinance",
+    "ignore::FutureWarning:yfinance",
+]
+
+# ----------------------------------------------------------------------------
+# Pyright: statische Typpruefung
+# ----------------------------------------------------------------------------
+[tool.pyright]
+include = ["src", "tests"]
+exclude = ["**/__pycache__", "data", "logs", "build"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
+reportGeneralTypeIssues = "warning"
+reportOptionalMemberAccess = "warning"
+
+# ----------------------------------------------------------------------------
+# Coverage (optional, fuer 'make coverage')
+# ----------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/__init__.py", "tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

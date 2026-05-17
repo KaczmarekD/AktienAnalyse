@@ -1,0 +1,86 @@
+symbol,name,index
+ADS.DE,Adidas,DAX
+AIR.DE,Airbus,DAX
+ALV.DE,Allianz,DAX
+BAS.DE,BASF,DAX
+BAYN.DE,Bayer,DAX
+BEI.DE,Beiersdorf,DAX
+BMW.DE,BMW,DAX
+BNR.DE,Brenntag,DAX
+CON.DE,Continental,DAX
+1COV.DE,Covestro,DAX
+DB1.DE,Deutsche Boerse,DAX
+DBK.DE,Deutsche Bank,DAX
+DHL.DE,DHL Group,DAX
+DTE.DE,Deutsche Telekom,DAX
+DTG.DE,Daimler Truck,DAX
+EOAN.DE,E.ON,DAX
+FRE.DE,Fresenius,DAX
+HEI.DE,Heidelberg Materials,DAX
+HEN3.DE,Henkel VZ,DAX
+HNR1.DE,Hannover Rueck,DAX
+IFX.DE,Infineon,DAX
+MBG.DE,Mercedes-Benz Group,DAX
+MRK.DE,Merck KGaA,DAX
+MTX.DE,MTU Aero Engines,DAX
+MUV2.DE,Munich Re,DAX
+P911.DE,Porsche AG,DAX
+PAH3.DE,Porsche Holding,DAX
+QIA.DE,Qiagen,DAX
+RHM.DE,Rheinmetall,DAX
+RWE.DE,RWE,DAX
+SAP.DE,SAP,DAX
+SHL.DE,Siemens Healthineers,DAX
+SIE.DE,Siemens,DAX
+SRT3.DE,Sartorius VZ,DAX
+SY1.DE,Symrise,DAX
+VNA.DE,Vonovia,DAX
+VOW3.DE,Volkswagen VZ,DAX
+ZAL.DE,Zalando,DAX
+CBK.DE,Commerzbank,DAX
+ENR.DE,Siemens Energy,DAX
+AFX.DE,Carl Zeiss Meditec,MDAX
+AIXA.DE,Aixtron,MDAX
+ARL.DE,Aareal Bank,MDAX
+BC8.DE,Bechtle,MDAX
+BOSS.DE,Hugo Boss,MDAX
+COP.DE,CompuGroup Medical,MDAX
+DUE.DE,Duerr,MDAX
+EVK.DE,Evonik,MDAX
+FNTN.DE,Freenet,MDAX
+FPE3.DE,Fuchs Petrolub VZ,MDAX
+FRA.DE,Fraport,MDAX
+G1A.DE,GEA Group,MDAX
+GBF.DE,Bilfinger,MDAX
+GFT.DE,GFT Technologies,MDAX
+HFG.DE,HelloFresh,MDAX
+HLE.DE,Hella,MDAX
+HOT.DE,Hochtief,MDAX
+JEN.DE,Jenoptik,MDAX
+KGX.DE,Kion Group,MDAX
+KRN.DE,Krones,MDAX
+LEG.DE,LEG Immobilien,MDAX
+LHA.DE,Lufthansa,MDAX
+LXS.DE,Lanxess,MDAX
+NDA.DE,Aurubis,MDAX
+NEM.DE,Nemetschek,MDAX
+PSM.DE,ProSiebenSat.1,MDAX
+PUM.DE,Puma,MDAX
+RAA.DE,Rational,MDAX
+SDF.DE,K+S,MDAX
+SOW.DE,Software AG,MDAX
+SZG.DE,Salzgitter,MDAX
+TEG.DE,TAG Immobilien,MDAX
+TKA.DE,ThyssenKrupp,MDAX
+UN01.DE,Uniper,MDAX
+UTDI.DE,United Internet,MDAX
+WCH.DE,Wacker Chemie,MDAX
+WAF.DE,Siltronic,MDAX
+WUW.DE,Wuestenrot & Wuerttembergische,MDAX
+EVD.DE,CTS Eventim,MDAX
+RRTL.DE,RTL Group,MDAX
+SAX.DE,Stroeer,MDAX
+SHA.DE,Schaeffler,MDAX
+TUI1.DE,TUI,MDAX
+AT1.DE,Aroundtown,MDAX
+KCO.DE,Klöckner & Co,MDAX

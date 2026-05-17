@@ -1,0 +1,25 @@
+.env
+# data/-Ordner enthält Cache + Fallback-CSV.
+# Nur Caches (Parquet) ignorieren, die CSV muss eingecheckt sein.
+data/*.parquet
+data/cache/
+logs/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Test- und Linter-Caches
+.pytest_cache/
+.ruff_cache/
+pytest-cache-files-*/
+
+# IDE
+.vscode/
+.idea/
+.claude/

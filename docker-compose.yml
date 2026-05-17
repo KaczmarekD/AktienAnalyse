@@ -1,0 +1,20 @@
+services:
+  value-analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: value-analyzer:0.2.0
+    container_name: value-analyzer
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Berlin
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    # Manueller Run:
+    #   docker compose run --rm value-analyzer python -m src.main
+    # Dry-Run:
+    #   docker compose run --rm value-analyzer python -m src.main --dry-run
