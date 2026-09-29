@@ -12,20 +12,18 @@ Scoring, Report-Bau, Dry-Run-Modus und Fehlerbehandlung.
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from pydantic import ValidationError
 
 from src.main import _run, run
 from src.universe import Ticker
 
-
 # ---------------------------------------------------------------------------
 # Hilfs-Fixture: minimale Settings ohne .env-Datei
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def settings(tmp_path, monkeypatch):
@@ -37,8 +35,7 @@ def settings(tmp_path, monkeypatch):
     from src.config import Settings
 
     s = Settings()  # type: ignore[call-arg]
-    s = s.model_copy(update={"data_dir": tmp_path / "data", "logs_dir": tmp_path / "logs"})
-    return s
+    return s.model_copy(update={"data_dir": tmp_path / "data", "logs_dir": tmp_path / "logs"})
 
 
 @pytest.fixture
@@ -55,8 +52,9 @@ def mock_tickers():
 
 
 # ---------------------------------------------------------------------------
-# _run() – Happy Path: Dry-Run
+# _run() - Happy Path: Dry-Run
 # ---------------------------------------------------------------------------
+
 
 class TestRunDryRun:
     def test_dry_run_returns_zero(self, settings, mock_tickers, mock_universe_df):
@@ -101,8 +99,9 @@ class TestRunDryRun:
 
 
 # ---------------------------------------------------------------------------
-# _run() – Happy Path: echter Lauf mit Mail
+# _run() - Happy Path: echter Lauf mit Mail
 # ---------------------------------------------------------------------------
+
 
 class TestRunWithMail:
     def test_real_run_calls_send_report(self, settings, mock_tickers, mock_universe_df):
@@ -148,8 +147,9 @@ class TestRunWithMail:
 
 
 # ---------------------------------------------------------------------------
-# _run() – DAX_ONLY-Filter
+# _run() - DAX_ONLY-Filter
 # ---------------------------------------------------------------------------
+
 
 class TestRunDaxOnly:
     def test_dax_only_filters_mdax_tickers(self, settings, mock_tickers, mock_universe_df):
@@ -177,12 +177,13 @@ class TestRunDaxOnly:
         # MDAX-Ticker duerfen nicht dabei sein
         passed_symbols = {t.symbol for t in passed_tickers}
         assert "TRAP.DE" not in passed_symbols  # MDAX
-        assert "VAL.DE" in passed_symbols        # DAX
+        assert "VAL.DE" in passed_symbols  # DAX
 
 
 # ---------------------------------------------------------------------------
-# _run() – Fehlerbehandlung
+# _run() - Fehlerbehandlung
 # ---------------------------------------------------------------------------
+
 
 class TestRunErrorHandling:
     def test_no_scoreable_data_returns_code_3(self, settings, mock_tickers):
@@ -244,8 +245,9 @@ class TestRunErrorHandling:
 
 
 # ---------------------------------------------------------------------------
-# run() – Config-Fehler (oeffentliche Einstiegsfunktion)
+# run() - Config-Fehler (oeffentliche Einstiegsfunktion)
 # ---------------------------------------------------------------------------
+
 
 class TestRunConfigError:
     def test_missing_env_returns_code_2(self, monkeypatch, tmp_path):
@@ -269,9 +271,10 @@ class TestRunConfigError:
                 "src.main.fetch_all",
                 return_value=pd.DataFrame(columns=["symbol", "market_cap", "composite_score"]),
             ),
-            patch("src.main.score", return_value=pd.DataFrame(
-                columns=["symbol", "market_cap", "composite_score"]
-            )),
+            patch(
+                "src.main.score",
+                return_value=pd.DataFrame(columns=["symbol", "market_cap", "composite_score"]),
+            ),
             patch("src.main.ping"),
         ):
             rc = run(dry_run=True)
@@ -282,6 +285,7 @@ class TestRunConfigError:
 # ---------------------------------------------------------------------------
 # force_refresh wird durchgereicht
 # ---------------------------------------------------------------------------
+
 
 class TestForceRefresh:
     def test_force_refresh_passed_to_fetch_all(self, settings, mock_tickers, mock_universe_df):

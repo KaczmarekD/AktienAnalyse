@@ -5,7 +5,6 @@ smtplib.SMTP wird vollstaendig gemockt - kein echter Netz-Call.
 
 from __future__ import annotations
 
-import smtplib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -13,10 +12,10 @@ import pytest
 
 from src.mailer import send_report
 
-
 # ---------------------------------------------------------------------------
 # Hilfs-Fixture: minimale Settings
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def settings(tmp_path, monkeypatch):
@@ -40,6 +39,7 @@ def csv_attachment(tmp_path) -> Path:
 # ---------------------------------------------------------------------------
 # Betreff und Adressierung
 # ---------------------------------------------------------------------------
+
 
 class TestMailHeaders:
     def test_subject_contains_prefix(self, settings):
@@ -73,6 +73,7 @@ class TestMailHeaders:
 # HTML-Inhalt
 # ---------------------------------------------------------------------------
 
+
 class TestMailBody:
     def test_html_alternative_present(self, settings):
         html = "<h1>Report</h1><p>Inhalt</p>"
@@ -97,6 +98,7 @@ class TestMailBody:
 # ---------------------------------------------------------------------------
 # CSV-Anhang
 # ---------------------------------------------------------------------------
+
 
 class TestCsvAttachment:
     def test_attachment_added_when_file_exists(self, settings, csv_attachment):
@@ -160,6 +162,7 @@ class TestCsvAttachment:
 # SMTP-Verbindung (TLS vs. SSL)
 # ---------------------------------------------------------------------------
 
+
 class TestSmtpConnection:
     def test_starttls_used_when_tls_true(self, settings):
         with patch("smtplib.SMTP") as MockSMTP:
@@ -172,13 +175,12 @@ class TestSmtpConnection:
 
         MockSMTP.assert_called_once()
         smtp_instance.starttls.assert_called_once()
-        smtp_instance.login.assert_called_once_with(
-            "sender@gmail.com", "test-app-password"
-        )
+        smtp_instance.login.assert_called_once_with("sender@gmail.com", "test-app-password")
 
     def test_smtp_ssl_used_when_tls_false(self, settings, monkeypatch):
         monkeypatch.setenv("SMTP_USE_TLS", "false")
         from src.config import Settings
+
         settings_no_tls = Settings()  # type: ignore[call-arg]
 
         with patch("smtplib.SMTP_SSL") as MockSMTPSSL:
