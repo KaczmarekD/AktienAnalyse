@@ -1,0 +1,6 @@
+# Einheitlich LF - der Container laeuft auf Linux. Mit CRLF bricht u.a.
+# "#!/bin/bash\r" im entrypoint.sh, wenn das Image unter Windows gebaut wird.
+* text=auto eol=lf
+
+*.parquet binary
+*.png binary
