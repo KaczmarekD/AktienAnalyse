@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     # --- Operatives ---
     data_dir: Path = Path("/app/data")
     logs_dir: Path = Path("/app/logs")
+    retention_days: int = Field(default=90, ge=0)  # 0 = nie aufraeumen
     healthcheck_url: str | None = None  # https://hc-ping.com/<uuid>
     cron_schedule: str = "30 7 * * 6"  # Sa 07:30 Europe/Berlin
     tz: str = "Europe/Berlin"

@@ -13,6 +13,7 @@ from . import __version__
 from .config import Settings, load_settings
 from .data_fetcher import FetcherConfig, fetch_all
 from .healthcheck import ping
+from .housekeeping import cleanup_old_artifacts
 from .logging_setup import setup_logging
 from .mailer import send_report
 from .reporting import build_report
@@ -25,6 +26,8 @@ def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
     log.info("=== value-analyzer v%s START ===", __version__)
 
     try:
+        cleanup_old_artifacts(settings.data_dir, settings.retention_days)
+
         tickers = load_universe()
         if settings.universe == "DAX_ONLY":
             tickers = [t for t in tickers if t.index == "DAX"]

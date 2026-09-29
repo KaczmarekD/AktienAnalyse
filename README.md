@@ -127,6 +127,7 @@ make test-cov       # Tests mit Coverage-HTML-Report
 | `VALUE_WEIGHT` / `QUALITY_WEIGHT` | `0.6` / `0.4` | Composite-Gewichtung (wird auf Summe 1 normiert) |
 | `DEFAULT_TAX_RATE` | `0.27` | Fallback-Steuersatz für ROIC-Berechnung |
 | `CRON_SCHEDULE` | `30 7 * * 6` | Cron-Ausdruck (Sa 07:30); Format: `m h dom mon dow` |
+| `RETENTION_DAYS` | `90` | Caches/Ranking-CSVs in `data/` nach X Tagen löschen (`0` = nie) |
 | `HEALTHCHECK_URL` | – | Optional: `https://hc-ping.com/<uuid>` |
 | `TZ` | `Europe/Berlin` | Container-Zeitzone |
 

@@ -2,6 +2,8 @@
 # data/-Ordner enthält Cache + Fallback-CSV.
 # Nur Caches (Parquet) ignorieren, die CSV muss eingecheckt sein.
 data/*.parquet
+data/value_ranking_*.csv
+data/preview_latest.html
 data/cache/
 logs/
 __pycache__/

@@ -85,6 +85,10 @@ FIELD_MAP: dict[str, tuple[str, ...]] = {
 class FetcherConfig:
     sleep_between: float = 0.4
     default_tax_rate: float = 0.27
+    # Unter dieser Erfolgsquote (Anteil Ticker mit Marktkapitalisierung) wird
+    # nicht gecached - sonst liefert ein Re-Run nach einem yfinance-Ausfall am
+    # selben Tag weiter die kaputten Daten.
+    min_cache_success_share: float = 0.8
 
 
 # ---------------------------------------------------------------------------
@@ -358,6 +362,21 @@ def fetch_all(
         time.sleep(cfg.sleep_between)
 
     df = pd.DataFrame(rows)
-    df.to_parquet(cache_file, index=False)
-    log.info("Fundamentals fuer %d Werte gecached -> %s", len(df), cache_file)
+    success_share = _success_share(df)
+    if success_share >= cfg.min_cache_success_share:
+        df.to_parquet(cache_file, index=False)
+        log.info("Fundamentals fuer %d Werte gecached -> %s", len(df), cache_file)
+    else:
+        log.warning(
+            "Nur %.0f %% der Ticker erfolgreich geladen (< %.0f %%) - kein Cache geschrieben",
+            success_share * 100,
+            cfg.min_cache_success_share * 100,
+        )
     return df
+
+
+def _success_share(df: pd.DataFrame) -> float:
+    """Anteil der Zeilen mit Marktkapitalisierung - fehlt sie, ist der Fetch gescheitert."""
+    if df.empty or "market_cap" not in df.columns:
+        return 0.0
+    return float(df["market_cap"].notna().mean())

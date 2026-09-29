@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 
 from src.data_fetcher import (
     FIELD_MAP,
+    FetcherConfig,
     _cagr,
     _dividend_yield,
     _earnings_stability,
@@ -15,7 +18,10 @@ from src.data_fetcher import (
     _pick,
     _roic,
     _safe_div,
+    fetch_all,
 )
+from src.fundamentals import Fundamentals, Identity, MarketData
+from src.universe import Ticker
 
 
 class TestSafeDiv:
@@ -180,3 +186,43 @@ class TestFieldMap:
         for key, candidates in FIELD_MAP.items():
             assert len(candidates) >= 1, f"Field {key} has no candidates"
             assert all(isinstance(c, str) for c in candidates)
+
+
+class TestFetchAllCache:
+    """fetch_one wird gepatcht - kein yfinance-Netzcall."""
+
+    TICKERS = tuple(Ticker(f"T{i}.DE", f"T{i}", "DAX") for i in range(5))
+    CFG = FetcherConfig(sleep_between=0)
+
+    @staticmethod
+    def _fake_fetch(failing: set[str]):
+        def fake(ticker, cfg=None):
+            fund = Fundamentals(identity=Identity(ticker.symbol, ticker.name, ticker.index))
+            if ticker.symbol in failing:
+                fund.errors.append("fetch failed: down")
+            else:
+                fund.market = MarketData(market_cap=1e9)
+            return fund
+
+        return fake
+
+    def test_caches_when_enough_succeed(self, tmp_path):
+        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch({"T0.DE"})):
+            df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
+        assert len(df) == 5
+        assert len(list(tmp_path.glob("fundamentals_*.parquet"))) == 1
+
+    def test_no_cache_on_mass_failure(self, tmp_path):
+        failing = {t.symbol for t in self.TICKERS[:4]}
+        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(failing)):
+            df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
+        assert len(df) == 5  # Daten werden trotzdem zurueckgegeben
+        assert list(tmp_path.glob("fundamentals_*.parquet")) == []
+
+    def test_uses_cache_on_second_run(self, tmp_path):
+        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(set())):
+            fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
+        with patch("src.data_fetcher.fetch_one") as fetch_one:
+            df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
+        fetch_one.assert_not_called()
+        assert len(df) == 5
