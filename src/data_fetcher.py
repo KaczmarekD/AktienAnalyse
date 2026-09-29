@@ -229,9 +229,7 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
     buybacks = _latest(_pick(cashflow, "buybacks"))
 
     # --- Value ---
-    div_yield = _f(info.get("dividendYield"))
-    if div_yield is not None and div_yield > 1:
-        div_yield = div_yield / 100.0  # yfinance liefert teils Prozent statt Dezimal
+    div_yield = _dividend_yield(info)
     buyback_yield = (
         _safe_div(abs(buybacks), fund.market.market_cap) if buybacks is not None else None
     )
@@ -279,6 +277,20 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
     )
 
     return fund
+
+
+def _dividend_yield(info: dict[str, Any]) -> float | None:
+    """Dividendenrendite als Dezimal (0.03 = 3 %).
+
+    ``trailingAnnualDividendYield`` ist dezimal und hat Vorrang. ``dividendYield``
+    liefert yfinance seit 0.2.5x in Prozent (1.36 = 1,36 %) - daher immer / 100,
+    ein Schwellwert wie "> 1" wuerde Renditen unter 1 % um Faktor 100 aufblaehen.
+    """
+    trailing = _f(info.get("trailingAnnualDividendYield"))
+    if trailing is not None:
+        return trailing
+    pct = _f(info.get("dividendYield"))
+    return pct / 100.0 if pct is not None else None
 
 
 def _roic(

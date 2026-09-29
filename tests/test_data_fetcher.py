@@ -8,6 +8,7 @@ import pytest
 from src.data_fetcher import (
     FIELD_MAP,
     _cagr,
+    _dividend_yield,
     _earnings_stability,
     _f,
     _latest,
@@ -104,6 +105,25 @@ class TestCagr:
     def test_too_short(self):
         assert _cagr([100]) is None
         assert _cagr([]) is None
+
+
+class TestDividendYield:
+    def test_prefers_trailing_decimal(self):
+        info = {"trailingAnnualDividendYield": 0.0136, "dividendYield": 1.36}
+        assert _dividend_yield(info) == pytest.approx(0.0136)
+
+    def test_percent_fallback_below_one_percent(self):
+        # 0.8 bedeutet 0,8 % - nicht 80 %
+        assert _dividend_yield({"dividendYield": 0.8}) == pytest.approx(0.008)
+
+    def test_percent_fallback_above_one_percent(self):
+        assert _dividend_yield({"dividendYield": 4.02}) == pytest.approx(0.0402)
+
+    def test_zero_trailing_is_kept(self):
+        assert _dividend_yield({"trailingAnnualDividendYield": 0.0}) == 0.0
+
+    def test_missing_returns_none(self):
+        assert _dividend_yield({}) is None
 
 
 class TestRoic:
