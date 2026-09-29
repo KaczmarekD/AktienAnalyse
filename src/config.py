@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import EmailStr, Field, SecretStr, field_validator
+from pydantic import EmailStr, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -55,12 +55,6 @@ class Settings(BaseSettings):
     healthcheck_url: str | None = None  # https://hc-ping.com/<uuid>
     cron_schedule: str = "30 7 * * 6"  # Sa 07:30 Europe/Berlin
     tz: str = "Europe/Berlin"
-
-    @field_validator("value_weight", "quality_weight")
-    @classmethod
-    def _weights_sane(cls, v: float) -> float:
-        # Validierung der Summe erfolgt in model_validator unten - hier nur die einzelne Range.
-        return v
 
     @property
     def effective_mail_from(self) -> str:

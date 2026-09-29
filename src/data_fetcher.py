@@ -300,7 +300,9 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
 
     div_yield = _dividend_yield(info)
     buyback_yield = _safe_div(abs(buybacks_t), mcap) if buybacks_t is not None else None
-    shareholder_yield = sum(v for v in (div_yield, buyback_yield) if v is not None) or None
+    # 0 % ist ein echter Wert (keine Dividende, keine Rueckkaeufe) - nur None, wenn beides fehlt
+    yields = [v for v in (div_yield, buyback_yield) if v is not None]
+    shareholder_yield = sum(yields) if yields else None
 
     fund.value = ValueMetrics(
         ev_ebit=_safe_div(fund.market.enterprise_value, ebit_t),

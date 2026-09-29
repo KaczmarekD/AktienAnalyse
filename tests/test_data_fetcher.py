@@ -307,3 +307,28 @@ class TestFetchOneCurrencyMismatch:
         assert f.value.p_fcf is None
         assert f.quality.fcf_margin == pytest.approx(0.2)
         assert any("fx" in e for e in f.errors)
+
+
+class TestFetchOneShareholderYield:
+    INCOME = _statement({"Total Revenue": 1_000.0, "EBIT": 100.0})
+
+    def _fetch(self, info, cashflow):
+        data = (
+            {"currency": "EUR", "financialCurrency": "EUR", **info},
+            self.INCOME,
+            None,
+            cashflow,
+        )
+        with patch("src.data_fetcher._ticker_data", return_value=data):
+            return fetch_one(Ticker("X.DE", "X", "MDAX"))
+
+    def test_zero_yield_is_kept(self):
+        f = self._fetch(
+            {"marketCap": 1_000.0, "trailingAnnualDividendYield": 0.0},
+            _statement({"Free Cash Flow": 50.0}),
+        )
+        assert f.value.shareholder_yield == 0.0
+
+    def test_missing_components_give_none(self):
+        f = self._fetch({"marketCap": 1_000.0}, _statement({"Free Cash Flow": 50.0}))
+        assert f.value.shareholder_yield is None

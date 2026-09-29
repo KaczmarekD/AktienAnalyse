@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import logging
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 
 import pandas as pd
@@ -38,7 +39,7 @@ def _fetch_wiki_table(url: str) -> pd.DataFrame:
     headers = {"User-Agent": "value-analyzer/1.0 (educational)"}
     response = requests.get(url, headers=headers, timeout=20)
     response.raise_for_status()
-    tables = pd.read_html(response.text)
+    tables = pd.read_html(StringIO(response.text))
     for tbl in tables:
         cols = {str(c).lower() for c in tbl.columns}
         if any(k in cols for k in ("ticker", "symbol")):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import logging
 import sys
 import traceback
@@ -90,8 +91,8 @@ def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
 
 def _try_send_error_mail(settings: Settings, trace: str) -> None:
     try:
-        html = f"<h2>Fehler im wochentlichen Batch-Run</h2><pre>{trace}</pre>"
-        send_report(settings, "FEHLER beim Batch-Run", html, attachment=None)
+        body = f"<h2>Fehler im woechentlichen Batch-Run</h2><pre>{html.escape(trace)}</pre>"
+        send_report(settings, "FEHLER beim Batch-Run", body, attachment=None)
     except Exception as inner:
         logging.getLogger("main").error("Auch Fehler-Mail fehlgeschlagen: %s", inner)
 

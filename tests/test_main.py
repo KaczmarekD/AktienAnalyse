@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.main import _run, run
+from src.main import _run, _try_send_error_mail, run
 from src.universe import Ticker
 
 # ---------------------------------------------------------------------------
@@ -242,6 +242,15 @@ class TestRunErrorHandling:
         # Traceback muss uebergeben worden sein
         traceback_arg = mock_err_mail.call_args.args[1]
         assert "RuntimeError" in traceback_arg
+
+    def test_error_mail_escapes_traceback(self, settings):
+        trace = "ValueError: <b>kaputt</b> & mehr"
+        with patch("src.main.send_report") as mock_send:
+            _try_send_error_mail(settings, trace)
+
+        body = mock_send.call_args.args[2]
+        assert "&lt;b&gt;kaputt&lt;/b&gt; &amp; mehr" in body
+        assert "<b>kaputt</b>" not in body
 
 
 # ---------------------------------------------------------------------------
