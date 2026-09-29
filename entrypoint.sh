@@ -11,9 +11,15 @@ echo "[entrypoint] Cron-Schedule: ${CRON_SCHEDULE}"
 
 # ENV in eine Datei dumpen, die der Cron-Job vor jedem Run sourct.
 # (Cron startet eine minimale Shell ohne Container-ENV.)
+# printf %q quotet Leerzeichen/Sonderzeichen (z.B. "[Value-Screening DAX/MDAX]"
+# oder Gmail-App-Passwoerter mit Leerzeichen) - sonst bricht das Sourcen ab.
+ENV_PATTERN='^(SMTP_|MAIL_|UNIVERSE$|TOP_N$|BOTTOM_N$|MIN_MARKET_CAP$|VALUE_WEIGHT$|QUALITY_WEIGHT$|DEFAULT_TAX_RATE$|HEALTHCHECK_URL$|TZ$|DATA_DIR$|LOGS_DIR$)'
 {
-    printenv | grep -E '^(SMTP_|MAIL_|UNIVERSE|TOP_N|BOTTOM_N|MIN_MARKET_CAP|VALUE_WEIGHT|QUALITY_WEIGHT|DEFAULT_TAX_RATE|HEALTHCHECK_URL|TZ|DATA_DIR|LOGS_DIR)=' \
-        | sed 's/^\(.*\)$/export \1/g'
+    for var in $(compgen -e); do
+        if [[ "$var" =~ $ENV_PATTERN ]]; then
+            printf 'export %s=%q\n' "$var" "${!var}"
+        fi
+    done
 } > /app/.env.cron
 
 # Dynamisches crontab-File schreiben
