@@ -19,7 +19,8 @@ class Identity:
     index: str
     sector: str | None = None
     industry: str | None = None
-    currency: str | None = None
+    currency: str | None = None  # Handelswaehrung (Kurs, Marktkapitalisierung)
+    financial_currency: str | None = None  # Berichtswaehrung der Abschluesse
 
 
 @dataclass

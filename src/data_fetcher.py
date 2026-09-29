@@ -16,6 +16,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -185,6 +186,42 @@ def _ticker_data(symbol: str) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFram
     return info, income, balance, cashflow
 
 
+@lru_cache(maxsize=16)
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
+def _fx_rate(from_ccy: str, to_ccy: str) -> float:
+    """Wechselkurs 1 from_ccy -> to_ccy (z.B. USD -> EUR). Pro Run gecached."""
+    rate = _f(yf.Ticker(f"{from_ccy}{to_ccy}=X").fast_info.get("lastPrice"))
+    if rate is None or rate <= 0:
+        msg = f"kein Kurs fuer {from_ccy}{to_ccy}=X"
+        raise ValueError(msg)
+    return rate
+
+
+def _statement_fx(info: dict[str, Any], errors: list[str]) -> float | None:
+    """Faktor von Berichts- in Handelswaehrung.
+
+    1.0, wenn beide gleich (oder unbekannt). None, wenn der Kurs nicht zu
+    bekommen ist - dann duerfen Abschlusswerte nicht gegen Marktdaten
+    gerechnet werden.
+    """
+    trading = info.get("currency")
+    reporting = info.get("financialCurrency")
+    if not trading or not reporting or trading == reporting:
+        return 1.0
+    try:
+        return _fx_rate(reporting, trading)
+    except Exception as e:
+        errors.append(f"fx {reporting}->{trading} failed: {e}")
+        log.warning("Wechselkurs %s->%s fehlgeschlagen: %s", reporting, trading, e)
+        return None
+
+
+def _to_trading(value: float | None, fx: float | None) -> float | None:
+    if value is None or fx is None:
+        return None
+    return value * fx
+
+
 def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
     cfg = cfg or FetcherConfig()
     fund = Fundamentals(
@@ -199,6 +236,7 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         return fund
 
     fund.identity.currency = info.get("currency")
+    fund.identity.financial_currency = info.get("financialCurrency")
     fund.identity.sector = info.get("sector")
     fund.identity.industry = info.get("industry")
 
@@ -233,17 +271,42 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
     buybacks = _latest(_pick(cashflow, "buybacks"))
 
     # --- Value ---
+    # Marktdaten sind in Handelswaehrung, Abschluesse in Berichtswaehrung (z.B.
+    # Qiagen: EUR vs. USD). Fuer Multiples Abschlusswerte umrechnen. Yahoos
+    # enterpriseValue/priceToBook/trailingPE mischen die Waehrungen dann
+    # unkonvertiert - selbst berechnen.
+    fx = _statement_fx(info, fund.errors)
+    mcap = fund.market.market_cap
+    ebit_t = _to_trading(ebit, fx)
+    fcf_t = _to_trading(fcf, fx)
+    equity_t = _to_trading(total_equity, fx)
+    net_income_t = _to_trading(net_income, fx)
+    buybacks_t = _to_trading(buybacks, fx)
+
+    if fx == 1.0:  # gleiche Waehrung - _statement_fx liefert exakt 1.0
+        pe_ratio = _f(info.get("trailingPE"))
+        pb_ratio = _f(info.get("priceToBook")) or _safe_div(mcap, equity_t)
+    else:
+        debt_t, cash_t = _to_trading(total_debt, fx), _to_trading(cash, fx)
+        fund.market.enterprise_value = (
+            mcap + debt_t - cash_t
+            if mcap is not None and debt_t is not None and cash_t is not None
+            else None
+        )
+        pe_ratio = (
+            _safe_div(mcap, net_income_t) if net_income_t is not None and net_income_t > 0 else None
+        )
+        pb_ratio = _safe_div(mcap, equity_t)
+
     div_yield = _dividend_yield(info)
-    buyback_yield = (
-        _safe_div(abs(buybacks), fund.market.market_cap) if buybacks is not None else None
-    )
+    buyback_yield = _safe_div(abs(buybacks_t), mcap) if buybacks_t is not None else None
     shareholder_yield = sum(v for v in (div_yield, buyback_yield) if v is not None) or None
 
     fund.value = ValueMetrics(
-        ev_ebit=_safe_div(fund.market.enterprise_value, ebit),
-        pe_ratio=_f(info.get("trailingPE")),
-        pb_ratio=_f(info.get("priceToBook")) or _safe_div(fund.market.market_cap, total_equity),
-        p_fcf=_safe_div(fund.market.market_cap, fcf),
+        ev_ebit=_safe_div(fund.market.enterprise_value, ebit_t),
+        pe_ratio=pe_ratio,
+        pb_ratio=pb_ratio,
+        p_fcf=_safe_div(mcap, fcf_t),
         dividend_yield=div_yield,
         buyback_yield=buyback_yield,
         shareholder_yield=shareholder_yield,

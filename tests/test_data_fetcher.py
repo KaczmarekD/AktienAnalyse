@@ -18,7 +18,9 @@ from src.data_fetcher import (
     _pick,
     _roic,
     _safe_div,
+    _statement_fx,
     fetch_all,
+    fetch_one,
 )
 from src.fundamentals import Fundamentals, Identity, MarketData
 from src.universe import Ticker
@@ -226,3 +228,82 @@ class TestFetchAllCache:
             df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
         fetch_one.assert_not_called()
         assert len(df) == 5
+
+
+def _statement(values: dict[str, float]) -> pd.DataFrame:
+    return pd.DataFrame({"2025-12-31": values})
+
+
+class TestStatementFx:
+    def test_same_currency_is_one(self):
+        assert _statement_fx({"currency": "EUR", "financialCurrency": "EUR"}, []) == 1.0
+
+    def test_unknown_currency_is_one(self):
+        assert _statement_fx({"currency": "EUR"}, []) == 1.0
+
+    def test_mismatch_uses_fx_rate(self):
+        with patch("src.data_fetcher._fx_rate", return_value=0.9) as fx_rate:
+            fx = _statement_fx({"currency": "EUR", "financialCurrency": "USD"}, [])
+        assert fx == 0.9
+        fx_rate.assert_called_once_with("USD", "EUR")
+
+    def test_fx_failure_returns_none_and_logs_error(self):
+        errors: list[str] = []
+        with patch("src.data_fetcher._fx_rate", side_effect=ValueError("down")):
+            fx = _statement_fx({"currency": "EUR", "financialCurrency": "USD"}, errors)
+        assert fx is None
+        assert errors
+        assert "USD->EUR" in errors[0]
+
+
+# Qiagen-Fall: Kurs/Marktkapitalisierung in EUR, Abschluss in USD.
+QIAGEN_INFO = {
+    "currency": "EUR",
+    "financialCurrency": "USD",
+    "marketCap": 8_000.0,
+    "enterpriseValue": 9_000.0,  # von Yahoo unkonvertiert gemischt
+    "priceToBook": 2.76,  # EUR-Kurs / USD-Buchwert
+    "trailingPE": 99.0,
+}
+
+
+class TestFetchOneCurrencyMismatch:
+    """Qiagen-Fall: Kurs/Marktkapitalisierung in EUR, Abschluss in USD."""
+
+    INCOME = _statement({"Total Revenue": 2_000.0, "EBIT": 500.0, "Net Income": 400.0})
+    BALANCE = _statement(
+        {"Stockholders Equity": 3_000.0, "Total Debt": 1_600.0, "Cash And Cash Equivalents": 600.0}
+    )
+    CASHFLOW = _statement({"Free Cash Flow": 400.0, "Repurchase Of Capital Stock": -200.0})
+
+    def _fetch(self, fx_rate):
+        data = (QIAGEN_INFO, self.INCOME, self.BALANCE, self.CASHFLOW)
+        with (
+            patch("src.data_fetcher._ticker_data", return_value=data),
+            patch("src.data_fetcher._fx_rate", **fx_rate),
+        ):
+            return fetch_one(Ticker("QIA.DE", "Qiagen", "MDAX"))
+
+    def test_value_multiples_use_converted_statements(self):
+        f = self._fetch({"return_value": 0.8})
+        assert f.identity.financial_currency == "USD"
+        # EV = 8000 + (1600 - 600) * 0.8 = 8800, EBIT = 500 * 0.8 = 400
+        assert f.market.enterprise_value == pytest.approx(8_800.0)
+        assert f.value.ev_ebit == pytest.approx(22.0)
+        assert f.value.pb_ratio == pytest.approx(8_000.0 / 2_400.0)
+        assert f.value.p_fcf == pytest.approx(8_000.0 / 320.0)
+        assert f.value.pe_ratio == pytest.approx(8_000.0 / 320.0)
+        assert f.value.buyback_yield == pytest.approx(160.0 / 8_000.0)
+
+    def test_quality_ratios_unaffected_by_fx(self):
+        f = self._fetch({"return_value": 0.8})
+        assert f.quality.fcf_margin == pytest.approx(0.2)
+        assert f.quality.debt_to_equity == pytest.approx(1_600.0 / 3_000.0)
+
+    def test_fx_failure_drops_mixed_multiples(self):
+        f = self._fetch({"side_effect": ValueError("down")})
+        assert f.value.ev_ebit is None
+        assert f.value.pb_ratio is None
+        assert f.value.p_fcf is None
+        assert f.quality.fcf_margin == pytest.approx(0.2)
+        assert any("fx" in e for e in f.errors)

@@ -223,6 +223,7 @@ def build_report(
         "market_cap",
         "price",
         "currency",
+        "financial_currency",
         "ev_ebit",
         "pe_ratio",
         "pb_ratio",
