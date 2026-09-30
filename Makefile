@@ -2,26 +2,26 @@
 # Nutze 'make help' fuer eine Uebersicht.
 .PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check clean build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
 
-PYTHON ?= python3
-PIP    ?= pip
+# Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
+UV     ?= uv
+RUN    ?= $(UV) run
+PYTHON ?= $(RUN) python
 
 help: ## Zeige verfuegbare Targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-# ---------- Dependencies ------------------------------------------------------
-install: ## Installiere Runtime-Dependencies aus dem Lockfile
-	$(PIP) install --no-deps -r requirements.lock
+# ---------- Dependencies (uv, ADR-0004) ----------------------------------------
+install: ## Runtime-Dependencies exakt aus uv.lock installieren
+	$(UV) sync --frozen --no-dev
 
-install-dev: ## Installiere Dev-Dependencies (tests, lint, type-check)
-	$(PIP) install -r requirements-dev.lock
+install-dev: ## Alle Dependencies inkl. Dev-Tools exakt aus uv.lock installieren
+	$(UV) sync --frozen
 
-lock: ## Regeneriere beide Lockfiles aus den .in Dateien
-	pip-compile --resolver=backtracking --strip-extras -o requirements.lock requirements.in
-	pip-compile --resolver=backtracking --strip-extras -o requirements-dev.lock requirements-dev.in
+lock: ## uv.lock nach Aenderungen an pyproject.toml aktualisieren (Versionen bleiben)
+	$(UV) lock
 
-upgrade: ## Aktualisiere alle Lockfiles auf die neuesten passenden Versionen
-	pip-compile --upgrade --resolver=backtracking --strip-extras -o requirements.lock requirements.in
-	pip-compile --upgrade --resolver=backtracking --strip-extras -o requirements-dev.lock requirements-dev.in
+upgrade: ## Alle Pakete auf die neuesten passenden Versionen heben
+	$(UV) lock --upgrade
 
 # ---------- Ausfuehrung -------------------------------------------------------
 run: ## Echter Lauf inkl. Mailversand (braucht .env)
@@ -35,20 +35,21 @@ force: ## Wie run, aber ignoriert den Abruf von heute in der DB
 
 # ---------- Qualitaetssicherung ----------------------------------------------
 test: ## Tests laufen lassen
-	pytest
+	$(RUN) pytest
 
 test-cov: ## Tests mit Coverage-Report
-	pytest --cov=src --cov-report=term-missing --cov-report=html
+	$(RUN) pytest --cov=src --cov-report=term-missing --cov-report=html
 
-lint: ## Code-Style pruefen (ruff)
-	ruff check src tests
+lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
+	$(RUN) ruff check src tests
+	$(RUN) ruff format --check src tests
 
 format: ## Code automatisch formatieren
-	ruff format src tests
-	ruff check --fix src tests
+	$(RUN) ruff format src tests
+	$(RUN) ruff check --fix src tests
 
 typecheck: ## Statische Typpruefung
-	pyright
+	$(RUN) pyright
 
 check: lint typecheck test ## Alles in einem: lint + typecheck + test (DB-Tests nur mit TEST_DATABASE_URL)
 
@@ -60,7 +61,7 @@ test-db-up: ## Wegwerf-Postgres fuer Tests starten (Port 55432)
 	until docker exec va-test-pg pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
 
 test-db: ## Alle Tests inkl. DB-Tests (vorher: make test-db-up)
-	TEST_DATABASE_URL=$(TEST_DATABASE_URL) pytest
+	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(RUN) pytest
 
 test-db-down: ## Wegwerf-Postgres stoppen (entfernt nur den Test-Container)
 	docker stop va-test-pg

@@ -130,8 +130,10 @@ In Python liefern die Repositories (`src/db/repositories/`) fertige DataFrames, 
 
 ### Lokale Entwicklung
 
+Voraussetzung ist [uv](https://docs.astral.sh/uv/) (Windows: `winget install astral-sh.uv`). uv holt auch die passende Python-Version.
+
 ```bash
-make install-dev    # Dev-Abhängigkeiten installieren
+make install-dev    # alle Abhängigkeiten exakt aus uv.lock (.venv)
 cp .env.example .env && nano .env
 make dry            # Dry-Run lokal
 make check          # ruff + pyright + pytest (DB-Tests werden ohne DB übersprungen)
@@ -199,10 +201,9 @@ value-analyzer/
 ├── tests/                  # pytest-Suite; tests/db/ gegen echtes PostgreSQL
 ├── data/
 │   └── dax_mdax_fallback.csv   # Editierbar ohne Rebuild bei DAX/MDAX-Mutationen
-├── pyproject.toml          # ruff + pytest + pyright Konfiguration
-├── requirements.in         # Top-Level-Abhängigkeiten
-├── requirements.lock       # Vollständig gepinnte transitive Abhängigkeiten
-├── Dockerfile              # Multi-Stage (Builder + schlanke Runtime)
+├── pyproject.toml          # Abhängigkeiten + ruff/pytest/pyright-Konfiguration
+├── uv.lock                 # Exakt gepinnte Versionen aller Abhängigkeiten (uv)
+├── Dockerfile              # Installiert exakt aus uv.lock, uv selbst bleibt draußen
 ├── docker-compose.yml
 ├── entrypoint.sh           # Generiert crontab aus CRON_SCHEDULE-Env
 ├── Makefile                # make help für alle Kommandos
@@ -213,10 +214,11 @@ value-analyzer/
 
 ## Lockfile-Workflow
 
-Direkte Änderungen in `requirements.lock` sind nicht erlaubt. Abhängigkeiten werden über die `.in`-Dateien verwaltet:
+Abhängigkeiten stehen in `pyproject.toml` (`dependencies`, Dev-Tools in der Gruppe `dev`), die exakten Versionen in `uv.lock`. `uv.lock` wird nie von Hand geändert:
 
 ```bash
-make lock        # Lockfiles aus *.in regenerieren (Versionen halten)
+uv add <paket>   # neue Abhängigkeit (Dev-Tool: uv add --dev <paket>)
+make lock        # uv.lock nach Änderungen an pyproject.toml aktualisieren (Versionen halten)
 make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 ```
 

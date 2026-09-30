@@ -1,4 +1,6 @@
 .env
+# Lokales Entwicklungs-Environment (uv) - im Image baut uv sync ein eigenes
+.venv/
 # Laufzeitdaten nie ins Image - nur die Fallback-CSV wird gebraucht
 data/*
 !data/dax_mdax_fallback.csv
