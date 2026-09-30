@@ -140,6 +140,7 @@ make check          # ruff + pyright + pytest (DB-Tests werden ohne DB überspru
 make test-db-up     # Wegwerf-Postgres auf Port 55432 (Docker)
 make test-db        # alle Tests inkl. DB-Tests
 make test-cov       # Tests mit Coverage-HTML-Report
+make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), vor Dependency-Upgrades
 ```
 
 `make help` zeigt alle verfügbaren Targets.

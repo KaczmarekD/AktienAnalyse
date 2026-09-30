@@ -20,11 +20,15 @@
    neuere Systemaufrufe wie `statx` (erst ab 4.11), daran scheitern moderne Build-Tools. Für Bun
    ist das auf genau diesem Prozessor dokumentiert. Node läuft deshalb nie auf der NAS.
 2. **Kein AVX2-Code.** NumPy setzt seit Version 2.4 x86-64-v2 voraus, das schafft der J4125 gerade
-   noch. Pakete, die x86-64-v3 brauchen, stürzen mit `Illegal instruction` ab. Nach jedem
-   Dependency-Upgrade vor dem Start auf der NAS prüfen:
+   noch. Pakete, die x86-64-v3 brauchen, stürzen mit `Illegal instruction` ab. Vor jedem
+   Dependency-Upgrade lokal prüfen:
    ```
-   docker compose run --rm scoring python -c "import numpy, pandas"
+   make check-j4125
    ```
+   Das baut das Image und führt Python darin unter QEMU mit dem CPU-Modell Denverton aus
+   (Goldmont, dieselbe Klasse wie der J4125: SSE4.2, kein AVX). Das Prüfskript
+   (`docker/j4125-check/check_imports.py`) stellt zuerst sicher, dass die Emulation greift.
+   Danach lädt es alle nativen Pakete und rechnet ein Ranking samt Parquet-Durchlauf.
 3. **Keine Kernel-Features jenseits von 4.4.** Postgres 18 bleibt beim Standard-`io_method`, die
    neue `io_uring`-Option wird nicht aktiviert. Es gibt keine cgroup-v2-Features.
 

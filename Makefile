@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check clean build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check check-j4125 clean build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -67,6 +67,13 @@ test-db: ## Alle Tests inkl. DB-Tests (vorher: make test-db-up)
 
 test-db-down: ## Wegwerf-Postgres stoppen (entfernt nur den Test-Container)
 	docker stop va-test-pg
+
+# J4125 der NAS (ADR-0008): kein AVX/AVX2. Das App-Image wird unter QEMU mit einem
+# CPU-Modell ohne AVX ausgefuehrt; braucht ein Paket x86-64-v3, bricht der Import ab.
+check-j4125: ## App-Image bauen und unter QEMU ohne AVX pruefen (vor jedem Dependency-Upgrade)
+	docker build -t value-analyzer:local .
+	docker build -f docker/j4125-check/Dockerfile --build-arg APP_IMAGE=value-analyzer:local -t value-analyzer:j4125-check .
+	docker run --rm value-analyzer:j4125-check
 
 # ---------- Docker auf Synology ---------------------------------------------
 build: ## Docker-Image bauen
