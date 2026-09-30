@@ -6,14 +6,16 @@ import math
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pandas as pd
 from sqlalchemy import insert, select, update
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ...consensus import ConsensusEntry
 from ..models import (
+    ConsensusSnapshot,
     FetchRun,
     FundamentalSnapshot,
     FxRate,
@@ -26,6 +28,8 @@ from ..serialization import json_safe, to_python
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+
+    from ...consensus import ConsensusStatus
 
 # Spalten, die write_snapshot annimmt (alles ausser den Schluesseln)
 SNAPSHOT_COLUMNS: tuple[str, ...] = tuple(
@@ -234,6 +238,49 @@ class MarketDataRepository:
             .where(RawInfo.fetch_run_id == fetch_run_id, Instrument.symbol == symbol)
         )
         return self.session.scalars(stmt).first()
+
+    def write_consensus(
+        self,
+        fetch_run_id: int,
+        instrument_id: int,
+        entries: Mapping[str, ConsensusEntry],
+        fetched_at: datetime,
+    ) -> None:
+        """Eine Zeile je Art (ADR-0010) - auch leere und gescheiterte Abrufe."""
+        if not entries:
+            return
+        self.session.execute(
+            insert(ConsensusSnapshot),
+            [
+                {
+                    "fetch_run_id": fetch_run_id,
+                    "instrument_id": instrument_id,
+                    "kind": kind,
+                    "fetched_at": fetched_at,
+                    "status": entry.status,
+                    "payload": None if entry.payload is None else json_safe(entry.payload),
+                    "error": entry.error,
+                }
+                for kind, entry in entries.items()
+            ],
+        )
+
+    def get_consensus(self, fetch_run_id: int, symbol: str) -> dict[str, ConsensusEntry]:
+        stmt = (
+            select(
+                ConsensusSnapshot.kind,
+                ConsensusSnapshot.status,
+                ConsensusSnapshot.payload,
+                ConsensusSnapshot.error,
+            )
+            .join(Instrument, Instrument.id == ConsensusSnapshot.instrument_id)
+            .where(ConsensusSnapshot.fetch_run_id == fetch_run_id, Instrument.symbol == symbol)
+            .order_by(ConsensusSnapshot.kind)
+        )
+        return {
+            kind: ConsensusEntry(cast("ConsensusStatus", status), payload, error)
+            for kind, status, payload, error in self.session.execute(stmt)
+        }
 
     def write_statements(
         self,

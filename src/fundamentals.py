@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import pandas as pd
 
+    from .consensus import ConsensusEntry
+
 
 @dataclass
 class Identity:
@@ -85,6 +87,8 @@ class RawFetch:
     provider_version: str
     info: dict[str, Any]
     statements: dict[str, pd.DataFrame | None]  # "income" / "balance" / "cashflow"
+    # Konsens-Snapshots je Art (ADR-0010) - nur gespeichert, nicht ausgewertet
+    consensus: dict[str, ConsensusEntry] = field(default_factory=dict)
 
 
 @dataclass

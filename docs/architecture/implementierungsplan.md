@@ -250,7 +250,8 @@ sich in ganz Phase 1 nicht ändern.**
   - eine Version anlegen und aktivieren, die jüngste Aktivierung gewinnt
   - `UPDATE`/`DELETE` verboten (der Löschschutz-Test greift automatisch)
   - das Profil „Standard“ wird aus ENV angelegt, auch bei wiederholtem Start nur einmal
-- **Implementierung:** Migration 0002 mit `protect_table()` sowie ein Repository
+- **Implementierung:** eine neue Migration (die nächste freie Nummer, `0002` ist durch F1.1
+  belegt) mit `protect_table()` sowie ein Repository
   ([scoring-profile.md](scoring-profile.md)).
 
 #### P2b.2 ScoringProfileParams
@@ -462,12 +463,18 @@ unverändert.
     `earnings_estimate`, `revenue_estimate`, `growth_estimates` und `analyst_price_targets`.
   - DB-Tests: Je Titel, Abruf und Art entsteht eine Zeile. Ein zweiter Abruf ergänzt Zeilen und lässt
     die alten stehen. `UPDATE` und `DELETE` sind verboten, das prüft der Löschschutz-Test.
-  - Fehlt eine Tabelle oder schlägt ihr Abruf fehl, bleibt der Titel erhalten, und der Fehler steht
-    in `errors`.
-- **Implementierung:** Tabelle `market_data.consensus_snapshot` (`fetch_run_id`, `instrument_id`,
-  `kind`, `payload` JSONB) mit `protect_table()`, Repository `write_consensus`/`get_consensus`.
-  Der Abruf folgt in `fetch_one` nach den Statements.
-- **Review:** Die zusätzliche Laufzeit je Titel ist gemessen und im Paket notiert.
+  - Fehlt eine Tabelle oder schlägt ihr Abruf fehl, bleibt der Titel erhalten. Der Fehler steht in
+    der Konsens-Zeile (`status = 'error'`, Spalte `error`). Die Snapshot-Spalte `errors` bleibt
+    unberührt, weil sonst die CSV ihr Aussehen änderte.
+- **Implementierung:**
+  - Tabelle `market_data.consensus_snapshot` (`fetch_run_id`, `instrument_id`, `kind`,
+    `fetched_at`, `status`, `payload` JSONB, `error`) mit `protect_table()`, Migration `0002`
+  - Repository `write_consensus`/`get_consensus`
+  - Umwandlung und Fehlertoleranz im neuen Modul `src/consensus.py`, der Abruf
+    (`fetch_consensus`) in `data_fetcher`
+- **Review:** Gemessen am 30.09.2026 an 8 DAX/MDAX-Titeln: Der Konsens-Abruf kostet im Median
+  0,26 s je Titel, also rund 25 s je Lauf. yfinance teilt dabei die Antworten zwischen den Arten.
+  Der Basisabruf dauert im Median 0,88 s je Titel.
 - **NAS (du):** Nur deployen, die Migration läuft beim Start.
 
 #### F1.2 Quartalsabschlüsse

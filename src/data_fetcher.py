@@ -18,7 +18,7 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from functools import lru_cache
+from functools import cache, lru_cache, partial
 from typing import Any
 
 import numpy as np
@@ -26,6 +26,7 @@ import pandas as pd
 import yfinance as yf
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from .consensus import CONSENSUS_KINDS, ConsensusEntry, collect_consensus
 from .fundamentals import (
     Fundamentals,
     Growth,
@@ -211,6 +212,23 @@ def _ticker_data(symbol: str) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFram
     return info, income, balance, cashflow
 
 
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=4), reraise=True)
+def _consensus_value(ticker: Callable[[], Any], kind: str) -> Any:
+    return getattr(ticker(), kind)
+
+
+def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
+    """Konsens-Snapshots (ADR-0010, F1.1). Wirft nie: Fehler stehen je Art im Ergebnis."""
+    ticker = cache(partial(yf.Ticker, symbol))  # eine Instanz, yfinance teilt dann die Antworten
+    entries = collect_consensus(
+        {kind: partial(_consensus_value, ticker, kind) for kind in CONSENSUS_KINDS}
+    )
+    failed = [kind for kind, entry in entries.items() if entry.status == "error"]
+    if failed:
+        log.warning("Konsensdaten %s nicht abrufbar: %s", symbol, ", ".join(failed))
+    return entries
+
+
 @lru_cache(maxsize=16)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
@@ -266,6 +284,7 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         provider_version=provider_version(),
         info=info,
         statements={"income": income, "balance": balance, "cashflow": cashflow},
+        consensus=fetch_consensus(ticker.symbol),
     )
     fund.provenance.fiscal_period_end = _fiscal_period_end(income)
 
