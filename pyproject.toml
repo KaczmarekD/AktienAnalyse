@@ -52,9 +52,9 @@ members = []
 # Ruff: Linting + Formatting (ersetzt black/isort/flake8/pyupgrade)
 # ----------------------------------------------------------------------------
 [tool.ruff]
-target-version = "py314"
+# Keine target-version: Ruff leitet sie aus project.requires-python ab (eine Quelle).
 line-length = 100
-extend-exclude = ["data", "logs", ".venv", ".venv*", "build", "dist"]
+extend-exclude = ["data", "logs", ".venv", "build", "dist"]
 
 [tool.ruff.lint]
 select = [
@@ -125,7 +125,7 @@ filterwarnings = [
 [tool.pyright]
 include = ["src", "tests"]
 exclude = ["**/__pycache__", "data", "logs", "build"]
-pythonVersion = "3.14"
+# Keine pythonVersion: Pyright nimmt die Version des Interpreters aus .venv (uv run).
 typeCheckingMode = "standard"
 reportMissingImports = true
 reportMissingTypeStubs = false

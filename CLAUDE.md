@@ -111,6 +111,12 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 inkonsistente Daten zurück, ETF-Anbieter bauen Websites um. Jeder externe Call hat
 Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 
+**Python 3.14**: Die Version steht an genau drei Stellen:
+`requires-python` in `pyproject.toml`, `.python-version` und `FROM` im
+Dockerfile. Ruff, Pyright und die CI leiten sie davon ab. Ab 3.14 schreibt der
+Formatter Ausnahmen ohne Klammern (`except TypeError, ValueError:`, PEP 758).
+Das fängt beide Typen ab und ist kein Python-2-Binding.
+
 ## Zielarchitektur (beschlossen, in Umsetzung)
 
 Das Projekt wird schrittweise zu ereignisgetriebenen Microservices
