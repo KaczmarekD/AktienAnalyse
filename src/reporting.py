@@ -10,7 +10,7 @@ dem Report in der Datenbank abgelegt. Dateien schreibt nur der Dry-Run.
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -155,6 +155,26 @@ Composite Value Score: Perzentilrang ueber EV/EBIT, P/B, P/FCF und Shareholder Y
 )
 
 
+# Textspalten, die das Template mit "or '-'" o. ae. auswertet. Zahlen bleiben NaN (das
+# Template prueft sie mit x == x bzw. fmt_*).
+_TEXT_COLUMNS = ("symbol", "name", "index", "sector", "industry", "currency", "financial_currency")
+
+
+def _template_rows(frame: pd.DataFrame) -> list[dict[Hashable, Any]]:
+    """Zeilen fuers Template: fehlende Texte als None.
+
+    Seit pandas 3 sind fehlende Werte in Textspalten NaN (truthy) statt None - im
+    Template stuende sonst "nan" statt "-".
+    """
+    rows = frame.to_dict(orient="records")
+    for row in rows:
+        for col in _TEXT_COLUMNS:
+            value = row.get(col)
+            if value is not None and not isinstance(value, str) and pd.isna(value):
+                row[col] = None
+    return rows
+
+
 def _fmt_num(v: Any) -> str:
     if v is None or pd.isna(v):
         return "-"
@@ -215,8 +235,8 @@ def build_report(
         now = datetime.now()
 
     valid = scored[scored["composite_score"].notna()].copy()
-    top_rows = valid.head(top_n).to_dict(orient="records")
-    bottom_rows = valid.tail(bottom_n).iloc[::-1].to_dict(orient="records")
+    top_rows = _template_rows(valid.head(top_n))
+    bottom_rows = _template_rows(valid.tail(bottom_n).iloc[::-1])
 
     scored_count = int(valid.shape[0])
     universe = universe_size if universe_size is not None else len(scored)

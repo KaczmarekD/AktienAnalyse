@@ -15,6 +15,16 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import pandas as pd
 
+# Mehrere Fehler eines Titels stehen in DataFrame und CSV als ein Text
+ERRORS_SEPARATOR = "; "
+
+
+def join_errors(errors: object) -> str:
+    """Fehlerliste (Liste oder Tupel) -> ein Text; leer oder fehlend -> ``""``."""
+    if isinstance(errors, list | tuple) and errors:
+        return ERRORS_SEPARATOR.join(str(e) for e in errors)
+    return ""
+
 
 @dataclass
 class Identity:
@@ -113,5 +123,5 @@ class Fundamentals:
         flat.update(asdict(self.quality))
         flat.update(asdict(self.growth))
         flat.update(asdict(self.provenance))
-        flat["errors"] = "; ".join(self.errors) if self.errors else ""
+        flat["errors"] = join_errors(self.errors)
         return flat

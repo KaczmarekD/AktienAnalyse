@@ -389,6 +389,8 @@ def _dividend_yield(info: dict[str, Any]) -> float | None:
     ``trailingAnnualDividendYield`` ist dezimal und hat Vorrang. ``dividendYield``
     liefert yfinance seit 0.2.5x in Prozent (1.36 = 1,36 %) - daher immer / 100,
     ein Schwellwert wie "> 1" wuerde Renditen unter 1 % um Faktor 100 aufblaehen.
+    Mit yfinance 1.7 unveraendert: Live-Vergleich gegen 0.2.66 am 30.09.2026 ergab
+    fuer alle 90 Titel identische Werte.
     """
     trailing = _f(info.get("trailingAnnualDividendYield"))
     if trailing is not None:

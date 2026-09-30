@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 from ..config import DatabaseSettings
+from ..fundamentals import ERRORS_SEPARATOR
 from .engine import create_db_engine, session_scope
 from .recorder import snapshot_row
 from .repositories.market_data import MarketDataRepository
@@ -112,7 +113,9 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 def _snapshot_values(row: Mapping[Any, Any]) -> dict[str, Any]:
     errors = to_python(row.get("errors"))
-    return snapshot_row(row, str(errors).split("; ") if errors else [], drop_unknown=True)
+    return snapshot_row(
+        row, str(errors).split(ERRORS_SEPARATOR) if errors else [], drop_unknown=True
+    )
 
 
 def _write_snapshots(repo: MarketDataRepository, fetch_run_id: int, df: pd.DataFrame) -> None:
