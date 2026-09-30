@@ -2,9 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # Feature-Branches: Ein Paket wird erst gepusht, wenn es lokal gruen ist,
+    # die CI bestaetigt das vor dem Merge (Implementierungsplan, Arbeitsweise).
+    branches: [main, master, "feat/**"]
+    # Reine Doku-Aenderungen brauchen keinen Testlauf. Weitere Pfad-Filter kommen,
+    # sobald es mehrere Workflows gibt (Python, Frontend, Images).
+    paths-ignore: ["docs/**", "**/*.md"]
   pull_request:
     branches: [main, master]
+    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 concurrency:
