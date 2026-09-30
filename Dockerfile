@@ -39,6 +39,8 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.l
     && rm -rf /wheels
 
 COPY src/ ./src/
+COPY migrations/ ./migrations/
+COPY alembic.ini ./
 COPY data/ ./data/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && touch /var/log/cron.log

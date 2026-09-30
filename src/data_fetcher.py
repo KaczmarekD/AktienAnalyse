@@ -5,19 +5,20 @@ beschriftet seine Statement-Zeilen inkonsistent (mal "Total Revenue", mal
 "TotalRevenue", mal "Revenue"); ``FIELD_MAP`` zentralisiert alle Varianten
 an einer Stelle, sodass eine yfinance-Umbenennung nur hier zu pflegen ist.
 
-Caching: tagesgenauer Parquet-Cache. Re-Runs am selben Tag treffen den Cache,
-``force_refresh=True`` umgeht ihn.
+Persistenz: ``fetch_all`` reicht jedes Ergebnis sofort an ``on_result`` weiter
+(im Batch: Schreiben in PostgreSQL). Die Rohdaten des Providers haengen als
+``Fundamentals.raw`` am Ergebnis. Die Wiederverwendung eines Abrufs vom selben
+Tag entscheidet ``main`` anhand der Datenbank - es gibt keinen Datei-Cache mehr.
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -30,7 +31,9 @@ from .fundamentals import (
     Growth,
     Identity,
     MarketData,
+    Provenance,
     QualityMetrics,
+    RawFetch,
     ValueMetrics,
 )
 from .universe import Ticker
@@ -86,10 +89,14 @@ FIELD_MAP: dict[str, tuple[str, ...]] = {
 class FetcherConfig:
     sleep_between: float = 0.4
     default_tax_rate: float = 0.27
-    # Unter dieser Erfolgsquote (Anteil Ticker mit Marktkapitalisierung) wird
-    # nicht gecached - sonst liefert ein Re-Run nach einem yfinance-Ausfall am
-    # selben Tag weiter die kaputten Daten.
-    min_cache_success_share: float = 0.8
+
+
+PROVIDER = "yfinance"
+
+
+def provider_version() -> str:
+    """Version des Datenproviders - wird mit jedem Abruf gespeichert."""
+    return str(getattr(yf, "__version__", "unknown"))
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +155,24 @@ def _latest(series: pd.Series | None) -> float | None:
     if cleaned.empty:
         return None
     return _f(cleaned.iloc[0])
+
+
+def _period_end(label: Any) -> date | None:
+    try:
+        return pd.Timestamp(label).date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _fiscal_period_end(income: pd.DataFrame | None) -> date | None:
+    """Geschaeftsjahresende der juengsten Umsatz-Spalte (sonst erste befuellte Spalte)."""
+    revenue = _pick(income, "revenue")
+    if revenue is not None and not revenue.dropna().empty:
+        return _period_end(revenue.dropna().index[0])
+    if income is None or income.empty:
+        return None
+    filled = [c for c in income.columns if income[c].notna().any()]
+    return _period_end(filled[0]) if filled else None
 
 
 def _series_n(series: pd.Series | None, n: int) -> list[float] | None:
@@ -225,7 +250,8 @@ def _to_trading(value: float | None, fx: float | None) -> float | None:
 def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
     cfg = cfg or FetcherConfig()
     fund = Fundamentals(
-        identity=Identity(symbol=ticker.symbol, name=ticker.name, index=ticker.index)
+        identity=Identity(symbol=ticker.symbol, name=ticker.name, index=ticker.index),
+        provenance=Provenance(fetched_at=datetime.now(UTC)),
     )
 
     try:
@@ -234,6 +260,14 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         fund.errors.append(f"fetch failed: {e}")
         log.warning("Fetch %s fehlgeschlagen: %s", ticker.symbol, e)
         return fund
+
+    fund.raw = RawFetch(
+        provider=PROVIDER,
+        provider_version=provider_version(),
+        info=info,
+        statements={"income": income, "balance": balance, "cashflow": cashflow},
+    )
+    fund.provenance.fiscal_period_end = _fiscal_period_end(income)
 
     fund.identity.currency = info.get("currency")
     fund.identity.financial_currency = info.get("financialCurrency")
@@ -276,6 +310,7 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
     # enterpriseValue/priceToBook/trailingPE mischen die Waehrungen dann
     # unkonvertiert - selbst berechnen.
     fx = _statement_fx(info, fund.errors)
+    fund.provenance.statement_fx = fx
     mcap = fund.market.market_cap
     ebit_t = _to_trading(ebit, fx)
     fcf_t = _to_trading(fcf, fx)
@@ -396,51 +431,35 @@ def _earnings_stability(income: pd.DataFrame | None) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Batch + Cache
+# Batch
 # ---------------------------------------------------------------------------
-
-
-def _cache_path(cache_dir: Path) -> Path:
-    return cache_dir / f"fundamentals_{date.today().isoformat()}.parquet"
 
 
 def fetch_all(
     tickers: Iterable[Ticker],
-    cache_dir: Path,
-    force_refresh: bool = False,
     cfg: FetcherConfig | None = None,
+    on_result: Callable[[Fundamentals], None] | None = None,
 ) -> pd.DataFrame:
-    """Holt alle Ticker. Liefert einen flachen DataFrame."""
+    """Holt alle Ticker und liefert einen flachen DataFrame.
+
+    ``on_result`` bekommt jedes Ergebnis sofort - so ist ein Titel gespeichert,
+    bevor der naechste abgerufen wird. Fehler im Callback brechen den Batch ab:
+    lieber keinen Report als Daten, die nicht in der Historie landen.
+    """
     cfg = cfg or FetcherConfig()
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = _cache_path(cache_dir)
-
-    if cache_file.exists() and not force_refresh:
-        log.info("Lade Fundamentals aus Cache: %s", cache_file)
-        return pd.read_parquet(cache_file)
-
     ticker_list = list(tickers)
     rows: list[dict[str, Any]] = []
     for i, t in enumerate(ticker_list, 1):
         log.info("(%d/%d) %s", i, len(ticker_list), t.symbol)
-        rows.append(fetch_one(t, cfg).to_flat_dict())
+        fund = fetch_one(t, cfg)
+        if on_result is not None:
+            on_result(fund)
+        rows.append(fund.to_flat_dict())
         time.sleep(cfg.sleep_between)
-
-    df = pd.DataFrame(rows)
-    success_share = _success_share(df)
-    if success_share >= cfg.min_cache_success_share:
-        df.to_parquet(cache_file, index=False)
-        log.info("Fundamentals fuer %d Werte gecached -> %s", len(df), cache_file)
-    else:
-        log.warning(
-            "Nur %.0f %% der Ticker erfolgreich geladen (< %.0f %%) - kein Cache geschrieben",
-            success_share * 100,
-            cfg.min_cache_success_share * 100,
-        )
-    return df
+    return pd.DataFrame(rows)
 
 
-def _success_share(df: pd.DataFrame) -> float:
+def success_share(df: pd.DataFrame) -> float:
     """Anteil der Zeilen mit Marktkapitalisierung - fehlt sie, ist der Fetch gescheitert."""
     if df.empty or "market_cap" not in df.columns:
         return 0.0

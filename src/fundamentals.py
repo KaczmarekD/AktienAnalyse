@@ -9,7 +9,11 @@ Dictionary, der direkt in einen pandas DataFrame oder eine CSV passt.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from datetime import date, datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 @dataclass
@@ -65,6 +69,25 @@ class Growth:
 
 
 @dataclass
+class Provenance:
+    """Woher und von wann die Werte stammen - Grundlage fuer Zeitreihen."""
+
+    fetched_at: datetime | None = None
+    fiscal_period_end: date | None = None  # Geschaeftsjahr des juengsten Abschlusses
+    statement_fx: float | None = None  # Faktor Berichts- -> Handelswaehrung (1.0 = gleich)
+
+
+@dataclass
+class RawFetch:
+    """Unveraenderte Rohdaten des Providers. Wird gespeichert, aber nie geflacht."""
+
+    provider: str
+    provider_version: str
+    info: dict[str, Any]
+    statements: dict[str, pd.DataFrame | None]  # "income" / "balance" / "cashflow"
+
+
+@dataclass
 class Fundamentals:
     """Vollstaendiger Datensatz pro Aktie."""
 
@@ -73,7 +96,9 @@ class Fundamentals:
     value: ValueMetrics = field(default_factory=ValueMetrics)
     quality: QualityMetrics = field(default_factory=QualityMetrics)
     growth: Growth = field(default_factory=Growth)
+    provenance: Provenance = field(default_factory=Provenance)
     errors: list[str] = field(default_factory=list)
+    raw: RawFetch | None = field(default=None, repr=False)
 
     @property
     def symbol(self) -> str:
@@ -87,5 +112,6 @@ class Fundamentals:
         flat.update(asdict(self.value))
         flat.update(asdict(self.quality))
         flat.update(asdict(self.growth))
+        flat.update(asdict(self.provenance))
         flat["errors"] = "; ".join(self.errors) if self.errors else ""
         return flat

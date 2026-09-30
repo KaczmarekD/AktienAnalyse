@@ -5,7 +5,6 @@ smtplib.SMTP wird vollstaendig gemockt - kein echter Netz-Call.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,6 +21,7 @@ def settings(tmp_path, monkeypatch):
     monkeypatch.setenv("SMTP_USER", "sender@gmail.com")
     monkeypatch.setenv("SMTP_PASSWORD", "test-app-password")
     monkeypatch.setenv("MAIL_TO", "empfaenger@example.com")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://va_app:x@localhost/value_analyzer")
     monkeypatch.chdir(tmp_path)
 
     from src.config import Settings
@@ -30,10 +30,8 @@ def settings(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def csv_attachment(tmp_path) -> Path:
-    path = tmp_path / "ranking_20260517.csv"
-    path.write_text("symbol;score\nSAP.DE;0.85\n", encoding="utf-8-sig")
-    return path
+def csv_attachment() -> tuple[str, bytes]:
+    return "ranking_20260517.csv", "symbol;score\nSAP.DE;0.85\n".encode("utf-8-sig")
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +99,7 @@ class TestMailBody:
 
 
 class TestCsvAttachment:
-    def test_attachment_added_when_file_exists(self, settings, csv_attachment):
+    def test_attachment_added(self, settings, csv_attachment):
         with patch("smtplib.SMTP") as MockSMTP:
             MockSMTP.return_value.__enter__ = lambda s: s
             MockSMTP.return_value.__exit__ = MagicMock(return_value=False)
@@ -117,7 +115,9 @@ class TestCsvAttachment:
             for part in (payload if isinstance(payload, list) else [])
             if part.get_filename()
         ]
-        assert csv_attachment.name in filenames
+        assert csv_attachment[0] in filenames
+        part = next(p for p in payload if p.get_filename())
+        assert part.get_payload(decode=True) == csv_attachment[1]
 
     def test_no_attachment_when_path_is_none(self, settings):
         with patch("smtplib.SMTP") as MockSMTP:
@@ -127,26 +127,6 @@ class TestCsvAttachment:
             smtp_instance.send_message = MagicMock()
 
             send_report(settings, subject="Test", html_body="<p>x</p>", attachment=None)
-
-        msg = smtp_instance.send_message.call_args.args[0]
-        payload = msg.get_payload()
-        filenames = [
-            part.get_filename()
-            for part in (payload if isinstance(payload, list) else [])
-            if part.get_filename()
-        ]
-        assert filenames == []
-
-    def test_no_attachment_when_file_missing(self, settings, tmp_path):
-        missing = tmp_path / "ghost.csv"  # existiert nicht
-
-        with patch("smtplib.SMTP") as MockSMTP:
-            MockSMTP.return_value.__enter__ = lambda s: s
-            MockSMTP.return_value.__exit__ = MagicMock(return_value=False)
-            smtp_instance = MockSMTP.return_value
-            smtp_instance.send_message = MagicMock()
-
-            send_report(settings, subject="Test", html_body="<p>x</p>", attachment=missing)
 
         msg = smtp_instance.send_message.call_args.args[0]
         payload = msg.get_payload()

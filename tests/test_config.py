@@ -14,6 +14,7 @@ def minimal_env(monkeypatch):
     monkeypatch.setenv("SMTP_USER", "test@gmail.com")
     monkeypatch.setenv("SMTP_PASSWORD", "test-app-password")
     monkeypatch.setenv("MAIL_TO", "recipient@example.com")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://va_app:x@localhost/value_analyzer")
     # .env-File aus dem Repo nicht laden (Tests sollen isoliert sein)
     monkeypatch.chdir("/tmp")
 
@@ -37,6 +38,7 @@ class TestSettings:
         monkeypatch.setenv("SMTP_USER", "test@gmail.com")
         monkeypatch.setenv("SMTP_PASSWORD", "x")
         monkeypatch.setenv("MAIL_TO", "not-an-email")
+        monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://va_app:x@localhost/value_analyzer")
         monkeypatch.chdir("/tmp")
         with pytest.raises(ValidationError):
             Settings()  # type: ignore[call-arg]
@@ -61,3 +63,23 @@ class TestSettings:
         monkeypatch.setenv("UNIVERSE", "S&P500")
         with pytest.raises(ValidationError):
             Settings()  # type: ignore[call-arg]
+
+    def test_database_url_is_required(self, minimal_env, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL")
+        with pytest.raises(ValidationError, match="database_url"):
+            Settings()  # type: ignore[call-arg]
+
+    def test_database_urls_are_secret(self, minimal_env, monkeypatch):
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql+psycopg://va_owner:geheim@db/x")
+        s = Settings()  # type: ignore[call-arg]
+        assert "geheim" not in repr(s)
+        assert s.database_url.get_secret_value().startswith("postgresql+psycopg://va_app")
+        assert s.database_owner_url is not None
+        assert "geheim" in s.database_owner_url.get_secret_value()
+
+    def test_owner_url_defaults_to_none(self, minimal_env):
+        assert Settings().database_owner_url is None  # type: ignore[call-arg]
+
+    def test_retention_days_is_gone(self, minimal_env):
+        # Daten werden nie mehr geloescht - die alte Einstellung existiert nicht mehr
+        assert not hasattr(Settings(), "retention_days")  # type: ignore[call-arg]

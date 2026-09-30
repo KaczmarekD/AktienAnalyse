@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
+
+import pandas as pd
+
 from src.fundamentals import (
     Fundamentals,
     Growth,
     Identity,
     MarketData,
+    Provenance,
     QualityMetrics,
+    RawFetch,
     ValueMetrics,
 )
 
@@ -42,3 +48,28 @@ class TestFundamentals:
         flat = f.to_flat_dict()
         assert "fetch failed" in flat["errors"]
         assert "parse failed" in flat["errors"]
+
+    def test_to_flat_dict_contains_provenance(self):
+        fetched = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
+        f = Fundamentals(
+            identity=Identity(symbol="X.DE", name="X", index="DAX"),
+            provenance=Provenance(
+                fetched_at=fetched, fiscal_period_end=date(2025, 12, 31), statement_fx=0.9
+            ),
+        )
+        flat = f.to_flat_dict()
+        assert flat["fetched_at"] == fetched
+        assert flat["fiscal_period_end"] == date(2025, 12, 31)
+        assert flat["statement_fx"] == 0.9
+
+    def test_raw_data_is_not_flattened(self):
+        f = Fundamentals(identity=Identity(symbol="X.DE", name="X", index="DAX"))
+        f.raw = RawFetch(
+            provider="yfinance",
+            provider_version="0.2.66",
+            info={"marketCap": 1.0},
+            statements={"income": pd.DataFrame()},
+        )
+        flat = f.to_flat_dict()
+        assert "raw" not in flat
+        assert "info" not in flat

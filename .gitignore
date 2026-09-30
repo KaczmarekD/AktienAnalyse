@@ -4,8 +4,12 @@
 data/*.parquet
 data/value_ranking_*.csv
 data/preview_latest.html
+data/preview_value_ranking_*.csv
 data/cache/
 logs/
+# PostgreSQL-Daten und Dumps (Bind-Mounts auf der Synology)
+pgdata/
+backups/
 __pycache__/
 *.pyc
 *.log

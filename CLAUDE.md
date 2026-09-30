@@ -12,9 +12,10 @@ versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking).
 
 ## Architektur in einem Satz
 
-`load_universe` → `fetch_all` (yfinance + Parquet-Cache) → `score`
-(Cross-Sektional-Ranking) → `build_report` (HTML+CSV) → `send_report` (SMTP),
-orchestriert von `src/main.py`, geplant via Cron im Container.
+`load_universe` → `fetch_all` (yfinance) → `score` (Cross-Sektional-Ranking)
+→ `build_report` (HTML+CSV) → `send_report` (SMTP), orchestriert von
+`src/main.py`, geplant via Cron im Container. Jeder Schritt wird über den
+`BatchRecorder` (`src/db/recorder.py`) in PostgreSQL 18 festgehalten.
 
 ## Methodik-Entscheidungen
 
@@ -84,6 +85,28 @@ von Hand gepflegt und nie automatisch überschrieben – sie ist das geprüfte
 Sicherheitsnetz. Die ISIN ist der Schlüssel für die Deka-Quelle. Weicht die
 Live-Quelle ab (Indexreview), zeigt der Mail-Report „Fallback-CSV pflegen“.
 
+**Datenhaltung: PostgreSQL, Daten werden niemals gelöscht.** Die DB ist die
+einzige Quelle der Wahrheit (keine Parquet-Caches, kein Housekeeping mehr).
+Warum: Snapshots sind nicht rekonstruierbar – yfinance liefert nur den
+aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
+- Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`.
+  Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID.
+- Die DB erzwingt „niemals löschen“ selbst (`src/db/ddl.py`): Trigger gegen
+  DELETE/TRUNCATE auf jeder Tabelle, Faktentabellen zusätzlich gegen UPDATE.
+  Einzige UPDATEs: einmaliger Abschluss von `batch.run`/`market_data.fetch_run`
+  und das Nachtragen einer ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur
+  SELECT (LAN-Auswertungen).
+- Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
+  Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
+  (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
+  Abfrage „Stand zu Datum X“ über `get_statements_as_of`).
+- Zugriffe nur über die Repositories in `src/db/repositories/` (`get_*`/`write_*`,
+  bewusst ohne delete). Jeder Titel wird sofort nach dem Abruf gespeichert.
+- Migrationen (Alembic, `migrations/`) sind nur additiv; jede neue Tabelle
+  braucht `protect_table()` – `tests/db/test_protection.py` prüft das.
+- Ist die DB nicht erreichbar, bricht der Lauf mit Exit 4 ab: ohne
+  Speicherung kein Report; ein manueller Nachlauf am selben Tag reicht.
+
 **Robustheit vor Performance**: yfinance fällt regelmäßig aus, gibt
 inkonsistente Daten zurück, ETF-Anbieter bauen Websites um. Jeder externe Call hat
 Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
@@ -131,7 +154,10 @@ ADR-0001 und ADR-0002 aufgehoben.
 2. Extraktion in `data_fetcher.fetch_one()` (`FIELD_MAP` erweitern, falls
    yfinance-Roh-Feld nötig)
 3. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS`
-4. Test in `tests/test_scoring.py`
+4. Spalte in `FundamentalSnapshot` (`src/db/models/market_data.py`) und
+   Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
+   sonst lehnt `write_snapshot` die unbekannte Spalte ab
+5. Test in `tests/test_scoring.py`
 
 **Neues Universum (z.B. Stoxx 600)**:
 1. Quelle(n) in `src/universe.py` (URL-Konstanten am Dateikopf, Soll-Anzahl
@@ -168,6 +194,13 @@ dasselbe bei jedem Push. Tests in `tests/` decken Scoring-Logik, CSV-Load,
 Reporting-Struktur und Config-Validierung ab. yfinance-Calls werden in
 Tests *nicht* gemockt – die Funktionen, die sie aufrufen, sind kein Teil
 der Test-Suite (zu viel Mocking-Overhead, zu wenig Wert).
+
+DB-Tests (`tests/db/`) laufen gegen ein echtes PostgreSQL, nicht gegen
+SQLite oder Mocks – Trigger, Rollenrechte und `DISTINCT ON` sind der
+eigentliche Prüfgegenstand. Jede Testfunktion bekommt eine frische DB aus
+einer migrierten Vorlage (Löschen ist ja verboten). Ohne `TEST_DATABASE_URL`
+werden sie übersprungen; lokal `make test-db-up && make test-db`, in CI
+per Postgres-Service-Container.
 
 ## Disclaimer
 

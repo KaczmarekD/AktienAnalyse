@@ -1,9 +1,14 @@
 .env
-data/
+# Laufzeitdaten nie ins Image - nur die Fallback-CSV wird gebraucht
+data/*
+!data/dax_mdax_fallback.csv
+pgdata/
+backups/
 logs/
 __pycache__/
 *.pyc
 .git/
 .gitignore
+.claude/
 README.md
 *.md

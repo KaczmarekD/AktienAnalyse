@@ -2,6 +2,9 @@
 
 Subject-Tag traegt eine Erfolgsstatistik (``ok 102/110`` oder
 ``partial 60/110``), damit der Posteingang als Health-Check dient.
+
+Die CSV entsteht nur im Speicher: Sie geht als Mail-Anhang raus und wird mit
+dem Report in der Datenbank abgelegt. Dateien schreibt nur der Dry-Run.
 """
 
 from __future__ import annotations
@@ -10,7 +13,6 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -168,7 +170,8 @@ def _fmt_pct(v: Any) -> str:
 @dataclass
 class ReportArtifacts:
     html: str
-    csv_path: Path
+    csv_bytes: bytes
+    csv_filename: str
     subject: str
     top_count: int
     bottom_count: int
@@ -194,7 +197,6 @@ def _build_subject(
 
 def build_report(
     scored: pd.DataFrame,
-    output_dir: Path,
     top_n: int = 20,
     bottom_n: int = 10,
     value_weight: float = 0.6,
@@ -206,7 +208,6 @@ def build_report(
     universe_added: Sequence[str] = (),
     universe_removed: Sequence[str] = (),
 ) -> ReportArtifacts:
-    output_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now()
 
     valid = scored[scored["composite_score"].notna()].copy()
@@ -239,7 +240,7 @@ def build_report(
         },
     )
 
-    csv_path = output_dir / f"value_ranking_{now.strftime('%Y%m%d')}.csv"
+    csv_filename = f"value_ranking_{now.strftime('%Y%m%d')}.csv"
     cols_order = [
         "rank_overall",
         "symbol",
@@ -275,7 +276,8 @@ def build_report(
         "errors",
     ]
     export = scored.reindex(columns=[c for c in cols_order if c in scored.columns])
-    export.to_csv(csv_path, index=False, sep=";", decimal=",", encoding="utf-8-sig")
+    # utf-8-sig (BOM), damit Excel Umlaute korrekt erkennt
+    csv_bytes = export.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
 
     top_name = top_rows[0]["name"] if top_rows else "?"
     subject = _build_subject(
@@ -285,10 +287,11 @@ def build_report(
         timestamp=now,
     )
 
-    log.info("Report erstellt: HTML %d Zeichen, CSV %s", len(html), csv_path.name)
+    log.info("Report erstellt: HTML %d Zeichen, CSV %s", len(html), csv_filename)
     return ReportArtifacts(
         html=html,
-        csv_path=csv_path,
+        csv_bytes=csv_bytes,
+        csv_filename=csv_filename,
         subject=subject,
         top_count=len(top_rows),
         bottom_count=len(bottom_rows),

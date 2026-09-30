@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+from typing import Any
 from unittest.mock import patch
 
 import pandas as pd
@@ -21,6 +23,8 @@ from src.data_fetcher import (
     _statement_fx,
     fetch_all,
     fetch_one,
+    provider_version,
+    success_share,
 )
 from src.fundamentals import Fundamentals, Identity, MarketData
 from src.universe import Ticker
@@ -190,8 +194,8 @@ class TestFieldMap:
             assert all(isinstance(c, str) for c in candidates)
 
 
-class TestFetchAllCache:
-    """fetch_one wird gepatcht - kein yfinance-Netzcall."""
+class TestFetchAll:
+    """fetch_one wird gepatcht - kein yfinance-Netzcall, kein Datei-Cache mehr."""
 
     TICKERS = tuple(Ticker(f"T{i}.DE", f"T{i}", "DAX") for i in range(5))
     CFG = FetcherConfig(sleep_between=0)
@@ -208,26 +212,36 @@ class TestFetchAllCache:
 
         return fake
 
-    def test_caches_when_enough_succeed(self, tmp_path):
+    def test_returns_flat_frame_and_writes_no_files(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch({"T0.DE"})):
-            df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
+            df = fetch_all(self.TICKERS, cfg=self.CFG)
         assert len(df) == 5
-        assert len(list(tmp_path.glob("fundamentals_*.parquet"))) == 1
+        assert "fetched_at" in df.columns
+        assert list(tmp_path.iterdir()) == []
 
-    def test_no_cache_on_mass_failure(self, tmp_path):
+    def test_callback_receives_every_result_immediately(self):
+        seen: list[str] = []
+        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch({"T1.DE"})):
+            fetch_all(self.TICKERS, cfg=self.CFG, on_result=lambda f: seen.append(f.symbol))
+        assert seen == [t.symbol for t in self.TICKERS]
+
+    def test_callback_error_aborts(self):
+        def boom(_):
+            raise RuntimeError("db down")
+
+        with (
+            patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(set())),
+            pytest.raises(RuntimeError, match="db down"),
+        ):
+            fetch_all(self.TICKERS, cfg=self.CFG, on_result=boom)
+
+    def test_success_share(self):
         failing = {t.symbol for t in self.TICKERS[:4]}
         with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(failing)):
-            df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
-        assert len(df) == 5  # Daten werden trotzdem zurueckgegeben
-        assert list(tmp_path.glob("fundamentals_*.parquet")) == []
-
-    def test_uses_cache_on_second_run(self, tmp_path):
-        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(set())):
-            fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
-        with patch("src.data_fetcher.fetch_one") as fetch_one:
-            df = fetch_all(self.TICKERS, cache_dir=tmp_path, cfg=self.CFG)
-        fetch_one.assert_not_called()
-        assert len(df) == 5
+            df = fetch_all(self.TICKERS, cfg=self.CFG)
+        assert success_share(df) == pytest.approx(0.2)
+        assert success_share(pd.DataFrame()) == 0.0
 
 
 def _statement(values: dict[str, float]) -> pd.DataFrame:
@@ -332,3 +346,59 @@ class TestFetchOneShareholderYield:
     def test_missing_components_give_none(self):
         f = self._fetch({"marketCap": 1_000.0}, _statement({"Free Cash Flow": 50.0}))
         assert f.value.shareholder_yield is None
+
+
+class TestFetchOneProvenanceAndRaw:
+    INCOME = pd.DataFrame(
+        {
+            pd.Timestamp("2025-12-31"): [2_000.0, 500.0],
+            pd.Timestamp("2024-12-31"): [1_900.0, 450.0],
+        },
+        index=["Total Revenue", "EBIT"],
+    )
+
+    def _fetch(self, income=None, side_effect=None):
+        data = (
+            {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0},
+            self.INCOME if income is None else income,
+            None,
+            None,
+        )
+        kwargs: dict[str, Any] = (
+            {"side_effect": side_effect} if side_effect else {"return_value": data}
+        )
+        with patch("src.data_fetcher._ticker_data", **kwargs):
+            return fetch_one(Ticker("X.DE", "X", "DAX"))
+
+    def test_raw_data_is_kept(self):
+        f = self._fetch()
+        assert f.raw is not None
+        assert f.raw.provider == "yfinance"
+        assert f.raw.provider_version == provider_version()
+        assert f.raw.info["marketCap"] == 1_000.0
+        assert f.raw.statements["income"] is self.INCOME
+        assert set(f.raw.statements) == {"income", "balance", "cashflow"}
+
+    def test_provenance_is_set(self):
+        f = self._fetch()
+        assert f.provenance.fetched_at is not None
+        assert f.provenance.fetched_at.tzinfo is not None
+        assert f.provenance.fiscal_period_end == date(2025, 12, 31)
+        assert f.provenance.statement_fx == 1.0
+
+    def test_fiscal_period_skips_empty_latest_column(self):
+        income = pd.DataFrame(
+            {pd.Timestamp("2026-12-31"): [float("nan")], pd.Timestamp("2025-12-31"): [2_000.0]},
+            index=["Total Revenue"],
+        )
+        assert self._fetch(income).provenance.fiscal_period_end == date(2025, 12, 31)
+
+    def test_string_period_labels_are_parsed(self):
+        income = _statement({"Total Revenue": 2_000.0})
+        assert self._fetch(income).provenance.fiscal_period_end == date(2025, 12, 31)
+
+    def test_failed_fetch_has_timestamp_but_no_raw(self):
+        f = self._fetch(side_effect=RuntimeError("down"))
+        assert f.raw is None
+        assert f.provenance.fetched_at is not None
+        assert f.errors

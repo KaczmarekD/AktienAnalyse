@@ -6,7 +6,6 @@ import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
-from pathlib import Path
 
 from .config import Settings
 
@@ -17,8 +16,9 @@ def send_report(
     settings: Settings,
     subject: str,
     html_body: str,
-    attachment: Path | None = None,
+    attachment: tuple[str, bytes] | None = None,
 ) -> None:
+    """Versendet den Report. ``attachment`` = (Dateiname, CSV-Bytes)."""
     msg = EmailMessage()
     full_subject = f"{settings.mail_subject_prefix} {subject}".strip()
     msg["Subject"] = full_subject
@@ -31,15 +31,10 @@ def send_report(
     )
     msg.add_alternative(html_body, subtype="html")
 
-    if attachment and attachment.exists():
-        data = attachment.read_bytes()
-        msg.add_attachment(
-            data,
-            maintype="text",
-            subtype="csv",
-            filename=attachment.name,
-        )
-        log.info("CSV-Anhang angehaengt: %s (%.1f KB)", attachment.name, len(data) / 1024)
+    if attachment:
+        filename, data = attachment
+        msg.add_attachment(data, maintype="text", subtype="csv", filename=filename)
+        log.info("CSV-Anhang angehaengt: %s (%.1f KB)", filename, len(data) / 1024)
 
     log.info(
         "Verbinde zu SMTP %s:%d (TLS=%s)",

@@ -14,16 +14,34 @@ from typing import Literal
 from pydantic import EmailStr, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_MODEL_CONFIG = SettingsConfigDict(
+    env_file=".env",
+    env_file_encoding="utf-8",
+    case_sensitive=False,
+    extra="ignore",
+)
 
-class Settings(BaseSettings):
+
+class _OwnerUrl(BaseSettings):
+    model_config = _MODEL_CONFIG
+
+    # Owner-Rolle nur fuer Migrationen beim Container-Start; None = database_url
+    database_owner_url: SecretStr | None = None
+
+
+class DatabaseSettings(_OwnerUrl):
+    """Nur die DB-Verbindung - reicht fuer Migration und Altdaten-Import."""
+
+    database_url: SecretStr | None = None
+
+
+class Settings(_OwnerUrl):
     """Anwendungs-Settings - alle Felder sind ENV-Variablen."""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
+    # --- Datenbank (Pflicht: ohne Speicherung kein Lauf) ---
+    # App-Rolle va_app: darf lesen/einfuegen, aber nichts loeschen.
+    # Format: postgresql+psycopg://va_app:<pw>@db:5432/value_analyzer
+    database_url: SecretStr = Field(min_length=1)
 
     # --- SMTP ---
     smtp_host: str = "smtp.gmail.com"
@@ -49,9 +67,8 @@ class Settings(BaseSettings):
     default_tax_rate: float = Field(default=0.27, ge=0, le=0.6)
 
     # --- Operatives ---
-    data_dir: Path = Path("/app/data")
+    data_dir: Path = Path("/app/data")  # Fallback-CSV und Dry-Run-Vorschau
     logs_dir: Path = Path("/app/logs")
-    retention_days: int = Field(default=90, ge=0)  # 0 = nie aufraeumen
     healthcheck_url: str | None = None  # https://hc-ping.com/<uuid>
     cron_schedule: str = "30 7 * * 6"  # Sa 07:30 Europe/Berlin
     tz: str = "Europe/Berlin"

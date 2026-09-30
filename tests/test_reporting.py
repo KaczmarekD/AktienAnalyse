@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -55,55 +54,61 @@ class TestSubject:
 
 
 class TestBuildReportIntegration:
-    def test_html_and_csv_produced(self, mock_universe_df, tmp_path: Path):
+    def test_html_and_csv_produced(self, mock_universe_df):
         scored = score(mock_universe_df, ScoringConfig())
-        report = build_report(scored, output_dir=tmp_path, top_n=3, bottom_n=2, universe_size=8)
+        report = build_report(scored, top_n=3, bottom_n=2, universe_size=8)
         assert report.html.startswith("<!DOCTYPE")
         assert "<table>" in report.html
         assert "Top 3 Value-Kandidaten" in report.html
-        assert report.csv_path.exists()
+        assert report.csv_filename.startswith("value_ranking_")
+        assert report.csv_filename.endswith(".csv")
+        assert report.csv_bytes.startswith(b"\xef\xbb\xbf")  # BOM fuer Excel
         assert report.top_count == 3
         assert report.bottom_count == 2
         assert report.scored > 0
         assert "Keine Anlageempfehlung" in report.html
 
-    def test_weights_rendered_as_single_percent(self, mock_universe_df, tmp_path: Path):
+    def test_weights_rendered_as_single_percent(self, mock_universe_df):
         scored = score(mock_universe_df, ScoringConfig())
-        report = build_report(scored, output_dir=tmp_path, universe_size=8)
+        report = build_report(scored, universe_size=8)
         assert "60 % Value" in report.html
         assert "%%" not in report.html
 
-    def test_subject_contains_stats(self, mock_universe_df, tmp_path: Path):
+    def test_subject_contains_stats(self, mock_universe_df):
         scored = score(mock_universe_df, ScoringConfig())
-        report = build_report(scored, output_dir=tmp_path, universe_size=8)
+        report = build_report(scored, universe_size=8)
         assert "/8]" in report.subject  # z.B. [ok 7/8]
         assert "DAX/MDAX Value-Screening" in report.subject
 
-    def test_csv_is_german_locale(self, mock_universe_df, tmp_path: Path):
+    def test_csv_is_german_locale(self, mock_universe_df):
         scored = score(mock_universe_df, ScoringConfig())
-        report = build_report(scored, output_dir=tmp_path, universe_size=8)
-        content = report.csv_path.read_text(encoding="utf-8-sig")
+        report = build_report(scored, universe_size=8)
+        content = report.csv_bytes.decode("utf-8-sig")
         # Deutsche CSV: Semikolon-Trenner, Komma-Dezimalzeichen
         assert ";" in content
         assert "," in content  # Dezimal
 
+    def test_build_report_writes_no_files(self, mock_universe_df, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        build_report(score(mock_universe_df, ScoringConfig()), universe_size=8)
+        assert list(tmp_path.iterdir()) == []
+
 
 class TestUniverseSourceNote:
-    def _html(self, mock_universe_df, tmp_path, **kwargs):
+    def _html(self, mock_universe_df, **kwargs):
         scored = score(mock_universe_df, ScoringConfig())
-        return build_report(scored, output_dir=tmp_path, universe_size=8, **kwargs).html
+        return build_report(scored, universe_size=8, **kwargs).html
 
-    def test_shows_source_and_as_of(self, mock_universe_df, tmp_path: Path):
+    def test_shows_source_and_as_of(self, mock_universe_df):
         html = self._html(
-            mock_universe_df, tmp_path, universe_source="iShares", universe_as_of=date(2026, 9, 29)
+            mock_universe_df, universe_source="iShares", universe_as_of=date(2026, 9, 29)
         )
         assert "Indexquelle: iShares (Stand 2026-09-29)" in html
         assert "Fallback-CSV pflegen" not in html
 
-    def test_warns_when_csv_is_outdated(self, mock_universe_df, tmp_path: Path):
+    def test_warns_when_csv_is_outdated(self, mock_universe_df):
         html = self._html(
             mock_universe_df,
-            tmp_path,
             universe_source="iShares",
             universe_added=["Ströer (SAX.DE, MDAX)"],
             universe_removed=["Hugo Boss (BOSS.DE, MDAX)"],
@@ -112,17 +117,15 @@ class TestUniverseSourceNote:
         assert "Ströer (SAX.DE, MDAX)" in html
         assert "Hugo Boss (BOSS.DE, MDAX)" in html
 
-    def test_warns_when_only_fallback_available(self, mock_universe_df, tmp_path: Path):
-        html = self._html(mock_universe_df, tmp_path, universe_source=FALLBACK_SOURCE)
+    def test_warns_when_only_fallback_available(self, mock_universe_df):
+        html = self._html(mock_universe_df, universe_source=FALLBACK_SOURCE)
         assert "Live-Indexquellen nicht erreichbar" in html
 
-    def test_deka_marked_without_as_of(self, mock_universe_df, tmp_path: Path):
-        html = self._html(mock_universe_df, tmp_path, universe_source="Deka")
+    def test_deka_marked_without_as_of(self, mock_universe_df):
+        html = self._html(mock_universe_df, universe_source="Deka")
         assert "Indexquelle: Deka (ohne Stichtag)" in html
         assert "Live-Indexquellen nicht erreichbar" not in html
 
-    def test_escapes_names(self, mock_universe_df, tmp_path: Path):
-        html = self._html(
-            mock_universe_df, tmp_path, universe_source="iShares", universe_added=["<b>X</b>"]
-        )
+    def test_escapes_names(self, mock_universe_df):
+        html = self._html(mock_universe_df, universe_source="iShares", universe_added=["<b>X</b>"])
         assert "<b>X</b>" not in html

@@ -1,16 +1,50 @@
 services:
+  db:
+    image: postgres:18
+    container_name: value-analyzer-db
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Berlin
+      POSTGRES_DB: value_analyzer
+      POSTGRES_USER: va_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
+      # Nur beim allerersten Start (leeres pgdata/) von db/init/01_roles.sh genutzt
+      VA_APP_PASSWORD: ${VA_APP_PASSWORD:?VA_APP_PASSWORD in .env setzen}
+      VA_READ_PASSWORD: ${VA_READ_PASSWORD:?VA_READ_PASSWORD in .env setzen}
+    volumes:
+      # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
+      # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,
+      # und Hyper Backup sichert ihn mit.
+      - ./pgdata:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Nur im LAN: DB_LAN_BIND auf die NAS-IP setzen (Default: nur lokal erreichbar)
+      - "${DB_LAN_BIND:-127.0.0.1}:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U va_owner -d value_analyzer"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    shm_size: 128mb
+
   value-analyzer:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: value-analyzer:0.2.0
+    image: value-analyzer:0.3.0
     container_name: value-analyzer
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       - TZ=Europe/Berlin
+      # App-Rolle ohne Loeschrechte; die Owner-Rolle nur fuer Migrationen beim Start
+      - DATABASE_URL=postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      - DATABASE_OWNER_URL=postgresql+psycopg://va_owner:${POSTGRES_PASSWORD}@db:5432/value_analyzer
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -18,3 +52,5 @@ services:
     #   docker compose run --rm value-analyzer python -m src.main
     # Dry-Run:
     #   docker compose run --rm value-analyzer python -m src.main --dry-run
+    # Altdaten importieren (einmalig, mehrfach ausfuehrbar):
+    #   docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
