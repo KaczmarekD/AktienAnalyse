@@ -207,8 +207,10 @@ def build_report(
     universe_as_of: date | None = None,
     universe_added: Sequence[str] = (),
     universe_removed: Sequence[str] = (),
+    now: datetime | None = None,
 ) -> ReportArtifacts:
-    now = datetime.now()
+    # Injizierbar, damit Tests (Golden-Master) deterministisch sind
+    now = now or datetime.now()
 
     valid = scored[scored["composite_score"].notna()].copy()
     top_rows = valid.head(top_n).to_dict(orient="records")
@@ -276,8 +278,11 @@ def build_report(
         "errors",
     ]
     export = scored.reindex(columns=[c for c in cols_order if c in scored.columns])
-    # utf-8-sig (BOM), damit Excel Umlaute korrekt erkennt
-    csv_bytes = export.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
+    # utf-8-sig (BOM), damit Excel Umlaute korrekt erkennt. LF fest, sonst haengt das
+    # Zeilenende vom Betriebssystem ab (pandas nimmt os.linesep).
+    csv_bytes = export.to_csv(index=False, sep=";", decimal=",", lineterminator="\n").encode(
+        "utf-8-sig"
+    )
 
     top_name = top_rows[0]["name"] if top_rows else "?"
     subject = _build_subject(

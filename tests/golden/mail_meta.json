@@ -1,0 +1,29 @@
+{
+  "deka": {
+    "subject": "[partial 7/8] DAX/MDAX Value-Screening 2026-10-03 - Top: Value Co",
+    "csv_filename": "value_ranking_20261003.csv",
+    "top_count": 5,
+    "bottom_count": 3,
+    "scored": 7,
+    "failed": 1,
+    "universe_size": 8
+  },
+  "fallback": {
+    "subject": "[partial 7/8] DAX/MDAX Value-Screening 2026-10-03 - Top: Value Co",
+    "csv_filename": "value_ranking_20261003.csv",
+    "top_count": 5,
+    "bottom_count": 3,
+    "scored": 7,
+    "failed": 1,
+    "universe_size": 8
+  },
+  "ishares": {
+    "subject": "[partial 7/8] DAX/MDAX Value-Screening 2026-10-03 - Top: Value Co",
+    "csv_filename": "value_ranking_20261003.csv",
+    "top_count": 5,
+    "bottom_count": 3,
+    "scored": 7,
+    "failed": 1,
+    "universe_size": 8
+  }
+}

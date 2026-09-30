@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Value-Screening DAX/MDAX</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: #222; max-width: 980px; margin: 0 auto; padding: 16px; }
+  h1 { color: #1a4d8c; border-bottom: 2px solid #1a4d8c; padding-bottom: 6px; }
+  h2 { color: #1a4d8c; margin-top: 28px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+  th, td { border: 1px solid #ccd6e0; padding: 6px 8px; text-align: right; }
+  th { background: #eef3f9; text-align: center; }
+  td.text { text-align: left; }
+  tr:nth-child(even) { background: #fafcff; }
+  .meta { color: #666; font-size: 12px; margin-bottom: 16px; }
+  .flag { background: #fff3cd; color: #7a5d00; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+  .footer { color: #888; font-size: 11px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 10px; }
+  .notice { background: #fff3cd; color: #7a5d00; padding: 8px 12px; border-radius: 4px;
+            font-size: 13px; margin-bottom: 16px; }
+  .ok { color: #1f7a3a; }
+  .warn { color: #b07000; }
+</style>
+</head>
+<body>
+<h1>Value-Screening DAX &amp; MDAX</h1>
+<div class="meta">
+  Stand: 2026-10-03 07:30 &middot;
+  Universum: 8 Werte gescannt,
+  <span class="warn">7 bewertet</span>,
+  1 fehlgeschlagen &middot;
+  Datenquelle: yfinance
+  &middot; Indexquelle: Fallback-CSV
+</div>
+
+<div class="notice">Live-Indexquellen nicht erreichbar &ndash; Universum stammt aus der Fallback-CSV.
+  Bei Indexaenderungen kann sie veraltet sein.</div>
+
+
+
+<h2>Top 5 Value-Kandidaten</h2>
+<p>Sortiert nach Composite Score (Gewichtung: 60 % Value, 40 % Quality).</p>
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th class="text">Unternehmen</th><th>Index</th><th class="text">Sektor</th>
+      <th>Score</th><th>Value</th><th>Quality</th>
+      <th>EV/EBIT</th><th>P/B</th><th>P/FCF</th><th>Div.-Yld</th>
+      <th>ROIC</th><th>FCF-Marge</th><th>NetDebt/EBITDA</th>
+    </tr>
+  </thead>
+  <tbody>
+  
+    <tr>
+      <td>1</td>
+      <td class="text"><b>Value Co</b><br><span style="color:#888;font-size:11px">VAL.DE</span>
+        
+      </td>
+      <td>DAX</td>
+      <td class="text">Industrials</td>
+      <td><b>0.73</b></td>
+      <td>0.67</td>
+      <td>0.82</td>
+      <td>8.00</td>
+      <td>1.20</td>
+      <td>9.00</td>
+      <td>4.0 %</td>
+      <td>18.0 %</td>
+      <td>15.0 %</td>
+      <td>1.20</td>
+    </tr>
+  
+    <tr>
+      <td>2</td>
+      <td class="text"><b>Trap Co</b><br><span style="color:#888;font-size:11px">TRAP.DE</span>
+         <span class="flag">Value-Trap?</span>
+      </td>
+      <td>MDAX</td>
+      <td class="text">Auto</td>
+      <td><b>0.63</b></td>
+      <td>0.88</td>
+      <td>0.26</td>
+      <td>5.00</td>
+      <td>0.40</td>
+      <td>4.00</td>
+      <td>8.0 %</td>
+      <td>2.0 %</td>
+      <td>2.0 %</td>
+      <td>5.50</td>
+    </tr>
+  
+    <tr>
+      <td>3</td>
+      <td class="text"><b>OK Co</b><br><span style="color:#888;font-size:11px">OK.DE</span>
+        
+      </td>
+      <td>DAX</td>
+      <td class="text">Utility</td>
+      <td><b>0.54</b></td>
+      <td>0.50</td>
+      <td>0.61</td>
+      <td>11.00</td>
+      <td>1.50</td>
+      <td>12.00</td>
+      <td>5.0 %</td>
+      <td>10.0 %</td>
+      <td>10.0 %</td>
+      <td>2.50</td>
+    </tr>
+  
+    <tr>
+      <td>4</td>
+      <td class="text"><b>Mid Co</b><br><span style="color:#888;font-size:11px">MID.DE</span>
+        
+      </td>
+      <td>MDAX</td>
+      <td class="text">Consumer</td>
+      <td><b>0.44</b></td>
+      <td>0.35</td>
+      <td>0.59</td>
+      <td>14.00</td>
+      <td>2.00</td>
+      <td>15.00</td>
+      <td>2.5 %</td>
+      <td>12.0 %</td>
+      <td>8.0 %</td>
+      <td>2.00</td>
+    </tr>
+  
+    <tr>
+      <td>5</td>
+      <td class="text"><b>Quality Co</b><br><span style="color:#888;font-size:11px">QUAL.DE</span>
+        
+      </td>
+      <td>DAX</td>
+      <td class="text">Tech</td>
+      <td><b>0.43</b></td>
+      <td>0.07</td>
+      <td>0.97</td>
+      <td>35.00</td>
+      <td>8.00</td>
+      <td>40.00</td>
+      <td>1.0 %</td>
+      <td>32.0 %</td>
+      <td>28.0 %</td>
+      <td>-0.50</td>
+    </tr>
+  
+  </tbody>
+</table>
+
+<h2>Watchlist: Bottom 3</h2>
+<p>Schwaechste Composite-Werte - dienen als Kontrast und ggf. als Short-/Avoid-Ideen.</p>
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th class="text">Unternehmen</th><th>Index</th><th class="text">Sektor</th>
+      <th>Score</th><th>Value</th><th>Quality</th>
+      <th>EV/EBIT</th><th>P/B</th><th>Verschuldung D/E</th>
+    </tr>
+  </thead>
+  <tbody>
+  
+    <tr>
+      <td>7</td>
+      <td class="text"><b>Loss Co</b><br><span style="color:#888;font-size:11px">LOSS.DE</span></td>
+      <td>MDAX</td>
+      <td class="text">Bio</td>
+      <td>0.14</td>
+      <td>0.14</td>
+      <td>0.14</td>
+      <td>-15.00</td>
+      <td>3.00</td>
+      <td>0.50</td>
+    </tr>
+  
+    <tr>
+      <td>6</td>
+      <td class="text"><b>Leverage Co</b><br><span style="color:#888;font-size:11px">LEV.DE</span></td>
+      <td>MDAX</td>
+      <td class="text">RealEst</td>
+      <td>0.41</td>
+      <td>0.46</td>
+      <td>0.34</td>
+      <td>22.00</td>
+      <td>0.70</td>
+      <td>3.50</td>
+    </tr>
+  
+    <tr>
+      <td>5</td>
+      <td class="text"><b>Quality Co</b><br><span style="color:#888;font-size:11px">QUAL.DE</span></td>
+      <td>DAX</td>
+      <td class="text">Tech</td>
+      <td>0.43</td>
+      <td>0.07</td>
+      <td>0.97</td>
+      <td>35.00</td>
+      <td>8.00</td>
+      <td>0.20</td>
+    </tr>
+  
+  </tbody>
+</table>
+
+<h2>Methodik (kurz)</h2>
+<p style="font-size:13px">
+Composite Value Score: Perzentilrang ueber EV/EBIT, P/B, P/FCF und Shareholder Yield (Cross-Sektional auf das gefilterte Universum). Niedrige Bewertungs-Multiples und hohe Yields ergeben hohe Ranks.
+<br>Quality Score: Perzentilrang ueber ROIC, FCF-Marge, operative Marge, Net Debt / EBITDA (invertiert) und Earnings-Stabilitaet.
+<br>Composite = 60 % Value + 40 % Quality. Negative Bewertungs-Multiples (Verluste) werden aus dem Value-Ranking ausgeschlossen, nicht mit 0 bestraft.
+<br>"Value-Trap"-Flag: oberes Value-Quartil + unteres Quality-Quartil.
+</p>
+
+<div class="footer">
+  Automatisch generiert durch value-analyzer v0.0.0-golden &middot;
+  Daten via yfinance &middot; CSV-Vollranking liegt als Anhang bei.
+  <br>Keine Anlageempfehlung. Eigene Pruefung erforderlich.
+</div>
+</body>
+</html>
