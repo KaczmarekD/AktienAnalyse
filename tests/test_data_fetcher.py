@@ -16,8 +16,8 @@ from src.data_fetcher import (
     _dividend_yield,
     _earnings_stability,
     _f,
+    _fiscal_period_end,
     _latest,
-    _period_end,
     _pick,
     _roic,
     _safe_div,
@@ -50,22 +50,26 @@ class TestSafeDiv:
         assert result == expected
 
 
-class TestPeriodEnd:
-    @pytest.mark.parametrize(
-        ("label", "expected"),
-        [
-            (pd.Timestamp("2025-12-31"), date(2025, 12, 31)),
-            ("2025-12-31", date(2025, 12, 31)),
-            # pd.Timestamp wirft hier nicht, sondern liefert NaT - das ist keine Periode
-            (None, None),
-            (float("nan"), None),
-            ("NaT", None),
-            (pd.NaT, None),
-            ("keine Periode", None),
-        ],
-    )
-    def test_cases(self, label, expected):
-        assert _period_end(label) == expected
+class TestFiscalPeriodEnd:
+    # Die Regel, was ein Periodenende ist, testet test_serialization (period_end)
+    @pytest.mark.parametrize("bad_label", [None, "NaT", "keine Periode", 0])
+    def test_skips_invalid_label_of_latest_revenue(self, bad_label):
+        income = pd.DataFrame(
+            {
+                bad_label: [3_000.0],
+                pd.Timestamp("2025-12-31"): [2_000.0],
+                pd.Timestamp("2024-12-31"): [1_900.0],
+            },
+            index=["Total Revenue"],
+        )
+        assert _fiscal_period_end(income) == date(2025, 12, 31)
+
+    def test_fallback_without_revenue_skips_invalid_label(self):
+        income = pd.DataFrame(
+            {None: [100.0], pd.Timestamp("2025-12-31"): [80.0]},
+            index=["Net Income"],
+        )
+        assert _fiscal_period_end(income) == date(2025, 12, 31)
 
 
 class TestF:
@@ -138,6 +142,10 @@ class TestCagr:
     def test_too_short(self):
         assert _cagr([100]) is None
         assert _cagr([]) is None
+
+    def test_overflow_returns_none(self):
+        # Aeltester Wert fast 0: first/last laeuft ueber (inf) - kein Wachstumswert
+        assert _cagr([5e9, 4e9, 3e9, 2e9, 1e-300]) is None
 
 
 class TestDividendYield:
@@ -423,3 +431,47 @@ class TestFetchOneProvenanceAndRaw:
         assert f.raw is None
         assert f.provenance.fetched_at is not None
         assert f.errors
+
+
+class TestFetchOneInvalidPeriods:
+    """Spalten ohne Periodenende zaehlen fuer keine Kennzahl - wie in statement_value.
+
+    Sonst stuenden im Snapshot Kennzahlen aus Werten, die nicht gespeichert werden
+    und sich aus der Historie nicht nachrechnen lassen.
+    """
+
+    # Die undatierte Spalte steht vorn und haette sonst Vorrang als juengste Periode
+    INCOME = pd.DataFrame(
+        {
+            None: [9_000.0, 9_000.0],
+            pd.Timestamp("2025-12-31"): [2_000.0, 500.0],
+            pd.Timestamp("2024-12-31"): [1_900.0, 450.0],
+        },
+        index=["Total Revenue", "Operating Income"],
+    )
+
+    def _fetch(self, income):
+        info = {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0}
+        with patch("src.data_fetcher._ticker_data", return_value=(info, income, None, None)):
+            return fetch_one(Ticker("X.DE", "X", "DAX"))
+
+    def test_metrics_ignore_undated_columns(self):
+        f = self._fetch(self.INCOME)
+        assert f.quality.operating_margin == pytest.approx(0.25)
+        assert f.provenance.fiscal_period_end == date(2025, 12, 31)
+
+    def test_raw_statements_stay_unchanged(self):
+        f = self._fetch(self.INCOME)
+        assert f.raw is not None
+        assert f.raw.statements["income"] is self.INCOME
+
+    def test_numeric_column_labels_give_no_metrics_but_an_error(self):
+        # z. B. RangeIndex nach einem Formatwechsel bei yfinance: keine Periode, keine Werte
+        income = pd.DataFrame(
+            {0: [2_000.0, 500.0], 1: [1_900.0, 450.0]},
+            index=["Total Revenue", "Operating Income"],
+        )
+        f = self._fetch(income)
+        assert f.quality.operating_margin is None
+        assert f.provenance.fiscal_period_end is None
+        assert any("income" in e and "Periodenende" in e for e in f.errors)
