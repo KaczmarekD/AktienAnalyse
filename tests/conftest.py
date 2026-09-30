@@ -2,8 +2,47 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
+
 import pandas as pd
 import pytest
+
+GOLDEN_DIR = Path(__file__).parent / "golden"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--update-golden",
+        action="store_true",
+        default=False,
+        help="Golden-Files unter tests/golden/ neu schreiben statt vergleichen",
+    )
+
+
+@pytest.fixture
+def golden(request: pytest.FixtureRequest) -> Callable[[str, bytes], None]:
+    """Vergleicht Bytes mit ``tests/golden/<name>``; ``--update-golden`` schreibt sie neu.
+
+    Golden-Files halten das heutige Verhalten fest (Sicherungsnetz fuer Umbauten).
+    Eine Abweichung ist entweder ein Fehler oder eine bewusste Aenderung - dann
+    neu schreiben und den Diff im Review begruenden.
+    """
+    update = request.config.getoption("--update-golden")
+
+    def check(name: str, actual: bytes) -> None:
+        path = GOLDEN_DIR / name
+        if update:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(actual)
+            return
+        assert path.exists(), f"Golden-File fehlt: {path.name} - einmal mit --update-golden erzeugen"
+        assert actual == path.read_bytes(), (
+            f"Abweichung zu golden/{path.name}. Bewusste Aenderung? Dann --update-golden "
+            "und den Diff im Review begruenden."
+        )
+
+    return check
 
 
 @pytest.fixture
