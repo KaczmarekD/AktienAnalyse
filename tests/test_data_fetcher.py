@@ -17,6 +17,7 @@ from src.data_fetcher import (
     _earnings_stability,
     _f,
     _latest,
+    _period_end,
     _pick,
     _roic,
     _safe_div,
@@ -40,11 +41,31 @@ class TestSafeDiv:
             (5.0, 0.0, None),
             (float("inf"), 1.0, None),
             (1.0, float("nan"), None),
+            # Ueberlauf: endliche Eingaben, Ergebnis inf - darf nicht ins Ranking
+            (1e308, 1e-10, None),
         ],
     )
     def test_cases(self, num, den, expected):
         result = _safe_div(num, den)
         assert result == expected
+
+
+class TestPeriodEnd:
+    @pytest.mark.parametrize(
+        ("label", "expected"),
+        [
+            (pd.Timestamp("2025-12-31"), date(2025, 12, 31)),
+            ("2025-12-31", date(2025, 12, 31)),
+            # pd.Timestamp wirft hier nicht, sondern liefert NaT - das ist keine Periode
+            (None, None),
+            (float("nan"), None),
+            ("NaT", None),
+            (pd.NaT, None),
+            ("keine Periode", None),
+        ],
+    )
+    def test_cases(self, label, expected):
+        assert _period_end(label) == expected
 
 
 class TestF:
