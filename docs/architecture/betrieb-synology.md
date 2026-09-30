@@ -20,15 +20,26 @@
    neuere Systemaufrufe wie `statx` (erst ab 4.11), daran scheitern moderne Build-Tools. Für Bun
    ist das auf genau diesem Prozessor dokumentiert. Node läuft deshalb nie auf der NAS.
 2. **Kein AVX2-Code.** NumPy setzt seit Version 2.4 x86-64-v2 voraus, das schafft der J4125 gerade
-   noch. Pakete, die x86-64-v3 brauchen, stürzen mit `Illegal instruction` ab. Vor jedem
-   Dependency-Upgrade lokal prüfen:
+   noch. Pakete, die x86-64-v3 brauchen, stürzen mit `Illegal instruction` ab. Nach jedem
+   Dependency-Upgrade und vor dem Deployment prüfen (die CI macht dasselbe bei jedem Push):
    ```
    make check-j4125
    ```
-   Das baut das Image und führt Python darin unter QEMU mit dem CPU-Modell Denverton aus
-   (Goldmont, dieselbe Klasse wie der J4125: SSE4.2, kein AVX). Das Prüfskript
-   (`docker/j4125-check/check_imports.py`) stellt zuerst sicher, dass die Emulation greift.
-   Danach lädt es alle nativen Pakete und rechnet ein Ranking samt Parquet-Durchlauf.
+   Das baut die Stufe `j4125-check` des Dockerfiles, also das App-Image plus QEMU, und führt
+   Python darin mit dem CPU-Modell Denverton aus (Goldmont, dieselbe Klasse wie der J4125:
+   SSE4.2, kein AVX; ein Goldmont-Plus-Modell hat QEMU nicht). Zuerst führt `run.sh` eine
+   einzelne AVX2-Instruktion aus. Sie muss mit SIGILL enden, sonst fängt die Emulation AVX2
+   nicht ab und die Prüfung bricht ab. Danach stellt das Prüfskript
+   (`docker/j4125-check/check_imports.py`) sicher, dass das CPU-Modell kein AVX meldet, lädt
+   jede native Erweiterung im Image und den Importgraph der App und rechnet wie im Wochenlauf:
+   Ranking, Mail-Report, Parquet-Durchlauf. Ein Paket mit AVX-Code beendet den Lauf mit
+   Exit-Code 132.
+
+   Bis die Images aus der CI kommen (P0.6), baut die NAS ihr Image noch selbst. Nach jedem
+   Build dort zusätzlich auf der echten CPU prüfen (ohne DB, ohne Migration):
+   ```
+   docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
+   ```
 3. **Keine Kernel-Features jenseits von 4.4.** Postgres 18 bleibt beim Standard-`io_method`, die
    neue `io_uring`-Option wird nicht aktiviert. Es gibt keine cgroup-v2-Features.
 

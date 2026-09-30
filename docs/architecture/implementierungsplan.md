@@ -149,9 +149,11 @@ keine gemeinsamen Dateien anfassen.
 #### P0.6 Images aus der CI, geprüft für den J4125
 
 - **Test:**
-  - Smoke-Schritt im Workflow: `docker run --rm <image> python -c "import numpy, pandas"`.
-  - Wenn machbar zusätzlich derselbe Import unter QEMU mit einem CPU-Modell ohne AVX2
-    (`qemu-x86_64 -cpu Goldmont-Plus`, entspricht dem J4125).
+  - Smoke-Schritt im Workflow: `docker run --rm <image> python -c "import src.main"`.
+  - J4125-Prüfung (vorgezogen, `make check-j4125` und CI-Schritt): Stufe `j4125-check` im
+    Dockerfile, Python unter `qemu-x86_64 -cpu Denverton` (Goldmont, ohne AVX; ein
+    Goldmont-Plus-Modell hat QEMU nicht). Gegenprobe mit einer AVX2-Instruktion, die mit
+    SIGILL enden muss. Details in [Betrieb auf der Synology](betrieb-synology.md).
 - **Implementierung:** `images.yml` baut `linux/amd64` und schiebt nach GHCR (Tags: Commit und
   Version). Compose nutzt `image:` statt `build:`.
 - **Grün:** Workflow grün, Image liegt in GHCR.

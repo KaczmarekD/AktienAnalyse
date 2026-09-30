@@ -56,10 +56,10 @@ jobs:
         run: uv sync
 
       - name: Ruff Lint
-        run: uv run ruff check src tests
+        run: uv run ruff check src tests docker
 
       - name: Ruff Format Check
-        run: uv run ruff format --check src tests
+        run: uv run ruff format --check src tests docker
 
       - name: Pyright Type-Check (wie make typecheck)
         run: uv run pyright
@@ -82,7 +82,7 @@ jobs:
           if-no-files-found: ignore
 
   docker-build:
-    name: Docker Build (smoke test)
+    name: Docker Build + J4125-Pruefung
     runs-on: ubuntu-latest
     needs: quality
     steps:
@@ -91,11 +91,34 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Eigene Cache-Scopes je Stufe, sonst ueberschreiben sich die Builds gegenseitig
       - name: Build image (no push)
         uses: docker/build-push-action@v6
         with:
           context: .
+          target: runtime
+          platforms: linux/amd64
           push: false
           tags: value-analyzer:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=runtime
+          cache-to: type=gha,scope=runtime,mode=max
+
+      # ADR-0008: dieselben Pakete wie im Laufzeit-Image, unter QEMU mit einem
+      # CPU-Modell ohne AVX (J4125 der NAS). Wie make check-j4125.
+      - name: J4125-Image bauen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: j4125-check
+          platforms: linux/amd64
+          load: true
+          tags: value-analyzer:j4125-check
+          cache-from: |
+            type=gha,scope=runtime
+            type=gha,scope=j4125-check
+          cache-to: type=gha,scope=j4125-check,mode=max
+
+      - name: J4125-Pruefung (QEMU, ohne AVX)
+        # Lokal unter 20 Sekunden; die Grenze faengt nur einen haengenden Lauf ab
+        timeout-minutes: 10
+        run: docker run --rm value-analyzer:j4125-check

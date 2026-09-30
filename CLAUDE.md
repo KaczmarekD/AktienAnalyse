@@ -143,10 +143,12 @@ Gemergt wird erst nach Abnahme durch den User. Abgehakt wird in
 `docs/architecture/roadmap.md`.
 
 **Grenzen der Zielhardware** (Synology mit Celeron J4125, ADR-0008):
-- Kein AVX/AVX2: keine Pakete, die x86-64-v3 voraussetzen. Vor jedem
-  Dependency-Upgrade `make check-j4125` ausführen. Das baut das Image und
-  startet es unter QEMU mit einem CPU-Modell ohne AVX (Denverton). Ein Paket,
-  das AVX braucht, bricht dort mit „Illegal instruction“ ab.
+- Kein AVX/AVX2: keine Pakete, die x86-64-v3 voraussetzen. Nach jedem
+  Dependency-Upgrade (`make lock`/`make upgrade`) und vor dem Deployment
+  `make check-j4125` ausführen; die CI macht dasselbe bei jedem Push. Das baut
+  die Stufe `j4125-check` des Dockerfiles (App-Image plus QEMU) und startet
+  Python darin mit einem CPU-Modell ohne AVX (Denverton). Ein Paket, das AVX
+  braucht, bricht dort mit „Illegal instruction“ ab.
 - DSM-Kernel 4.4: Ziel ist, Images nur für `linux/amd64` in CI zu bauen
   statt auf der NAS (Roadmap Phase 0). Node/Bun laufen nie auf der NAS.
 

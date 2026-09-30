@@ -43,12 +43,12 @@ test-cov: ## Tests mit Coverage-Report
 	$(RUN) pytest --cov=src --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
-	$(RUN) ruff check src tests
-	$(RUN) ruff format --check src tests
+	$(RUN) ruff check src tests docker
+	$(RUN) ruff format --check src tests docker
 
 format: ## Code automatisch formatieren
-	$(RUN) ruff format src tests
-	$(RUN) ruff check --fix src tests
+	$(RUN) ruff format src tests docker
+	$(RUN) ruff check --fix src tests docker
 
 typecheck: ## Statische Typpruefung
 	$(RUN) pyright
@@ -68,12 +68,12 @@ test-db: ## Alle Tests inkl. DB-Tests (vorher: make test-db-up)
 test-db-down: ## Wegwerf-Postgres stoppen (entfernt nur den Test-Container)
 	docker stop va-test-pg
 
-# J4125 der NAS (ADR-0008): kein AVX/AVX2. Das App-Image wird unter QEMU mit einem
-# CPU-Modell ohne AVX ausgefuehrt; braucht ein Paket x86-64-v3, bricht der Import ab.
-check-j4125: ## App-Image bauen und unter QEMU ohne AVX pruefen (vor jedem Dependency-Upgrade)
-	docker build -t value-analyzer:local .
-	docker build -f docker/j4125-check/Dockerfile --build-arg APP_IMAGE=value-analyzer:local -t value-analyzer:j4125-check .
-	docker run --rm value-analyzer:j4125-check
+# J4125 der NAS (ADR-0008): kein AVX/AVX2. Die Stufe j4125-check im Dockerfile ist das
+# App-Image plus QEMU; Python laeuft dort mit einem CPU-Modell ohne AVX. Braucht ein Paket
+# x86-64-v3, bricht der Lauf mit "Illegal instruction" (Exit-Code 132) ab.
+check-j4125: ## Nach make lock/upgrade und vor dem Deployment: Image unter QEMU ohne AVX pruefen
+	docker build --platform linux/amd64 --target j4125-check -t value-analyzer:j4125-check .
+	docker run --rm --platform linux/amd64 value-analyzer:j4125-check
 
 # ---------- Docker auf Synology ---------------------------------------------
 build: ## Docker-Image bauen

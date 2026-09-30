@@ -1,7 +1,10 @@
 # syntax=docker/dockerfile:1.7
 # Ziel (ADR-0008): Images entstehen in der CI und die NAS laedt sie nur (P0.6).
 # Bis dahin baut die NAS wie bisher selbst (docker compose build).
-FROM python:3.14-slim AS runtime
+#
+# Stufen: base (alles fuer den Lauf) -> j4125-check (base + QEMU, nur zum Pruefen)
+#         base -> runtime (Standard-Ziel, docker-compose.yml nutzt target: runtime)
+FROM python:3.14-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -37,3 +40,21 @@ RUN chmod +x /entrypoint.sh && touch /var/log/cron.log
 VOLUME ["/app/data", "/app/logs"]
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+# ---------- J4125-Pruefung (ADR-0008) ------------------------------------------
+# Dasselbe Image plus QEMU: Python laeuft unter dem CPU-Modell Denverton (Goldmont,
+# SSE4.2, kein AVX - dieselbe Klasse wie der J4125 der NAS). Aufruf: make check-j4125
+FROM base AS j4125-check
+RUN apt-get update && apt-get install -y --no-install-recommends qemu-user tini \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/j4125-check/check_imports.py docker/j4125-check/avx2_probe.py /opt/j4125/
+COPY --chmod=0755 docker/j4125-check/run.sh /opt/j4125/run.sh
+# tini als PID 1: Trifft QEMU auf AVX, beendet es sich selbst mit SIGILL. Als PID 1 wuerde
+# der Kernel dieses Signal verwerfen und QEMU ewig haengen statt mit Exit-Code 132 zu enden.
+# In run.sh: -cpu Denverton,-xsavec - die Emulation (TCG) bildet XSAVEC nicht nach und
+# wuerde sonst bei jedem Start warnen; fuer die AVX-Frage spielt es keine Rolle.
+ENTRYPOINT ["tini", "--", "/opt/j4125/run.sh"]
+CMD ["/opt/j4125/check_imports.py"]
+
+# ---------- Laufzeit-Image (Standard-Ziel) -------------------------------------
+FROM base AS runtime
