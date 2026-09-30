@@ -35,8 +35,10 @@
    Ranking, Mail-Report, Parquet-Durchlauf. Ein Paket mit AVX-Code beendet den Lauf mit
    Exit-Code 132.
 
-   Bis die Images aus der CI kommen (P0.6), baut die NAS ihr Image noch selbst. Nach jedem
-   Build dort zusätzlich auf der echten CPU prüfen (ohne DB, ohne Migration):
+   Bis die Images aus der CI kommen (P0.6), baut die NAS ihr Image noch selbst. Der Build
+   braucht BuildKit (`RUN --mount` im Dockerfile); mit Docker 24 im Container Manager ist das
+   Standard. Nach jedem Build dort zusätzlich auf der echten CPU prüfen (ohne DB, ohne
+   Migration):
    ```
    docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
    ```
