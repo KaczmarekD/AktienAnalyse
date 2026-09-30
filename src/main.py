@@ -19,7 +19,7 @@ from .logging_setup import setup_logging
 from .mailer import send_report
 from .reporting import build_report
 from .scoring import ScoringConfig, score
-from .universe import load_universe
+from .universe import Ticker, load_universe
 
 
 def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
@@ -29,7 +29,8 @@ def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
     try:
         cleanup_old_artifacts(settings.data_dir, settings.retention_days)
 
-        tickers = load_universe()
+        universe = load_universe()
+        tickers = universe.tickers
         if settings.universe == "DAX_ONLY":
             tickers = [t for t in tickers if t.index == "DAX"]
         universe_size = len(tickers)
@@ -63,6 +64,10 @@ def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
             quality_weight=settings.quality_weight,
             version=__version__,
             universe_size=universe_size,
+            universe_source=universe.source,
+            universe_as_of=universe.as_of,
+            universe_added=[_ticker_label(t) for t in universe.added],
+            universe_removed=[_ticker_label(t) for t in universe.removed],
         )
 
         if dry_run:
@@ -87,6 +92,10 @@ def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
             _try_send_error_mail(settings, traceback.format_exc())
         return 1
     return 0
+
+
+def _ticker_label(t: Ticker) -> str:
+    return f"{t.name} ({t.symbol}, {t.index})"
 
 
 def _try_send_error_mail(settings: Settings, trace: str) -> None:

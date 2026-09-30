@@ -6,7 +6,7 @@ den README (der zeigt, **wie** das Projekt betrieben wird).
 
 ## Was das Projekt tut
 
-Wöchentlicher Batch-Job auf einer Synology, der DAX/MDAX (~110 Werte) nach
+Wöchentlicher Batch-Job auf einer Synology, der DAX/MDAX (90 Werte) nach
 einer Value-+-Quality-Methodik durchscoresd und das Ergebnis als E-Mail
 versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking).
 
@@ -69,11 +69,22 @@ Deployment unterscheiden, geh durch `Settings`.
 Schwellwert hardcoden willst, frag dich erst, ob `ScoringConfig` die richtige
 Heimat ist – meistens ja.
 
-**Fallback-Ticker leben in `data/dax_mdax_fallback.csv`**, nicht im Code.
-DAX/MDAX-Mutationen passieren mehrmals pro Jahr – CSV editieren ohne Rebuild.
+**Universum-Quellen: iShares → Deka → Fallback-CSV** (`src/universe.py`).
+Wikipedia wurde ersetzt, weil die englische MDAX-Seite nachweislich veraltet
+war und die deutsche keine Ticker hat. Jede Live-Quelle wird hart validiert
+(lesbares JSON/XLSX, exakt 40/50 Aktien; iShares zusätzlich Stichtag
+plausibel und ≤ 10 Tage – die Deka-Datei enthält kein Datum, der Report
+zeigt dann „ohne Stichtag“). Die undokumentierte iShares-API brach im
+Sept. 2026 schon einmal still (HTML mit HTTP 200). Abweichungen zur CSV
+werden über Symbol + Index + ISIN erkannt, also auch Auf-/Abstiege. Recherche und Abwägung: `docs/DAX MDAX Datenquellen.md`.
+
+**Fallback-CSV `data/dax_mdax_fallback.csv` (symbol,name,index,isin)** wird
+von Hand gepflegt und nie automatisch überschrieben – sie ist das geprüfte
+Sicherheitsnetz. Die ISIN ist der Schlüssel für die Deka-Quelle. Weicht die
+Live-Quelle ab (Indexreview), zeigt der Mail-Report „Fallback-CSV pflegen“.
 
 **Robustheit vor Performance**: yfinance fällt regelmäßig aus, gibt
-inkonsistente Daten zurück, Wikipedia ändert HTML. Jeder externe Call hat
+inkonsistente Daten zurück, ETF-Anbieter bauen Websites um. Jeder externe Call hat
 Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 
 ## Was NICHT in dieses Projekt gehört
@@ -98,8 +109,9 @@ Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 4. Test in `tests/test_scoring.py`
 
 **Neues Universum (z.B. Stoxx 600)**:
-1. Wiki-URL und Parser in `src/universe.py`
-2. Fallback-CSV in `data/`
+1. Quelle(n) in `src/universe.py` (URL-Konstanten am Dateikopf, Soll-Anzahl
+   in `UniverseConfig.expected_counts`)
+2. Fallback-CSV in `data/` inkl. ISIN-Spalte
 3. ENV `UNIVERSE` in `config.py` um neuen Literal-Wert erweitern
 4. Branch in `main.py:_run`
 
@@ -112,8 +124,14 @@ parsen) und `mailer.py` anpassen.
 - **yfinance** (Yahoo Finance): kostenlos, kein Vertrag. Kann jederzeit
   rate-limiten oder umbenennen. Wenn das chronisch wird, Wechsel zu FMP
   oder EODHD über ein neues `data_fetcher_*.py`-Modul.
-- **Wikipedia DAX/MDAX-Tabellen**: lieferndes HTML kann jederzeit Spalten
-  umsortieren. Der Parser ist defensiv, Fallback-CSV deckt den Ausfall ab.
+- **iShares-Holdings (EXS1/EXS3)**: undokumentierte Frontend-API von
+  BlackRock, liefert Ticker + ISIN. Kann jederzeit umziehen – dann URL/Params
+  am Kopf von `universe.py` anpassen.
+- **Deka-ETF-XLSX**: Blatt „Indexzusammensetzung“, nur ISIN/WKN.
+- **OpenFIGI**: ISIN → Xetra-Ticker für Neuaufnahmen, die noch nicht in der
+  CSV stehen; ohne API-Key (10 ISINs pro Request).
+- Keine dieser Quellen erlaubt automatisierten Abruf ausdrücklich; robots.txt
+  sperrt die genutzten Pfade nicht. Private Nutzung, 1× pro Woche.
 - **Gmail SMTP**: kostenlos bis ~500 Mails/Tag; App-Passwort erforderlich.
 - **Healthchecks.io** (optional): Free-Tier reicht für einen wöchentlichen
   Check; alternativ Self-Hosted oder gar nicht.

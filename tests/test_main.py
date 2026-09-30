@@ -2,7 +2,7 @@
 
 Alle externen Grenzen werden gemockt:
 - fetch_all   → gibt mock_universe_df zurueck (kein yfinance-Netz)
-- load_universe → gibt eine feste Ticker-Liste zurueck
+- load_universe → gibt ein festes Universe (Quelle iShares) zurueck
 - send_report → prueft Aufruf ohne echten SMTP
 - ping        → prueft Healthcheck-Aufruf
 
@@ -12,13 +12,20 @@ Scoring, Report-Bau, Dry-Run-Modus und Fehlerbehandlung.
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
 from src.main import _run, _try_send_error_mail, run
-from src.universe import Ticker
+from src.reporting import build_report
+from src.universe import Ticker, Universe
+
+
+def _universe(tickers, **kwargs):
+    return Universe(tickers=tickers, source="iShares", as_of=date(2026, 9, 29), **kwargs)
+
 
 # ---------------------------------------------------------------------------
 # Hilfs-Fixture: minimale Settings ohne .env-Datei
@@ -59,7 +66,7 @@ def mock_tickers():
 class TestRunDryRun:
     def test_dry_run_returns_zero(self, settings, mock_tickers, mock_universe_df):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=mock_universe_df),
             patch("src.main.send_report") as mock_send,
             patch("src.main.ping") as mock_ping,
@@ -72,7 +79,7 @@ class TestRunDryRun:
 
     def test_dry_run_writes_html_preview(self, settings, mock_tickers, mock_universe_df):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=mock_universe_df),
             patch("src.main.send_report"),
             patch("src.main.ping"),
@@ -87,7 +94,7 @@ class TestRunDryRun:
 
     def test_dry_run_writes_csv(self, settings, mock_tickers, mock_universe_df):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=mock_universe_df),
             patch("src.main.send_report"),
             patch("src.main.ping"),
@@ -106,7 +113,7 @@ class TestRunDryRun:
 class TestRunWithMail:
     def test_real_run_calls_send_report(self, settings, mock_tickers, mock_universe_df):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=mock_universe_df),
             patch("src.main.send_report") as mock_send,
             patch("src.main.ping"),
@@ -121,7 +128,7 @@ class TestRunWithMail:
 
     def test_real_run_pings_success(self, settings, mock_tickers, mock_universe_df):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=mock_universe_df),
             patch("src.main.send_report"),
             patch("src.main.ping") as mock_ping,
@@ -134,7 +141,7 @@ class TestRunWithMail:
 
     def test_subject_contains_stats(self, settings, mock_tickers, mock_universe_df):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=mock_universe_df),
             patch("src.main.send_report") as mock_send,
             patch("src.main.ping"),
@@ -164,7 +171,7 @@ class TestRunDaxOnly:
             return mock_universe_df[mock_universe_df["symbol"].isin(dax_symbols)].copy()
 
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", side_effect=fake_fetch_all),
             patch("src.main.send_report"),
             patch("src.main.ping"),
@@ -192,7 +199,7 @@ class TestRunErrorHandling:
         )
 
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", return_value=empty_df),
             patch("src.main.score", return_value=empty_df),
             patch("src.main.ping") as mock_ping,
@@ -206,7 +213,7 @@ class TestRunErrorHandling:
 
     def test_exception_in_fetch_returns_code_1(self, settings, mock_tickers):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", side_effect=RuntimeError("yfinance down")),
             patch("src.main.ping") as mock_ping,
             patch("src.main._try_send_error_mail"),
@@ -220,7 +227,7 @@ class TestRunErrorHandling:
 
     def test_exception_in_dry_run_does_not_send_error_mail(self, settings, mock_tickers):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", side_effect=RuntimeError("boom")),
             patch("src.main.ping"),
             patch("src.main._try_send_error_mail") as mock_err_mail,
@@ -231,7 +238,7 @@ class TestRunErrorHandling:
 
     def test_exception_in_real_run_sends_error_mail(self, settings, mock_tickers):
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", side_effect=RuntimeError("crash")),
             patch("src.main.ping"),
             patch("src.main._try_send_error_mail") as mock_err_mail,
@@ -272,10 +279,12 @@ class TestRunConfigError:
         monkeypatch.setenv("SMTP_USER", "test@gmail.com")
         monkeypatch.setenv("SMTP_PASSWORD", "dummy")
         monkeypatch.setenv("MAIL_TO", "r@example.com")
+        monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+        monkeypatch.setenv("LOGS_DIR", str(tmp_path / "logs"))
         monkeypatch.chdir(tmp_path)
 
         with (
-            patch("src.main.load_universe", return_value=[]),
+            patch("src.main.load_universe", return_value=_universe([])),
             patch(
                 "src.main.fetch_all",
                 return_value=pd.DataFrame(columns=["symbol", "market_cap", "composite_score"]),
@@ -288,7 +297,7 @@ class TestRunConfigError:
         ):
             rc = run(dry_run=True)
 
-        assert rc != 2
+        assert rc == 3  # Config gueltig, aber leeres Universum -> "keine bewertbaren Daten"
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +314,7 @@ class TestForceRefresh:
             return mock_universe_df
 
         with (
-            patch("src.main.load_universe", return_value=mock_tickers),
+            patch("src.main.load_universe", return_value=_universe(mock_tickers)),
             patch("src.main.fetch_all", side_effect=fake_fetch_all),
             patch("src.main.send_report"),
             patch("src.main.ping"),
@@ -313,3 +322,37 @@ class TestForceRefresh:
             _run(settings, force_refresh=True, dry_run=True)
 
         assert captured["force_refresh"] is True
+
+
+# ---------------------------------------------------------------------------
+# Indexquelle im Report
+# ---------------------------------------------------------------------------
+
+
+class TestUniverseSourceInReport:
+    def _build_report_kwargs(self, settings, universe, mock_universe_df):
+        with (
+            patch("src.main.load_universe", return_value=universe),
+            patch("src.main.fetch_all", return_value=mock_universe_df),
+            patch("src.main.build_report", wraps=build_report) as br,
+            patch("src.main.ping"),
+        ):
+            _run(settings, force_refresh=False, dry_run=True)
+        return br.call_args.kwargs
+
+    def test_passes_source_with_as_of(self, settings, mock_tickers, mock_universe_df):
+        kwargs = self._build_report_kwargs(settings, _universe(mock_tickers), mock_universe_df)
+        assert kwargs["universe_source"] == "iShares"
+        assert kwargs["universe_as_of"] == date(2026, 9, 29)
+        assert kwargs["universe_added"] == []
+        assert kwargs["universe_removed"] == []
+
+    def test_passes_csv_drift(self, settings, mock_tickers, mock_universe_df):
+        uni = _universe(
+            mock_tickers,
+            added=[Ticker("SAX.DE", "Ströer", "MDAX")],
+            removed=[Ticker("BOSS.DE", "Hugo Boss", "MDAX")],
+        )
+        kwargs = self._build_report_kwargs(settings, uni, mock_universe_df)
+        assert kwargs["universe_added"] == ["Ströer (SAX.DE, MDAX)"]
+        assert kwargs["universe_removed"] == ["Hugo Boss (BOSS.DE, MDAX)"]

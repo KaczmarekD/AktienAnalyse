@@ -7,18 +7,22 @@ Subject-Tag traegt eine Erfolgsstatistik (``ok 102/110`` oder
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 from jinja2 import Template
 
+from .universe import FALLBACK_SOURCE
+
 log = logging.getLogger(__name__)
 
 
-HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
+HTML_TEMPLATE = Template(
+    r"""<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -36,6 +40,8 @@ HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
   .meta { color: #666; font-size: 12px; margin-bottom: 16px; }
   .flag { background: #fff3cd; color: #7a5d00; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
   .footer { color: #888; font-size: 11px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 10px; }
+  .notice { background: #fff3cd; color: #7a5d00; padding: 8px 12px; border-radius: 4px;
+            font-size: 13px; margin-bottom: 16px; }
   .ok { color: #1f7a3a; }
   .warn { color: #b07000; }
 </style>
@@ -48,10 +54,24 @@ HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
   <span class="{{ 'ok' if stats.failed == 0 else 'warn' }}">{{ stats.scored }} bewertet</span>,
   {{ stats.failed }} fehlgeschlagen &middot;
   Datenquelle: yfinance
+  {% if universe_source %}&middot; Indexquelle: {{ universe_source }}
+    {%- if universe_as_of %} (Stand {{ universe_as_of }}){% elif not is_fallback %} (ohne Stichtag){% endif %}
+  {%- endif %}
 </div>
+{% if is_fallback %}
+<div class="notice">Live-Indexquellen nicht erreichbar &ndash; Universum stammt aus der Fallback-CSV.
+  Bei Indexaenderungen kann sie veraltet sein.</div>
+{% endif %}
+{% if universe_added or universe_removed %}
+<div class="notice"><b>Fallback-CSV pflegen:</b> Die Indexquelle weicht von
+  <code>data/dax_mdax_fallback.csv</code> ab.
+  {% if universe_added %}<br>Neu im Index: {{ universe_added | join(", ") }}{% endif %}
+  {% if universe_removed %}<br>Nicht mehr im Index: {{ universe_removed | join(", ") }}{% endif %}
+</div>
+{% endif %}
 
 <h2>Top {{ top_n }} Value-Kandidaten</h2>
-<p>Sortiert nach Composite Score (Gewichtung: {{ "%.0f" | format(weights.value*100) }} %% Value, {{ "%.0f" | format(weights.quality*100) }} %% Quality).</p>
+<p>Sortiert nach Composite Score (Gewichtung: {{ "%.0f" | format(weights.value*100) }} % Value, {{ "%.0f" | format(weights.quality*100) }} % Quality).</p>
 <table>
   <thead>
     <tr>
@@ -117,7 +137,7 @@ HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
 <p style="font-size:13px">
 Composite Value Score: Perzentilrang ueber EV/EBIT, P/B, P/FCF und Shareholder Yield (Cross-Sektional auf das gefilterte Universum). Niedrige Bewertungs-Multiples und hohe Yields ergeben hohe Ranks.
 <br>Quality Score: Perzentilrang ueber ROIC, FCF-Marge, operative Marge, Net Debt / EBITDA (invertiert) und Earnings-Stabilitaet.
-<br>Composite = {{ "%.0f" | format(weights.value*100) }} %% Value + {{ "%.0f" | format(weights.quality*100) }} %% Quality. Negative Bewertungs-Multiples (Verluste) werden aus dem Value-Ranking ausgeschlossen, nicht mit 0 bestraft.
+<br>Composite = {{ "%.0f" | format(weights.value*100) }} % Value + {{ "%.0f" | format(weights.quality*100) }} % Quality. Negative Bewertungs-Multiples (Verluste) werden aus dem Value-Ranking ausgeschlossen, nicht mit 0 bestraft.
 <br>"Value-Trap"-Flag: oberes Value-Quartil + unteres Quality-Quartil.
 </p>
 
@@ -128,7 +148,9 @@ Composite Value Score: Perzentilrang ueber EV/EBIT, P/B, P/FCF und Shareholder Y
 </div>
 </body>
 </html>
-""")
+""",
+    autoescape=True,
+)
 
 
 def _fmt_num(v: Any) -> str:
@@ -179,6 +201,10 @@ def build_report(
     quality_weight: float = 0.4,
     version: str = "0.2.0",
     universe_size: int | None = None,
+    universe_source: str | None = None,
+    universe_as_of: date | None = None,
+    universe_added: Sequence[str] = (),
+    universe_removed: Sequence[str] = (),
 ) -> ReportArtifacts:
     output_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now()
@@ -199,6 +225,11 @@ def build_report(
         bottom_rows=bottom_rows,
         weights={"value": value_weight, "quality": quality_weight},
         version=version,
+        universe_source=universe_source,
+        universe_as_of=universe_as_of.isoformat() if universe_as_of else None,
+        is_fallback=universe_source == FALLBACK_SOURCE,
+        universe_added=list(universe_added),
+        universe_removed=list(universe_removed),
         fmt_num=_fmt_num,
         fmt_pct=_fmt_pct,
         stats={

@@ -7,9 +7,7 @@
 annotated-types==0.7.0
     # via pydantic
 beautifulsoup4==4.14.3
-    # via
-    #   -r requirements.in
-    #   yfinance
+    # via yfinance
 certifi==2026.4.22
     # via
     #   curl-cffi
@@ -24,6 +22,8 @@ dnspython==2.8.0
     # via email-validator
 email-validator==2.3.0
     # via -r requirements.in
+et-xmlfile==2.0.0
+    # via openpyxl
 frozendict==2.4.7
     # via yfinance
 idna==3.15
@@ -31,8 +31,6 @@ idna==3.15
     #   email-validator
     #   requests
 jinja2==3.1.6
-    # via -r requirements.in
-lxml==5.4.0
     # via -r requirements.in
 markdown-it-py==4.2.0
     # via rich
@@ -47,6 +45,8 @@ numpy==2.2.6
     #   -r requirements.in
     #   pandas
     #   yfinance
+openpyxl==3.1.5
+    # via -r requirements.in
 pandas==2.3.3
     # via
     #   -r requirements.in

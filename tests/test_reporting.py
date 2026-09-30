@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from src.reporting import _build_subject, _fmt_num, _fmt_pct, build_report
 from src.scoring import ScoringConfig, score
+from src.universe import FALLBACK_SOURCE
 
 
 class TestFormatters:
@@ -65,6 +67,12 @@ class TestBuildReportIntegration:
         assert report.scored > 0
         assert "Keine Anlageempfehlung" in report.html
 
+    def test_weights_rendered_as_single_percent(self, mock_universe_df, tmp_path: Path):
+        scored = score(mock_universe_df, ScoringConfig())
+        report = build_report(scored, output_dir=tmp_path, universe_size=8)
+        assert "60 % Value" in report.html
+        assert "%%" not in report.html
+
     def test_subject_contains_stats(self, mock_universe_df, tmp_path: Path):
         scored = score(mock_universe_df, ScoringConfig())
         report = build_report(scored, output_dir=tmp_path, universe_size=8)
@@ -78,3 +86,43 @@ class TestBuildReportIntegration:
         # Deutsche CSV: Semikolon-Trenner, Komma-Dezimalzeichen
         assert ";" in content
         assert "," in content  # Dezimal
+
+
+class TestUniverseSourceNote:
+    def _html(self, mock_universe_df, tmp_path, **kwargs):
+        scored = score(mock_universe_df, ScoringConfig())
+        return build_report(scored, output_dir=tmp_path, universe_size=8, **kwargs).html
+
+    def test_shows_source_and_as_of(self, mock_universe_df, tmp_path: Path):
+        html = self._html(
+            mock_universe_df, tmp_path, universe_source="iShares", universe_as_of=date(2026, 9, 29)
+        )
+        assert "Indexquelle: iShares (Stand 2026-09-29)" in html
+        assert "Fallback-CSV pflegen" not in html
+
+    def test_warns_when_csv_is_outdated(self, mock_universe_df, tmp_path: Path):
+        html = self._html(
+            mock_universe_df,
+            tmp_path,
+            universe_source="iShares",
+            universe_added=["Ströer (SAX.DE, MDAX)"],
+            universe_removed=["Hugo Boss (BOSS.DE, MDAX)"],
+        )
+        assert "Fallback-CSV pflegen" in html
+        assert "Ströer (SAX.DE, MDAX)" in html
+        assert "Hugo Boss (BOSS.DE, MDAX)" in html
+
+    def test_warns_when_only_fallback_available(self, mock_universe_df, tmp_path: Path):
+        html = self._html(mock_universe_df, tmp_path, universe_source=FALLBACK_SOURCE)
+        assert "Live-Indexquellen nicht erreichbar" in html
+
+    def test_deka_marked_without_as_of(self, mock_universe_df, tmp_path: Path):
+        html = self._html(mock_universe_df, tmp_path, universe_source="Deka")
+        assert "Indexquelle: Deka (ohne Stichtag)" in html
+        assert "Live-Indexquellen nicht erreichbar" not in html
+
+    def test_escapes_names(self, mock_universe_df, tmp_path: Path):
+        html = self._html(
+            mock_universe_df, tmp_path, universe_source="iShares", universe_added=["<b>X</b>"]
+        )
+        assert "<b>X</b>" not in html

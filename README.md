@@ -11,7 +11,7 @@
 
 ## Was es tut
 
-- Lädt das DAX/MDAX-Universum (~110 Titel) von Wikipedia, Fallback aus `data/dax_mdax_fallback.csv`
+- Lädt das DAX/MDAX-Universum (40 + 50 Titel) aus den Holdings der iShares-ETFs, Fallback Deka-ETF, dann `data/dax_mdax_fallback.csv`
 - Holt Fundamentaldaten via **yfinance** (kein API-Key nötig) mit lokalem Parquet-Cache
 - Berechnet einen **Composite Score** aus Value- und Quality-Faktoren (cross-sektional, Perzentilrang)
 - Markiert potenzielle **Value Traps** (billig, aber schlechte Qualität)
@@ -23,7 +23,7 @@
 ## Pipeline
 
 ```
-load_universe()          Wikipedia + CSV-Fallback → Liste von Tickern
+load_universe()          iShares → Deka → CSV, validiert → Ticker + Quelle
       │
 fetch_all()              yfinance + Parquet-Cache → DataFrame mit Fundamentaldaten
       │
@@ -146,13 +146,14 @@ value-analyzer/
 ├── src/
 │   ├── main.py             # Orchestrator: verbindet alle Module
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
-│   ├── universe.py         # Wikipedia-Parser + CSV-Fallback
+│   ├── universe.py         # Index-Quellen iShares/Deka/CSV + Validierung
 │   ├── fundamentals.py     # Dataclasses: Identity/MarketData/Value/Quality/Growth
 │   ├── data_fetcher.py     # yfinance + FIELD_MAP + Parquet-Cache
 │   ├── scoring.py          # ScoringConfig + Cross-sektionaler Composite Score
 │   ├── reporting.py        # HTML-Mail-Body + CSV-Vollranking
 │   ├── mailer.py           # SMTP-Versand (Gmail)
 │   ├── healthcheck.py      # Healthchecks.io Ping
+│   ├── housekeeping.py     # Alte Caches/Rankings löschen (RETENTION_DAYS)
 │   └── logging_setup.py    # RotatingFileHandler (5 MB × 10)
 ├── tests/                  # pytest-Suite (38 Testdateien)
 ├── data/
