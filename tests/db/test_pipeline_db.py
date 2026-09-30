@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
+from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
 from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.reporting import ReportingRepository
@@ -63,6 +64,16 @@ def _fake_ticker_data(symbol: str):
     return info, income, balance, cashflow
 
 
+def _fake_consensus(symbol: str) -> dict[str, ConsensusEntry]:
+    """BBB.DE: Yahoo drosselt den Abruf - der Titel darf dadurch nicht verloren gehen."""
+    if symbol == "BBB.DE":
+        return {"eps_trend": ConsensusEntry("error", None, "RuntimeError: Too Many Requests")}
+    return {
+        "eps_trend": ConsensusEntry("ok", {"+1y": {"current": 4.5, "90daysAgo": 4.7}}, None),
+        "growth_estimates": ConsensusEntry("empty", None, None),
+    }
+
+
 @pytest.fixture
 def db_settings(tmp_path, monkeypatch, db_url):
     monkeypatch.setenv("SMTP_USER", "test@gmail.com")
@@ -80,6 +91,7 @@ def _patched_run(settings, *, force_refresh=False, dry_run=False):
     with (
         patch("src.main.load_universe", return_value=UNIVERSE),
         patch("src.data_fetcher._ticker_data", side_effect=_fake_ticker_data) as ticker_data,
+        patch("src.data_fetcher.fetch_consensus", side_effect=_fake_consensus),
         patch("src.data_fetcher.time.sleep"),
         patch("src.main.send_report") as send,
         patch("src.main.ping", return_value=None),
@@ -112,6 +124,11 @@ class TestFullRun:
             assert set(snapshots["symbol"]) == {t.symbol for t in TICKERS}
             assert set(md.get_universe(run.fetch_run_id)["symbol"]) == {t.symbol for t in TICKERS}
             assert md.get_raw_info(run.fetch_run_id, "AAA.DE")["beta"] is None  # type: ignore[index]
+            consensus = md.get_consensus(run.fetch_run_id, "AAA.DE")
+            assert consensus == _fake_consensus("AAA.DE")
+            assert md.get_consensus(run.fetch_run_id, "BBB.DE")["eps_trend"].status == "error"
+            # Konsens-Fehler landen nicht in der Snapshot-Spalte errors - die CSV bleibt gleich
+            assert snapshots.set_index("symbol").loc["BBB.DE", "errors"] == ""
             assert len(md.get_statements_as_of("AAA.DE", pd.Timestamp.now(tz="UTC"))) > 5
             fetch_run = md.get_fetch_run(run.fetch_run_id)
             assert fetch_run is not None

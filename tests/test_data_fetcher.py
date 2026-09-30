@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from src.consensus import ConsensusEntry
 from src.data_fetcher import (
     FIELD_MAP,
     FetcherConfig,
@@ -28,6 +29,13 @@ from src.data_fetcher import (
 )
 from src.fundamentals import Fundamentals, Identity, MarketData
 from src.universe import Ticker
+
+
+@pytest.fixture(autouse=True)
+def no_consensus_network():
+    """fetch_one holt zusaetzlich Konsensdaten (F1.1) - in Tests nie ueber das Netz."""
+    with patch("src.data_fetcher.fetch_consensus", return_value={}) as fake:
+        yield fake
 
 
 class TestSafeDiv:
@@ -397,8 +405,19 @@ class TestFetchOneProvenanceAndRaw:
         income = _statement({"Total Revenue": 2_000.0})
         assert self._fetch(income).provenance.fiscal_period_end == date(2025, 12, 31)
 
-    def test_failed_fetch_has_timestamp_but_no_raw(self):
+    def test_failed_fetch_has_timestamp_but_no_raw(self, no_consensus_network):
         f = self._fetch(side_effect=RuntimeError("down"))
         assert f.raw is None
         assert f.provenance.fetched_at is not None
         assert f.errors
+        no_consensus_network.assert_not_called()
+
+    def test_consensus_is_kept_without_touching_errors(self, no_consensus_network):
+        """ADR-0010: Zusatzdaten nur speichern - Snapshot-Fehler und CSV bleiben gleich."""
+        entries = {"eps_trend": ConsensusEntry("error", None, "RuntimeError: 429")}
+        no_consensus_network.return_value = entries
+        f = self._fetch()
+        no_consensus_network.assert_called_once_with("X.DE")
+        assert f.raw is not None
+        assert f.raw.consensus == entries
+        assert f.errors == []
