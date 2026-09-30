@@ -472,6 +472,11 @@ unverändert.
   - Repository `write_consensus`/`get_consensus`
   - Umwandlung und Fehlertoleranz im neuen Modul `src/consensus.py`, der Abruf
     (`fetch_consensus`) in `data_fetcher`
+  - Die Zuordnung Art → yfinance-Attribut steht in `data_fetcher.CONSENSUS_FIELDS`.
+    Benennt yfinance um, bleiben die Namen in der DB gleich.
+  - HTTP-Fehler, die yfinance nur loggt, werden als `error` gespeichert, nicht als
+    `empty`. Nach einem Rate-Limit (429) gibt es keinen Retry, die übrigen Arten des Titels
+    werden übersprungen.
 - **Review:** Gemessen am 30.09.2026 an 8 DAX/MDAX-Titeln: Der Konsens-Abruf kostet im Median
   0,26 s je Titel, also rund 25 s je Lauf. yfinance teilt dabei die Antworten zwischen den Arten.
   Der Basisabruf dauert im Median 0,88 s je Titel.

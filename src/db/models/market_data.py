@@ -97,8 +97,10 @@ class RawInfo(Base):
 class ConsensusSnapshot(Base):
     """Konsensschaetzungen je Abruf, Titel und Art (ADR-0010) - unveraenderte Rohdaten.
 
-    ``status``: ``ok`` (Payload vorhanden), ``empty`` (Yahoo liefert nichts) oder ``error``
-    (Abruf gescheitert, Text in ``error``). So bleibt auch sichtbar, wann Daten fehlten.
+    ``status``: ``ok`` (Payload vorhanden), ``empty`` (keine Daten, meist keine
+    Analystenabdeckung) oder ``error`` (Abruf gescheitert oder nach einem Rate-Limit
+    uebersprungen, Grund in ``error``). So bleibt auch sichtbar, wann Daten fehlten.
+    ``fetched_at`` ist wie bei ``raw_info`` der Beginn des Abrufs dieses Titels.
     """
 
     __tablename__ = "consensus_snapshot"

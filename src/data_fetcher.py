@@ -18,15 +18,16 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from functools import cache, lru_cache, partial
+from functools import lru_cache, partial
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
+from yfinance.exceptions import YFRateLimitError
 
-from .consensus import CONSENSUS_KINDS, ConsensusEntry, collect_consensus
+from .consensus import ConsensusEntry, collect_consensus, to_payload
 from .fundamentals import (
     Fundamentals,
     Growth,
@@ -83,6 +84,17 @@ FIELD_MAP: dict[str, tuple[str, ...]] = {
         "Common Stock Repurchased",
         "RepurchaseOfStock",
     ),
+}
+
+# Konsens-Snapshots (ADR-0010): stabiler Name der Art in der DB -> Attribut von yf.Ticker.
+# Benennt yfinance ein Attribut um, wird nur hier nachgezogen - die DB-Namen bleiben.
+CONSENSUS_FIELDS: dict[str, str] = {
+    "eps_trend": "eps_trend",
+    "eps_revisions": "eps_revisions",
+    "earnings_estimate": "earnings_estimate",
+    "revenue_estimate": "revenue_estimate",
+    "growth_estimates": "growth_estimates",
+    "analyst_price_targets": "analyst_price_targets",
 }
 
 
@@ -212,16 +224,57 @@ def _ticker_data(symbol: str) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFram
     return info, income, balance, cashflow
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=4), reraise=True)
-def _consensus_value(ticker: Callable[[], Any], kind: str) -> Any:
-    return getattr(ticker(), kind)
+class YahooResponseError(Exception):
+    """yfinance hat einen HTTP-Fehler nur geloggt und eine leere Antwort geliefert."""
+
+
+class _YfErrorCapture(logging.Handler):
+    """Sammelt die ERROR-Meldungen, die yfinance waehrend eines Aufrufs loggt."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.ERROR)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+@retry(
+    retry=retry_if_not_exception_type((YFRateLimitError, YahooResponseError)),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    reraise=True,
+)
+def _consensus_value(yt: Any, attr: str) -> Any:
+    """Ein Attribut von ``yf.Ticker`` abrufen.
+
+    yfinance verschluckt HTTP-Fehler wie 401, 404 oder 5xx: Es loggt sie und liefert
+    leer. Das wird hier zum Fehler, statt als "keine Daten" gespeichert zu werden. Ein
+    Retry hilft dann nicht, weil yfinance das leere Ergebnis cacht. Ebenso wenig
+    wird nach einem Rate-Limit sofort wiederholt.
+    """
+    capture = _YfErrorCapture()
+    yf_logger = logging.getLogger("yfinance")
+    yf_logger.addHandler(capture)
+    try:
+        value = getattr(yt, attr)
+    finally:
+        yf_logger.removeHandler(capture)
+    if capture.messages and to_payload(value) is None:
+        raise YahooResponseError(capture.messages[-1])
+    return value
 
 
 def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
-    """Konsens-Snapshots (ADR-0010, F1.1). Wirft nie: Fehler stehen je Art im Ergebnis."""
-    ticker = cache(partial(yf.Ticker, symbol))  # eine Instanz, yfinance teilt dann die Antworten
+    """Konsens-Snapshots (ADR-0010, F1.1). Wirft nie: Fehler stehen je Art im Ergebnis.
+
+    Nach einem Rate-Limit werden die restlichen Arten uebersprungen, damit der
+    naechste Titel nicht in eine andauernde Drosselung laeuft.
+    """
+    yt = yf.Ticker(symbol)
     entries = collect_consensus(
-        {kind: partial(_consensus_value, ticker, kind) for kind in CONSENSUS_KINDS}
+        {kind: partial(_consensus_value, yt, attr) for kind, attr in CONSENSUS_FIELDS.items()},
+        stop_after=lambda e: isinstance(e, YFRateLimitError),
     )
     failed = [kind for kind, entry in entries.items() if entry.status == "error"]
     if failed:

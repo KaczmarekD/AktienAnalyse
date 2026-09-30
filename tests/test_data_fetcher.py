@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
+from tenacity import wait_none
+from yfinance.exceptions import YFRateLimitError
 
-from src.consensus import ConsensusEntry
+from src.consensus import CONSENSUS_KINDS, ConsensusEntry
 from src.data_fetcher import (
+    CONSENSUS_FIELDS,
     FIELD_MAP,
     FetcherConfig,
+    YahooResponseError,
     _cagr,
+    _consensus_value,
     _dividend_yield,
     _earnings_stability,
     _f,
@@ -36,6 +43,71 @@ def no_consensus_network():
     """fetch_one holt zusaetzlich Konsensdaten (F1.1) - in Tests nie ueber das Netz."""
     with patch("src.data_fetcher.fetch_consensus", return_value={}) as fake:
         yield fake
+
+
+class _FakeTicker:
+    """Steht fuer ``yf.Ticker``: verhaelt sich wie yfinance, ganz ohne Netz."""
+
+    def __init__(self, behaviour: Callable[[], Any]) -> None:
+        self.calls = 0
+        self._behaviour = behaviour
+
+    @property
+    def eps_trend(self) -> Any:
+        self.calls += 1
+        return self._behaviour()
+
+
+class TestConsensusValue:
+    """Der yfinance-Adapter fuer die Konsens-Snapshots (F1.1)."""
+
+    def test_every_stored_kind_has_a_yfinance_attribute(self):
+        assert set(CONSENSUS_FIELDS) == set(CONSENSUS_KINDS)
+
+    def test_http_error_swallowed_by_yfinance_becomes_an_error(self):
+        """yfinance loggt 401/404/5xx nur und liefert leer - das ist kein 'keine Daten'."""
+
+        def swallowed() -> pd.DataFrame:
+            logging.getLogger("yfinance").error("HTTP Error 401: Invalid Crumb")
+            return pd.DataFrame()
+
+        fake = _FakeTicker(swallowed)
+        with pytest.raises(YahooResponseError, match="Invalid Crumb"):
+            _consensus_value(fake, "eps_trend")
+        assert fake.calls == 1  # Wiederholen hilft nicht, yfinance hat das Ergebnis gecacht
+
+    def test_logged_error_with_data_keeps_the_data(self):
+        frame = pd.DataFrame({"current": [1.0]}, index=["0y"])
+
+        def noisy_but_ok() -> pd.DataFrame:
+            logging.getLogger("yfinance").error("irrelevant")
+            return frame
+
+        assert _consensus_value(_FakeTicker(noisy_but_ok), "eps_trend") is frame
+
+    def test_rate_limit_is_not_retried(self):
+        def throttled() -> Any:
+            raise YFRateLimitError
+
+        fake = _FakeTicker(throttled)
+        with pytest.raises(YFRateLimitError):
+            _consensus_value(fake, "eps_trend")
+        assert fake.calls == 1
+
+    def test_other_failures_are_retried_once(self):
+        frame = pd.DataFrame({"current": [1.0]}, index=["0y"])
+        outcomes: list[Any] = [ConnectionError("reset"), frame]
+
+        def flaky() -> Any:
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        fake = _FakeTicker(flaky)
+        no_wait = _consensus_value.retry_with(wait=wait_none())  # type: ignore[attr-defined]
+        assert no_wait(fake, "eps_trend") is frame
+        assert fake.calls == 2
 
 
 class TestSafeDiv:
