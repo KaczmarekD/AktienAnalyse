@@ -197,6 +197,8 @@ make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 
 Details zu Faktorwahl, Defaults, bekannten Grenzen und Konventionen: [CLAUDE.md](CLAUDE.md)
 
+Geplanter Umbau zu Microservices mit Angular-Frontend, FastAPI, NATS und PostgreSQL: [Zielarchitektur und Roadmap](docs/architecture/README.md), [Architekturentscheidungen (ADRs)](docs/adr/README.md)
+
 ---
 
 ## Haftungsausschluss

@@ -88,6 +88,27 @@ Live-Quelle ab (Indexreview), zeigt der Mail-Report „Fallback-CSV pflegen“.
 inkonsistente Daten zurück, ETF-Anbieter bauen Websites um. Jeder externe Call hat
 Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 
+## Zielarchitektur (beschlossen, in Umsetzung)
+
+Das Projekt wird schrittweise zu ereignisgetriebenen Microservices
+umgebaut: `market-data`, `scoring`, `notification` und `web-api` (FastAPI:
+REST, WebSocket, Eventmanager), dazu ein Angular-Frontend im eigenen
+nginx-Container, NATS JetStream und PostgreSQL. Plan und Roadmap:
+`docs/architecture/README.md`, Entscheidungen: `docs/adr/` (ADR-0001 bis
+ADR-0009), Recherche: `docs/research/`.
+
+Bis eine Phase umgesetzt ist, beschreibt dieses Dokument den **Ist-Stand**.
+Neue Arbeit folgt der Zielrichtung, bei Widersprüchen gelten die ADRs.
+Pläne und Recherche-Ergebnisse werden in `docs/` fortgeschrieben, nicht nur
+im Chat besprochen.
+
+**Grenzen der Zielhardware** (Synology mit Celeron J4125, ADR-0008):
+- Kein AVX/AVX2: keine Pakete, die x86-64-v3 voraussetzen. Nach
+  Dependency-Upgrades im Image auf der NAS `python -c "import numpy, pandas"`
+  prüfen.
+- DSM-Kernel 4.4: Ziel ist, Images nur für `linux/amd64` in CI zu bauen
+  statt auf der NAS (Roadmap Phase 0). Node/Bun laufen nie auf der NAS.
+
 ## Was NICHT in dieses Projekt gehört
 
 - Backtesting/Performance-Tracking. Das ist ein **Screener**, kein Backtest.
@@ -95,10 +116,13 @@ Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 - Sektor-relatives Ranking. Aktuell global. Wäre für Banken/Versicherer
   sauberer, aber bei 90 Werten zu wenig Daten pro Sektor.
 - Echtzeit-Daten oder Intraday. Wöchentlicher Batch reicht für
-  Fundamentaldaten, die sich quartalsweise ändern.
-- Dependency-Injection-Framework. Bei 9 Modulen würde es nur Lesbarkeit
-  kosten.
-- Microservices/Message Queues. Single-Container-Batch.
+  Fundamentaldaten, die sich quartalsweise ändern. Der geplante WebSocket
+  im web-api synchronisiert nur die UI und streamt keine Kurse.
+- Ein separates Dependency-Injection-Framework. `Depends` von FastAPI und
+  FastStream reicht.
+
+Früher stand hier auch „Microservices/Message Queues“. Das ist durch
+ADR-0001 und ADR-0002 aufgehoben.
 
 ## Wenn du was änderst
 
