@@ -450,9 +450,13 @@ def _statement_rows(
             continue
         for period_label in df.columns:
             try:
-                period_end = pd.Timestamp(period_label).date()
+                period_ts = pd.Timestamp(period_label)
             except TypeError, ValueError:
                 continue
+            # None, NaN und "NaT" werfen nicht, sondern ergeben NaT - keine Periode
+            if pd.isna(period_ts):
+                continue
+            period_end = period_ts.date()
             for line_item, raw in df[period_label].items():
                 value = to_python(raw)
                 if not isinstance(value, int | float) or isinstance(value, bool):

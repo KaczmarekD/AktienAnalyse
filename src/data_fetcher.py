@@ -111,7 +111,9 @@ def _safe_div(num: float | None, den: float | None) -> float | None:
         nv, dv = float(num), float(den)
         if not np.isfinite(nv) or not np.isfinite(dv) or dv == 0:
             return None
-        return nv / dv
+        result = nv / dv
+        # Float-Division laeuft bei winzigem Nenner ueber (inf) statt zu werfen
+        return result if np.isfinite(result) else None
     except TypeError, ValueError, ZeroDivisionError:
         return None
 
@@ -159,9 +161,11 @@ def _latest(series: pd.Series | None) -> float | None:
 
 def _period_end(label: Any) -> date | None:
     try:
-        return pd.Timestamp(label).date()
+        ts = pd.Timestamp(label)
     except TypeError, ValueError:
         return None
+    # None, NaN und "NaT" werfen nicht, sondern ergeben NaT - das ist keine Periode
+    return None if pd.isna(ts) else ts.date()
 
 
 def _fiscal_period_end(income: pd.DataFrame | None) -> date | None:
