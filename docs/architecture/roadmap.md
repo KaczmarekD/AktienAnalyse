@@ -17,11 +17,14 @@
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
+| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | offen |
 
 **Reihenfolge:**
 - Phase 2 wurde vorgezogen, weil jede Woche ohne Stichtagsdaten verloren ist.
 - Phase 0 beginnt mit P0.1: Der Golden-Master ist das Sicherungsnetz für alle späteren Umbauten.
 - Ab Phase 1 ist die Reihenfolge verbindlich.
+- Track F1 ist aus demselben Grund vorgezogen wie Phase 2 und kann parallel zu Phase 0 laufen.
+  F2 und F3 beginnen erst, wenn ADR-0011 angenommen ist, frühestens nach P1.5 und P2b.2.
 
 ## Sofort (du, auf der NAS)
 
@@ -133,10 +136,51 @@ Details: [Implementierungsplan, Phase 5](implementierungsplan.md#phase-5--auftei
 
 **Fertig, wenn:** die Zielarchitektur aus [README.md](README.md) läuft.
 
+## Track F – Fundamentaldaten und Anker
+
+Details: [Implementierungsplan, Track F](implementierungsplan.md#track-f--fundamentaldaten-und-anker-adr-0010-adr-0011)
+
+**F1 – Stichtagsdaten sichern** ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md),
+beschlossen, vorgezogen):
+
+- [ ] F1.1 Konsens-Snapshots
+- [ ] F1.2 Quartalsabschlüsse
+- [ ] F1.3 Historie der Aktienanzahl
+- [ ] F1.4 Kurshistorie
+- [ ] NAS (du): Deployment. Der erste Lauf danach dauert länger, weil die Kurshistorie erstmals
+      gefüllt wird.
+
+**Fertig, wenn:** Konsens, Quartale, Aktienanzahl und Kurse jede Woche gespeichert werden und die
+Mail unverändert ist.
+
+**F2/F3 – Auswertung** ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md),
+vorgeschlagen, erst nach Annahme):
+
+- [ ] Entscheidung über ADR-0011 nach P1.5 und P2b.2. Vorher laufen ein Rescore-Vergleich v1/v2 und
+      die Prüfung des Immobilien-EBIT.
+- [ ] F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme
+- [ ] F2.2 Netto-Aktienemission
+- [ ] F2.3 Momentum und Value-Trap-Regel
+- [ ] F2.4 Branchenregeln und Abschnitt „Finanzwerte“
+- [ ] F2.5 Standardprofil v2 aktivieren
+- [ ] F3.1 Ertragskraftwert und implizites Wachstum
+- [ ] F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung
+
+**Fertig, wenn:** über ADR-0011 entschieden ist. Wird es angenommen, außerdem: Das Standardprofil v2
+ist aktiv, und das Titel-Detail zeigt die Anker.
+
 ## Danach (Ideen, nicht beschlossen)
 
 - Watchlists und Diagramme zum Score-Verlauf
 - Mehrere Mail-Empfänger. Dann auch einen einfachen Login einführen
   ([ADR-0007](../adr/0007-lan-only-ohne-login.md)).
 - Weitere Kanäle in `notification`, z. B. Telegram
-- Wechsel des Datenanbieters (FMP/EODHD) als weiterer Adapter in `market-data`
+- Wechsel des Datenanbieters (FMP/EODHD) als weiterer Adapter in `market-data`, etwa für eine
+  lange Abschlusshistorie der Anker. ESAP (öffentlich ab Juli 2027) als freie Quelle prüfen.
+- Revisionsmomentum als Faktor, sobald die Konsens-Snapshots aus F1.1 mindestens ein Jahr
+  Historie haben
+- LLM-Lesehilfe für die Top-Kandidaten: Geschäfts- und Risikobericht mit Vorjahresvergleich. Braucht
+  ein eigenes ADR ([Recherche, Stufe 4](../research/fundamentalanalyse-sota/bericht.md#stufe-4-optional)).
+- Directors' Dealings der BaFin sichern (nur 12 Monate online), falls die Nutzungsbedingungen es
+  erlauben
+- P/B mit aktivierten Forschungsausgaben (Intangibles)

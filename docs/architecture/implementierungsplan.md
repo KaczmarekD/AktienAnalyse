@@ -427,3 +427,194 @@ sich in ganz Phase 1 nicht ändern.**
 
 - **Test:** Der Link-Check der Doku läuft durch.
 - **Implementierung:** CLAUDE.md auf die Zielarchitektur umschreiben, dazu ein Runbook für die NAS.
+
+### Track F – Fundamentaldaten und Anker (ADR-0010, ADR-0011)
+
+Grundlage ist die [Recherche](../research/fundamentalanalyse-sota/bericht.md). Der Track läuft
+neben den Phasen. Die Voraussetzungen stehen bei jedem Paket, Zyklus und Definition of Done gelten
+unverändert.
+
+- **F1 (Daten sichern)** ist mit
+  [ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md) beschlossen. Das Paket ist
+  vorgezogen wie Phase 2, weil sich Konsens- und Quartalsdaten nicht nachholen lassen.
+  - F1 speichert nur. Ranking und Mail ändern sich nicht, deshalb kann F1 parallel zu Phase 0
+    laufen.
+  - Vor Phase 1 entsteht der Code in `src/`, danach im Yahoo-Adapter (P1.4) bzw. in
+    `domain/metrics` (P1.3).
+  - Ändert ein Phase-0-Paket dieselbe Datei, etwa `data_fetcher.py` in P0.5, wird zuerst das
+    Phase-0-Paket gemergt.
+- **F2 und F3 (Auswertung)** setzen voraus, dass
+  [ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md) akzeptiert ist. Es ist derzeit
+  nur vorgeschlagen. Bis zur Annahme wird kein F2- oder F3-Paket begonnen, entschieden wird nach
+  P1.5 und P2b.2.
+  - F2 baut außerdem auf P1.3, P1.5 und P2b.2 auf. Neue Faktoren und Regeln kommen zunächst
+    abgeschaltet, die Golden-Files bleiben dabei gleich. Erst F2.5 aktiviert das Standardprofil v2
+    und aktualisiert die Golden-Files bewusst.
+  - F3.1 folgt nach P2b.2, F3.2 nach P3.7.
+- **Tests ohne yfinance-Mocks** (CLAUDE.md): Parser und Kennzahlen werden gegen aufgezeichnete
+  Rohdaten als JSON-Fixtures geprüft. Die Abruf-Funktionen selbst gehören nicht zur Test-Suite.
+
+#### F1.1 Konsens-Snapshots
+
+- **Voraussetzung:** Phase 2 ist auf der NAS deployt, sonst wird nichts gespeichert.
+- **Test:**
+  - Ein Parser-Test mit aufgezeichneten Antworten von `eps_trend`, `eps_revisions`,
+    `earnings_estimate`, `revenue_estimate`, `growth_estimates` und `analyst_price_targets`.
+  - DB-Tests: Je Titel, Abruf und Art entsteht eine Zeile. Ein zweiter Abruf ergänzt Zeilen und lässt
+    die alten stehen. `UPDATE` und `DELETE` sind verboten, das prüft der Löschschutz-Test.
+  - Fehlt eine Tabelle oder schlägt ihr Abruf fehl, bleibt der Titel erhalten, und der Fehler steht
+    in `errors`.
+- **Implementierung:** Tabelle `market_data.consensus_snapshot` (`fetch_run_id`, `instrument_id`,
+  `kind`, `payload` JSONB) mit `protect_table()`, Repository `write_consensus`/`get_consensus`.
+  Der Abruf folgt in `fetch_one` nach den Statements.
+- **Review:** Die zusätzliche Laufzeit je Titel ist gemessen und im Paket notiert.
+- **NAS (du):** Nur deployen, die Migration läuft beim Start.
+
+#### F1.2 Quartalsabschlüsse
+
+- **Voraussetzung:** wie F1.1.
+- **Test:**
+  - Ein Parser-Test mit aufgezeichneten Quartals-Statements.
+  - DB-Tests: `statement_value` versioniert mit `frequency = 'quarterly'` genauso wie `annual`,
+    also neue Zeile nur bei geändertem Wert.
+  - `get_statements_as_of(…, frequency="quarterly")` liefert Quartale getrennt von den
+    Jahreswerten.
+- **Implementierung:** `quarterly_income_stmt`, `quarterly_balance_sheet` und
+  `quarterly_cashflow` abrufen und über `write_statements(..., frequency="quarterly")` speichern.
+  Die Spalte `frequency` ist freier Text, eine Migration ist nicht nötig.
+
+#### F1.3 Historie der Aktienanzahl
+
+- **Voraussetzung:** wie F1.1.
+- **Test:**
+  - Parser-Test: Eine aufgezeichnete `get_shares_full`-Serie wird zu einem Wert je Tag (bei
+    mehreren Werten am selben Tag gilt der letzte).
+  - DB-Tests: Eine Zeile entsteht nur für ein neues Datum oder einen geänderten Wert.
+- **Implementierung:** Tabelle `market_data.share_count` (`instrument_id`, `as_of`, `shares`,
+  `first_seen_fetch_run_id`, `first_seen_at`) mit `protect_table()`. Beim ersten Abruf ab
+  2000-01-01, danach ab dem letzten gespeicherten Datum.
+
+#### F1.4 Kurshistorie
+
+- **Voraussetzung:** wie F1.1.
+- **Test:**
+  - Ein Parser-Test mit einer aufgezeichneten Antwort von
+    `history(auto_adjust=False, actions=True)`.
+  - DB-Tests: die Erstbefüllung, die inkrementelle Ergänzung und der Split-Fall. Ändern sich alte
+    Kurse durch einen Split, entstehen neue Versionen, und die alten bleiben erhalten.
+- **Implementierung:** Tabelle `market_data.price_bar` (`instrument_id`, `trade_date`, `close`,
+  `adj_close`, `dividend`, `split`, `first_seen_fetch_run_id`, `first_seen_at`) mit
+  `protect_table()`. Der erste Abruf holt `period="max"`, danach die letzten 40 Handelstage.
+- **Review:** Den Speicherbedarf nach der Erstbefüllung messen. Erwartet werden rund 0,7 Mio. Zeilen
+  im niedrigen zweistelligen MB-Bereich.
+- **NAS (du):** Der erste Lauf nach dem Deployment dauert wegen der Erstbefüllung länger.
+
+#### F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme
+
+- **Voraussetzung:** P1.3, P1.5, P2b.2.
+- **Test:**
+  - Kennzahlen-Tests mit Fixtures echter Titel und von Hand nachgerechneten Erwartungswerten:
+    - jedes der neun F-Score-Signale einzeln
+    - fehlende Vorjahreswerte ergeben `None`, nicht 0
+    - `operating_accruals` und `cfo_assets` mit Vorzeichen
+  - Scoring-Test: Die drei Faktoren stehen im Katalog und sind im Profil v1 abgeschaltet. Die
+    Golden-Files bleiben unverändert.
+- **Implementierung:**
+  - Die Funktionen kommen nach `va_market_data.domain.metrics`, die Felder in `QualityMetrics` und
+    in den Snapshot (additive Migration).
+  - Die Katalogeinträge kommen nach `va_scoring`.
+  - `FIELD_MAP` wird um fehlende Zeilen ergänzt, etwa Umlaufvermögen, kurzfristige
+    Verbindlichkeiten, Aktienanzahl und Umsatzkosten.
+- **Review:** Die Definitionen sind gegen Piotroski (2000) und Sloan (1996) geprüft und im Code
+  als Quelle genannt.
+
+#### F2.2 Netto-Aktienemission
+
+- **Voraussetzung:** F1.3, F1.4 (für die Splits), P2b.2.
+- **Test:**
+  - Die 12-Monats-Veränderung aus Fixture-Serien: Ein Rückkauf ergibt einen negativen Wert, eine
+    Kapitalerhöhung einen positiven. Ein Split zählt nicht als Emission.
+  - Scoring-Test: Negative Werte bleiben im Ranking. Der Ausschluss negativer Multiples greift hier
+    nicht, weil `net_share_issuance` kein Multiple ist. Im Profil v1 ist der Faktor abgeschaltet.
+- **Implementierung:** Die Kennzahl kommt nach `domain.metrics`, dazu der Katalogeintrag. Der
+  Katalog bekommt ein Kennzeichen „kein Multiple“, das den Ausschluss negativer Werte je Faktor
+  steuert.
+
+#### F2.3 Momentum und Value-Trap-Regel
+
+- **Voraussetzung:** F1.4, F2.1, P2b.2.
+- **Test:**
+  - Das 12-1-Momentum aus Fixture-Kursen: auf Basis von `adj_close`, der letzte Monat ausgelassen.
+    Eine zu kurze Historie ergibt `None`.
+  - Flag-Tests: Nur die Kombination aus hohem Value-Score, schwachem Momentum und schwachem F-Score
+    setzt die neue Regel. Das Ergebnis nennt den Grund („quality“ oder „momentum“).
+  - Mit abgeschalteter Regel (v1) bleiben die Golden-Files unverändert.
+- **Implementierung:** Die Kennzahl `momentum_12_1` entsteht in `market-data` aus `price_bar` und
+  reist im Snapshot mit. Neue Profil-Parameter: `trap_momentum_rule` (an/aus),
+  `trap_momentum_max_rank` und `trap_fscore_max`. Momentum geht nicht in den Composite ein.
+
+#### F2.4 Branchenregeln und Abschnitt „Finanzwerte“
+
+- **Voraussetzung:** P2b.2, F2.1.
+- **Test:**
+  - Bei Banken und Versicherern werden die ausgeschlossenen Faktoren nicht gerankt. Die Titel
+    fallen unter den Mindestanteil und erscheinen in der Liste „Finanzwerte“ mit P/B, P/E, ROE und
+    dem gerechtfertigten P/B.
+  - Für alle anderen Titel ändern sich die Ränge nur, weil die Finanzwerte aus dem Querschnitt
+    fallen.
+  - Mit abgeschalteter Regel (v1) bleiben die Golden-Files unverändert.
+  - Renderer-Test: Der Abschnitt erscheint nur, wenn Titel betroffen sind.
+- **Implementierung:** Die Klassifikation läuft über die Yahoo-`industry` mit einer Präfix-Liste im
+  Profil. Dazu kommen der Parameter `industry_rules` (an/aus), die Liste im Ergebnis und ein
+  Template-Abschnitt.
+- **Immobilien:** Die Präfix-Liste folgt aus der Vorprüfung zu ADR-0011: Enthält das EBIT von
+  Vonovia, LEG, TAG und Aroundtown Bewertungsergebnisse nach IAS 40? Ein Test mit deren
+  gespeicherten `statement_value`-Zeilen sichert die Einstufung ab.
+- **Review:** Es wird kein Rang innerhalb einer Branche berechnet.
+
+#### F2.5 Standardprofil v2 aktivieren
+
+- **Voraussetzung:** F2.1 bis F2.4.
+- **Test:**
+  - Die Version 2 des Profils „Standard“ enthält die Werte aus ADR-0011.
+  - Ein Rescore mit v1 reproduziert das alte Ranking.
+  - Die Golden-Files werden bewusst aktualisiert: neues Ranking, Abschnitt „Finanzwerte“, die
+    Spalte „Abdeckung“ (vorhandene Faktoren x/y je Titel) und der Footer „Standard v2“.
+- **Implementierung:** Seed-Migration für v2 samt Aktivierung, dazu die Spalte „Abdeckung“ im
+  Report.
+- **Review:** Die Top- und Flop-Listen von v1 und v2 werden auf einem echten Snapshot verglichen und
+  die Unterschiede in der Abnahme begründet.
+- **Doku:** Den Methodik-Abschnitt in CLAUDE.md auf den neuen Ist-Stand umschreiben.
+- **NAS (du):** v2 wirkt ab dem nächsten Lauf. Rollback heißt: v1 aktivieren.
+
+#### F3.1 Ertragskraftwert und implizites Wachstum
+
+- **Voraussetzung:** P1.5, P2b.2.
+- **Test:** Die reinen Funktionen werden an Hand-Beispielen geprüft:
+  - EPV aus dem Mittelwert der verfügbaren EBIT-Jahre, der effektiven Steuerquote und der
+    Nettoverschuldung
+  - Preis/EPV
+  - Reverse DCF per Bisektion. Bei negativem FCF oder ohne Lösung zwischen −20 % und +40 % gibt es
+    kein Ergebnis.
+  - Sensitivität bei ±1 Prozentpunkt Kapitalkosten
+  - DB-Test: Die Anker je Lauf landen in `scoring.anchor_value` (Long-Format: `scoring_run_id`,
+    `instrument_id`, `anchor`, `value`).
+- **Implementierung:**
+  - `va_scoring.domain.anchors` mit den Profil-Parametern `cost_of_capital` (0,08),
+    `terminal_growth` (0,02) und `dcf_years` (10).
+  - Die CSV bekommt die Spalten `price_to_epv` und `implied_fcf_growth`. Die Golden-CSV wird
+    bewusst aktualisiert.
+  - Für Finanzwerte gibt es keine EPV-Anker, dort gilt das gerechtfertigte P/B aus F2.4.
+- **Review:** Die Werte von drei bekannten Titeln sind plausibilisiert.
+
+#### F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung
+
+- **Voraussetzung:** P3.2, P3.7, F1.2 bis F1.4, F3.1.
+- **Test:**
+  - API-Tests: Die Wertlinie ist Gewinn bzw. FCF je Aktie mal dem Median-Multiple der eigenen
+    Historie, bei Finanzwerten der Buchwert je Aktie. Bei der Renditezerlegung ergibt die Summe der
+    Teile die Gesamtrendite, bis auf Rundung.
+  - Bei zu kurzer Historie bleibt die Linie leer, statt geschätzt zu werden.
+  - Komponententest der Ansicht mit Chart und Sensitivität der Anker.
+- **Implementierung:** Endpunkt `GET /api/v1/instruments/{id}/anchors` und Chart im Titel-Detail.
+- **Review:** Das UI zeigt an, wie viele Jahre die Wertlinie abdeckt.

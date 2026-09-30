@@ -19,6 +19,15 @@ versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking).
 
 ## Methodik-Entscheidungen
 
+> **Stand der Entscheidungen (30.09.2026):**
+> - ADR-0010 (`docs/adr/`) beschließt, zusätzlich Konsensschätzungen, Quartalsabschlüsse,
+>   Aktienanzahl und Kurse zu speichern (Track F1). Das ist ohne Einfluss auf das Ranking.
+> - ADR-0011 schlägt Änderungen an Faktoren und Value-Trap-Flag sowie Branchenregeln für
+>   Finanzwerte vor. Es ist nur *vorgeschlagen*.
+>
+> Bis ADR-0011 angenommen und F2.5 umgesetzt ist, gilt die Methodik unten unverändert. Grundlage ist
+> die Recherche unter `docs/research/fundamentalanalyse-sota/`.
+
 **Composite = 0.6 × Value + 0.4 × Quality** – die Quality-Komponente
 existiert primär, um klassische *Value Traps* zu unterdrücken (vgl.
 Asness/Frazzini/Pedersen, "Quality Minus Junk"). Reines Value-Investing

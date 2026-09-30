@@ -120,7 +120,7 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 | [scoring-profile.md](scoring-profile.md) | Scoring im UI: Versionen, Live-Vorschau, Validierung |
 | [frontend.md](frontend.md) | Angular-Stack, Realtime im Client, nginx-Container, Schnittstellenregeln |
 | [betrieb-synology.md](betrieb-synology.md) | Regeln für den J4125, Compose, Build und Deployment, Backup, Monitoring |
-| [roadmap.md](roadmap.md) | Phasen 0–5 mit Arbeitspaketen zum Abhaken und Abschlusskriterien |
+| [roadmap.md](roadmap.md) | Phasen 0–5 und Track F (Fundamentaldaten) mit Arbeitspaketen zum Abhaken und Abschlusskriterien |
 | [implementierungsplan.md](implementierungsplan.md) | Arbeitsweise Test → Implementierung → Grün → Review und alle Arbeitspakete im Detail |
-| [ADRs](../adr/README.md) | Architekturentscheidungen ADR-0001 bis ADR-0009 |
-| [Recherche](../research/) | Notizen zur Zielarchitektur und zu DAX/MDAX-Datenquellen |
+| [ADRs](../adr/README.md) | Architekturentscheidungen ADR-0001 bis ADR-0011 |
+| [Recherche](../research/) | Notizen zur Zielarchitektur, zu DAX/MDAX-Datenquellen und zur langfristigen Fundamentalanalyse |

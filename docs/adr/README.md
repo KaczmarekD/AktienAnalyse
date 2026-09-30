@@ -15,6 +15,8 @@ ein neues ADR das alte, und das alte bekommt den Status „ersetzt durch ADR-XXX
 | [0007](0007-lan-only-ohne-login.md) | Nur im LAN erreichbar, zum Start ohne Login | akzeptiert | 2026-09-30 |
 | [0008](0008-zielhardware-j4125.md) | Zielhardware J4125: nur amd64, Build in CI, kein AVX2 | akzeptiert | 2026-09-30 |
 | [0009](0009-scoring-profile-in-der-db.md) | Scoring-Profile versioniert in der DB, im UI editierbar | akzeptiert | 2026-09-30 |
+| [0010](0010-stichtagsdaten-konsens-quartale-kurse.md) | Zusätzliche Stichtagsdaten sichern: Konsens, Quartale, Aktienanzahl, Kurse | akzeptiert | 2026-09-30 |
+| [0011](0011-fundamentale-anker-und-belegte-faktoren.md) | Fundamentale Anker und belegte Faktoren im Scoring | vorgeschlagen | 2026-09-30 |
 
 ## Vorlage
 

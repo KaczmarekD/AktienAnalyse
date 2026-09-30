@@ -82,11 +82,24 @@ passt zum Schreibschutz:
 `scoring.scoring_run` bekommt einen Verweis auf die verwendete Profil-Version, zusätzlich zum
 vorhandenen `config_hash`.
 
+## Zusätzliche Stichtagsdaten (Track F1)
+
+Die Tabellen sind mit [ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)
+beschlossen, aber noch nicht umgesetzt. Sie speichern nur und fließen noch in keine Auswertung ein.
+
+| Tabelle | Inhalt | Schreibweise |
+|---|---|---|
+| `market_data.consensus_snapshot` | fetch_run_id, instrument_id, kind (`eps_trend`, `eps_revisions`, `earnings_estimate`, `revenue_estimate`, `growth_estimates`, `analyst_price_targets`), payload (JSONB) | anfügen, eine Zeile je Abruf, Titel und Art |
+| `market_data.statement_value` | wie bisher, zusätzlich `frequency = 'quarterly'` | versioniert wie `annual` |
+| `market_data.share_count` | instrument_id, as_of, shares, first_seen_fetch_run_id, first_seen_at | anfügen, neue Zeile nur bei neuem Datum oder geändertem Wert |
+| `market_data.price_bar` | instrument_id, trade_date, close, adj_close, dividend, split, first_seen_fetch_run_id, first_seen_at | wie `share_count`, beim ersten Abruf die ganze Historie |
+
 ## Speicherbedarf
 
 Kennzahlen, Rohdaten und Statement-Werte für 90 Titel ergeben grob wenige MB pro Woche. Postgres
 komprimiert große Werte automatisch (TOAST). Selbst über Jahre bleibt das bei einigen hundert MB.
-Löschen ist deshalb weder nötig noch vorgesehen.
+Die Kurshistorie aus F1.4 bringt bei der Erstbefüllung einmalig rund 0,7 Mio. Zeilen, das sind
+voraussichtlich einige Dutzend MB. Löschen ist deshalb weder nötig noch vorgesehen.
 
 ## Altdaten
 
