@@ -1,10 +1,11 @@
 # Zielarchitektur Value-Analyzer
 
 > **Status:** Plan, beschlossen am 30.09.2026. Umsetzung in Phasen, siehe [Roadmap](roadmap.md).
-> Erledigt ist das Universum aus iShares/Deka. Die Postgres-Persistenz (Phase 2) ist auf
-> `feat/postgres-persistence` in Arbeit. Der Code in `src/` ist weiterhin der Wochen-Batch,
-> [CLAUDE.md](../../CLAUDE.md) beschreibt diesen Ist-Stand. Für neue Arbeit gilt die hier
-> beschriebene Richtung. Bei Widersprüchen haben die [ADRs](../adr/README.md) Vorrang.
+> Erledigt sind das Universum aus iShares/Deka und im Code die Postgres-Persistenz (Phase 2,
+> `261dc8f`). Deployment und Altdaten-Import auf der NAS stehen noch aus. Der Code in `src/`
+> ist weiterhin der Wochen-Batch, [CLAUDE.md](../../CLAUDE.md) beschreibt diesen Ist-Stand. Für
+> neue Arbeit gilt die hier beschriebene Richtung. Bei Widersprüchen haben die
+> [ADRs](../adr/README.md) Vorrang.
 
 ## Kurzfassung
 
@@ -92,7 +93,7 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 | Contracts und Config | Pydantic 2.13 + pydantic-settings | Events, API-DTOs, Settings und Validierungsregeln aus einem Modell-System |
 | Messaging | NATS JetStream 2.12+ mit FastStream 0.7 | Persistenz, Replay, Request/Reply, Deduplizierung, geringer Ressourcenbedarf ([ADR-0002](../adr/0002-nats-jetstream-und-faststream.md)) |
 | Datenbank | PostgreSQL 18 (19 erscheint voraussichtlich Ende Oktober 2026) | `uuidv7()` eingebaut, ein Schema und eine Rolle je Service ([ADR-0003](../adr/0003-postgresql-schema-pro-service.md)) |
-| ORM und Migrationen | SQLAlchemy 2.1 (async, psycopg 3) + Alembic | 2.1 ist seit 24.09.2026 stabil, das Extra `sqlalchemy[asyncio]` wird benötigt. Kein SQLModel, damit Datenbank-Modelle und API-DTOs getrennt bleiben. |
+| ORM und Migrationen | SQLAlchemy 2.1 mit psycopg 3 + Alembic | Heute synchron (Batch, Phase 2). Einzelne Services stellen erst bei Bedarf auf die async-Engine um, dafür braucht es das Extra `sqlalchemy[asyncio]` ([datenhaltung.md](datenhaltung.md)). Kein SQLModel, damit Datenbank-Modelle und API-DTOs getrennt bleiben. |
 | Datenanalyse | pandas 3, NumPy 2 | nur in `market-data` und `scoring`. pyarrow entfällt mit dem Parquet-Cache. |
 | Frontend | Angular 22 | zoneless und OnPush als Standard, Signal Forms und Resource-API stabil, Tests mit Vitest ([ADR-0005](../adr/0005-angular-frontend-eigener-container.md)) |
 | State | NgRx SignalStore + Events-Plugin (NgRx ≥ 21) | Server-Events werden direkt zu Store-Events |

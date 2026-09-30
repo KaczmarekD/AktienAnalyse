@@ -1,9 +1,9 @@
 # Datenhaltung
 
-> **Status:** Die Grundlage entsteht gerade: Die Postgres-Persistenz wird auf dem Branch
-> `feat/postgres-persistence` umgesetzt (Stand 30.09.2026, noch nicht gemergt). Nach dem Merge
-> ist die Alembic-Migration die maßgebliche Quelle für Tabellen und Spalten. Dieses Dokument
-> beschreibt das Konzept und wie es in die Zielarchitektur wächst. Entscheidung:
+> **Status:** Die Postgres-Persistenz ist seit `261dc8f` auf `main` umgesetzt (Phase 2).
+> Maßgeblich für Tabellen und Spalten ist die Alembic-Migration
+> `migrations/versions/0001_initial_schema.py`. Dieses Dokument beschreibt das Konzept und wie es
+> in die Zielarchitektur wächst. Entscheidung:
 > [ADR-0003](../adr/0003-postgresql-schema-pro-service.md).
 
 ## Grundsätze
@@ -22,8 +22,7 @@
 
 ## Schemas und Tabellen (Phase 2)
 
-Stand auf `feat/postgres-persistence` (auf `ca85d93` rebased, im Review, Migration
-`migrations/versions/0001`):
+Stand `261dc8f` (Migration `0001_initial_schema`):
 
 | Schema | Tabellen | Zweck |
 |---|---|---|
@@ -91,7 +90,7 @@ Löschen ist deshalb weder nötig noch vorgesehen.
 
 ## Altdaten
 
-Der Branch bringt einen einmaligen Import der alten Parquet-Caches und Ranking-CSVs mit
+Phase 2 bringt einen einmaligen Import der alten Parquet-Caches und Ranking-CSVs mit
 (`batch.import_file` verhindert per SHA-256 den doppelten Import). Bis dieser Import auf der NAS
 gelaufen ist, muss `RETENTION_DAYS=0` gesetzt bleiben. Sonst löscht das alte Housekeeping genau die
 Dateien, die importiert werden sollen.

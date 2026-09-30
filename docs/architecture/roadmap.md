@@ -10,7 +10,7 @@
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
 | 0 | Fundament: uv, Python 3.14, aktuelle Dependencies, Images aus CI | offen |
 | 1 | Modularer Monolith mit den späteren Service-Grenzen | offen |
-| 2 | Postgres als Historien-Schicht | 🚧 in Arbeit auf `feat/postgres-persistence` |
+| 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | offen, nach Phase 2 |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
@@ -56,16 +56,15 @@ Python 3.14 grün sind.
 **Fertig, wenn:** es weiterhin ein Container ist, die Mail identisch bleibt und die CI die Grenzen
 erzwingt.
 
-## Phase 2 – Postgres (in Arbeit)
+## Phase 2 – Postgres (Code fertig, Deployment offen)
 
-Umsetzung auf `feat/postgres-persistence` in einer eigenen Session. Details in
-[datenhaltung.md](datenhaltung.md).
+Umgesetzt in `261dc8f`. Details in [datenhaltung.md](datenhaltung.md).
 
-- [ ] Schemas `batch`, `market_data`, `scoring` und `reporting` mit Alembic
-- [ ] Rollen Owner, `va_app` und `va_read`, Trigger gegen Löschen und Überschreiben
-- [ ] Rohdaten (`raw_info`) und Statement-Werte im Long-Format (`statement_value`)
-- [ ] Import der alten Parquet- und CSV-Dateien, Housekeeping entfernen
-- [ ] Merge nach `main`, Deployment auf der NAS, Altdaten-Import auf der NAS ausführen
+- [x] Schemas `batch`, `market_data`, `scoring` und `reporting` mit Alembic (`261dc8f`)
+- [x] Rollen `va_owner`, `va_app` und `va_read`, Trigger gegen Löschen und Überschreiben (`261dc8f`)
+- [x] Rohdaten (`raw_info`) und Statement-Werte im Long-Format (`statement_value`) (`261dc8f`)
+- [x] Import der alten Parquet- und CSV-Dateien, Housekeeping entfernt (`261dc8f`)
+- [ ] Nach GitHub pushen, Deployment auf der NAS, Altdaten-Import auf der NAS ausführen
 - [ ] Danach `RETENTION_DAYS` aus der `.env` entfernen
 - [ ] Backup per `pg_dump` einrichten ([betrieb-synology.md](betrieb-synology.md))
 

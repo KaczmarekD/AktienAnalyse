@@ -12,8 +12,8 @@
   („lieber einen Ticker verlieren als den ganzen Batch“), Pydantic Settings, die Test-Suite,
   Ruff/Pyright/CI.
 - Die Universum-Kette iShares → Deka → Fallback-CSV mit harter Validierung (seit `ca85d93`).
-- Die Postgres-Persistenz mit Schemas pro Fachbereich (in Arbeit auf `feat/postgres-persistence`,
-  siehe [datenhaltung.md](datenhaltung.md)).
+- Die Postgres-Persistenz mit Schemas pro Fachbereich (seit `261dc8f`, siehe
+  [datenhaltung.md](datenhaltung.md)).
 
 **Was vor dem Aufteilen entkoppelt werden muss:**
 
@@ -106,7 +106,7 @@ class SnapshotRepository(Protocol):
 | `config.py` | `va-platform`: Basis-Settings (DB, NATS, Logging) + je Service eine eigene Settings-Klasse |
 | `logging_setup.py` | `va-platform`: structlog mit JSON auf stdout, Docker rotiert die Logs |
 | `main.py` | entfällt. Die Services reagieren auf Events, pro Service gibt es eine `cli.py` für manuelle Läufe. |
-| `src/db/` (Branch `feat/postgres-persistence`) | Modelle und Repositories je Schema zum Besitzer-Service: `market_data` → `market-data`, `scoring` → `scoring`, `reporting` → `notification`, `batch` → `web-api`. Der Altdaten-Import bleibt ein einmaliges CLI-Kommando. |
+| `src/db/` (seit `261dc8f`) | Modelle und Repositories je Schema zum Besitzer-Service: `market_data` → `market-data`, `scoring` → `scoring`, `reporting` → `notification`, `batch` → `web-api`. Der Altdaten-Import bleibt ein einmaliges CLI-Kommando. |
 
 ## Grenzen erzwingen (import-linter)
 
@@ -138,9 +138,10 @@ wandert nie in diese beiden Pakete.
   Roh-Statements echter Titel. Damit sind die Kennzahlen testbar, ohne yfinance zu mocken.
   Die CLAUDE.md-Regel „yfinance-Calls werden in Tests nicht gemockt“ bleibt bestehen.
 - **Event-Handler:** FastStream-`TestNatsBroker` (im Speicher, ohne laufendes NATS).
-- **Repositories und Migrationen:** Postgres 18 per Testcontainers. Der Branch
-  `feat/postgres-persistence` bringt dafür schon `tests/db/` mit, inklusive eines Tests, der
-  den Löschschutz jeder Tabelle prüft.
+- **Repositories und Migrationen:** gegen ein echtes Postgres 18, wie seit `261dc8f` in
+  `tests/db/` umgesetzt. Jeder Test bekommt eine frische Datenbank aus einer migrierten Vorlage,
+  lokal per `make test-db-up`, in der CI als Service-Container. Ein Test prüft den Löschschutz
+  jeder Tabelle.
 - **Contracts:** JSON-Schema-Snapshots der Pydantic-Modelle. Jede Schema-Änderung ist im Diff
   sichtbar.
 - **web-api:** OpenAPI-Snapshot plus `oasdiff breaking` gegen den letzten Release

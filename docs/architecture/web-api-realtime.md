@@ -51,8 +51,8 @@ eingebaute FastAPI-Integration von FastStream ist veraltet und wurde in das Pake
 
 Schreibende Endpunkte akzeptieren ausschließlich JSON (siehe Sicherheitsregeln).
 
-**Übergang in Phase 3:** Bevor es Events gibt, liest das web-api über die Rolle `va_read` (aus
-`feat/postgres-persistence`) direkt aus den Schemas des Batches. Die Profil-Vorschau ruft den
+**Übergang in Phase 3:** Bevor es Events gibt, liest das web-api über die Rolle `va_read` (seit
+Phase 2 vorhanden) direkt aus den Schemas des Batches. Die Profil-Vorschau ruft den
 Scoring-Code über einen Port im selben Prozess auf. Ab Phase 4 werden daraus Projektionen und
 Request/Reply, ohne dass sich die REST-API ändert.
 
