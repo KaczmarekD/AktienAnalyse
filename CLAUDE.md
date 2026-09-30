@@ -76,7 +76,8 @@ war und die deutsche keine Ticker hat. Jede Live-Quelle wird hart validiert
 plausibel und ≤ 10 Tage – die Deka-Datei enthält kein Datum, der Report
 zeigt dann „ohne Stichtag“). Die undokumentierte iShares-API brach im
 Sept. 2026 schon einmal still (HTML mit HTTP 200). Abweichungen zur CSV
-werden über Symbol + Index + ISIN erkannt, also auch Auf-/Abstiege. Recherche und Abwägung: `docs/DAX MDAX Datenquellen.md`.
+werden über Symbol + Index + ISIN erkannt, also auch Auf-/Abstiege.
+Recherche und Abwägung: `docs/research/dax-mdax-datenquellen/bericht.md` (Rohnotizen unter `notizen/`).
 
 **Fallback-CSV `data/dax_mdax_fallback.csv` (symbol,name,index,isin)** wird
 von Hand gepflegt und nie automatisch überschrieben – sie ist das geprüfte
@@ -92,7 +93,7 @@ Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 - Backtesting/Performance-Tracking. Das ist ein **Screener**, kein Backtest.
   Wenn das gewünscht wird, separate Pipeline mit `vectorbt`.
 - Sektor-relatives Ranking. Aktuell global. Wäre für Banken/Versicherer
-  sauberer, aber bei 110 Werten zu wenig Daten pro Sektor.
+  sauberer, aber bei 90 Werten zu wenig Daten pro Sektor.
 - Echtzeit-Daten oder Intraday. Wöchentlicher Batch reicht für
   Fundamentaldaten, die sich quartalsweise ändern.
 - Dependency-Injection-Framework. Bei 9 Modulen würde es nur Lesbarkeit

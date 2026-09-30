@@ -19,7 +19,7 @@ bewusst nicht automatisch ueberschrieben.
 
 Rechtliches: Keine Quelle erlaubt automatisierten Abruf ausdruecklich;
 iShares/Deka sperren die Pfade nicht per robots.txt. Privat, 1x pro Woche.
-Hintergrund: docs/DAX MDAX Datenquellen.md
+Hintergrund: docs/research/dax-mdax-datenquellen/bericht.md
 """
 
 from __future__ import annotations

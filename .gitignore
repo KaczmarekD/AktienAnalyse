@@ -25,7 +25,3 @@ pytest-cache-files-*/
 .vscode/
 .idea/
 .claude/
-
-# Recherche-Rohnotizen (Bericht liegt in docs/)
-research_notes/
-reports/
