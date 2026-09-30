@@ -63,7 +63,11 @@ class TestToPayload:
 
     def test_duplicate_row_labels_keep_all_rows(self):
         frame = pd.DataFrame({"avg": [1.0, 2.0]}, index=["0y", "0y"])
-        assert to_payload(frame) == {"index": ["0y", "0y"], "columns": ["avg"], "data": [[1.0], [2.0]]}
+        assert to_payload(frame) == {
+            "index": ["0y", "0y"],
+            "columns": ["avg"],
+            "data": [[1.0], [2.0]],
+        }
 
 
 class TestCollectConsensus:

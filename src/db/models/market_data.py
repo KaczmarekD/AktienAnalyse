@@ -16,8 +16,10 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ...consensus import CONSENSUS_KINDS, CONSENSUS_STATUSES
 from .base import Base, in_values
 
 FETCH_ORIGINS = ("live", "import")
@@ -90,6 +92,36 @@ class RawInfo(Base):
     )
     fetched_at: Mapped[datetime]
     payload: Mapped[dict[str, Any]]
+
+
+class ConsensusSnapshot(Base):
+    """Konsensschaetzungen je Abruf, Titel und Art (ADR-0010) - unveraenderte Rohdaten.
+
+    ``status``: ``ok`` (Payload vorhanden), ``empty`` (Yahoo liefert nichts) oder ``error``
+    (Abruf gescheitert, Text in ``error``). So bleibt auch sichtbar, wann Daten fehlten.
+    """
+
+    __tablename__ = "consensus_snapshot"
+    __table_args__ = (
+        CheckConstraint(in_values("kind", CONSENSUS_KINDS), name="kind"),
+        CheckConstraint(in_values("status", CONSENSUS_STATUSES), name="status"),
+        CheckConstraint("(status = 'ok') = (payload IS NOT NULL)", name="payload_only_if_ok"),
+        CheckConstraint("(status = 'error') = (error IS NOT NULL)", name="error_only_if_error"),
+        {"schema": "market_data"},
+    )
+
+    fetch_run_id: Mapped[int] = mapped_column(
+        ForeignKey("market_data.fetch_run.id"), primary_key=True
+    )
+    instrument_id: Mapped[int] = mapped_column(
+        ForeignKey("market_data.instrument.id"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(primary_key=True)
+    fetched_at: Mapped[datetime]
+    status: Mapped[str]
+    # none_as_null: Python-None wird SQL-NULL statt JSON-null - sonst greift der CHECK nicht
+    payload: Mapped[Any | None] = mapped_column(JSONB(none_as_null=True))
+    error: Mapped[str | None]
 
 
 class StatementValue(Base):
