@@ -414,7 +414,7 @@ class MarketDataRepository:
             stmt = stmt.where(Instrument.symbol.in_(list(symbols)))
         df = self._frame(stmt, ["symbol", *SNAPSHOT_COLUMNS])
         df = df.rename(columns={"index_name": "index"})
-        df["errors"] = df["errors"].map(lambda e: "; ".join(e) if e else "")
+        df["errors"] = df["errors"].map(_join_errors)
         for metric in SNAPSHOT_METRICS:
             df[metric] = pd.to_numeric(df[metric], errors="coerce").astype(float)
         return df
@@ -460,3 +460,10 @@ def _statement_rows(
                     continue
                 out.setdefault((statement, str(line_item), period_end), float(value))
     return out
+
+
+def _join_errors(errors: object) -> str:
+    """TEXT[]-Spalte ``errors`` -> ``"a; b"`` wie in ``to_flat_dict``; fehlend/leer -> ``""``."""
+    if isinstance(errors, list) and errors:
+        return "; ".join(str(e) for e in errors)
+    return ""
