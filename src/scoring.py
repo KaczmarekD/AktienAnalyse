@@ -79,7 +79,8 @@ class ScoringConfig:
 def _percentile_rank(series: pd.Series, direction: str, drop_non_positive: bool) -> pd.Series:
     """Perzentilrang. NaN bleibt NaN. direction='low' -> niedrig wird zu hohem Score."""
     s = series.astype(float)
-    valid = s.notna()
+    # +/-inf ist kein Messwert (Ueberlauf) - wie NaN nicht ranken, egal woher es kommt
+    valid = np.isfinite(s)
     if direction == "low" and drop_non_positive:
         valid = valid & (s > 0)
     ranks = s[valid].rank(pct=True, method="average")

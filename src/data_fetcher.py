@@ -26,6 +26,7 @@ import pandas as pd
 import yfinance as yf
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from .db.serialization import period_end
 from .fundamentals import (
     Fundamentals,
     Growth,
@@ -159,24 +160,33 @@ def _latest(series: pd.Series | None) -> float | None:
     return _f(cleaned.iloc[0])
 
 
-def _period_end(label: Any) -> date | None:
-    try:
-        ts = pd.Timestamp(label)
-    except TypeError, ValueError:
-        return None
-    # None, NaN und "NaT" werfen nicht, sondern ergeben NaT - das ist keine Periode
-    return None if pd.isna(ts) else ts.date()
+def _dated_columns(
+    df: pd.DataFrame | None, statement: str, errors: list[str]
+) -> pd.DataFrame | None:
+    """Nur Spalten mit Periodenende - genau die, die ``statement_value`` speichert.
+
+    Sonst stuenden im Snapshot Kennzahlen aus Werten, die nicht in der Historie
+    landen und sich daraus nicht nachrechnen lassen.
+    """
+    if df is None or df.empty:
+        return df
+    keep = [period_end(c) is not None for c in df.columns]
+    if all(keep):
+        return df
+    errors.append(f"{statement}: {keep.count(False)} Spalte(n) ohne Periodenende verworfen")
+    return df.loc[:, keep]
 
 
 def _fiscal_period_end(income: pd.DataFrame | None) -> date | None:
     """Geschaeftsjahresende der juengsten Umsatz-Spalte (sonst erste befuellte Spalte)."""
+    labels: list[Any] = []
     revenue = _pick(income, "revenue")
-    if revenue is not None and not revenue.dropna().empty:
-        return _period_end(revenue.dropna().index[0])
-    if income is None or income.empty:
-        return None
-    filled = [c for c in income.columns if income[c].notna().any()]
-    return _period_end(filled[0]) if filled else None
+    if revenue is not None:
+        labels += list(revenue.dropna().index)
+    if income is not None and not income.empty:
+        labels += [c for c in income.columns if income[c].notna().any()]
+    # Erstes gueltiges Label - eine Spalte ohne Datum darf das Jahr nicht kosten
+    return next((d for d in map(period_end, labels) if d is not None), None)
 
 
 def _series_n(series: pd.Series | None, n: int) -> list[float] | None:
@@ -190,14 +200,12 @@ def _cagr(values: list[float]) -> float | None:
     """CAGR aus Zeitreihe (juengstes Element zuerst). None bei Vorzeichenwechsel."""
     if not values or len(values) < 2:
         return None
-    first, last = values[0], values[-1]
-    if last == 0 or first / last <= 0:
+    # _safe_div: None bei 0 und bei Ueberlauf (aeltester Wert fast 0 -> inf)
+    ratio = _safe_div(values[0], values[-1])
+    if ratio is None or ratio <= 0:
         return None
     years = len(values) - 1
-    try:
-        return float((first / last) ** (1.0 / years) - 1.0)
-    except ZeroDivisionError, ValueError:
-        return None
+    return float(ratio ** (1.0 / years) - 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +279,10 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         info=info,
         statements={"income": income, "balance": balance, "cashflow": cashflow},
     )
+    # Rohdaten bleiben unveraendert, gerechnet wird nur mit datierten Spalten
+    income = _dated_columns(income, "income", fund.errors)
+    balance = _dated_columns(balance, "balance", fund.errors)
+    cashflow = _dated_columns(cashflow, "cashflow", fund.errors)
     fund.provenance.fiscal_period_end = _fiscal_period_end(income)
 
     fund.identity.currency = info.get("currency")

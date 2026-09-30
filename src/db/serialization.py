@@ -27,6 +27,23 @@ def to_python(value: Any) -> Any:
     return value
 
 
+def period_end(label: Any) -> date | None:
+    """Spaltenlabel eines Abschlusses (bei yfinance das Periodenende) -> ``date``.
+
+    Die eine Regel fuer Kennzahlen (data_fetcher) und Speicherung (statement_value).
+    None, wenn das Label kein Datum ist: None/NaN/NaT, Text ohne Datum oder eine Zahl -
+    pandas liest Zahlen als Nanosekunden seit 1970, ein RangeIndex waere sonst 1970-01-01.
+    """
+    if isinstance(label, int | float | np.number):
+        return None
+    try:
+        ts = pd.Timestamp(label)
+    except TypeError, ValueError:
+        return None
+    # None und "NaT" werfen nicht, sondern ergeben NaT
+    return None if pd.isna(ts) else ts.date()
+
+
 def json_safe(obj: Any) -> Any:
     """Rekursiv JSONB-tauglich machen. NaN/Inf sind kein gueltiges JSON -> null."""
     if isinstance(obj, dict):
