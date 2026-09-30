@@ -209,8 +209,10 @@ def build_report(
     universe_removed: Sequence[str] = (),
     now: datetime | None = None,
 ) -> ReportArtifacts:
-    # Injizierbar, damit Tests (Golden-Master) deterministisch sind
-    now = now or datetime.now()
+    # Injizierbar, damit Tests (Golden-Master) deterministisch sind. Lokale Zeit:
+    # Dockerfile und Compose setzen TZ=Europe/Berlin.
+    if now is None:
+        now = datetime.now()
 
     valid = scored[scored["composite_score"].notna()].copy()
     top_rows = valid.head(top_n).to_dict(orient="records")

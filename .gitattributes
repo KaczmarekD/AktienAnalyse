@@ -4,3 +4,6 @@
 
 *.parquet binary
 *.png binary
+
+# Golden-Files werden byte-genau verglichen - Git darf keine Zeilenenden umschreiben
+tests/golden/** -text

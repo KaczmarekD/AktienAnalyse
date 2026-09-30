@@ -214,13 +214,20 @@ werden sie übersprungen; lokal `make test-db-up && make test-db`, in CI
 per Postgres-Service-Container.
 
 **Golden-Master der Mail** (`tests/test_golden_report.py`, Dateien unter
-`tests/golden/`): Ein fester Datensatz läuft durch `score()` und
-`build_report()`. HTML (je Indexquelle), CSV und Metadaten müssen byte-gleich
-bleiben. Das ist das Sicherungsnetz für Umbauten, in Phase 1 dürfen sich die
-Dateien nicht ändern. Ist eine Änderung an der Mail gewollt, die Dateien mit
-`pytest tests/test_golden_report.py --update-golden` neu schreiben und den
-Diff im Review begründen. `build_report` bekommt dafür einen festen
-Zeitpunkt (`now=`), die CSV hat immer LF-Zeilenenden.
+`tests/golden/`): Ein eingefrorener Datensatz
+(`golden/input_fundamentals.json`, bewusst nicht die geteilte Fixture) läuft
+durch `score()` und `build_report()`. Dabei gilt:
+- HTML (je Zweig der Indexquelle) und Metadaten müssen byte-gleich bleiben.
+- Die CSV muss inhaltlich gleich bleiben, Gleitkommazahlen mit Toleranz in
+  der letzten Stelle.
+- Format-Regeln: BOM, `;`, Dezimalkomma, LF.
+
+Das ist das Sicherungsnetz für Umbauten, in Phase 1 dürfen sich die Dateien
+nicht ändern. Ist eine Änderung an der Mail gewollt, die Dateien mit
+`pytest tests/test_golden_report.py --update-golden` neu schreiben. Geänderte
+Dateien melden sich dabei als „übersprungen“, und der Diff wird im Review
+begründet. In der CI ist `--update-golden` verboten. `build_report` bekommt
+dafür einen festen Zeitpunkt (`now=`), die CSV hat immer LF-Zeilenenden.
 
 ## Disclaimer
 

@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import difflib
+import os
 from collections.abc import Callable
+from itertools import islice
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
+
+# Vergleicht Golden-Inhalt (erwartet) mit dem aktuellen Ergebnis; wirft AssertionError
+GoldenCompare = Callable[[bytes, bytes, str], None]
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -20,29 +26,50 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def _text_diff(expected: bytes, actual: bytes, name: str, max_lines: int = 60) -> str:
+    diff = difflib.unified_diff(
+        expected.decode("utf-8", errors="replace").splitlines(),
+        actual.decode("utf-8", errors="replace").splitlines(),
+        fromfile=f"golden/{name}",
+        tofile="aktuell",
+        lineterm="",
+    )
+    return "\n".join(islice(diff, max_lines))
+
+
+def compare_exact(expected: bytes, actual: bytes, name: str) -> None:
+    if actual != expected:
+        msg = (
+            f"Abweichung zu golden/{name}. Bewusste Aenderung? Dann --update-golden "
+            f"und den Diff im Review begruenden.\n{_text_diff(expected, actual, name)}"
+        )
+        raise AssertionError(msg)
+
+
 @pytest.fixture
-def golden(request: pytest.FixtureRequest) -> Callable[[str, bytes], None]:
-    """Vergleicht Bytes mit ``tests/golden/<name>``; ``--update-golden`` schreibt sie neu.
+def golden(request: pytest.FixtureRequest) -> Callable[..., None]:
+    """Vergleicht Ergebnisse mit ``tests/golden/<name>``.
 
     Golden-Files halten das heutige Verhalten fest (Sicherungsnetz fuer Umbauten).
-    Eine Abweichung ist entweder ein Fehler oder eine bewusste Aenderung - dann
-    neu schreiben und den Diff im Review begruenden.
+    Eine Abweichung ist entweder ein Fehler oder eine bewusste Aenderung. Mit
+    ``--update-golden`` werden geaenderte Dateien neu geschrieben und der Test als
+    uebersprungen gemeldet, damit jede Aenderung sichtbar bleibt. In der CI ist
+    das verboten.
     """
     update = request.config.getoption("--update-golden")
+    if update and os.environ.get("CI"):
+        pytest.fail("--update-golden ist in der CI verboten - Golden-Files nur lokal neu schreiben")
 
-    def check(name: str, actual: bytes) -> None:
+    def check(name: str, actual: bytes, compare: GoldenCompare = compare_exact) -> None:
         path = GOLDEN_DIR / name
         if update:
+            if path.exists() and path.read_bytes() == actual:
+                return
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(actual)
-            return
-        assert path.exists(), (
-            f"Golden-File fehlt: {path.name} - einmal mit --update-golden erzeugen"
-        )
-        assert actual == path.read_bytes(), (
-            f"Abweichung zu golden/{path.name}. Bewusste Aenderung? Dann --update-golden "
-            "und den Diff im Review begruenden."
-        )
+            pytest.skip(f"Golden-File neu geschrieben: {name} - Diff im Review begruenden")
+        assert path.exists(), f"Golden-File fehlt: {name} - einmal mit --update-golden erzeugen"
+        compare(path.read_bytes(), actual, name)
 
     return check
 
