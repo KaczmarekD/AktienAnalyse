@@ -125,6 +125,17 @@ Neue Arbeit folgt der Zielrichtung, bei Widersprüchen gelten die ADRs.
 Pläne und Recherche-Ergebnisse werden in `docs/` fortgeschrieben, nicht nur
 im Chat besprochen.
 
+**Arbeitsweise:** Umgesetzt wird in Arbeitspaketen nach dem Zyklus
+Test → Implementierung → Grün → Review
+(`docs/architecture/implementierungsplan.md`):
+1. Tests zuerst.
+2. Code, bis die neuen Tests grün sind.
+3. Die komplette Prüfkette läuft durch (`make check` und `make test-db`).
+4. Review des Diffs.
+
+Gemergt wird erst nach Abnahme durch den User. Abgehakt wird in
+`docs/architecture/roadmap.md`.
+
 **Grenzen der Zielhardware** (Synology mit Celeron J4125, ADR-0008):
 - Kein AVX/AVX2: keine Pakete, die x86-64-v3 voraussetzen. Nach
   Dependency-Upgrades im Image auf der NAS `python -c "import numpy, pandas"`
