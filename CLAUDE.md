@@ -201,7 +201,8 @@ parsen) und `mailer.py` anpassen.
 ## Qualitätssicherung
 
 `make check` läuft Ruff + Pyright + Pytest. CI auf GitHub Actions macht
-dasselbe bei jedem Push. Tests in `tests/` decken Scoring-Logik, CSV-Load,
+dasselbe bei jedem Push auf `main` und `feat/**` sowie bei Pull Requests.
+Tests in `tests/` decken Scoring-Logik, CSV-Load,
 Reporting-Struktur und Config-Validierung ab. yfinance-Calls werden in
 Tests *nicht* gemockt – die Funktionen, die sie aufrufen, sind kein Teil
 der Test-Suite (zu viel Mocking-Overhead, zu wenig Wert).

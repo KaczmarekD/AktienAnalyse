@@ -5,16 +5,16 @@ on:
     # Feature-Branches: Ein Paket wird erst gepusht, wenn es lokal gruen ist,
     # die CI bestaetigt das vor dem Merge (Implementierungsplan, Arbeitsweise).
     branches: [main, master, "feat/**"]
-    # Reine Doku-Aenderungen brauchen keinen Testlauf. Weitere Pfad-Filter kommen,
-    # sobald es mehrere Workflows gibt (Python, Frontend, Images).
-    paths-ignore: ["docs/**", "**/*.md"]
+    # Bewusst ohne Pfad-Filter: Jeder Stand bekommt einen Status, auch reine
+    # Doku-Aenderungen (sonst haengen Pflicht-Checks). Filter erst mit mehreren
+    # Workflows (Python, Frontend, Images).
   pull_request:
     branches: [main, master]
-    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Pro Branch: Push- und PR-Lauf desselben Branches ersetzen sich gegenseitig
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
