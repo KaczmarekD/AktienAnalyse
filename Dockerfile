@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # Ziel (ADR-0008): Images entstehen in der CI und die NAS laedt sie nur (P0.6).
 # Bis dahin baut die NAS wie bisher selbst (docker compose build).
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

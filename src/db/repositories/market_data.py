@@ -450,7 +450,7 @@ def _statement_rows(
         for period_label in df.columns:
             try:
                 period_end = pd.Timestamp(period_label).date()
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             for line_item, raw in df[period_label].items():
                 value = to_python(raw)
