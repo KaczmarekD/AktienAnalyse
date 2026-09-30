@@ -3,8 +3,10 @@
 .PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check clean build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
+# --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
+# statt still neu zu locken.
 UV     ?= uv
-RUN    ?= $(UV) run
+RUN    ?= $(UV) run --locked
 PYTHON ?= $(RUN) python
 
 help: ## Zeige verfuegbare Targets
@@ -12,10 +14,10 @@ help: ## Zeige verfuegbare Targets
 
 # ---------- Dependencies (uv, ADR-0004) ----------------------------------------
 install: ## Runtime-Dependencies exakt aus uv.lock installieren
-	$(UV) sync --frozen --no-dev
+	$(UV) sync --locked --no-dev
 
 install-dev: ## Alle Dependencies inkl. Dev-Tools exakt aus uv.lock installieren
-	$(UV) sync --frozen
+	$(UV) sync --locked
 
 lock: ## uv.lock nach Aenderungen an pyproject.toml aktualisieren (Versionen bleiben)
 	$(UV) lock

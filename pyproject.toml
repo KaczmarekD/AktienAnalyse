@@ -41,6 +41,8 @@ dev = [
 # Anwendung, kein installierbares Paket: Container und Tests starten aus dem
 # Repo-Root (python -m src.main), wie bisher mit pip-tools.
 package = false
+# Gleiche uv-Minor-Version lokal, in der CI und im Docker-Build (reproduzierbare Locks)
+required-version = ">=0.12.21,<0.13"
 
 [tool.uv.workspace]
 # Ab Phase 1 (P1.1) kommen packages/* und services/* als Mitglieder dazu.

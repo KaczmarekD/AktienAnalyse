@@ -42,6 +42,9 @@ jobs:
     env:
       # DB-Tests laufen gegen den Service-Container (jede Testfunktion: eigene DB)
       TEST_DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
+      # Jeder uv-Aufruf bricht ab, wenn uv.lock nicht zu pyproject.toml passt,
+      # und lockt nie still neu
+      UV_LOCKED: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -49,30 +52,31 @@ jobs:
       - name: uv und Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v10.2.0
         with:
+          version: "0.12.21"
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
       - name: Dependencies exakt aus uv.lock
-        run: uv sync --frozen
+        run: uv sync
 
       - name: Ruff Lint
-        run: uv run --frozen ruff check src tests
+        run: uv run ruff check src tests
 
       - name: Ruff Format Check
-        run: uv run --frozen ruff format --check src tests
+        run: uv run ruff format --check src tests
 
-      - name: Pyright Type-Check
-        run: uv run --frozen pyright src
+      - name: Pyright Type-Check (wie make typecheck)
+        run: uv run pyright
 
       - name: Migrationen gegen leere DB pruefen
         env:
           DATABASE_OWNER_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
         run: |
-          uv run --frozen python -m src.db.migrate
-          uv run --frozen alembic check
+          uv run python -m src.db.migrate
+          uv run alembic check
 
       - name: Pytest
-        run: uv run --frozen pytest --cov=src --cov-report=xml --cov-report=term
+        run: uv run pytest --cov=src --cov-report=xml --cov-report=term
 
       - name: Upload coverage
         if: matrix.python-version == '3.12'
