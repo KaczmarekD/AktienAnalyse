@@ -6,7 +6,9 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 import pytest
+from sqlalchemy.exc import IntegrityError
 
+from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
 from src.db.recorder import snapshot_values
 from src.db.repositories.market_data import MarketDataRepository, UniverseMember
@@ -147,6 +149,81 @@ class TestRawInfo:
         session.commit()
         payload = repo.get_raw_info(fid, "SAP.DE")
         assert payload == {"marketCap": 1.5e11, "beta": None, "officers": [{"age": None}]}
+
+
+EPS_TREND = {"+1y": {"current": 4.548, "90daysAgo": 4.71843}, "0y": {"current": 3.69}}
+
+
+class TestConsensusSnapshots:
+    """ADR-0010, F1.1: je Abruf, Titel und Art genau eine Zeile - nur anfuegen."""
+
+    def test_one_row_per_kind_with_status(self, engine):
+        entries = {
+            "eps_trend": ConsensusEntry("ok", EPS_TREND, None),
+            "growth_estimates": ConsensusEntry("empty", None, None),
+            "analyst_price_targets": ConsensusEntry("error", None, "RuntimeError: 429"),
+        }
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["KGX.DE"])["KGX.DE"]
+            repo.write_consensus(fid, iid, entries, fetched_at=T0)
+        with session_scope(engine) as s:
+            assert MarketDataRepository(s).get_consensus(fid, "KGX.DE") == entries
+
+    def test_second_fetch_adds_rows_and_keeps_the_old_ones(self, engine):
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            first = _fetch_run(repo, started_at=T0)
+            iid = repo.get_or_create_instruments(["KGX.DE"])["KGX.DE"]
+            repo.write_consensus(
+                first, iid, {"eps_trend": ConsensusEntry("ok", EPS_TREND, None)}, fetched_at=T0
+            )
+            second = _fetch_run(repo, started_at=T0 + timedelta(days=7))
+            revised = {"+1y": {"current": 4.40, "90daysAgo": 4.60}}
+            repo.write_consensus(
+                second,
+                iid,
+                {"eps_trend": ConsensusEntry("ok", revised, None)},
+                fetched_at=T0 + timedelta(days=7),
+            )
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            assert repo.get_consensus(first, "KGX.DE")["eps_trend"].payload == EPS_TREND
+            assert repo.get_consensus(second, "KGX.DE")["eps_trend"].payload == revised
+
+    def test_nothing_to_write_is_fine(self, session):
+        repo = MarketDataRepository(session)
+        fid = _fetch_run(repo)
+        iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+        repo.write_consensus(fid, iid, {}, fetched_at=T0)
+        session.commit()
+        assert repo.get_consensus(fid, "SAP.DE") == {}
+
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            ConsensusEntry("ok", None, None),  # ok ohne Payload
+            ConsensusEntry("error", None, None),  # Fehler ohne Text
+            ConsensusEntry("empty", {"x": 1}, None),  # leer, aber mit Payload
+            ConsensusEntry("unklar", None, None),  # type: ignore[arg-type] - unbekannter Status
+        ],
+    )
+    def test_inconsistent_entries_are_rejected_by_the_database(self, session, entry):
+        repo = MarketDataRepository(session)
+        fid = _fetch_run(repo)
+        iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+        with pytest.raises(IntegrityError):
+            repo.write_consensus(fid, iid, {"eps_trend": entry}, fetched_at=T0)
+
+    def test_unknown_kind_is_rejected_by_the_database(self, session):
+        repo = MarketDataRepository(session)
+        fid = _fetch_run(repo)
+        iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+        with pytest.raises(IntegrityError):
+            repo.write_consensus(
+                fid, iid, {"kursziel_raten": ConsensusEntry("empty", None, None)}, fetched_at=T0
+            )
 
 
 class TestStatementVersioning:
