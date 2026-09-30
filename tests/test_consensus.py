@@ -61,12 +61,22 @@ class TestToPayload:
     def test_empty_response_has_no_payload(self, empty):
         assert to_payload(empty) is None
 
-    def test_duplicate_row_labels_keep_all_rows(self):
+    def test_duplicate_row_labels_keep_all_rows_and_mark_the_format(self):
         frame = pd.DataFrame({"avg": [1.0, 2.0]}, index=["0y", "0y"])
         assert to_payload(frame) == {
+            "format": "split",
             "index": ["0y", "0y"],
             "columns": ["avg"],
             "data": [[1.0], [2.0]],
+        }
+
+    def test_duplicate_column_labels_keep_all_values(self):
+        frame = pd.DataFrame([[0.1, 0.2]], index=["0y"], columns=["indexTrend", "indexTrend"])
+        assert to_payload(frame) == {
+            "format": "split",
+            "index": ["0y"],
+            "columns": ["indexTrend", "indexTrend"],
+            "data": [[0.1, 0.2]],
         }
 
 
@@ -105,3 +115,35 @@ class TestCollectConsensus:
         error = collect_consensus({"eps_trend": noisy})["eps_trend"].error
         assert error is not None
         assert len(error) <= 500
+
+    def test_nul_characters_are_removed_from_error_text(self):
+        """PostgreSQL lehnt NUL in TEXT ab - sonst scheiterte das Speichern des ganzen Titels."""
+
+        def binary_body() -> Any:
+            raise RuntimeError("HTTP 500: \x00\x00garbage")
+
+        error = collect_consensus({"eps_trend": binary_body})["eps_trend"].error
+        assert error == "RuntimeError: HTTP 500: garbage"
+
+    def test_stop_condition_skips_the_remaining_kinds(self):
+        """Nach einem Rate-Limit keine weiteren Anfragen - sie traefen den naechsten Titel."""
+        calls: list[str] = []
+
+        def throttled() -> Any:
+            calls.append("eps_trend")
+            msg = "Too Many Requests"
+            raise ConnectionRefusedError(msg)
+
+        def later() -> Any:
+            calls.append("growth_estimates")
+            return {"x": 1.0}
+
+        entries = collect_consensus(
+            {"eps_trend": throttled, "growth_estimates": later},
+            stop_after=lambda e: isinstance(e, ConnectionRefusedError),
+        )
+        assert calls == ["eps_trend"]
+        assert entries["eps_trend"].status == "error"
+        skipped = entries["growth_estimates"]
+        assert skipped.status == "error"
+        assert skipped.error == "uebersprungen nach ConnectionRefusedError"

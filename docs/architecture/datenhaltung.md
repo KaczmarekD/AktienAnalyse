@@ -90,7 +90,7 @@ speichern nur und fließen noch in keine Auswertung ein.
 
 | Tabelle | Inhalt | Schreibweise |
 |---|---|---|
-| `market_data.consensus_snapshot` | fetch_run_id, instrument_id, kind (`eps_trend`, `eps_revisions`, `earnings_estimate`, `revenue_estimate`, `growth_estimates`, `analyst_price_targets`), fetched_at, status (`ok`, `empty`, `error`), payload (JSONB, nur bei `ok`), error (nur bei `error`) | anfügen, eine Zeile je Abruf, Titel und Art, auch für leere und gescheiterte Abrufe. DataFrames liegen als `{Zeile: {Spalte: Wert}}` vor, z. B. `payload -> '+1y' ->> 'current'`. |
+| `market_data.consensus_snapshot` | fetch_run_id, instrument_id, kind (`eps_trend`, `eps_revisions`, `earnings_estimate`, `revenue_estimate`, `growth_estimates`, `analyst_price_targets`), fetched_at, status (`ok`, `empty`, `error`), payload (JSONB, nur bei `ok`), error (nur bei `error`) | anfügen, eine Zeile je Abruf, Titel und Art, auch für leere und gescheiterte Abrufe. `error` erfasst auch HTTP-Fehler, die yfinance nur loggt, sowie Arten, die nach einem Rate-Limit übersprungen wurden. DataFrames liegen als `{Zeile: {Spalte: Wert}}` vor, z. B. `payload -> '+1y' ->> 'current'`. Bei doppelten Beschriftungen gilt das Split-Format mit `"format": "split"`. |
 | `market_data.statement_value` | wie bisher, zusätzlich `frequency = 'quarterly'` | versioniert wie `annual` |
 | `market_data.share_count` | instrument_id, as_of, shares, first_seen_fetch_run_id, first_seen_at | anfügen, neue Zeile nur bei neuem Datum oder geändertem Wert |
 | `market_data.price_bar` | instrument_id, trade_date, close, adj_close, dividend, split, first_seen_fetch_run_id, first_seen_at | wie `share_count`, beim ersten Abruf die ganze Historie |
