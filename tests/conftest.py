@@ -36,7 +36,9 @@ def golden(request: pytest.FixtureRequest) -> Callable[[str, bytes], None]:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(actual)
             return
-        assert path.exists(), f"Golden-File fehlt: {path.name} - einmal mit --update-golden erzeugen"
+        assert path.exists(), (
+            f"Golden-File fehlt: {path.name} - einmal mit --update-golden erzeugen"
+        )
         assert actual == path.read_bytes(), (
             f"Abweichung zu golden/{path.name}. Bewusste Aenderung? Dann --update-golden "
             "und den Diff im Review begruenden."
