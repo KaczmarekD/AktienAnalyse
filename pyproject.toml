@@ -76,6 +76,8 @@ root_packages = [
     "va_notification",
     "src",  # Altbestand, bis Phase 1 ihn aufgeloest hat
 ]
+# Auch Drittpakete im Graphen, damit Vertraege sie verbieten koennen
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Services importieren einander nicht"
@@ -99,6 +101,12 @@ name = "Contracts sind reine Datenformate"
 type = "forbidden"
 source_modules = ["va_contracts"]
 forbidden_modules = ["va_platform"]
+
+[[tool.importlinter.contracts]]
+name = "Contracts ohne Datenverarbeitung, Datenbank und Provider"
+type = "forbidden"
+source_modules = ["va_contracts"]
+forbidden_modules = ["pandas", "numpy", "sqlalchemy", "psycopg", "yfinance"]
 
 [[tool.importlinter.contracts]]
 name = "Neue Pakete haengen nicht am Altbestand src"
@@ -141,6 +149,11 @@ ignore = [
     "PLR0915",     # too many statements
     "B008",        # function call in default arg (Depends pattern)
 ]
+
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic wertet Annotationen zur Laufzeit aus: Ihre Imports bleiben ausserhalb von
+# TYPE_CHECKING (sonst scheitert das Modell erst beim Validieren)
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "va_contracts.base.Contract"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests duerfen "dict(...)" verwenden, lokale Imports nutzen, etc.

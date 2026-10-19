@@ -1,0 +1,31 @@
+{
+  "description": "notification -> web-api: der Report ist verschickt (bei ``dry_run`` nur gespeichert).",
+  "properties": {
+    "dry_run": {
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "report_id": {
+      "minimum": 1,
+      "title": "Report Id",
+      "type": "integer"
+    },
+    "run_id": {
+      "minimum": 1,
+      "title": "Run Id",
+      "type": "integer"
+    },
+    "subject": {
+      "title": "Subject",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "report_id",
+    "subject",
+    "dry_run"
+  ],
+  "title": "ReportSentV1",
+  "type": "object"
+}

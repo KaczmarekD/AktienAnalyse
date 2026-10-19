@@ -168,6 +168,10 @@ inkompatiblen Protokollversion wird schon beim Handshake abgelehnt.
 {"op": "resync", "topic": "ranking"}
 ```
 
+Die Nachrichten sind eigene Modelle des Protokolls (P4.5) mit camelCase-Feldnamen. Die
+Event-Payloads aus `va-contracts` bleiben snake_case und werden dort abgebildet
+([events.md](events.md)).
+
 ## Synchronisation des Frontends
 
 Grundprinzip: **REST liefert den Zustand, WebSocket meldet Änderungen.**

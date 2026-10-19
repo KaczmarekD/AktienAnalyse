@@ -49,14 +49,25 @@ verpasster Events für WebSocket-Clients.
 
 | Subject | Sender | Empfänger | Inhalt (Auszug) |
 |---|---|---|---|
-| `va.screening.run.requested` | web-api | market-data | run_id, trigger (`scheduled`/`manual`), Optionen `force_refresh`, `dry_run`, `notify` |
+| `va.screening.run.requested` | web-api | market-data | run_id, trigger (`scheduled`/`manual`), options (`force_refresh`, `dry_run`, `notify`) |
 | `live.va.marketdata.fetch.progressed` | market-data | web-api | run_id, done, total, symbol, ok |
-| `va.marketdata.snapshot.completed` | market-data | scoring, web-api | run_id, fetch_run_id, as_of, success_share, universe_source, fundamentals[] |
-| `va.scoring.run.completed` | scoring | notification, web-api | run_id (leer bei Rescore), scoring_run_id, trigger, Profil (id, version), ranking[] |
+| `va.marketdata.snapshot.completed` | market-data | scoring, web-api | run_id, trigger, options, fetch_run_id, as_of, success_share, universe (Quelle, Stichtag, Größe, Zu-/Abgänge), fundamentals[] |
+| `va.scoring.run.completed` | scoring | notification, web-api | run_id (leer genau bei Rescore), trigger, options, scoring_run_id, fetch_run_id, as_of, universe, value_weight, quality_weight, Profil (id, version, Name), ranking[] (mindestens eine Zeile) |
 | `va.scoring.profile.saved` | scoring | web-api | profile_id, version |
 | `va.scoring.profile.activated` | scoring | web-api | profile_id, version |
 | `va.notification.report.sent` | notification | web-api | run_id, report_id, subject, dry_run |
-| `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id, stage, reason |
+| `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id (leer genau bei Rescore), trigger, options, stage, reason (z. B. `timeout`, `no_data`), scoring_run_id |
+
+Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring
+setzt den Trigger fort, notification verschickt bei `dry_run` oder `notify=false` keine Mail und
+pingt den Healthcheck nur bei `trigger=scheduled`. `scoring.run.completed` enthält alles, was
+Mail und CSV brauchen, auch das Universum (für `partial`/`ok` im Betreff) und die Gewichte.
+Ein Test rendert die Golden-Mail allein aus diesem Event (`tests/test_contracts_v1.py`). Keine
+bewertbaren Daten sind kein leeres Ranking, sondern `screening.run.failed` mit
+`reason=no_data`.
+
+Feldnamen sind snake_case wie in Python und den Tabellen. Das WebSocket-Protokoll zum Browser
+(P4.5) hat eigene Nachrichtenmodelle und bildet dort auf camelCase ab.
 
 Request/Reply über Core-NATS:
 
@@ -71,28 +82,35 @@ Request/Reply über Core-NATS:
 ## Envelope
 
 Jedes Event steckt in einer Hülle nach CloudEvents 1.0. Die Payload-Modelle liegen versioniert
-in `packages/va-contracts`.
+in `packages/va-contracts` (seit P1.2: `va_contracts.events.v1`, Hülle `va_contracts.Envelope`,
+Katalog `va_contracts.events.v1.EVENTS`). Ihre JSON-Schemas stehen als Golden-Files unter
+`tests/golden/contracts/v1/`.
 
 ```python
-class Envelope(BaseModel, Generic[T]):
+class Envelope[T](Contract):
     specversion: Literal["1.0"] = "1.0"
     id: UUID                       # UUIDv7; zugleich Nats-Msg-Id fuer die Deduplizierung
     type: str                      # z. B. "scoring.run.completed"
     source: str                    # z. B. "va/scoring"
-    time: datetime
-    dataschema: str                # z. B. "va-contracts/scoring.run.completed/v1"
-    correlationid: str | None      # run_id (batch.run.id)
+    time: AwareDatetime
+    dataschema: str                # z. B. "urn:va-contracts:scoring.run.completed:v1"
+    correlationid: str | None      # run_id (batch.run.id) als Text
     causationid: UUID | None       # id des ausloesenden Events
     data: T
 ```
+
+`dataschema` ist eine URN, weil CloudEvents dort eine absolute URI verlangt. Die Hülle prüft,
+dass `type` und `dataschema` laut Katalog zur Payload gehören. Sender erzeugen sie mit
+`new_envelope(spec, data, source=…)`, Empfänger lesen rohes JSON mit `parse_envelope(raw)`: Das
+Dataschema wählt das Modell, ein unbekanntes ergibt `UnknownEventError`.
 
 Die Tabellen in Postgres behalten ihre `bigint`-IDs. UUIDv7 gibt es nur für Event-IDs.
 
 Regeln zur Weiterentwicklung:
 
 - Additive Änderungen (neue optionale Felder) sind jederzeit erlaubt.
-- Inkompatible Änderungen bekommen ein neues `dataschema` (`…/v2`). Während der Umstellung
-  verstehen Empfänger beide Versionen.
+- Inkompatible Änderungen bekommen ein neues `dataschema` (`…:v2`). Während der Umstellung
+  verstehen Empfänger beide Versionen (beide Einträge in `BY_DATASCHEMA`).
 - Aus denselben Modellen entstehen die JSON-Schemas für die TypeScript-Typen im Frontend und
   die AsyncAPI-Doku. FastStream erzeugt Letztere automatisch.
 
