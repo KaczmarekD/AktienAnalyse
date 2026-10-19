@@ -28,7 +28,7 @@ fehl.
 
 Standard für jedes Paket:
 
-1. `make check`: Ruff (Lint und Format), Pyright, Pytest
+1. `make check`: Ruff (Lint und Format), Pyright, import-linter (seit P1.1), Pytest
 2. `make test-db-up && make test-db`: alle Tests inklusive der DB-Tests gegen echtes Postgres 18
 3. Die Migrationen laufen gegen eine leere Datenbank durch (wie im CI-Job).
 4. Die Golden-Files sind unverändert. Oder sie wurden bewusst aktualisiert, und das Review
@@ -199,8 +199,19 @@ sich in ganz Phase 1 nicht ändern.**
 - **Implementierung:** Gerüste für `packages/va-contracts`, `packages/va-platform`,
   `services/market-data`, `services/scoring` und `services/notification`. Die Composition Root
   bleibt vorerst beim Batch.
-- **Grün:** Standard plus `lint-imports`.
-- **Review:** Paketnamen und Abhängigkeiten zwischen den Workspace-Mitgliedern.
+  - Paketnamen `va-<name>`, Import-Namen `va_<name>`, Build-Backend `uv_build`. Die Services
+    hängen von `va-contracts` und `va-platform` ab, `va-platform` von `va-contracts`.
+  - Die Mitglieder stehen in der Dev-Gruppe des Root-Projekts: Tests, Pyright und import-linter
+    sehen sie, ins Image kommen sie noch nicht. Ab P1.3, wenn der Batch sie nutzt, werden sie
+    normale Abhängigkeiten.
+  - Der Docker-Build bindet `packages/` und `services/` ein. Ohne die Verzeichnisse bricht
+    `uv sync --locked` ab, weil das Lockfile Workspace-Mitglieder nennt.
+  - Neben den beiden Verträgen aus [code-struktur.md](code-struktur.md) gibt es drei weitere:
+    Die geteilten Pakete kennen keine Services, `va_contracts` kennt `va_platform` nicht, und
+    kein neues Paket importiert den Altbestand `src`. `va_web_api` kommt mit P3.1 dazu.
+- **Grün:** Standard plus `lint-imports` (`make imports`, CI-Schritt „Import-Grenzen“).
+- **Review:** Paketnamen und Abhängigkeiten zwischen den Workspace-Mitgliedern. Gegenprobe am
+  19.10.2026: Je ein eingebauter Verstoß gegen jeden der fünf Verträge wurde erkannt.
 
 #### P1.2 Contracts v1
 

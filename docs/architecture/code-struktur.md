@@ -110,6 +110,10 @@ class SnapshotRepository(Protocol):
 
 ## Grenzen erzwingen (import-linter)
 
+Umgesetzt mit P1.1 in `pyproject.toml` (`make imports`). Dort stehen außerdem drei weitere
+Verträge: Die geteilten Pakete kennen keine Services, `va_contracts` kennt `va_platform` nicht,
+und kein neues Paket importiert den Altbestand `src`. `va_web_api` kommt mit P3.1 dazu.
+
 ```toml
 [tool.importlinter]
 root_packages = [

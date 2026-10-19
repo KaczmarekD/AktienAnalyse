@@ -143,7 +143,7 @@ Voraussetzung ist [uv](https://docs.astral.sh/uv/) (Windows: `winget install ast
 make install-dev    # alle Abhängigkeiten exakt aus uv.lock (.venv)
 cp .env.example .env && nano .env
 make dry            # Dry-Run lokal
-make check          # ruff + pyright + pytest (DB-Tests werden ohne DB übersprungen)
+make check          # ruff + pyright + import-linter + pytest (DB-Tests ohne DB übersprungen)
 make test-db-up     # Wegwerf-Postgres auf Port 55432 (Docker)
 make test-db        # alle Tests inkl. DB-Tests
 make test-cov       # Tests mit Coverage-HTML-Report

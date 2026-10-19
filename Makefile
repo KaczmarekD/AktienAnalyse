@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -8,6 +8,8 @@
 UV     ?= uv
 RUN    ?= $(UV) run --locked
 PYTHON ?= $(RUN) python
+# Python-Code fuer Ruff (Pyright: [tool.pyright] include in pyproject.toml)
+PY_PATHS = src tests docker packages services
 
 help: ## Zeige verfuegbare Targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -43,17 +45,20 @@ test-cov: ## Tests mit Coverage-Report
 	$(RUN) pytest --cov=src --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
-	$(RUN) ruff check src tests docker
-	$(RUN) ruff format --check src tests docker
+	$(RUN) ruff check $(PY_PATHS)
+	$(RUN) ruff format --check $(PY_PATHS)
 
 format: ## Code automatisch formatieren
-	$(RUN) ruff format src tests docker
-	$(RUN) ruff check --fix src tests docker
+	$(RUN) ruff format $(PY_PATHS)
+	$(RUN) ruff check --fix $(PY_PATHS)
 
 typecheck: ## Statische Typpruefung
 	$(RUN) pyright
 
-check: lint typecheck test ## Alles in einem: lint + typecheck + test (DB-Tests nur mit TEST_DATABASE_URL)
+imports: ## Grenzen zwischen den Workspace-Paketen pruefen (import-linter)
+	$(RUN) lint-imports
+
+check: lint typecheck imports test ## Alles in einem: lint + typecheck + imports + test (DB-Tests nur mit TEST_DATABASE_URL)
 
 # DB-Tests laufen gegen ein echtes PostgreSQL (jede Testfunktion bekommt eine eigene DB).
 TEST_DATABASE_URL ?= postgresql+psycopg://postgres:test@localhost:55432/postgres

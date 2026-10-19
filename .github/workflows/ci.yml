@@ -58,13 +58,16 @@ jobs:
         run: uv sync
 
       - name: Ruff Lint
-        run: uv run ruff check src tests docker
+        run: uv run ruff check src tests docker packages services
 
       - name: Ruff Format Check
-        run: uv run ruff format --check src tests docker
+        run: uv run ruff format --check src tests docker packages services
 
       - name: Pyright Type-Check (wie make typecheck)
         run: uv run pyright
+
+      - name: Import-Grenzen (wie make imports)
+        run: uv run lint-imports
 
       - name: Migrationen gegen leere DB pruefen
         env:
