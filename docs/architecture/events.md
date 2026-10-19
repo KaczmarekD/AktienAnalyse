@@ -31,6 +31,12 @@ jede Stufe     ─ screening.run.failed ────────────► 
 ⁽¹⁾ Flüchtig über Core-NATS. Geht eine Fortschrittsmeldung verloren, ist das egal, weil das
 web-api den Run-Status ohnehin selbst führt.
 
+Bis Phase 4 läuft die Kette im Batch-Prozess über `va_platform.bus.InProcessBus` (P1.8):
+`src/main.py` übernimmt die Rolle des web-api (Run anlegen, `screening.run.requested`
+senden, Ergebnis über den `RunTracker` festhalten), der Trigger ist immer `scheduled`.
+Im Prozess gilt `max_deliver=1`. Mit NATS kann ein Event erneut zugestellt werden; spätestens
+dann braucht notification die Inbox, sonst ginge die Mail doppelt raus.
+
 ## Subjects und Streams
 
 | Präfix | Zweck | Speicherung |
@@ -56,7 +62,7 @@ verpasster Events für WebSocket-Clients.
 | `va.scoring.profile.saved` | scoring | web-api | profile_id, version |
 | `va.scoring.profile.activated` | scoring | web-api | profile_id, version |
 | `va.notification.report.sent` | notification | web-api | run_id, report_id, subject, dry_run |
-| `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id (leer genau bei Rescore), trigger, options, stage, reason (z. B. `timeout`, `no_data`), scoring_run_id |
+| `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id (leer genau bei Rescore), trigger, options, stage, reason (z. B. `timeout`, `no_data`), scoring_run_id, detail (Traceback für die Fehlermail) |
 
 Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring
 setzt den Trigger fort, notification verschickt bei `dry_run` oder `notify=false` keine Mail und

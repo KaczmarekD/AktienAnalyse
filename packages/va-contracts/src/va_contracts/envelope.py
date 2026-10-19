@@ -88,6 +88,9 @@ def parse_envelope(raw: str | bytes) -> Envelope[Contract]:
     if spec is None or spec.type != head.type:
         msg = f"unbekanntes Event: type={head.type!r}, dataschema={head.dataschema!r}"
         raise UnknownEventError(msg)
-    return Envelope[Contract].model_validate(
+    # Mit dem Modell parametrisiert, nicht mit Contract: Sonst serialisiert Pydantic ``data``
+    # als leeren Contract, und ein weitergereichtes Event kaeme ohne Payload an.
+    envelope_type: type[Envelope[Contract]] = Envelope[spec.model]
+    return envelope_type.model_validate(
         {**head.model_dump(exclude={"data"}), "data": spec.model.model_validate(head.data)}
     )

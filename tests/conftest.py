@@ -75,6 +75,21 @@ def golden(request: pytest.FixtureRequest) -> Callable[..., None]:
 
 
 @pytest.fixture
+def settings(tmp_path, monkeypatch):
+    """Gueltige Settings ohne echte Dienste; Daten und Logs unter ``tmp_path``."""
+    monkeypatch.setenv("SMTP_USER", "test@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "dummy-app-pw")
+    monkeypatch.setenv("MAIL_TO", "recipient@example.com")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://va_app:x@localhost/value_analyzer")
+    monkeypatch.chdir(tmp_path)
+
+    from src.config import Settings
+
+    s = Settings()  # type: ignore[call-arg]
+    return s.model_copy(update={"data_dir": tmp_path / "data", "logs_dir": tmp_path / "logs"})
+
+
+@pytest.fixture
 def mock_universe_df() -> pd.DataFrame:
     """Repraesentatives 8-Werte-Universum mit allen Profilen."""
     rows = [

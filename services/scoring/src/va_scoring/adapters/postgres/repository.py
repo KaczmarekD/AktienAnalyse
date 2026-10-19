@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -64,6 +64,24 @@ def config_hash(config: dict[str, Any] | None) -> str | None:
 class ScoringRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    # --- Instrumente (nur lesend, gehoeren market-data) ------------------------
+
+    def get_instrument_ids(self, symbols: Iterable[str]) -> dict[str, int]:
+        """IDs aus ``market_data.instrument``. market-data legt sie beim Abruf an; fehlt
+        ein Symbol, ist das ein Fehler im Ablauf und kein Fall zum Anlegen."""
+        wanted = sorted(set(symbols))
+        if not wanted:
+            return {}
+        rows = self.session.execute(
+            select(_instrument.c.symbol, _instrument.c.id).where(_instrument.c.symbol.in_(wanted))
+        ).all()
+        ids = {str(symbol): int(iid) for symbol, iid in rows}
+        missing = [s for s in wanted if s not in ids]
+        if missing:
+            msg = f"Instrumente fehlen in market_data.instrument: {', '.join(missing)}"
+            raise LookupError(msg)
+        return ids
 
     # --- write -------------------------------------------------------------
 

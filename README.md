@@ -204,7 +204,9 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 ```
 value-analyzer/
 ├── src/
-│   ├── main.py             # Orchestrator: verbindet alle Module
+│   ├── main.py             # Einstieg: Lauf anlegen, Event-Kette starten, abschließen
+│   ├── composition.py      # Adapter bauen, Handler der Module an den Bus hängen
+│   ├── run_tracker.py      # Abschluss von batch.run aus den Events
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
 │   ├── universe.py         # Verdrahtung: Quellen-Kette + Pfad der Fallback-CSV
 │   ├── data_fetcher.py     # Verdrahtung: Yahoo-Adapter für den Batch

@@ -25,6 +25,18 @@
   },
   "description": "jede Stufe, Watchdog -> notification, web-api: ein Run ist gescheitert.\n\n``options`` entscheidet ueber die Fehlermail (nicht bei ``dry_run`` oder ohne\n``notify``), ``trigger`` ueber den Healthcheck-Ping (nur bei ``scheduled``).",
   "properties": {
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
     "options": {
       "$ref": "#/$defs/RunOptionsV1"
     },

@@ -12,10 +12,14 @@ versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking).
 
 ## Architektur in einem Satz
 
-`load_universe` → `fetch_all` (yfinance) → `score` (Cross-Sektional-Ranking)
-→ `build_report` (HTML+CSV) → `send_report` (SMTP), orchestriert von
-`src/main.py`, geplant via Cron im Container. Jeder Schritt wird über den
-`BatchRecorder` (`src/db/recorder.py`) in PostgreSQL 18 festgehalten.
+`src/main.py` legt den Lauf an und startet die Event-Kette auf dem Bus im Prozess
+(`va_platform.bus.InProcessBus`): market-data (Universum, yfinance) →
+`marketdata.snapshot.completed` → scoring (Cross-Sektional-Ranking) →
+`scoring.run.completed` → notification (HTML+CSV, SMTP, Healthcheck). Die Handler
+liegen unter `entrypoints/handlers.py` der Module, `src/composition.py` verdrahtet
+sie, `src/run_tracker.py` leitet aus den Events den Abschluss von `batch.run` ab.
+Jedes Modul speichert selbst in PostgreSQL 18 (`adapters/postgres/store.py`).
+Geplant via Cron im Container.
 
 ## Methodik-Entscheidungen
 

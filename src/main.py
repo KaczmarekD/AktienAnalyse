@@ -1,8 +1,10 @@
-"""Orchestriert den Batch: Universum -> Daten -> Scoring -> Report -> Mail.
+"""Einstieg des Batches: Lauf anlegen, Event-Kette starten, Lauf abschliessen (P1.8).
 
-Jeder Schritt landet ueber den ``BatchRecorder`` in PostgreSQL - nichts wird
-geloescht oder ueberschrieben. Ist die Datenbank nicht erreichbar, bricht der
-Lauf ab (Exit 4): ohne Speicherung kein Report, ein manueller Nachlauf reicht.
+Die Arbeit machen die Handler der Module am Bus (``src/composition.py``):
+market-data -> scoring -> notification. Dieses Modul verdrahtet nur, startet die Kette mit
+``screening.run.requested`` und schreibt am Ende das Ergebnis des ``RunTracker`` in
+``batch.run``. Ist die Datenbank nicht erreichbar, bricht der Lauf ab (Exit 4): ohne
+Speicherung kein Report, ein manueller Nachlauf reicht.
 
 Exit-Codes: 0 ok, 1 Fehler im Lauf, 2 Konfiguration, 3 keine bewertbaren
 Daten, 4 Datenbank nicht erreichbar.
@@ -11,52 +13,54 @@ Daten, 4 Datenbank nicht erreichbar.
 from __future__ import annotations
 
 import argparse
-import html
 import logging
 import sys
 import traceback
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import date
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from pydantic import ValidationError
 
-from va_notification.adapters.healthchecks import ping, ping_target
-from va_notification.domain.report import ReportArtifacts, build_report
-from va_platform.db import create_db_engine
-from va_scoring.domain.scoring import ScoringConfig, score
+from va_contracts import new_envelope
+from va_contracts.events.v1 import (
+    RUN_FAILED,
+    RUN_REQUESTED,
+    RunFailedV1,
+    RunOptionsV1,
+    ScreeningRunRequestedV1,
+    Stage,
+)
+from va_notification.entrypoints.handlers import notify_failure_without_run
+from va_platform.bus import InProcessBus, follow_up
 
 from . import __version__
+from .composition import alert_channels, build_adapters, wire
 from .config import Settings, load_settings
-from .data_fetcher import FetcherConfig, fetch_all
 from .db.log_handler import BufferingLogHandler
-from .db.recorder import BatchRecorder
 from .logging_setup import setup_logging
-from .mailer import send_report
-from .universe import load_universe
+from .run_tracker import EXIT_FAILED, EXIT_NO_DATA, EXIT_OK, RunOutcome, RunTracker
 
 if TYPE_CHECKING:
-    import pandas as pd
+    from va_platform.bus import DeadLetter
 
-    from va_market_data.domain.fundamentals import Fundamentals
-    from va_market_data.domain.history import HistoryState
-    from va_market_data.domain.universe import Ticker
+    from .composition import Adapters
 
-EXIT_OK = 0
-EXIT_FAILED = 1
+__all__ = ["EXIT_FAILED", "EXIT_NO_DATA", "EXIT_OK", "main", "run"]
+
 EXIT_CONFIG = 2
-EXIT_NO_DATA = 3
 EXIT_DB_UNAVAILABLE = 4
+
+SOURCE = "va/batch"
+# Im Prozess keine Wiederholung: Die Handler fangen ihre Fehler selbst und melden
+# screening.run.failed. Was trotzdem durchschlaegt, ist ein Bug - den Abruf deshalb
+# nochmal zu starten, kostete nur Minuten und erzeugte einen zweiten fetch_run.
+MAX_DELIVER = 1
 
 # Nie in die Datenbank: Passwoerter, Verbindungs-URLs, Healthcheck-UUID
 _SECRET_SETTINGS = {"smtp_password", "database_url", "database_owner_url", "healthcheck_url"}
 
 log = logging.getLogger("main")
-
-
-def _open_recorder(settings: Settings) -> BatchRecorder:
-    return BatchRecorder(create_db_engine(settings.database_url.get_secret_value()))
 
 
 def _settings_snapshot(settings: Settings) -> dict[str, Any]:
@@ -87,12 +91,18 @@ def _safely(what: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Non
         log.warning("%s konnte nicht gespeichert werden", what, exc_info=True)
 
 
-def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
+def _run(
+    settings: Settings,
+    *,
+    force_refresh: bool,
+    dry_run: bool,
+    adapters: Adapters | None = None,
+) -> int:
     with _capture_logs() as captured:
         log.info("=== value-analyzer v%s START ===", __version__)
         try:
-            recorder = _open_recorder(settings)
-            run_id = recorder.start_run(
+            adapters = adapters or build_adapters(settings)
+            run_id = adapters.batch.start_run(
                 kind="batch",
                 dry_run=dry_run,
                 force_refresh=force_refresh,
@@ -101,267 +111,93 @@ def _run(settings: Settings, *, force_refresh: bool, dry_run: bool) -> int:
             )
         except Exception:
             log.exception("Datenbank nicht erreichbar - Lauf abgebrochen")
-            ping(settings.healthcheck_url, success=False, message="database unreachable")
-            if not dry_run:
-                _try_send_error_mail(settings, traceback.format_exc())
+            sender, heartbeat = (
+                (adapters.sender, adapters.heartbeat) if adapters else alert_channels(settings)
+            )
+            notify_failure_without_run(
+                sender,
+                heartbeat,
+                "database unreachable",
+                detail=traceback.format_exc(),
+                dry_run=dry_run,
+            )
             return EXIT_DB_UNAVAILABLE
 
         try:
-            return _execute(
-                settings, recorder, run_id, force_refresh=force_refresh, dry_run=dry_run
-            )
+            options = RunOptionsV1(force_refresh=force_refresh, dry_run=dry_run)
+            try:
+                outcome = _execute(settings, adapters, run_id, options)
+            except Exception:
+                # Faellt etwas aus dem Bus heraus, ist es ein Bug: abschliessen und alarmieren
+                log.exception("Unerwarteter Fehler im Run")
+                outcome = RunOutcome(
+                    status="failed", exit_code=EXIT_FAILED, error=traceback.format_exc()
+                )
+                _alarm(adapters, "unexpected error", outcome.error or "", dry_run=dry_run)
+            _safely("Laufabschluss", adapters.batch.finish_run, run_id, **outcome.finish_kwargs())
+            if outcome.exit_code == EXIT_OK:
+                log.info(
+                    "=== Run erfolgreich (scored %s/%s) ===",
+                    outcome.scored_count,
+                    outcome.universe_size,
+                )
+            return outcome.exit_code
         finally:
-            _safely("Log-Zeilen", recorder.record_logs, run_id, captured.entries)
+            _safely("Log-Zeilen", adapters.batch.record_logs, run_id, captured.entries)
 
 
 def _execute(
-    settings: Settings, recorder: BatchRecorder, run_id: int, *, force_refresh: bool, dry_run: bool
-) -> int:
-    ids: dict[str, int | None] = {"fetch_run_id": None, "scoring_run_id": None, "report_id": None}
-    universe_size: int | None = None
-    try:
-        universe = load_universe()
-        tickers = universe.tickers
-        if settings.universe == "DAX_ONLY":
-            tickers = [t for t in tickers if t.index == "DAX"]
-        universe_size = len(tickers)
+    settings: Settings, adapters: Adapters, run_id: int, options: RunOptionsV1
+) -> RunOutcome:
+    """Startet die Kette und wartet ihr Ende ab (im Prozess: bis ``publish`` zurueckkehrt)."""
+    tracker = RunTracker(run_id)
 
-        symbols = [t.symbol for t in tickers]
-        fetch_run_id = (
-            None if force_refresh else recorder.find_reusable_fetch(date.today(), symbols)
-        )
-        if fetch_run_id is not None:
-            log.info("Nutze Abruf #%d von heute aus der Datenbank", fetch_run_id)
-            df = recorder.load_snapshots(fetch_run_id, symbols)
-        else:
-            fetch_run_id = recorder.start_fetch(tickers, universe.source, universe.as_of)
-            ids["fetch_run_id"] = fetch_run_id
-            df = _fetch_and_store(settings, recorder, fetch_run_id, tickers)
-        ids["fetch_run_id"] = fetch_run_id
-
-        scoring_cfg = ScoringConfig(
-            min_market_cap=settings.min_market_cap,
-            value_weight=settings.value_weight,
-            quality_weight=settings.quality_weight,
-        )
-        scored = score(df, scoring_cfg)
-        ids["scoring_run_id"] = recorder.record_scoring(fetch_run_id, df, scored, scoring_cfg)
-
-        if scored.empty or int(scored["composite_score"].notna().sum()) == 0:
-            log.error("Keine bewertbaren Datenpunkte - Abbruch.")
-            recorder.finish_run(
-                run_id,
-                status="no_data",
-                exit_code=EXIT_NO_DATA,
-                universe_size=universe_size,
-                scored_count=0,
-                failed_count=universe_size,
-                **ids,
+    def dead_letter(dead: DeadLetter) -> None:
+        # Ein Handler ist an einem Bug gescheitert: Der Lauf endet wie jeder Fehlschlag,
+        # also mit Ping und Fehlermail. Ein gescheitertes Fehler-Event loest keines mehr aus.
+        tracker.on_dead_letter(dead)
+        if dead.envelope.type != RUN_FAILED.type:
+            failed = RunFailedV1(
+                run_id=run_id,
+                trigger="scheduled",
+                options=options,
+                stage=_stage(dead.consumer),
+                reason=f"{dead.consumer}: {dead.error}",
+                detail=repr(dead.error),
             )
-            _ping(settings, recorder, run_id, success=False, message="no scoreable data")
-            return EXIT_NO_DATA
+            bus.publish(follow_up(dead.envelope, RUN_FAILED, failed, source=SOURCE))
 
-        report = build_report(
-            scored,
-            top_n=settings.top_n,
-            bottom_n=settings.bottom_n,
-            value_weight=settings.value_weight,
-            quality_weight=settings.quality_weight,
-            version=__version__,
-            universe_size=universe_size,
-            universe_source=universe.source,
-            universe_as_of=universe.as_of,
-            universe_added=[_ticker_label(t) for t in universe.added],
-            universe_removed=[_ticker_label(t) for t in universe.removed],
+    bus = InProcessBus(max_deliver=MAX_DELIVER, on_dead_letter=dead_letter)
+    wire(bus, adapters, settings, version=__version__)
+    tracker.subscribe(bus)
+    bus.publish(
+        new_envelope(
+            RUN_REQUESTED,
+            ScreeningRunRequestedV1(run_id=run_id, trigger="scheduled", options=options),
+            source=SOURCE,
+            correlationid=str(run_id),
         )
-        ids["report_id"] = recorder.record_report(run_id, ids["scoring_run_id"], report)
-        counts = {
-            "universe_size": report.universe_size,
-            "scored_count": report.scored,
-            "failed_count": report.failed,
-        }
-        status = "success" if report.failed == 0 else "partial"
-
-        if dry_run:
-            _write_preview(settings, report)
-            recorder.finish_run(run_id, status=status, exit_code=EXIT_OK, **counts, **ids)
-            return EXIT_OK
-
-        _send_and_record(settings, recorder, run_id, ids["report_id"], report)
-        log.info("=== Run erfolgreich (scored %d/%d) ===", report.scored, report.universe_size)
-        # Die Mail ist raus: ein DB-Fehler beim Abschluss darf keinen Fehlalarm ausloesen
-        _safely(
-            "Laufabschluss",
-            recorder.finish_run,
-            run_id,
-            status=status,
-            exit_code=EXIT_OK,
-            **counts,
-            **ids,
-        )
-        _ping(
-            settings,
-            recorder,
-            run_id,
-            success=True,
-            message=f"scored {report.scored}/{report.universe_size}",
-        )
-    except Exception as e:
-        trace = traceback.format_exc()
-        log.exception("Unerwarteter Fehler im Run")
-        _safely(
-            "Laufabschluss",
-            recorder.finish_run,
-            run_id,
-            status="failed",
-            exit_code=EXIT_FAILED,
-            error=trace,
-            universe_size=universe_size,
-            **ids,
-        )
-        _ping(settings, recorder, run_id, success=False, message=str(e))
-        if not dry_run:
-            _try_send_error_mail(settings, trace, recorder=recorder, run_id=run_id)
-        return EXIT_FAILED
-    return EXIT_OK
-
-
-def _fetch_and_store(
-    settings: Settings, recorder: BatchRecorder, fetch_run_id: int, tickers: list[Ticker]
-) -> pd.DataFrame:
-    """Ruft alle Titel ab und speichert jeden sofort.
-
-    Laesst sich ein Titel auch nach Retries nicht speichern, faellt nur er aus dem
-    Lauf - Report und Datenbank bleiben deckungsgleich.
-    """
-    unsaved: set[str] = set()
-
-    def store(fund: Fundamentals) -> None:
-        try:
-            recorder.record_fundamentals(fetch_run_id, fund)
-        except Exception:
-            log.exception("%s konnte nicht gespeichert werden - Titel entfaellt", fund.symbol)
-            unsaved.add(fund.symbol)
-
-    df = fetch_all(
-        tickers,
-        cfg=FetcherConfig(default_tax_rate=settings.default_tax_rate),
-        on_result=store,
-        history=_history_state(recorder, tickers),
     )
-    if unsaved and "symbol" in df.columns:
-        df = df[~df["symbol"].isin(unsaved)].reset_index(drop=True)
-    recorder.finish_fetch(fetch_run_id, df)
-    return df
+    if tracker.outcome is None:
+        log.error("Die Event-Kette endete ohne Ergebnis - Lauf gilt als gescheitert")
+        _alarm(adapters, "run without outcome", "Lauf ohne Ergebnis", dry_run=options.dry_run)
+        return RunOutcome(status="failed", exit_code=EXIT_FAILED, error="Lauf ohne Ergebnis")
+    return tracker.outcome
 
 
-def _history_state(recorder: BatchRecorder, tickers: list[Ticker]) -> dict[str, HistoryState]:
-    """Gespeicherter Stand der Zeitreihen je Titel.
-
-    Ist er nicht lesbar, wird die ganze Historie geholt. Die Versionierung verhindert
-    Dubletten, es kostet nur Zeit.
-    """
+def _alarm(adapters: Adapters, message: str, detail: str, *, dry_run: bool) -> None:
+    """Ping /fail und Fehlermail, wenn die Kette selbst keinen Fehlschlag melden konnte."""
     try:
-        return recorder.history_state([t.symbol for t in tickers])
+        notify_failure_without_run(
+            adapters.sender, adapters.heartbeat, message, detail=detail, dry_run=dry_run
+        )
     except Exception:
-        log.warning("Stand der Zeitreihen nicht lesbar - rufe die ganze Historie ab", exc_info=True)
-        return {}
+        log.exception("Alarm konnte nicht verschickt werden")
 
 
-def _ticker_label(t: Ticker) -> str:
-    return f"{t.name} ({t.symbol}, {t.index})"
-
-
-def _write_preview(settings: Settings, report: ReportArtifacts) -> None:
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    preview = settings.data_dir / "preview_latest.html"
-    preview.write_text(report.html, encoding="utf-8")
-    # Praefix: Der Altdaten-Import greift nur value_ranking_*.csv auf
-    csv_path = settings.data_dir / f"preview_{report.csv_filename}"
-    csv_path.write_bytes(report.csv_bytes)
-    log.info("DRY-RUN: HTML-Preview -> %s", preview)
-    log.info("DRY-RUN: CSV -> %s", csv_path)
-    log.info("DRY-RUN: Subject waere -> %s", report.subject)
-
-
-def _send_and_record(
-    settings: Settings,
-    recorder: BatchRecorder,
-    run_id: int,
-    report_id: int | None,
-    report: ReportArtifacts,
-) -> None:
-    delivery = {
-        "run_id": run_id,
-        "report_id": report_id,
-        "channel": "mail",
-        "kind": "report",
-        "recipient": str(settings.mail_to),
-        "subject": report.subject,
-    }
-    try:
-        send_report(
-            settings,
-            report.subject,
-            report.html,
-            attachment=(report.csv_filename, report.csv_bytes),
-        )
-    except Exception as e:
-        _safely(
-            "Versandprotokoll", recorder.record_delivery, **delivery, success=False, error=str(e)
-        )
-        raise
-    _safely("Versandprotokoll", recorder.record_delivery, **delivery, success=True)
-
-
-def _ping(
-    settings: Settings, recorder: BatchRecorder, run_id: int, *, success: bool, message: str
-) -> None:
-    result = ping(settings.healthcheck_url, success=success, message=message)
-    if result is None:
-        return
-    _safely(
-        "Healthcheck-Protokoll",
-        recorder.record_delivery,
-        run_id=run_id,
-        report_id=None,
-        channel="healthcheck",
-        kind="ping_ok" if success else "ping_fail",
-        recipient=ping_target(settings.healthcheck_url),
-        subject=None,
-        success=result,
-        error=None if result else "Ping fehlgeschlagen",
-    )
-
-
-def _try_send_error_mail(
-    settings: Settings,
-    trace: str,
-    *,
-    recorder: BatchRecorder | None = None,
-    run_id: int | None = None,
-) -> None:
-    subject = "FEHLER beim Batch-Run"
-    error: str | None = None
-    try:
-        body = f"<h2>Fehler im woechentlichen Batch-Run</h2><pre>{html.escape(trace)}</pre>"
-        send_report(settings, subject, body, attachment=None)
-    except Exception as inner:
-        log.error("Auch Fehler-Mail fehlgeschlagen: %s", inner)
-        error = str(inner)
-    if recorder is not None:
-        _safely(
-            "Versandprotokoll",
-            recorder.record_delivery,
-            run_id=run_id,
-            report_id=None,
-            channel="mail",
-            kind="error",
-            recipient=str(settings.mail_to),
-            subject=subject,
-            success=error is None,
-            error=error,
-        )
+def _stage(consumer: str) -> Stage:
+    """Stufe fuer screening.run.failed; was keinem Modul gehoert, meldet der Watchdog."""
+    return consumer if consumer in get_args(Stage) else "watchdog"  # type: ignore[return-value]
 
 
 def run(force_refresh: bool = False, dry_run: bool = False) -> int:
