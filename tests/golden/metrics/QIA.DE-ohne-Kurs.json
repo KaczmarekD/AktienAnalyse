@@ -1,0 +1,45 @@
+{
+ "errors": [
+  "fx USD->EUR failed: kein Kurs"
+ ],
+ "fiscal_period_end": "2025-12-31",
+ "growth": {
+  "eps_growth_5y": -0.09884464810856064,
+  "revenue_growth_5y": -0.008084257153451513
+ },
+ "identity": {
+  "currency": "EUR",
+  "financial_currency": "USD",
+  "index": "DAX",
+  "industry": "Diagnostics & Research",
+  "name": "QIA.DE",
+  "sector": "Healthcare",
+  "symbol": "QIA.DE"
+ },
+ "market": {
+  "enterprise_value": null,
+  "market_cap": 8501399040.0,
+  "price": 41.17,
+  "shares_outstanding": 206495000.0
+ },
+ "quality": {
+  "debt_to_equity": 0.4796977571586547,
+  "earnings_stability": 0.5612604019285823,
+  "fcf_margin": 0.21397139424468625,
+  "gross_margin": 0.6217682400804977,
+  "net_debt_ebitda": 1.3570497457711006,
+  "operating_margin": 0.24895227222596758,
+  "roa": 0.06764278090667564,
+  "roic": 0.08115528999105312
+ },
+ "statement_fx": null,
+ "value": {
+  "buyback_yield": null,
+  "dividend_yield": 0.008847185,
+  "ev_ebit": null,
+  "p_fcf": null,
+  "pb_ratio": null,
+  "pe_ratio": null,
+  "shareholder_yield": 0.008847185
+ }
+}

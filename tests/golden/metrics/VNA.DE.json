@@ -1,0 +1,43 @@
+{
+ "errors": [],
+ "fiscal_period_end": "2025-12-31",
+ "growth": {
+  "eps_growth_5y": null,
+  "revenue_growth_5y": -0.009296613518317232
+ },
+ "identity": {
+  "currency": "EUR",
+  "financial_currency": "EUR",
+  "index": "DAX",
+  "industry": "Real Estate Services",
+  "name": "VNA.DE",
+  "sector": "Real Estate",
+  "symbol": "VNA.DE"
+ },
+ "market": {
+  "enterprise_value": 60183232512.0,
+  "market_cap": 14020399104.0,
+  "price": 16.525,
+  "shares_outstanding": 848435623.0
+ },
+ "quality": {
+  "debt_to_equity": 1.5724843992339788,
+  "earnings_stability": 0.0,
+  "fcf_margin": 0.4592227182353603,
+  "gross_margin": 0.4004389091045504,
+  "net_debt_ebitda": 10.103064137216762,
+  "operating_margin": 0.08888847207112578,
+  "roa": 0.03992266391293578,
+  "roic": 0.03558700150302729
+ },
+ "statement_fx": 1.0,
+ "value": {
+  "buyback_yield": 0.046161310758647,
+  "dividend_yield": 0.0742942,
+  "ev_ebit": 17.472269563652198,
+  "p_fcf": 5.7265854282563415,
+  "pb_ratio": 0.5144449,
+  "pe_ratio": 3.764237,
+  "shareholder_yield": 0.12045551075864701
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "errors": [],
+ "fiscal_period_end": "2025-12-31",
+ "growth": {
+  "eps_growth_5y": 0.46250853041297124,
+  "revenue_growth_5y": 0.07625552156258508
+ },
+ "identity": {
+  "currency": "EUR",
+  "financial_currency": "EUR",
+  "index": "DAX",
+  "industry": "Software - Application",
+  "name": "SAP.DE",
+  "sector": "Technology",
+  "symbol": "SAP.DE"
+ },
+ "market": {
+  "enterprise_value": 228758716416.0,
+  "market_cap": 228994121728.0,
+  "price": 198.4,
+  "shares_outstanding": 1154204232.0
+ },
+ "quality": {
+  "debt_to_equity": 0.16767595209258512,
+  "earnings_stability": 0.5664569557242596,
+  "fcf_margin": 0.22872282608695652,
+  "gross_margin": 0.728641304347826,
+  "net_debt_ebitda": -0.06162511389049946,
+  "operating_margin": 0.2614130434782609,
+  "roa": 0.10177368465933316,
+  "roic": 0.1474580921548972
+ },
+ "statement_fx": 1.0,
+ "value": {
+  "buyback_yield": 0.008458732413667697,
+  "dividend_yield": 0.012548941,
+  "ev_ebit": 21.256152798364617,
+  "p_fcf": 27.20614491243911,
+  "pb_ratio": 5.1180186,
+  "pe_ratio": 29.700598,
+  "shareholder_yield": 0.021007673413667695
+ }
+}

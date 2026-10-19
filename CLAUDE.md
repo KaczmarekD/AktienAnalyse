@@ -191,13 +191,20 @@ ADR-0001 und ADR-0002 aufgehoben.
 
 **Neuer Scoring-Faktor**:
 1. Feld in passende `*Metrics`-Dataclass in `fundamentals.py`
-2. Extraktion in `data_fetcher.fetch_one()` (`FIELD_MAP` erweitern, falls
-   yfinance-Roh-Feld nötig)
-3. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS`
-4. Spalte in `FundamentalSnapshot` (`src/db/models/market_data.py`) und
+2. Berechnung als reine Funktion in `va_market_data.domain.metrics`
+   (`Metrics`, `compute_metrics`), Test unter `services/market-data/tests/`.
+   Der Feldname muss in `Metrics` und in der Dataclass gleich sein, ein Test
+   prüft das
+3. Feld im Contract `FundamentalsV1` (`va_contracts`) und dessen
+   Schema-Golden-Files unter `tests/golden/contracts/v1/` (additiv)
+4. Auslesen der Rohwerte in `data_fetcher.fetch_one()` (`StatementFigures`
+   bzw. `MarketFigures`; `FIELD_MAP` erweitern, falls yfinance-Roh-Feld nötig)
+5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS`
+6. Spalte in `FundamentalSnapshot` (`src/db/models/market_data.py`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab
-5. Test in `tests/test_scoring.py`
+7. Test in `tests/test_scoring.py`, Golden-Files der Kennzahlen
+   (`tests/golden/metrics/`) bewusst mit `--update-golden` erneuern
 
 **Neues Universum (z.B. Stoxx 600)**:
 1. Quelle(n) in `src/universe.py` (URL-Konstanten am Dateikopf, Soll-Anzahl

@@ -274,7 +274,29 @@ sich in ganz Phase 1 nicht ändern.**
   dabei weiterhin nicht gemockt.
 - **Implementierung:** `va_market_data.domain.metrics`. `data_fetcher` ruft die Funktionen auf,
   bis P1.4 den Adapter einführt.
-- **Review:** Im Domain-Code gibt es keine Ein-/Ausgabe.
+  - `compute_metrics(StatementFigures, MarketFigures, fx=…)` rechnet alle Kennzahlen inklusive
+    FX-Umrechnung und Free-Cash-Flow-Ersatz. `data_fetcher` liest nur noch aus (`FIELD_MAP`,
+    `info`, Periodenregel, FX-Abruf) und übernimmt das Ergebnis in die `Fundamentals`.
+  - Sicherungstests: Rohdaten von sieben echten Titeln (`tests/fixtures/metrics/`, darunter Bank,
+    Versicherer, Immobilien und Qiagen mit USD-Abschluss), Erwartungswerte als Golden-Files aus
+    dem Code vor dem Umbau (`tests/golden/metrics/`). Sie blieben unverändert grün, ebenso die
+    Golden-Mail.
+  - Service-Tests liegen unter `services/market-data/tests/` (in `testpaths`).
+  - `va-market-data` ist seit P1.3 eine Laufzeitabhängigkeit. Das Dockerfile installiert erst
+    die Fremdpakete ohne Workspace (`--no-install-workspace`, große Schicht, bleibt im Cache),
+    dann die Mitglieder nicht-editierbar (`--no-editable`, kleine Schicht).
+- **Review:** Im Domain-Code gibt es keine Ein-/Ausgabe. Ein import-linter-Vertrag verbietet
+  yfinance, requests, SQLAlchemy, psycopg und Alembic in allen `domain`-Schichten.
+  - Verhaltensgleichheit am 19.10.2026 belegt: 4.000 Zufallsfälle gegen den alten `fetch_one`
+    ohne Abweichung, dazu eine Golden-Variante „Qiagen ohne Wechselkurs“ aus dem alten Code.
+  - Nachgeschärft: Die Domain bekommt die Reihen roh (mit Lücken) und wendet „4 von 5 Jahren“
+    selbst an. Die Prozent-Eigenheit der Dividendenrendite und das Parsen von Zahlen bleiben
+    beim Abruf. `default_tax_rate` ist Pflicht (Wert aus den Settings). Lokale Builds holen
+    geänderten Code der Mitglieder per `--refresh-package` ins Image.
+  - Bekannt und bewusst unverändert (Golden-Files): Fehlt ein Jahr in der Mitte, rechnet die
+    CAGR über die vorhandenen Werte, als lägen sie direkt hintereinander (Beispiel
+    100, –, 80, 70, 60 ergibt 18,6 % statt 13,6 %). Betrifft nur die Wachstumswerte, die nicht
+    in den Composite eingehen. Eine Korrektur wäre eine bewusste Änderung der Golden-Files.
 
 #### P1.4 Adapter für Yahoo und Universum hinter Ports
 

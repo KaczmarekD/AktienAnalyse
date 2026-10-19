@@ -1,0 +1,43 @@
+{
+ "errors": [],
+ "fiscal_period_end": "2025-12-31",
+ "growth": {
+  "eps_growth_5y": 0.2136107114753285,
+  "revenue_growth_5y": 0.1984092323628479
+ },
+ "identity": {
+  "currency": "EUR",
+  "financial_currency": "EUR",
+  "index": "DAX",
+  "industry": "Insurance - Diversified",
+  "name": "ALV.DE",
+  "sector": "Financial Services",
+  "symbol": "ALV.DE"
+ },
+ "market": {
+  "enterprise_value": 65366581248.0,
+  "market_cap": 161651818496.0,
+  "price": 426.2,
+  "shares_outstanding": 379286270.0
+ },
+ "quality": {
+  "debt_to_equity": 0.5624023468639393,
+  "earnings_stability": 0.8152854238489603,
+  "fcf_margin": 0.22512913786831576,
+  "gross_margin": null,
+  "net_debt_ebitda": null,
+  "operating_margin": null,
+  "roa": 0.010519625569670675,
+  "roic": 0.12235486893023538
+ },
+ "statement_fx": 1.0,
+ "value": {
+  "buyback_yield": 0.01894194589636347,
+  "dividend_yield": 0.039410003,
+  "ev_ebit": 4.0304958224195335,
+  "p_fcf": 5.224011714581179,
+  "pb_ratio": 2.562376,
+  "pe_ratio": 13.973771,
+  "shareholder_yield": 0.05835194889636347
+ }
+}
