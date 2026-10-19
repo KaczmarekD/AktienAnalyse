@@ -1,91 +1,33 @@
-"""Brücke zwischen Batch-Pipeline und Repositories.
+"""Schema ``batch``: Start, Abschluss und Log-Zeilen eines Laufs (``BatchStore``).
 
-Jede Methode ist eine eigene, sofort committete Transaktion: Ein Absturz nach
-Titel 80 verliert nichts von dem, was bis dahin abgerufen wurde.
+Seit P1.8 speichern die Module ihre Daten selbst (``adapters/postgres/store.py``); hier
+bleibt nur die Ablaufsteuerung. Jede Methode ist eine eigene, sofort committete
+Transaktion.
 """
 
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable, Collection, Mapping, Sequence
-from dataclasses import asdict
-from datetime import date
 from typing import TYPE_CHECKING, Any
 
-import pandas as pd
-from sqlalchemy.exc import InterfaceError, OperationalError
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-from va_market_data.adapters.postgres import MarketDataRepository, UniverseMember, snapshot_values
-from va_market_data.adapters.yahoo import PROVIDER, provider_version
-from va_market_data.application.fetch import success_share
-from va_market_data.domain.history import HistoryState, daily_price_bars, daily_share_counts
-from va_notification.adapters.postgres import ReportingRepository
 from va_platform.db import session_scope
-from va_platform.serialization import to_python
-from va_scoring.adapters.postgres import FactorScoreRow, ScoreRow, ScoringRepository
 
 from .. import __version__
 from .repositories.runs import RunRepository
 
 if TYPE_CHECKING:
-    from sqlalchemy import Engine
-    from sqlalchemy.orm import Session
+    from collections.abc import Sequence
 
-    from va_market_data.domain.fundamentals import Fundamentals
-    from va_market_data.domain.universe import Ticker
-    from va_notification.domain.report import ReportArtifacts
-    from va_scoring.domain.scoring import ScoringConfig
+    from sqlalchemy import Engine
 
     from .log_handler import LogEntry
-
-log = logging.getLogger(__name__)
-
-# Ein Abruf vom selben Tag wird nur wiederverwendet, wenn mindestens dieser Anteil
-# der Ticker eine Marktkapitalisierung hat - sonst liefert ein Re-Run nach einem
-# yfinance-Ausfall weiter die kaputten Daten.
-MIN_REUSE_SUCCESS_SHARE = 0.8
-
-# Voruebergehende DB-Stoerungen (Verbindungsabbruch, NAS-I/O) - kein Retry bei Datenfehlern
-_TRANSIENT_DB_ERRORS = (OperationalError, InterfaceError)
-
-
-def scoring_config_dict(cfg: ScoringConfig) -> dict[str, Any]:
-    return asdict(cfg)
-
-
-class _OptionalWrites:
-    """Schreibt Zusatzdaten eines Titels (ADR-0010) je in einem Savepoint.
-
-    Ein Fehler kostet nur diese Daten: Der Titel bleibt in Report und Datenbank.
-    Voruebergehende DB-Stoerungen laufen weiter in den Retry der ganzen Transaktion.
-    """
-
-    def __init__(self, session: Session, symbol: str) -> None:
-        self._session = session
-        self._symbol = symbol
-
-    def write(self, label: str, write: Callable[[], object]) -> None:
-        try:
-            with self._session.begin_nested():
-                write()
-        except _TRANSIENT_DB_ERRORS:
-            raise
-        except Exception:
-            log.warning(
-                "%s fuer %s nicht gespeichert - der Titel bleibt",
-                label,
-                self._symbol,
-                exc_info=True,
-            )
 
 
 class BatchRecorder:
     def __init__(self, engine: Engine, app_version: str = __version__) -> None:
         self._engine = engine
         self._app_version = app_version
-
-    # --- Lauf -----------------------------------------------------------------
 
     @retry(
         stop=stop_after_attempt(3),
@@ -118,203 +60,3 @@ class BatchRecorder:
     def record_logs(self, run_id: int, entries: Sequence[LogEntry]) -> None:
         with session_scope(self._engine) as s:
             RunRepository(s).write_logs(run_id, entries)
-
-    # --- Abruf ----------------------------------------------------------------
-
-    def find_reusable_fetch(self, day: date, symbols: Collection[str]) -> int | None:
-        with session_scope(self._engine) as s:
-            fetch_run = MarketDataRepository(s).get_reusable_fetch_run(
-                day, MIN_REUSE_SUCCESS_SHARE, symbols
-            )
-            return fetch_run.id if fetch_run else None
-
-    def history_state(self, symbols: Collection[str]) -> dict[str, HistoryState]:
-        """Bis wann die Zeitreihen je Titel gespeichert sind; fehlt ein Titel, gilt alles."""
-        with session_scope(self._engine) as s:
-            repo = MarketDataRepository(s)
-            last_share = repo.get_last_share_dates(symbols)
-            last_price = repo.get_last_price_dates(symbols)
-            splits = repo.get_price_split_days(symbols)
-        return {
-            symbol: HistoryState(
-                last_share_date=last_share.get(symbol),
-                last_price_date=last_price.get(symbol),
-                price_split_days=splits.get(symbol, frozenset()),
-            )
-            for symbol in last_share.keys() | last_price.keys()
-        }
-
-    def load_snapshots(self, fetch_run_id: int, symbols: Collection[str]) -> pd.DataFrame:
-        with session_scope(self._engine) as s:
-            return MarketDataRepository(s).get_snapshots_df(fetch_run_id, symbols)
-
-    def start_fetch(self, tickers: Sequence[Ticker], source: str, as_of: date | None = None) -> int:
-        with session_scope(self._engine) as s:
-            repo = MarketDataRepository(s)
-            fetch_run_id = repo.write_fetch_run_start(
-                provider=PROVIDER,
-                provider_version=provider_version(),
-                universe_source=source,
-                universe_as_of=as_of,
-                universe_size=len(tickers),
-            )
-            repo.write_universe(
-                fetch_run_id,
-                [UniverseMember(t.symbol, t.index, t.name, source) for t in tickers],
-            )
-            repo.write_isins({t.symbol: t.isin for t in tickers if t.isin})
-            return fetch_run_id
-
-    @retry(
-        retry=retry_if_exception_type(_TRANSIENT_DB_ERRORS),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=5),
-        reraise=True,
-    )
-    def record_fundamentals(self, fetch_run_id: int, fund: Fundamentals) -> None:
-        """Ein Titel = eine Transaktion; ein Retry wiederholt sie vollstaendig."""
-        with session_scope(self._engine) as s:
-            repo = MarketDataRepository(s)
-            instrument_id = repo.get_or_create_instruments([fund.symbol])[fund.symbol]
-            repo.write_snapshot(fetch_run_id, instrument_id, snapshot_values(fund))
-            fetched_at = fund.provenance.fetched_at
-            if fund.raw is None or fetched_at is None:
-                return
-            raw = fund.raw
-            repo.write_raw_info(fetch_run_id, instrument_id, raw.info, fetched_at)
-            repo.write_statements(
-                fetch_run_id,
-                instrument_id,
-                raw.statements,
-                currency=fund.identity.financial_currency,
-                fetched_at=fetched_at,
-            )
-            # Zusatzdaten (ADR-0010) je in einem Savepoint
-            optional = _OptionalWrites(s, fund.symbol)
-            optional.write(
-                "Konsens",
-                lambda: repo.write_consensus(
-                    fetch_run_id, instrument_id, raw.consensus, fetched_at
-                ),
-            )
-            optional.write(
-                "Quartale",
-                lambda: repo.write_statements(
-                    fetch_run_id,
-                    instrument_id,
-                    raw.quarterly,
-                    currency=fund.identity.financial_currency,
-                    fetched_at=fetched_at,
-                    frequency="quarterly",
-                ),
-            )
-            optional.write(
-                "Aktienanzahl",
-                lambda: repo.write_share_counts(
-                    fetch_run_id,
-                    instrument_id,
-                    daily_share_counts(raw.shares),
-                    fetched_at=fetched_at,
-                ),
-            )
-            optional.write(
-                "Kurse",
-                lambda: repo.write_price_bars(
-                    fetch_run_id,
-                    instrument_id,
-                    daily_price_bars(raw.prices, fetched_at=fetched_at),
-                    fetched_at=fetched_at,
-                ),
-            )
-            reporting_ccy = fund.identity.financial_currency
-            trading_ccy = fund.identity.currency
-            fx = fund.provenance.statement_fx
-            if reporting_ccy and trading_ccy and reporting_ccy != trading_ccy and fx is not None:
-                repo.write_fx_rate(fetch_run_id, reporting_ccy, trading_ccy, fx, fetched_at)
-
-    def finish_fetch(self, fetch_run_id: int, df: pd.DataFrame) -> None:
-        ok_count = int(df["market_cap"].notna().sum()) if "market_cap" in df.columns else 0
-        with session_scope(self._engine) as s:
-            MarketDataRepository(s).write_fetch_run_finish(
-                fetch_run_id, ok_count=ok_count, success_share=success_share(df)
-            )
-
-    # --- Scoring / Report / Versand -----------------------------------------------
-
-    def record_scoring(
-        self, fetch_run_id: int, df_all: pd.DataFrame, scored: pd.DataFrame, cfg: ScoringConfig
-    ) -> int:
-        """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``."""
-        symbols = [str(s) for s in df_all.get("symbol", pd.Series(dtype=str)).dropna()]
-        scored_symbols = [str(s) for s in scored.get("symbol", pd.Series(dtype=str)).dropna()]
-        with session_scope(self._engine) as s:
-            ids = MarketDataRepository(s).get_or_create_instruments([*symbols, *scored_symbols])
-            repo = ScoringRepository(s)
-            scoring_run_id = repo.write_scoring_run(
-                fetch_run_id=fetch_run_id,
-                config=scoring_config_dict(cfg),
-                app_version=self._app_version,
-            )
-            results = [_score_row(ids[str(r["symbol"])], r) for r in scored.to_dict("records")]
-            passed = set(scored_symbols)
-            results += [
-                ScoreRow(ids[sym], False, None, None, None, None, None)
-                for sym in dict.fromkeys(symbols)
-                if sym not in passed
-            ]
-            repo.write_score_results(scoring_run_id, results)
-            repo.write_factor_scores(scoring_run_id, _factor_rows(scored, ids, cfg))
-            return scoring_run_id
-
-    def record_report(
-        self, run_id: int, scoring_run_id: int | None, report: ReportArtifacts
-    ) -> int:
-        with session_scope(self._engine) as s:
-            return ReportingRepository(s).write_report(
-                run_id=run_id,
-                scoring_run_id=scoring_run_id,
-                subject=report.subject,
-                html=report.html,
-                csv_bytes=report.csv_bytes,
-                csv_filename=report.csv_filename,
-                top_n=report.top_count,
-                bottom_n=report.bottom_count,
-            )
-
-    def record_delivery(self, **kwargs: Any) -> None:
-        with session_scope(self._engine) as s:
-            ReportingRepository(s).write_delivery(**kwargs)
-
-
-def _score_row(instrument_id: int, row: Mapping[Any, Any]) -> ScoreRow:
-    flag = to_python(row.get("value_trap_flag"))
-    rank = to_python(row.get("rank_overall"))
-    return ScoreRow(
-        instrument_id=instrument_id,
-        passed_filter=True,
-        value_score=to_python(row.get("value_score")),
-        quality_score=to_python(row.get("quality_score")),
-        composite_score=to_python(row.get("composite_score")),
-        value_trap_flag=None if flag is None else bool(flag),
-        rank_overall=None if rank is None else int(rank),
-    )
-
-
-def _factor_rows(
-    scored: pd.DataFrame, ids: dict[str, int], cfg: ScoringConfig
-) -> list[FactorScoreRow]:
-    factors = [("value", k, v) for k, v in cfg.value_factors.items()]
-    factors += [("quality", k, v) for k, v in cfg.quality_factors.items()]
-    rows: list[FactorScoreRow] = []
-    for record in scored.to_dict("records"):
-        for category, key, (column, direction) in factors:
-            raw = to_python(record.get(column))
-            rank = to_python(record.get(f"rank_{key}"))
-            if raw is None and rank is None:
-                continue
-            rows.append(
-                FactorScoreRow(
-                    ids[str(record["symbol"])], key, category, column, direction, raw, rank
-                )
-            )
-    return rows

@@ -381,6 +381,31 @@ sich in ganz Phase 1 nicht ändern.**
 - **Implementierung:** Schnittstelle `EventBus` und `InProcessBus` in `va-platform`, Handler in
   den Modulen. `main.py` verdrahtet nur noch.
 - **Review:** `/simplify` zusätzlich, weil hier der größte Umbau zusammenläuft.
+- **Umgesetzt (19.10.2026):**
+  - `va_platform.bus`: `EventBus`, `InProcessBus` (jede Zustellung als JSON-Kopie,
+    Fan-out, Wiederholung bis `max_deliver`, danach `DeadLetter`), `follow_up` für
+    Folge-Events (Korrelation = Run, Ursache = auslösendes Event).
+  - Handler: market-data `RunRequestedHandler` (Anwendungsfall `take_snapshot`), scoring
+    `SnapshotCompletedHandler`, notification `NotificationHandler`. Jeder Handler fängt
+    seine Fehler und meldet `screening.run.failed`. Speicher je Modul in
+    `adapters/postgres/store.py`; scoring liest Instrument-IDs nur noch (kein Anlegen).
+  - `src/composition.py` (`Adapters`, `build_adapters`, `wire`), `src/run_tracker.py`
+    (Vorläufer der Run-Projektion im web-api), `src/main.py` startet nur die Kette.
+    Im Batch `max_deliver=1`: Die Handler wiederholen nichts selbst, ein zweiter Abruf
+    kostete Minuten. Ein Dead Letter beendet den Lauf über `screening.run.failed`.
+  - Fällt trotzdem etwas aus dem Bus heraus oder endet die Kette ohne Ergebnis, schließt
+    `main.py` den Lauf als `failed` ab und alarmiert (Ping `/fail`, Fehlermail).
+  - Contracts: `RunFailedV1.detail` (Traceback für die Fehlermail) additiv, Konstante
+    `REASON_NO_DATA`.
+    `parse_envelope` parametrisiert mit dem Payload-Modell; vorher verlor ein
+    weitergereichtes Event beim Serialisieren seine Payload.
+  - Bewusste Unterschiede zum alten Ablauf: Scheitert der Mailversand, bleibt
+    `batch.run.report_id` leer (der Report verweist über `run_id` auf den Lauf); scheitert
+    der Abruf, bleibt `universe_size` leer. Der Abschluss von `batch.run` ist immer
+    „sicher“ (ein DB-Fehler dort ändert den Exit-Code nicht mehr, auch nicht im Dry-Run).
+  - Tests: Bus-Verträge (`packages/va-platform/tests`), Handler je Modul, RunTracker,
+    Golden-Mail über den Bus (`tests/test_pipeline_bus.py`, HTML byte-gleich).
+    `test_main`/`test_pipeline_db` bekommen die Adapter injiziert.
 
 #### P1.9 Aufräumen
 

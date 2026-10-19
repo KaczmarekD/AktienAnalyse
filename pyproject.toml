@@ -183,7 +183,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel", "va_contracts.base.Contr
     "RUF059",       # unused tuple unpacking
     "PLC0415",      # local import in test methods OK
 ]
-"services/*/tests/**/*.py" = [
+"{packages,services}/*/tests/**/*.py" = [
     "ARG", "PLR2004", "S101",
     "C408",         # dict(...) statt {} - lesbarer in Mock-Daten
     "PT018",        # compound asserts

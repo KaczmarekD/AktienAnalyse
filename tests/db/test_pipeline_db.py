@@ -140,7 +140,7 @@ def _patched_run(
         build_adapters(settings),
         load_universe=lambda: UNIVERSE,
         sender=Mock(send=send),
-        heartbeat=Mock(**{"ping.return_value": None}),
+        heartbeat=Mock(ping=Mock(return_value=None)),
     )
     with (
         patch(
@@ -253,7 +253,7 @@ class TestFullRun:
             assert run.scoring_run_id is not None
             scores = ScoringRepository(s).get_scores_df(run.scoring_run_id)
         assert set(scores["symbol"]) == {"AAA.DE", "BBB.DE"}
-        assert "Gamma" not in send.call_args.args[2]
+        assert "Gamma" not in send.call_args.args[1]  # (Betreff, HTML)
 
     def test_full_run_after_dax_only_fetches_again(self, db_settings, engine):
         _patched_run(db_settings.model_copy(update={"universe": "DAX_ONLY"}))
@@ -396,13 +396,14 @@ class TestFullRun:
             assert ReportingRepository(s).get_deliveries(run.id) == []
 
     def test_failure_is_recorded_with_traceback(self, db_settings, engine):
-        with (
-            patch("src.main.load_universe", return_value=UNIVERSE),
-            patch("src.main.fetch_all", side_effect=RuntimeError("yfinance down")),
-            patch("src.main.ping", return_value=None),
-            patch("src.main.send_report"),
-        ):
-            rc = _run(db_settings, force_refresh=False, dry_run=False)
+        adapters = replace(
+            build_adapters(db_settings),
+            load_universe=lambda: UNIVERSE,
+            fetch=Mock(side_effect=RuntimeError("yfinance down")),
+            sender=Mock(),
+            heartbeat=Mock(ping=Mock(return_value=None)),
+        )
+        rc = _run(db_settings, force_refresh=False, dry_run=False, adapters=adapters)
         assert rc == 1
         with session_scope(engine) as s:
             run = RunRepository(s).get_latest_run()

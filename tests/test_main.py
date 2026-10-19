@@ -128,6 +128,12 @@ def recorder():
     return FakeRecorder()
 
 
+def _heartbeat(result: bool | None) -> Mock:
+    heartbeat = Mock()
+    heartbeat.ping.return_value = result
+    return heartbeat
+
+
 def _adapters(recorder, universe, fetch, *, ping_result=None, sender=None) -> Adapters:
     return Adapters(
         batch=recorder,
@@ -137,7 +143,7 @@ def _adapters(recorder, universe, fetch, *, ping_result=None, sender=None) -> Ad
         load_universe=lambda: universe,
         fetch=fetch,
         sender=sender or Mock(),
-        heartbeat=Mock(**{"ping.return_value": ping_result}),
+        heartbeat=_heartbeat(ping_result),
         clock=datetime.now,
     )
 
@@ -309,7 +315,8 @@ class TestRunWithMail:
     def test_mail_failure_is_recorded_and_fails_run(
         self, settings, recorder, mock_tickers, mock_universe_df
     ):
-        sender = Mock(**{"send.side_effect": OSError("smtp down")})
+        sender = Mock()
+        sender.send.side_effect = OSError("smtp down")
         rc, _, _ = _run_with(
             settings, recorder, mock_tickers, {"return_value": mock_universe_df}, sender=sender
         )
@@ -447,14 +454,52 @@ class TestRunErrorHandling:
         assert len(_mails(adapters)) == 1
         assert recorder.get("record_delivery") == []
 
-    def test_unknown_end_of_run_fails(self, settings, recorder, mock_tickers, mock_universe_df):
+    def test_unknown_end_of_run_fails_and_alerts(
+        self, settings, recorder, mock_tickers, mock_universe_df
+    ):
         """Endet die Kette ohne Abschluss-Event (Bug), darf der Lauf nicht als ok gelten."""
         with patch("src.main.wire"):  # niemand reagiert auf den Start
-            rc, _, _ = _run_with(
+            rc, adapters, _ = _run_with(
                 settings, recorder, mock_tickers, {"return_value": mock_universe_df}
             )
         assert rc == 1
         assert recorder.get("finish_run")[0]["status"] == "failed"
+        assert _pings(adapters)[-1].args[0] is False
+        assert len(_mails(adapters, ERROR_SUBJECT)) == 1
+
+    def test_handler_bug_becomes_a_dead_letter_and_fails_the_run(
+        self, settings, recorder, mock_tickers, mock_universe_df
+    ):
+        """Ein Handler, der wirft (statt run.failed zu melden): Lauf scheitert mit Alarm."""
+        with patch(
+            "va_scoring.entrypoints.handlers.SnapshotCompletedHandler.__call__",
+            side_effect=RuntimeError("Bug im Handler"),
+        ):
+            rc, adapters, _ = _run_with(
+                settings, recorder, mock_tickers, {"return_value": mock_universe_df}
+            )
+        assert rc == 1
+        finish = recorder.get("finish_run")[0]
+        assert finish["status"] == "failed"
+        assert "scoring" in finish["error"]
+        assert "Bug im Handler" in finish["error"]
+        assert _pings(adapters)[-1].args[0] is False
+        assert len(_mails(adapters, ERROR_SUBJECT)) == 1
+
+    def test_error_escaping_the_bus_fails_the_run_with_alarm(
+        self, settings, recorder, mock_tickers, mock_universe_df
+    ):
+        with patch("src.main.InProcessBus.publish", side_effect=RuntimeError("Bus kaputt")):
+            rc, adapters, _ = _run_with(
+                settings, recorder, mock_tickers, {"return_value": mock_universe_df}
+            )
+        assert rc == 1
+        finish = recorder.get("finish_run")[0]
+        assert finish["status"] == "failed"
+        assert "Bus kaputt" in finish["error"]
+        assert _pings(adapters)[-1].args[0] is False
+        assert len(_mails(adapters, ERROR_SUBJECT)) == 1
+        assert recorder.get("record_logs")  # Log-Zeilen trotzdem gespeichert
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +553,7 @@ class TestUniverseSourceInReport:
     def test_shows_source_with_as_of(self, settings, mock_tickers, mock_universe_df):
         html = self._preview(settings, _universe(mock_tickers), mock_universe_df)
         assert "iShares" in html
-        assert "29.09.2026" in html
+        assert "Stand 2026-09-29" in html
 
     def test_shows_csv_drift(self, settings, mock_tickers, mock_universe_df):
         uni = _universe(

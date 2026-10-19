@@ -30,7 +30,11 @@ from va_contracts.events.v1 import (
     UniverseMemberV1,
 )
 from va_notification.domain.errors import ERROR_SUBJECT, error_mail_html
-from va_notification.entrypoints.handlers import NotificationConfig, NotificationHandler
+from va_notification.entrypoints.handlers import (
+    NotificationConfig,
+    NotificationHandler,
+    notify_failure_without_run,
+)
 from va_platform.bus import InProcessBus
 
 NOW = datetime(2026, 10, 17, 7, 30)
@@ -156,9 +160,13 @@ def _failed(
     )
 
 
-def _publish(setup: Setup, data) -> Envelope[Any]:
-    spec = SCORING_RUN_COMPLETED if isinstance(data, ScoringRunCompletedV1) else RUN_FAILED
-    env = new_envelope(spec, data, source="va/test", correlationid="1")
+def _publish(setup: Setup, data: ScoringRunCompletedV1 | RunFailedV1) -> Envelope[Any]:
+    if isinstance(data, ScoringRunCompletedV1):
+        env: Envelope[Any] = new_envelope(
+            SCORING_RUN_COMPLETED, data, source="va/test", correlationid="1"
+        )
+    else:
+        env = new_envelope(RUN_FAILED, data, source="va/test", correlationid="1")
     setup.bus.publish(env)
     return env
 
@@ -290,15 +298,21 @@ class TestFailureWithoutRun:
     """Datenbank nicht erreichbar: Es gibt keinen Run, also nichts zu speichern."""
 
     def test_pings_and_mails_without_recording(self, setup):
-        setup.handler.notify_failure_without_run(
-            "database unreachable", detail="Traceback ...", dry_run=False
+        notify_failure_without_run(
+            setup.sender,
+            setup.heartbeat,
+            "database unreachable",
+            detail="Traceback ...",
+            dry_run=False,
         )
         assert setup.heartbeat.pings == [(False, "database unreachable")]
         assert [m["subject"] for m in setup.sender.sent] == [ERROR_SUBJECT]
         assert setup.store.deliveries == []
 
     def test_dry_run_only_pings(self, setup):
-        setup.handler.notify_failure_without_run("database unreachable", detail="x", dry_run=True)
+        notify_failure_without_run(
+            setup.sender, setup.heartbeat, "database unreachable", detail="x", dry_run=True
+        )
         assert setup.heartbeat.pings == [(False, "database unreachable")]
         assert setup.sender.sent == []
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -184,6 +185,19 @@ class TestFailures:
         harness.settle()
         assert received == [2]
         assert [d.envelope.data.run_id for d in harness.dead] == [1]
+
+
+def test_unreadable_message_is_a_dead_letter():
+    """Im Prozess nur kuenstlich zu erzeugen, ueber NATS ein realer Fall (fremde Version)."""
+    dead: list[DeadLetter] = []
+    bus = InProcessBus(max_deliver=2, on_dead_letter=dead.append)
+    received: list[Envelope[Any]] = []
+    bus.subscribe(RUN_REQUESTED, "market-data", received.append)
+    with patch("va_platform.bus.parse_envelope", side_effect=ValueError("kaputt")):
+        bus.publish(_requested())
+    assert received == []
+    assert [(d.consumer, d.attempts) for d in dead] == [("market-data", 2)]
+    assert dead[0].envelope.type == RUN_REQUESTED.type
 
 
 def test_max_deliver_must_be_positive():

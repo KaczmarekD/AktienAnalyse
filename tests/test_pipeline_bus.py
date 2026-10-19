@@ -7,7 +7,8 @@ gehen also zweimal ueber JSON (Snapshot und Ranking).
 Verglichen wird mit ``mail_deka.html``, weil der Fall ohne Zu- und Abgaenge auskommt (die
 anderen Golden-Faelle tragen fertige Texte statt Titeln). Die CSV hat hier mehr Spalten als
 ``ranking.csv``: Der eingefrorene Datensatz kennt nicht alle Felder, das Event fuehrt sie
-leer mit, wie es jeder echte Abruf ohnehin tut.
+leer mit, wie es jeder echte Abruf ohnehin tut. Aus demselben Grund stehen ganzzahlige Kurse
+des Datensatzes dort als Gleitkommazahl.
 """
 
 from __future__ import annotations
@@ -83,6 +84,11 @@ class Sender:
         self.sent.append((subject, html_body, attachment))
 
 
+class NoHeartbeat:
+    def ping(self, success: bool, message: str | None = None) -> bool | None:
+        return None
+
+
 def _fetch(tickers, *, on_result, history):
     return pd.DataFrame(RECORDS)
 
@@ -99,7 +105,7 @@ def _run(settings) -> tuple[Sender, list[str]]:
         ),
         fetch=_fetch,
         sender=sender,
-        heartbeat=type("NoHeartbeat", (), {"ping": lambda self, success, message=None: None})(),
+        heartbeat=NoHeartbeat(),
         clock=lambda: FIXED_NOW,
     )
     bus = InProcessBus(max_deliver=1)
@@ -132,7 +138,15 @@ def test_golden_mail_through_the_bus(settings):
     golden = _csv((GOLDEN_DIR / "ranking.csv").read_bytes())
     actual = _csv(csv_bytes)
     assert list(golden.columns) == [c for c in actual.columns if c in golden.columns]
-    assert set(actual.columns) - set(golden.columns) == {"industry"}
+    extra = set(actual.columns) - set(golden.columns)
+    assert extra, "erwartet: Felder, die der eingefrorene Datensatz nicht kennt"
+    assert not extra & set().union(*RECORDS)
+    assert actual[sorted(extra)].isna().all().all()
     pd.testing.assert_frame_equal(
-        actual[golden.columns], golden, check_exact=False, rtol=1e-12, atol=0.0
+        actual[golden.columns],
+        golden,
+        check_dtype=False,  # Kurse: im Datensatz ganzzahlig, im Contract float (42 -> 42,0)
+        check_exact=False,
+        rtol=1e-12,
+        atol=0.0,
     )

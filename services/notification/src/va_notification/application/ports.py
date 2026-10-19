@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from ..domain.report import ReportArtifacts
 
 
 class ReportSender(Protocol):
@@ -20,3 +23,24 @@ class Heartbeat(Protocol):
     """
 
     def ping(self, success: bool, message: str | None = None) -> bool | None: ...
+
+
+class ReportStore(Protocol):
+    """Speicher von notification: erzeugte Reports und jeder Versandversuch."""
+
+    def record_report(
+        self, run_id: int | None, scoring_run_id: int | None, report: ReportArtifacts
+    ) -> int: ...
+
+    def record_delivery(
+        self,
+        *,
+        run_id: int | None,
+        report_id: int | None,
+        channel: str,
+        kind: str,
+        recipient: str | None,
+        subject: str | None,
+        success: bool,
+        error: str | None = None,
+    ) -> None: ...

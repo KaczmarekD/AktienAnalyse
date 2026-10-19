@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pandas as pd
 import pytest
 
 from va_contracts import Envelope, new_envelope
@@ -22,6 +21,9 @@ from va_contracts.events.v1 import (
 from va_platform.bus import InProcessBus
 from va_scoring.domain.scoring import ScoringConfig, score
 from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 UNIVERSE = UniverseInfoV1(
     source="iShares",

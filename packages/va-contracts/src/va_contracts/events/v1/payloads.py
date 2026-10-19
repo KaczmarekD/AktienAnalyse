@@ -17,6 +17,8 @@ RunTrigger = Literal["scheduled", "manual"]
 ScoringTrigger = Literal["scheduled", "manual", "rescore"]
 # Stufe, an der ein Run gescheitert ist; der Watchdog meldet haengende Runs
 Stage = Literal["market-data", "scoring", "notification", "watchdog"]
+# reason in screening.run.failed, wenn es nichts zu bewerten gab (kein leeres Ranking)
+REASON_NO_DATA = "no_data"
 
 
 class RunOptionsV1(Contract):
@@ -156,3 +158,5 @@ class RunFailedV1(_RunScoped):
     stage: Stage
     reason: str  # z. B. "timeout" (Watchdog), "no_data" oder die Fehlermeldung der Stufe
     scoring_run_id: PositiveId | None = None  # bei einem gescheiterten Rescore
+    # Details fuer die Fehlermail, etwa der Traceback (additiv seit P1.8)
+    detail: str | None = None
