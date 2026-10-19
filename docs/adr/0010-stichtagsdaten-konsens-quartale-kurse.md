@@ -64,8 +64,8 @@ betroffenen Zusatzdaten, nie den Titel.
   bewertet werden können.
 - ⚠️ Je Titel kommen rund 8 bis 10 Yahoo-Abrufe hinzu. Der Lauf dauert länger, und Rate-Limits
   werden wahrscheinlicher. Retry und Fehlertoleranz gelten wie bisher.
-- ⚠️ Die Erstbefüllung der Kurse umfasst rund 0,7 Mio. Zeilen, danach kommen wenige MB pro Woche
-  hinzu.
+- ⚠️ Die Erstbefüllung der Kurse umfasst rund 0,5 Mio. Zeilen (gemessen 92 MB mit Indizes),
+  danach kommen wenige MB pro Woche hinzu.
 - ⚠️ Mit P1.4 wandern die Abrufe in den Yahoo-Adapter und die Parser nach `domain`. Ab Phase 5
   gehören die Tabellen dem Service `market-data`.
 

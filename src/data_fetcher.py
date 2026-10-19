@@ -28,7 +28,7 @@ import yfinance as yf
 from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 from yfinance.exceptions import YFRateLimitError
 
-from .consensus import ConsensusEntry, collect_consensus, to_payload
+from .consensus import MAX_ERROR_LENGTH, ConsensusEntry, collect_consensus, to_payload
 from .db.serialization import period_end
 from .fundamentals import (
     Fundamentals,
@@ -99,6 +99,16 @@ CONSENSUS_FIELDS: dict[str, str] = {
     "growth_estimates": "growth_estimates",
     "analyst_price_targets": "analyst_price_targets",
 }
+
+# Arten, die yfinance aus einem gemeinsamen Abruf (Modul earningsTrend) liest. Scheitert
+# er, loggt yfinance den Fehler nur beim ersten Zugriff; die anderen kaemen still leer.
+CONSENSUS_SHARED_SOURCE: tuple[str, ...] = (
+    "eps_trend",
+    "eps_revisions",
+    "earnings_estimate",
+    "revenue_estimate",
+    "growth_estimates",
+)
 
 # Quartalsabschluesse (ADR-0010, F1.2): Statement -> Attribut von yf.Ticker.
 QUARTERLY_FIELDS: dict[str, str] = {
@@ -288,7 +298,9 @@ def _yahoo_errors_raised() -> Iterator[None]:
 
     yfinance faengt Fehler standardmaessig ab (``config.debug.hide_exceptions``) und
     liefert eine leere Antwort, auch bei einem Rate-Limit. In den Zusatzabrufen sollen
-    sie ankommen: fuer Retry, Abbruch nach Rate-Limit und Log.
+    sie ankommen: fuer Retry, Abbruch nach Rate-Limit und Log. Der Retry hilft nur bei
+    Netzfehlern - eine HTTP-Fehlerantwort cacht yfinance, der zweite Versuch liest sie
+    nur erneut.
     """
     debug = yf.config.debug
     hidden = debug.hide_exceptions
@@ -340,6 +352,27 @@ def _consensus_value(yt: Any, attr: str) -> Any:
     return value
 
 
+def _mark_follow_up_errors(entries: dict[str, ConsensusEntry]) -> None:
+    """Ist der gemeinsame Abruf gescheitert (HTTP-Fehler, den yfinance nur loggt), ist
+    "leer" bei den anderen Arten kein Befund (keine Analystenabdeckung), sondern derselbe
+    Ausfall. Ein Fehler, der nur eine Art betrifft (etwa beim Parsen), zaehlt nicht."""
+    failed = next(
+        (
+            k
+            for k in CONSENSUS_SHARED_SOURCE
+            if k in entries
+            and (entries[k].error or "").startswith(f"{YahooResponseError.__name__}:")
+        ),
+        None,
+    )
+    if failed is None:
+        return
+    reason = f"Folgefehler nach {failed}: {entries[failed].error}"[:MAX_ERROR_LENGTH]
+    for kind in CONSENSUS_SHARED_SOURCE:
+        if kind in entries and entries[kind].status == "empty":
+            entries[kind] = ConsensusEntry("error", None, reason)
+
+
 def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
     """Konsens-Snapshots (ADR-0010, F1.1). Wirft nie: Fehler stehen je Art im Ergebnis.
 
@@ -351,6 +384,7 @@ def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
         {kind: partial(_consensus_value, yt, attr) for kind, attr in CONSENSUS_FIELDS.items()},
         stop_after=note_rate_limit,
     )
+    _mark_follow_up_errors(entries)
     failed = [kind for kind, entry in entries.items() if entry.status == "error"]
     if failed:
         log.warning("Konsensdaten %s nicht abrufbar: %s", symbol, ", ".join(failed))
@@ -451,7 +485,9 @@ def price_frames(
 
     Ein Split passt bei Yahoo alle frueheren Kurse an. Steht im Fenster ein Split, der
     noch nicht gespeichert ist, wird deshalb die ganze Historie geholt - so entstehen
-    fuer alle betroffenen Tage neue Versionen. Scheitert das, bleibt das Fenster.
+    fuer alle betroffenen Tage neue Versionen. Scheitert das, gibt es diese Woche keine
+    Kurse: Gespeichert gaelte der Split als bekannt, und die Altkurse blieben unbereinigt.
+    So steht er naechste Woche wieder im Fenster und loest den Vollabruf erneut aus.
     """
     try:
         frame = _price_history(yt, start)
@@ -469,9 +505,11 @@ def price_frames(
         full = _price_history(yt, None)
     except Exception as e:
         note_rate_limit(e)
-        log.warning("Kurshistorie %s nach Split nicht vollstaendig: %s", symbol, e)
-        return frame
-    return frame if full is None else full
+        log.warning("Kurshistorie %s nach Split nicht abrufbar, diese Woche ohne: %s", symbol, e)
+        return None
+    if full is None:
+        log.warning("Kurshistorie %s nach Split leer, diese Woche ohne Kurse", symbol)
+    return full
 
 
 def fetch_prices(
@@ -517,6 +555,18 @@ def _to_trading(value: float | None, fx: float | None) -> float | None:
     return value * fx
 
 
+def _additional[T](label: str, symbol: str, fetch: Callable[[], T], fallback: T) -> T:
+    """Ein Zusatzabruf (ADR-0010). Nach einem Rate-Limit entfaellt er; ein unerwarteter
+    Fehler kostet nur diese Daten, nie den Titel."""
+    if _RATE_LIMIT.hit:
+        return fallback
+    try:
+        return fetch()
+    except Exception:
+        log.exception("%s fuer %s nicht abrufbar - der Titel bleibt", label, symbol)
+        return fallback
+
+
 def fetch_one(
     ticker: Ticker, cfg: FetcherConfig | None = None, history: HistoryState | None = None
 ) -> Fundamentals:
@@ -544,13 +594,17 @@ def fetch_one(
         else state.last_price_date - timedelta(days=cfg.price_overlap_days)
     )
     # Zusatzdaten (ADR-0010): nach einem Rate-Limit bleibt der Rest dieses Titels aus
-    consensus = fetch_consensus(ticker.symbol)
-    quarterly = {} if _RATE_LIMIT.hit else fetch_quarterly(ticker.symbol)
-    shares = None if _RATE_LIMIT.hit else fetch_share_counts(ticker.symbol, shares_start)
-    prices = (
-        None
-        if _RATE_LIMIT.hit
-        else fetch_prices(ticker.symbol, price_start, state.price_split_days)
+    symbol = ticker.symbol
+    consensus = _additional("Konsens", symbol, lambda: fetch_consensus(symbol), {})
+    quarterly = _additional("Quartale", symbol, lambda: fetch_quarterly(symbol), {})
+    shares = _additional(
+        "Aktienanzahl", symbol, lambda: fetch_share_counts(symbol, shares_start), None
+    )
+    prices = _additional(
+        "Kurse",
+        symbol,
+        lambda: fetch_prices(symbol, price_start, state.price_split_days),
+        None,
     )
     if _RATE_LIMIT.hit:
         log.warning("Rate-Limit bei %s - restliche Zusatzdaten fehlen diese Woche", ticker.symbol)

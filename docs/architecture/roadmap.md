@@ -152,6 +152,7 @@ beschlossen, vorgezogen):
 - [ ] F1.3 Historie der Aktienanzahl
 - [ ] F1.4 Kurshistorie
 - [ ] F1.5 Fix-Paket Zusatzdaten (Review F1.2 bis F1.4)
+- [ ] F1.6 Fix-Paket Gesamt-Review Track F
 - [ ] NAS (du): Deployment. Der erste Lauf danach dauert länger, weil die Kurshistorie erstmals
       gefüllt wird.
 
