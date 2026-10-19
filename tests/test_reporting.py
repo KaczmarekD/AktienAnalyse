@@ -93,6 +93,14 @@ class TestBuildReportIntegration:
         build_report(score(mock_universe_df, ScoringConfig()), universe_size=8)
         assert list(tmp_path.iterdir()) == []
 
+    def test_missing_sector_shows_dash_not_nan(self, mock_universe_df):
+        # pandas 3: fehlende Texte kommen als NaN (truthy) statt None - im Template "-"
+        df = mock_universe_df.copy()
+        df.loc[df["symbol"] == "VAL.DE", "sector"] = None
+        report = build_report(score(df, ScoringConfig()), top_n=8, bottom_n=8, universe_size=8)
+        assert ">nan<" not in report.html
+        assert '<td class="text">-</td>' in report.html
+
 
 class TestUniverseSourceNote:
     def _html(self, mock_universe_df, **kwargs):

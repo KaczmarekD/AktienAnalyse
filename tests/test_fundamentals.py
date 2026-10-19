@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 import pandas as pd
+import pytest
 
 from src.fundamentals import (
     Fundamentals,
@@ -15,7 +16,24 @@ from src.fundamentals import (
     QualityMetrics,
     RawFetch,
     ValueMetrics,
+    join_errors,
 )
+
+
+@pytest.mark.parametrize(
+    ("errors", "expected"),
+    [
+        (["fx USD->EUR failed", "fetch failed"], "fx USD->EUR failed; fetch failed"),
+        (("fetch failed",), "fetch failed"),  # ARRAY-Spalten koennen als Tupel kommen
+        ([], ""),
+        # Defensiv: kein Text daraus machen, wenn gar keine Liste ankommt
+        (None, ""),
+        (pd.NA, ""),
+        (float("nan"), ""),
+    ],
+)
+def test_join_errors(errors, expected):
+    assert join_errors(errors) == expected
 
 
 class TestFundamentals:
