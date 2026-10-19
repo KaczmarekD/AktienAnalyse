@@ -29,6 +29,8 @@ WORKDIR /app
 #    Mitgliedern nur die pyproject.toml (sonst passt --locked nicht zum Lockfile)
 # 2. die Workspace-Mitglieder, die der Batch nutzt (ab P1.3), nicht-editierbar:
 #    Ein editierbarer Eintrag zeigte auf den Bind-Mount, den es nach RUN nicht mehr gibt.
+#    --refresh-package: uv erkennt geaenderten Code der Mitglieder nur an Zeitstempeln
+#    und baute sonst lokal aus dem Cache-Mount einen alten Stand ins Image.
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
@@ -47,7 +49,9 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=packages,target=packages \
     --mount=type=bind,source=services,target=services \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
-    uv sync --locked --inexact --no-dev --no-install-project --no-editable
+    uv sync --locked --inexact --no-dev --no-install-project --no-editable \
+        --refresh-package va-contracts --refresh-package va-platform \
+        --refresh-package va-market-data
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/

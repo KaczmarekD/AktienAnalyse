@@ -7,18 +7,15 @@ Yahoo-Adapter) liest die Zahlen aus und uebergibt sie als ``StatementFigures`` u
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
 # Zeitreihen ueber die letzten fuenf Geschaeftsjahre, davon muessen vier vorliegen
 HISTORY_YEARS = 5
 MIN_HISTORY = max(2, HISTORY_YEARS - 1)
-# Steuerquote fuer ROIC, wenn keine effektive berechenbar ist (deutscher Durchschnitt);
-# der Batch uebergibt den Wert aus den Settings
-DEFAULT_TAX_RATE = 0.27
 # Effektive Steuerquote begrenzen: Verlustjahre und Einmaleffekte sonst als Ausreisser
 MAX_TAX_RATE = 0.6
 
@@ -27,8 +24,10 @@ MAX_TAX_RATE = 0.6
 class StatementFigures:
     """Jahresabschluss in Berichtswaehrung: juengste Werte und Reihen (juengstes Jahr zuerst).
 
-    Die Reihen enthalten die gueltigen Werte der letzten ``HISTORY_YEARS`` Jahre.
-    ``capex`` ist wie bei Yahoo negativ, ``buybacks`` ebenso.
+    Die Reihen enthalten einen Wert je Geschaeftsjahr, ``None`` fuer ein fehlendes. Welche
+    Jahre zaehlen (die letzten ``HISTORY_YEARS``, davon mindestens ``MIN_HISTORY``
+    gueltige), entscheidet die Domain. ``capex`` ist wie bei Yahoo negativ, ``buybacks``
+    ebenso.
     """
 
     revenue: float | None = None
@@ -47,9 +46,9 @@ class StatementFigures:
     operating_cash_flow: float | None = None
     capex: float | None = None
     buybacks: float | None = None
-    revenue_history: Sequence[float] = ()
-    eps_history: Sequence[float] = ()
-    net_income_history: Sequence[float] = ()
+    revenue_history: Sequence[float | None] = ()
+    eps_history: Sequence[float | None] = ()
+    net_income_history: Sequence[float | None] = ()
 
 
 @dataclass(frozen=True)
@@ -60,8 +59,7 @@ class MarketFigures:
     enterprise_value: float | None = None
     trailing_pe: float | None = None
     price_to_book: float | None = None
-    trailing_dividend_yield: float | None = None  # dezimal, 0.03 = 3 %
-    dividend_yield_percent: float | None = None  # in Prozent, 1.36 = 1,36 %
+    dividend_yield: float | None = None  # dezimal, 0.03 = 3 %
 
 
 @dataclass(frozen=True)
@@ -86,17 +84,6 @@ class Metrics:
     earnings_stability: float | None
     revenue_growth_5y: float | None
     eps_growth_5y: float | None
-
-
-def to_float(value: Any) -> float | None:
-    """Endliche Zahl als ``float``, sonst ``None`` (auch fuer NaN, inf und Text)."""
-    if value is None:
-        return None
-    try:
-        number = float(value)
-    except TypeError, ValueError:
-        return None
-    return number if np.isfinite(number) else None
 
 
 def safe_div(num: float | None, den: float | None) -> float | None:
@@ -129,18 +116,6 @@ def cagr(values: Sequence[float]) -> float | None:
     return float(ratio ** (1.0 / years) - 1.0)
 
 
-def dividend_yield(*, trailing: float | None, percent: float | None) -> float | None:
-    """Dividendenrendite als Dezimal (0.03 = 3 %).
-
-    Die dezimale Trailing-Rendite hat Vorrang. Die Rendite in Prozent (yfinance seit
-    0.2.5x, z. B. 1.36 = 1,36 %) wird immer durch 100 geteilt - ein Schwellwert wie
-    "> 1" wuerde Renditen unter 1 % um den Faktor 100 aufblaehen.
-    """
-    if trailing is not None:
-        return trailing
-    return percent / 100.0 if percent is not None else None
-
-
 def roic(
     *,
     ebit: float | None,
@@ -162,11 +137,21 @@ def roic(
     return safe_div(nopat, invested)
 
 
-def earnings_stability(net_income: Sequence[float]) -> float | None:
-    """1 - min(Variationskoeffizient, 1) des Jahresueberschusses; hoeher = stabiler."""
-    if len(net_income) < MIN_HISTORY:
+def _recent(history: Sequence[float | None]) -> list[float] | None:
+    """Gueltige Werte der letzten ``HISTORY_YEARS`` Jahre, ``None`` bei zu wenigen."""
+    values = [v for v in history[:HISTORY_YEARS] if v is not None and math.isfinite(v)]
+    return values if len(values) >= MIN_HISTORY else None
+
+
+def earnings_stability(net_income: Sequence[float | None]) -> float | None:
+    """1 - min(Variationskoeffizient, 1) des Jahresueberschusses; hoeher = stabiler.
+
+    Ueber die letzten ``HISTORY_YEARS`` Jahre, davon mindestens ``MIN_HISTORY`` gueltige.
+    """
+    values = _recent(net_income)
+    if values is None:
         return None
-    arr = np.array(net_income, dtype=float)
+    arr = np.array(values, dtype=float)
     mean_abs = float(np.mean(np.abs(arr)))
     if mean_abs <= 0:
         return None
@@ -174,8 +159,9 @@ def earnings_stability(net_income: Sequence[float]) -> float | None:
     return max(0.0, 1.0 - min(cv, 1.0))
 
 
-def _growth(history: Sequence[float]) -> float | None:
-    return cagr(history) if len(history) >= MIN_HISTORY else None
+def _growth(history: Sequence[float | None]) -> float | None:
+    values = _recent(history)
+    return None if values is None else cagr(values)
 
 
 def _to_trading(value: float | None, fx: float | None) -> float | None:
@@ -189,7 +175,7 @@ def compute_metrics(
     market: MarketFigures,
     *,
     fx: float | None,
-    default_tax_rate: float = DEFAULT_TAX_RATE,
+    default_tax_rate: float,
 ) -> Metrics:
     """Alle Kennzahlen eines Titels.
 
@@ -228,9 +214,7 @@ def compute_metrics(
         )
         pb_ratio = safe_div(mcap, equity_t)
 
-    div_yield = dividend_yield(
-        trailing=market.trailing_dividend_yield, percent=market.dividend_yield_percent
-    )
+    div_yield = market.dividend_yield
     buyback_yield = safe_div(abs(buybacks_t), mcap) if buybacks_t is not None else None
     # 0 % ist ein echter Wert (keine Dividende, keine Rueckkaeufe) - nur None, wenn beides fehlt
     yields = [v for v in (div_yield, buyback_yield) if v is not None]

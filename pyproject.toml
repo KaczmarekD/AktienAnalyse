@@ -231,7 +231,7 @@ reportOptionalMemberAccess = "warning"
 # Coverage (optional, fuer 'make coverage')
 # ----------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["src", "va_contracts"]
+source = ["src", "va_contracts", "va_market_data"]
 omit = ["src/__init__.py", "tests/*"]
 
 [tool.coverage.report]

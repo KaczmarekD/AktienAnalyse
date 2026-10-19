@@ -287,6 +287,16 @@ sich in ganz Phase 1 nicht ändern.**
     dann die Mitglieder nicht-editierbar (`--no-editable`, kleine Schicht).
 - **Review:** Im Domain-Code gibt es keine Ein-/Ausgabe. Ein import-linter-Vertrag verbietet
   yfinance, requests, SQLAlchemy, psycopg und Alembic in allen `domain`-Schichten.
+  - Verhaltensgleichheit am 19.10.2026 belegt: 4.000 Zufallsfälle gegen den alten `fetch_one`
+    ohne Abweichung, dazu eine Golden-Variante „Qiagen ohne Wechselkurs“ aus dem alten Code.
+  - Nachgeschärft: Die Domain bekommt die Reihen roh (mit Lücken) und wendet „4 von 5 Jahren“
+    selbst an. Die Prozent-Eigenheit der Dividendenrendite und das Parsen von Zahlen bleiben
+    beim Abruf. `default_tax_rate` ist Pflicht (Wert aus den Settings). Lokale Builds holen
+    geänderten Code der Mitglieder per `--refresh-package` ins Image.
+  - Bekannt und bewusst unverändert (Golden-Files): Fehlt ein Jahr in der Mitte, rechnet die
+    CAGR über die vorhandenen Werte, als lägen sie direkt hintereinander (Beispiel
+    100, –, 80, 70, 60 ergibt 18,6 % statt 13,6 %). Betrifft nur die Wachstumswerte, die nicht
+    in den Composite eingehen. Eine Korrektur wäre eine bewusste Änderung der Golden-Files.
 
 #### P1.4 Adapter für Yahoo und Universum hinter Ports
 

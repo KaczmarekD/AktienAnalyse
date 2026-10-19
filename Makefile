@@ -42,7 +42,7 @@ test: ## Tests laufen lassen
 	$(RUN) pytest
 
 test-cov: ## Tests mit Coverage-Report
-	$(RUN) pytest --cov=src --cov=va_contracts --cov-report=term-missing --cov-report=html
+	$(RUN) pytest --cov=src --cov=va_contracts --cov=va_market_data --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
 	$(RUN) ruff check $(PY_PATHS)

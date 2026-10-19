@@ -14,6 +14,7 @@ Tag entscheidet ``main`` anhand der Datenbank - es gibt keinen Datei-Cache mehr.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
@@ -28,12 +29,10 @@ from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wai
 from yfinance.exceptions import YFRateLimitError
 
 from va_market_data.domain.metrics import (
-    HISTORY_YEARS,
     MarketFigures,
     Metrics,
     StatementFigures,
     compute_metrics,
-    to_float,
 )
 
 from .consensus import MAX_ERROR_LENGTH, ConsensusEntry, collect_consensus, to_payload
@@ -184,15 +183,42 @@ def _latest(series: pd.Series | None) -> float | None:
     cleaned = series.dropna()
     if cleaned.empty:
         return None
-    return to_float(cleaned.iloc[0])
+    return _to_float(cleaned.iloc[0])
 
 
-def _history(series: pd.Series | None) -> list[float]:
-    """Gueltige Werte der letzten ``HISTORY_YEARS`` Jahre (juengstes zuerst)."""
-    if series is None:
-        return []
-    values = (to_float(x) for x in series.iloc[:HISTORY_YEARS].tolist())
-    return [v for v in values if v is not None]
+def _to_float(value: Any) -> float | None:
+    """Endliche Zahl als ``float``, sonst ``None`` (auch fuer NaN, inf und Text)."""
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except TypeError, ValueError:
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _history(series: pd.Series | None) -> list[float | None]:
+    """Ein Wert je Geschaeftsjahr (juengstes zuerst), ``None`` fuer ein fehlendes.
+
+    Welche Jahre fuer Wachstum und Stabilitaet zaehlen, entscheidet die Domain.
+    """
+    return [] if series is None else [_to_float(x) for x in series.tolist()]
+
+
+def _dividend_yield(info: dict[str, Any]) -> float | None:
+    """Dividendenrendite als Dezimal (0.03 = 3 %).
+
+    ``trailingAnnualDividendYield`` ist dezimal und hat Vorrang. ``dividendYield``
+    liefert yfinance seit 0.2.5x in Prozent (1.36 = 1,36 %) - daher immer / 100,
+    ein Schwellwert wie "> 1" wuerde Renditen unter 1 % um Faktor 100 aufblaehen.
+    Mit yfinance 1.7 unveraendert: Live-Vergleich gegen 0.2.66 am 30.09.2026 ergab
+    fuer alle 90 Titel identische Werte.
+    """
+    trailing = _to_float(info.get("trailingAnnualDividendYield"))
+    if trailing is not None:
+        return trailing
+    pct = _to_float(info.get("dividendYield"))
+    return pct / 100.0 if pct is not None else None
 
 
 def _fields_of(
@@ -500,7 +526,7 @@ def fetch_prices(
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
     """Wechselkurs 1 from_ccy -> to_ccy (z.B. USD -> EUR). Pro Run gecached."""
-    rate = to_float(yf.Ticker(f"{from_ccy}{to_ccy}=X").fast_info.get("lastPrice"))
+    rate = _to_float(yf.Ticker(f"{from_ccy}{to_ccy}=X").fast_info.get("lastPrice"))
     if rate is None or rate <= 0:
         msg = f"kein Kurs fuer {from_ccy}{to_ccy}=X"
         raise ValueError(msg)
@@ -601,10 +627,10 @@ def fetch_one(
     fund.identity.industry = info.get("industry")
 
     fund.market = MarketData(
-        price=to_float(info.get("currentPrice") or info.get("regularMarketPrice")),
-        market_cap=to_float(info.get("marketCap")),
-        enterprise_value=to_float(info.get("enterpriseValue")),
-        shares_outstanding=to_float(info.get("sharesOutstanding")),
+        price=_to_float(info.get("currentPrice") or info.get("regularMarketPrice")),
+        market_cap=_to_float(info.get("marketCap")),
+        enterprise_value=_to_float(info.get("enterpriseValue")),
+        shares_outstanding=_to_float(info.get("sharesOutstanding")),
     )
 
     statements = StatementFigures(
@@ -631,10 +657,9 @@ def fetch_one(
     market = MarketFigures(
         market_cap=fund.market.market_cap,
         enterprise_value=fund.market.enterprise_value,
-        trailing_pe=to_float(info.get("trailingPE")),
-        price_to_book=to_float(info.get("priceToBook")),
-        trailing_dividend_yield=to_float(info.get("trailingAnnualDividendYield")),
-        dividend_yield_percent=to_float(info.get("dividendYield")),
+        trailing_pe=_to_float(info.get("trailingPE")),
+        price_to_book=_to_float(info.get("priceToBook")),
+        dividend_yield=_dividend_yield(info),
     )
     fx = _statement_fx(info, fund.errors)
     fund.provenance.statement_fx = fx
