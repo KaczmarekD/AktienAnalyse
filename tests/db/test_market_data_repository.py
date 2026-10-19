@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -22,6 +24,7 @@ from src.fundamentals import (
 )
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
+WEEK = timedelta(days=7)
 
 
 def _statements(revenue: float, ebit: float = 500.0) -> dict[str, pd.DataFrame]:
@@ -275,6 +278,112 @@ class TestStatementVersioning:
         assert revenue(before) == 2_000.0
         assert revenue(after) == 1_950.0
         assert len(after) == 4
+
+
+QUARTERLY_FIXTURES = Path(__file__).parents[1] / "fixtures" / "quarterly"
+
+
+def _recorded_quarters(symbol: str) -> dict[str, pd.DataFrame]:
+    """Echte Quartalsabschluesse (yfinance 0.2.66, aufgezeichnet am 30.09.2026)."""
+    doc = json.loads((QUARTERLY_FIXTURES / f"{symbol}.json").read_text(encoding="utf-8"))
+    return {
+        name: pd.DataFrame(
+            part["data"],
+            index=part["index"],
+            columns=[pd.Timestamp(c) for c in part["columns"]],
+        )
+        for name, part in doc["statements"].items()
+    }
+
+
+def _revenue_frame(period: str, revenue: float) -> dict[str, pd.DataFrame]:
+    return {"income": pd.DataFrame({pd.Timestamp(period): [revenue]}, index=["Total Revenue"])}
+
+
+class TestQuarterlyStatements:
+    """F1.2: Quartale werden versioniert wie Jahreswerte, aber getrennt davon."""
+
+    def _write(self, engine, statements, *, frequency, started_at=T0, symbol="SAP.DE") -> int:
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo, started_at=started_at)
+            iid = repo.get_or_create_instruments([symbol])[symbol]
+            return repo.write_statements(
+                fid, iid, statements, currency="EUR", fetched_at=started_at, frequency=frequency
+            )
+
+    def test_recorded_quarters_are_stored_completely(self, engine):
+        quarters = _recorded_quarters("SAP.DE")
+        expected = sum(int(df.notna().sum().sum()) for df in quarters.values())
+        assert self._write(engine, quarters, frequency="quarterly") == expected
+        with session_scope(engine) as s:
+            stored = MarketDataRepository(s).get_statements_as_of(
+                "SAP.DE", T0, frequency="quarterly"
+            )
+        assert len(stored) == expected
+        assert set(stored["period_end"]) == {
+            pd.Timestamp(c).date() for c in quarters["income"].columns
+        }
+        revenue = stored[
+            (stored["line_item"] == "Total Revenue") & (stored["period_end"] == date(2026, 6, 30))
+        ]
+        assert float(revenue["value"].iloc[0]) == 9_878_000_000.0
+
+    def test_missing_quarterly_statement_is_skipped(self, engine):
+        quarters = _recorded_quarters("ALV.DE")
+        assert quarters["cashflow"].empty
+        self._write(engine, quarters, frequency="quarterly", symbol="ALV.DE")
+        with session_scope(engine) as s:
+            stored = MarketDataRepository(s).get_statements_as_of(
+                "ALV.DE", T0, frequency="quarterly"
+            )
+        assert set(stored["statement"]) == {"income", "balance"}
+
+    def test_unchanged_quarters_are_not_duplicated(self, engine):
+        quarters = _recorded_quarters("SAP.DE")
+        self._write(engine, quarters, frequency="quarterly")
+        assert self._write(engine, quarters, frequency="quarterly", started_at=T0 + WEEK) == 0
+
+    def test_revised_quarter_creates_new_version(self, engine):
+        self._write(engine, _revenue_frame("2026-06-30", 9_878.0), frequency="quarterly")
+        revised = _revenue_frame("2026-06-30", 9_900.0)
+        assert self._write(engine, revised, frequency="quarterly", started_at=T0 + WEEK) == 1
+        with session_scope(engine) as s:
+            history = MarketDataRepository(s).get_statement_history(
+                "SAP.DE", "Total Revenue", frequency="quarterly"
+            )
+        assert list(history["value"]) == [9_878.0, 9_900.0]
+
+    def test_annual_and_quarterly_values_are_kept_apart(self, engine):
+        """Geschaeftsjahr 2025 und Q4 2025 enden am selben Tag - beide bleiben erhalten."""
+        annual = _revenue_frame("2025-12-31", 36_000.0)
+        q4 = _revenue_frame("2025-12-31", 9_700.0)
+        assert self._write(engine, annual, frequency="annual") == 1
+        assert self._write(engine, q4, frequency="quarterly", started_at=T0 + WEEK) == 1
+        assert self._write(engine, annual, frequency="annual", started_at=T0 + 2 * WEEK) == 0
+        later = T0 + 3 * WEEK
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            assert list(repo.get_statements_as_of("SAP.DE", later)["value"]) == [36_000.0]
+            quarterly = repo.get_statements_as_of("SAP.DE", later, frequency="quarterly")
+            assert list(quarterly["value"]) == [9_700.0]
+            assert list(repo.get_statement_history("SAP.DE", "Total Revenue")["value"]) == [
+                36_000.0
+            ]
+
+    def test_unknown_frequency_is_rejected(self, session):
+        repo = MarketDataRepository(session)
+        fid = _fetch_run(repo)
+        iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+        with pytest.raises(ValueError, match="monthly"):
+            repo.write_statements(
+                fid,
+                iid,
+                _revenue_frame("2026-06-30", 1.0),
+                currency="EUR",
+                fetched_at=T0,
+                frequency="monthly",
+            )
 
 
 class TestFxRates:

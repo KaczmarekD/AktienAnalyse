@@ -17,6 +17,7 @@ from src.consensus import CONSENSUS_KINDS, ConsensusEntry
 from src.data_fetcher import (
     CONSENSUS_FIELDS,
     FIELD_MAP,
+    QUARTERLY_FIELDS,
     FetcherConfig,
     YahooResponseError,
     _cagr,
@@ -33,6 +34,7 @@ from src.data_fetcher import (
     fetch_all,
     fetch_one,
     provider_version,
+    quarterly_frames,
     success_share,
 )
 from src.fundamentals import Fundamentals, Identity, MarketData
@@ -44,6 +46,78 @@ def no_consensus_network():
     """fetch_one holt zusaetzlich Konsensdaten (F1.1) - in Tests nie ueber das Netz."""
     with patch("src.data_fetcher.fetch_consensus", return_value={}) as fake:
         yield fake
+
+
+@pytest.fixture(autouse=True)
+def no_quarterly_network():
+    """fetch_one holt zusaetzlich Quartalsabschluesse (F1.2) - in Tests nie ueber das Netz."""
+    with patch("src.data_fetcher.fetch_quarterly", return_value={}) as fake:
+        yield fake
+
+
+class _FakeQuarterlyTicker:
+    """Steht fuer ``yf.Ticker`` mit Quartals-Attributen, ganz ohne Netz."""
+
+    def __init__(self, **behaviour: Callable[[], Any]) -> None:
+        self.calls: list[str] = []
+        self._behaviour = behaviour
+
+    def __getattr__(self, attr: str) -> Any:
+        if attr.startswith("_"):
+            raise AttributeError(attr)
+        self.calls.append(attr)
+        return self._behaviour[attr]()
+
+
+QUARTER = pd.DataFrame({pd.Timestamp("2026-06-30"): [9_878.0]}, index=["Total Revenue"])
+
+
+class TestQuarterlyFrames:
+    """Der yfinance-Adapter fuer die Quartalsabschluesse (F1.2)."""
+
+    def test_every_statement_has_a_quarterly_attribute(self):
+        assert set(QUARTERLY_FIELDS) == {"income", "balance", "cashflow"}
+
+    def test_frames_come_back_per_statement(self):
+        fake = _FakeQuarterlyTicker(
+            quarterly_income_stmt=lambda: QUARTER,
+            quarterly_balance_sheet=pd.DataFrame,
+            quarterly_cashflow=lambda: None,
+        )
+        frames = quarterly_frames(fake, "SAP.DE")
+        assert frames["income"] is QUARTER
+        assert frames["balance"] is not None
+        assert frames["balance"].empty
+        assert frames["cashflow"] is None
+
+    def test_failure_costs_only_that_statement(self, caplog):
+        def broken() -> Any:
+            msg = "connection reset"
+            raise ConnectionError(msg)
+
+        fake = _FakeQuarterlyTicker(
+            quarterly_income_stmt=broken,
+            quarterly_balance_sheet=lambda: QUARTER,
+            quarterly_cashflow=lambda: QUARTER,
+        )
+        with patch("time.sleep"):
+            frames = quarterly_frames(fake, "SAP.DE")
+        assert frames == {"income": None, "balance": QUARTER, "cashflow": QUARTER}
+        assert fake.calls.count("quarterly_income_stmt") == 2  # ein Retry
+        assert "SAP.DE" in caplog.text
+        assert "income" in caplog.text
+
+    def test_rate_limit_stops_the_remaining_statements(self):
+        def throttled() -> Any:
+            raise YFRateLimitError
+
+        fake = _FakeQuarterlyTicker(
+            quarterly_income_stmt=throttled,
+            quarterly_balance_sheet=lambda: QUARTER,
+            quarterly_cashflow=lambda: QUARTER,
+        )
+        assert quarterly_frames(fake, "SAP.DE") == {"income": None}
+        assert fake.calls == ["quarterly_income_stmt"]  # kein Retry, nichts weiter
 
 
 class _FakeTicker:
@@ -522,6 +596,19 @@ class TestFetchOneProvenanceAndRaw:
         assert f.raw is not None
         assert f.raw.consensus == entries
         assert f.errors == []
+
+    def test_quarterly_statements_are_kept_raw(self, no_quarterly_network):
+        """F1.2: Quartale werden nur gespeichert - Kennzahlen und CSV bleiben gleich."""
+        no_quarterly_network.return_value = {"income": QUARTER, "cashflow": None}
+        f = self._fetch()
+        no_quarterly_network.assert_called_once_with("X.DE")
+        assert f.raw is not None
+        assert f.raw.quarterly == {"income": QUARTER, "cashflow": None}
+        assert f.errors == []
+
+    def test_failed_base_fetch_skips_the_quarters(self, no_quarterly_network):
+        self._fetch(side_effect=RuntimeError("down"))
+        no_quarterly_network.assert_not_called()
 
 
 class TestFetchOneInvalidPeriods:

@@ -74,6 +74,23 @@ def _fake_consensus(symbol: str) -> dict[str, ConsensusEntry]:
     }
 
 
+QUARTERS = [pd.Timestamp("2026-06-30"), pd.Timestamp("2026-03-31")]
+
+
+def _fake_quarterly(symbol: str) -> dict[str, pd.DataFrame | None]:
+    """Q2/Q1 2026; bei CCC.DE fehlt der Quartals-Cashflow (wie bei Versicherern)."""
+    income = pd.DataFrame(
+        {QUARTERS[0]: [260.0, 40.0], QUARTERS[1]: [240.0, 35.0]},
+        index=["Total Revenue", "EBIT"],
+    )
+    cashflow = (
+        None
+        if symbol == "CCC.DE"
+        else pd.DataFrame({QUARTERS[0]: [30.0]}, index=["Free Cash Flow"])
+    )
+    return {"income": income, "balance": pd.DataFrame(), "cashflow": cashflow}
+
+
 @pytest.fixture
 def db_settings(tmp_path, monkeypatch, db_url):
     monkeypatch.setenv("SMTP_USER", "test@gmail.com")
@@ -92,6 +109,7 @@ def _patched_run(settings, *, force_refresh=False, dry_run=False):
         patch("src.main.load_universe", return_value=UNIVERSE),
         patch("src.data_fetcher._ticker_data", side_effect=_fake_ticker_data) as ticker_data,
         patch("src.data_fetcher.fetch_consensus", side_effect=_fake_consensus),
+        patch("src.data_fetcher.fetch_quarterly", side_effect=_fake_quarterly),
         patch("src.data_fetcher.time.sleep"),
         patch("src.main.send_report") as send,
         patch("src.main.ping", return_value=None),
@@ -129,7 +147,15 @@ class TestFullRun:
             assert md.get_consensus(run.fetch_run_id, "BBB.DE")["eps_trend"].status == "error"
             # Konsens-Fehler landen nicht in der Snapshot-Spalte errors - die CSV bleibt gleich
             assert snapshots.set_index("symbol").loc["BBB.DE", "errors"] == ""
-            assert len(md.get_statements_as_of("AAA.DE", pd.Timestamp.now(tz="UTC"))) > 5
+            now = pd.Timestamp.now(tz="UTC")
+            annual = md.get_statements_as_of("AAA.DE", now)
+            assert len(annual) > 5
+            assert set(annual["period_end"]) == {p.date() for p in PERIODS}
+            quarterly = md.get_statements_as_of("AAA.DE", now, frequency="quarterly")
+            assert len(quarterly) == 5  # 2 x 2 GuV-Werte + 1 Cashflow-Wert
+            assert set(quarterly["period_end"]) == {q.date() for q in QUARTERS}
+            ccc = md.get_statements_as_of("CCC.DE", now, frequency="quarterly")
+            assert set(ccc["statement"]) == {"income"}
             fetch_run = md.get_fetch_run(run.fetch_run_id)
             assert fetch_run is not None
             assert fetch_run.success_share == 1.0

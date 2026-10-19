@@ -164,6 +164,14 @@ class BatchRecorder:
                 currency=fund.identity.financial_currency,
                 fetched_at=fetched_at,
             )
+            repo.write_statements(
+                fetch_run_id,
+                instrument_id,
+                fund.raw.quarterly,
+                currency=fund.identity.financial_currency,
+                fetched_at=fetched_at,
+                frequency="quarterly",
+            )
             reporting_ccy = fund.identity.financial_currency
             trading_ccy = fund.identity.currency
             fx = fund.provenance.statement_fx

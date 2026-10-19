@@ -508,9 +508,20 @@ unverändert.
     also neue Zeile nur bei geändertem Wert.
   - `get_statements_as_of(…, frequency="quarterly")` liefert Quartale getrennt von den
     Jahreswerten.
-- **Implementierung:** `quarterly_income_stmt`, `quarterly_balance_sheet` und
-  `quarterly_cashflow` abrufen und über `write_statements(..., frequency="quarterly")` speichern.
-  Die Spalte `frequency` ist freier Text, eine Migration ist nicht nötig.
+- **Implementierung:**
+  - `quarterly_income_stmt`, `quarterly_balance_sheet` und `quarterly_cashflow` abrufen
+    (`data_fetcher.fetch_quarterly`, Zuordnung in `QUARTERLY_FIELDS`) und über
+    `write_statements(..., frequency="quarterly")` speichern.
+  - Die Spalte `frequency` ist freier Text, eine Migration ist nicht nötig. Das Repository
+    akzeptiert nur `annual` und `quarterly`, `get_statement_history` fragt je Frequenz ab.
+  - Ein Fehler kostet nur den betroffenen Abschluss. Nach einem Rate-Limit bleiben die restlichen
+    Abschlüsse des Titels aus.
+- **Review:** Gemessen am 30.09.2026 an 8 DAX/MDAX-Titeln:
+  - Der Quartalsabruf kostet im Median 0,58 s je Titel, also rund 50 s je Lauf.
+  - Yahoo liefert 5 bis 7 Quartale je Abschluss. Banken und Versicherer (Allianz, Deutsche Bank)
+    haben keinen Quartals-Cashflow.
+  - Im Median fallen rund 700 Werte je Titel an, ab der zweiten Woche wird nur Neues oder
+    Geändertes gespeichert.
 
 #### F1.3 Historie der Aktienanzahl
 
