@@ -184,6 +184,34 @@ class ShareCount(Base):
     first_seen_at: Mapped[datetime]
 
 
+class PriceBar(Base):
+    """Versionierter Tageskurs (ADR-0010, F1.4) aus ``history(auto_adjust=False, actions=True)``.
+
+    Wie ``statement_value``: Eine Zeile entsteht nur fuer einen neuen Tag oder einen
+    geaenderten Wert. Ein Split passt bei Yahoo alle frueheren Kurse an, die alten
+    Versionen bleiben stehen. ``dividend``/``split`` sind 0 an Tagen ohne Ereignis.
+    """
+
+    __tablename__ = "price_bar"
+    __table_args__ = (
+        CheckConstraint("close > 0", name="close"),
+        CheckConstraint("dividend >= 0", name="dividend"),
+        CheckConstraint("split >= 0", name="split"),
+        Index("ix_price_bar_key", "instrument_id", "trade_date", "first_seen_at"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("market_data.instrument.id"))
+    trade_date: Mapped[date]  # Handelstag, Zeitzone der Boerse
+    close: Mapped[float]  # split-, nicht dividendenbereinigt
+    adj_close: Mapped[float | None]  # zusaetzlich dividendenbereinigt, Stand des Abrufs
+    dividend: Mapped[float]
+    split: Mapped[float]
+    first_seen_fetch_run_id: Mapped[int] = mapped_column(ForeignKey("market_data.fetch_run.id"))
+    first_seen_at: Mapped[datetime]
+
+
 class FxRate(Base):
     __tablename__ = "fx_rate"
     __table_args__ = (

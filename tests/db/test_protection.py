@@ -13,6 +13,7 @@ from src.db.engine import session_scope
 from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.runs import RunRepository
 from src.db.repositories.scoring import ScoreRow, ScoringRepository
+from src.history import PriceBar
 
 APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting")
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
@@ -116,6 +117,44 @@ class TestTriggers:
         with pytest.raises(DBAPIError, match="verboten"):
             _exec(engine, "DELETE FROM market_data.share_count")
 
+    def test_price_bar_rejects_update_and_delete(self, engine):
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            bars = {date(2026, 7, 29): PriceBar(200.0, 200.0, 0.0, 0.0)}
+            repo.write_price_bars(fid, iid, bars, fetched_at=T0)
+        with pytest.raises(DBAPIError, match="verboten"):
+            _exec(engine, "UPDATE market_data.price_bar SET close = 1")
+        with pytest.raises(DBAPIError, match="verboten"):
+            _exec(engine, "DELETE FROM market_data.price_bar")
+
+    @pytest.mark.parametrize(
+        ("close", "dividend", "split", "constraint"),
+        [
+            (0.0, 0.0, 0.0, "price_bar_close"),
+            (1.0, -0.1, 0.0, "price_bar_dividend"),
+            (1.0, 0.0, -1.0, "price_bar_split"),
+        ],
+    )
+    def test_price_bar_values_are_checked(self, engine, close, dividend, split, constraint):
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+        with pytest.raises(DBAPIError, match=constraint):
+            _exec(
+                engine,
+                "INSERT INTO market_data.price_bar (instrument_id, trade_date, close, dividend, "
+                "split, first_seen_fetch_run_id, first_seen_at) "
+                "VALUES (:iid, '2026-07-29', :close, :dividend, :split, :fid, now())",
+                iid=iid,
+                fid=fid,
+                close=close,
+                dividend=dividend,
+                split=split,
+            )
+
     def test_share_count_must_be_positive(self, engine):
         with session_scope(engine) as s:
             repo = MarketDataRepository(s)
@@ -176,6 +215,17 @@ class TestRoles:
         with session_scope(read_engine) as s:
             stored = MarketDataRepository(s).get_share_counts("SAP.DE")
         assert list(stored["shares"]) == [1_154_204_232]
+
+    def test_app_role_can_write_price_bars(self, app_engine, read_engine):
+        with session_scope(app_engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            bars = {date(2026, 7, 29): PriceBar(200.0, 198.0, 0.0, 0.0)}
+            repo.write_price_bars(fid, iid, bars, fetched_at=T0)
+        with session_scope(read_engine) as s:
+            stored = MarketDataRepository(s).get_price_bars("SAP.DE")
+        assert list(stored["close"]) == [200.0]
 
     def test_app_role_has_no_delete_privilege(self, engine, app_engine):
         _start_run(engine)

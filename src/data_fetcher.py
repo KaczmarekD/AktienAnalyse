@@ -17,7 +17,7 @@ import logging
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache, partial
 from typing import Any
 
@@ -39,7 +39,7 @@ from .fundamentals import (
     RawFetch,
     ValueMetrics,
 )
-from .history import HistoryState
+from .history import HistoryState, split_days
 from .universe import Ticker
 
 log = logging.getLogger(__name__)
@@ -106,6 +106,15 @@ QUARTERLY_FIELDS: dict[str, str] = {
     "cashflow": "quarterly_cashflow",
 }
 
+# Kurshistorie (ADR-0010, F1.4): eigene Spalte -> Spalte von
+# yf.Ticker.history(auto_adjust=False, actions=True)
+PRICE_FIELDS: dict[str, str] = {
+    "close": "Close",
+    "adj_close": "Adj Close",
+    "dividend": "Dividends",
+    "split": "Stock Splits",
+}
+
 
 @dataclass
 class FetcherConfig:
@@ -113,6 +122,9 @@ class FetcherConfig:
     default_tax_rate: float = 0.27
     # Erster Abruf der Aktienanzahl (F1.3); Yahoo liefert meist erst ab 2015
     shares_history_start: date = date(2000, 1, 1)
+    # Kurse (F1.4): ab dem letzten gespeicherten Tag minus 8 Wochen (~40 Handelstage).
+    # Spaete Korrekturen werden sichtbar, ausgefallene Laeufe hinterlassen keine Luecke.
+    price_overlap_days: int = 56
 
 
 PROVIDER = "yfinance"
@@ -367,6 +379,61 @@ def fetch_share_counts(symbol: str, start: date) -> pd.Series | None:
     return share_count_series(yf.Ticker(symbol), symbol, start)
 
 
+def normalize_prices(frame: pd.DataFrame | None) -> pd.DataFrame | None:
+    """yfinance-Spalten -> eigene Namen (``PRICE_FIELDS``). Fehlende Spalten bleiben leer."""
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return None
+    renamed = frame.rename(columns={yahoo: own for own, yahoo in PRICE_FIELDS.items()})
+    return renamed.reindex(columns=list(PRICE_FIELDS))
+
+
+@retry(
+    retry=retry_if_not_exception_type(YFRateLimitError),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    reraise=True,
+)
+def _price_history(yt: Any, start: date | None) -> pd.DataFrame | None:
+    window: dict[str, Any] = {"period": "max"} if start is None else {"start": start}
+    frame = yt.history(**window, auto_adjust=False, actions=True)
+    return frame if isinstance(frame, pd.DataFrame) and not frame.empty else None
+
+
+def price_frames(
+    yt: Any, symbol: str, start: date | None, known_splits: frozenset[date]
+) -> pd.DataFrame | None:
+    """Kurshistorie ab ``start`` (``None``: die ganze). Ein Fehler kostet nur diese Woche.
+
+    Ein Split passt bei Yahoo alle frueheren Kurse an. Steht im Fenster ein Split, der
+    noch nicht gespeichert ist, wird deshalb die ganze Historie geholt - so entstehen
+    fuer alle betroffenen Tage neue Versionen. Scheitert das, bleibt das Fenster.
+    """
+    try:
+        frame = _price_history(yt, start)
+    except Exception as e:
+        log.warning("Kurshistorie %s nicht abrufbar: %s", symbol, e)
+        return None
+    if frame is None or start is None:
+        return frame
+    new_splits = split_days(normalize_prices(frame)) - known_splits
+    if not new_splits:
+        return frame
+    log.info("Neuer Split bei %s (%s) - hole die ganze Kurshistorie", symbol, min(new_splits))
+    try:
+        full = _price_history(yt, None)
+    except Exception as e:
+        log.warning("Kurshistorie %s nach Split nicht vollstaendig: %s", symbol, e)
+        return frame
+    return frame if full is None else full
+
+
+def fetch_prices(
+    symbol: str, start: date | None, known_splits: frozenset[date]
+) -> pd.DataFrame | None:
+    """Kurshistorie (ADR-0010, F1.4) mit eigenen Spaltennamen. Wirft nie."""
+    return normalize_prices(price_frames(yf.Ticker(symbol), symbol, start, known_splits))
+
+
 @lru_cache(maxsize=16)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
@@ -420,8 +487,14 @@ def fetch_one(
         log.warning("Fetch %s fehlgeschlagen: %s", ticker.symbol, e)
         return fund
 
+    state = history or HistoryState()
     # Ab dem letzten gespeicherten Tag: Er kommt erneut mit, eine Korrektur wird sichtbar
-    shares_start = (history.last_share_date if history else None) or cfg.shares_history_start
+    shares_start = state.last_share_date or cfg.shares_history_start
+    price_start = (
+        None
+        if state.last_price_date is None
+        else state.last_price_date - timedelta(days=cfg.price_overlap_days)
+    )
     fund.raw = RawFetch(
         provider=PROVIDER,
         provider_version=provider_version(),
@@ -430,6 +503,7 @@ def fetch_one(
         consensus=fetch_consensus(ticker.symbol),
         quarterly=fetch_quarterly(ticker.symbol),
         shares=fetch_share_counts(ticker.symbol, shares_start),
+        prices=fetch_prices(ticker.symbol, price_start, state.price_split_days),
     )
     # Rohdaten bleiben unveraendert, gerechnet wird nur mit datierten Spalten
     income = _dated_columns(income, "income", fund.errors)

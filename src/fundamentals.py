@@ -103,6 +103,8 @@ class RawFetch:
     quarterly: dict[str, pd.DataFrame | None] = field(default_factory=dict)
     # Antwort von get_shares_full (ADR-0010, F1.3) - nur gespeichert, nicht ausgewertet
     shares: pd.Series | None = None
+    # Kurse je Tag (ADR-0010, F1.4), Spalten wie data_fetcher.PRICE_FIELDS - nur gespeichert
+    prices: pd.DataFrame | None = None
 
 
 @dataclass

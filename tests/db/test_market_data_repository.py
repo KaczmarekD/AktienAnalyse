@@ -22,7 +22,7 @@ from src.fundamentals import (
     QualityMetrics,
     ValueMetrics,
 )
-from src.history import daily_share_counts
+from src.history import PriceBar, daily_share_counts
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 WEEK = timedelta(days=7)
@@ -459,6 +459,99 @@ class TestShareCounts:
             repo.get_or_create_instruments(["ALV.DE"])  # bekannt, aber ohne Aktienanzahl
             last = repo.get_last_share_dates(["SAP.DE", "KGX.DE", "ALV.DE", "NEU.DE"])
         assert last == {"SAP.DE": date(2026, 7, 29), "KGX.DE": date(2025, 11, 17)}
+
+    def test_nothing_to_write(self, engine):
+        assert self._write(engine, {}) == 0
+
+
+def _bar(close: float, *, adj: float | None = None, dividend=0.0, split=0.0) -> PriceBar:
+    return PriceBar(
+        close=close, adj_close=close if adj is None else adj, dividend=dividend, split=split
+    )
+
+
+PRE_SPLIT = {date(2026, 7, 28): _bar(300.0), date(2026, 7, 29): _bar(303.0)}
+
+
+class TestPriceBars:
+    """F1.4: Kurshistorie - neue Zeile nur bei neuem Tag oder geaendertem Wert."""
+
+    def _write(self, engine, bars, *, started_at=T0, symbol="SAP.DE") -> int:
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo, started_at=started_at)
+            iid = repo.get_or_create_instruments([symbol])[symbol]
+            return repo.write_price_bars(fid, iid, bars, fetched_at=started_at)
+
+    def test_initial_fill_stores_every_day(self, engine):
+        assert self._write(engine, PRE_SPLIT) == 2
+        with session_scope(engine) as s:
+            stored = MarketDataRepository(s).get_price_bars("SAP.DE")
+        assert list(stored["trade_date"]) == list(PRE_SPLIT)
+        assert list(stored["close"]) == [300.0, 303.0]
+        assert list(stored.columns) == [
+            "trade_date",
+            "close",
+            "adj_close",
+            "dividend",
+            "split",
+            "first_seen_at",
+        ]
+
+    def test_incremental_window_adds_only_new_days(self, engine):
+        self._write(engine, PRE_SPLIT)
+        window = {**PRE_SPLIT, date(2026, 7, 30): _bar(305.0)}
+        assert self._write(engine, window, started_at=T0 + WEEK) == 1
+
+    def test_float_noise_creates_no_version(self, engine):
+        self._write(engine, PRE_SPLIT)
+        noisy = {d: _bar(b.close, adj=b.close * (1 + 6e-7)) for d, b in PRE_SPLIT.items()}
+        assert self._write(engine, noisy, started_at=T0 + WEEK) == 0
+
+    def test_split_creates_new_versions_and_keeps_the_old(self, engine):
+        """1:3-Split am 30.07.: Yahoo passt alle aelteren Kurse an."""
+        self._write(engine, PRE_SPLIT)
+        after = {
+            date(2026, 7, 28): _bar(100.0),
+            date(2026, 7, 29): _bar(101.0),
+            date(2026, 7, 30): _bar(102.0, split=3.0),
+        }
+        assert self._write(engine, after, started_at=T0 + WEEK) == 3
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            now = repo.get_price_bars("SAP.DE").set_index("trade_date")
+            before = repo.get_price_bars("SAP.DE", known_at=T0).set_index("trade_date")
+            history = repo.get_price_bar_history("SAP.DE")
+        assert list(now["close"]) == [100.0, 101.0, 102.0]
+        assert now.at[date(2026, 7, 30), "split"] == 3.0
+        assert list(before["close"]) == [300.0, 303.0]
+        assert len(history) == 5
+        july_28 = history[history["trade_date"] == date(2026, 7, 28)]
+        assert list(july_28["close"]) == [300.0, 100.0]
+
+    def test_dividend_adjustment_of_adj_close_is_a_new_version(self, engine):
+        self._write(engine, PRE_SPLIT)
+        adjusted = {d: _bar(b.close, adj=b.close * 0.99) for d, b in PRE_SPLIT.items()}
+        assert self._write(engine, adjusted, started_at=T0 + WEEK) == 2
+
+    def test_missing_adj_close_is_stored_empty(self, engine):
+        bars = {date(2026, 7, 28): PriceBar(300.0, None, 0.0, 0.0)}
+        assert self._write(engine, bars) == 1
+        with session_scope(engine) as s:
+            stored = MarketDataRepository(s).get_price_bars("SAP.DE")
+        assert stored["adj_close"].isna().all()
+
+    def test_history_state_per_symbol(self, engine):
+        self._write(engine, {**PRE_SPLIT, date(2000, 6, 26): _bar(50.0, split=3.0)})
+        self._write(engine, {date(2025, 11, 17): _bar(40.0)}, symbol="KGX.DE")
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            repo.get_or_create_instruments(["ALV.DE"])  # bekannt, aber ohne Kurse
+            symbols = ["SAP.DE", "KGX.DE", "ALV.DE"]
+            last = repo.get_last_price_dates(symbols)
+            splits = repo.get_price_split_days(symbols)
+        assert last == {"SAP.DE": date(2026, 7, 29), "KGX.DE": date(2025, 11, 17)}
+        assert splits == {"SAP.DE": frozenset({date(2000, 6, 26)})}
 
     def test_nothing_to_write(self, engine):
         assert self._write(engine, {}) == 0

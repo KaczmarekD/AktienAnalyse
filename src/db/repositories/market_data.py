@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ...consensus import ConsensusEntry
 from ...fundamentals import join_errors
+from ...history import PriceBar
 from ..models import (
     ConsensusSnapshot,
     FetchRun,
@@ -25,6 +26,7 @@ from ..models import (
     ShareCount,
     StatementValue,
 )
+from ..models import PriceBar as PriceBarRow
 from ..models import UniverseMember as UniverseMemberRow
 from ..models.market_data import FREQUENCIES
 from ..serialization import json_safe, period_end, to_python
@@ -500,6 +502,132 @@ class MarketDataRepository:
             .group_by(Instrument.symbol)
         )
         return dict(self.session.execute(stmt).all())
+
+    # --- Kurshistorie (F1.4) -----------------------------------------------------
+
+    def write_price_bars(
+        self,
+        fetch_run_id: int,
+        instrument_id: int,
+        bars: Mapping[date, PriceBar],
+        *,
+        fetched_at: datetime,
+    ) -> int:
+        """Speichert nur neue Tage oder geaenderte Werte. Liefert die Anzahl neuer Zeilen.
+
+        Geaendert heisst: ausserhalb des Float-Rauschens von Yahoo (``PriceBar.same_as``).
+        Ein Tag, der im Abruf fehlt, bleibt mit seinem letzten Stand stehen.
+        """
+        if not bars:
+            return 0
+        current = {
+            row.trade_date: PriceBar(row.close, row.adj_close, row.dividend, row.split)
+            for row in self.session.execute(
+                self._latest_prices_stmt(None).where(
+                    PriceBarRow.instrument_id == instrument_id,
+                    PriceBarRow.trade_date >= min(bars),
+                )
+            )
+        }
+        new_rows = [
+            {
+                "instrument_id": instrument_id,
+                "trade_date": day,
+                "close": bar.close,
+                "adj_close": bar.adj_close,
+                "dividend": bar.dividend,
+                "split": bar.split,
+                "first_seen_fetch_run_id": fetch_run_id,
+                "first_seen_at": fetched_at,
+            }
+            for day, bar in sorted(bars.items())
+            if day not in current or not bar.same_as(current[day])
+        ]
+        if new_rows:
+            self.session.execute(insert(PriceBarRow), new_rows)
+        return len(new_rows)
+
+    @staticmethod
+    def _latest_prices_stmt(known_at: datetime | None):
+        """Letzte Version je Handelstag; mit ``known_at`` so, wie sie damals bekannt war."""
+        stmt = (
+            select(
+                PriceBarRow.trade_date,
+                PriceBarRow.close,
+                PriceBarRow.adj_close,
+                PriceBarRow.dividend,
+                PriceBarRow.split,
+                PriceBarRow.first_seen_at,
+            )
+            .ext(distinct_on(PriceBarRow.trade_date))
+            .order_by(
+                PriceBarRow.trade_date, PriceBarRow.first_seen_at.desc(), PriceBarRow.id.desc()
+            )
+        )
+        if known_at is not None:
+            stmt = stmt.where(PriceBarRow.first_seen_at <= known_at)
+        return stmt
+
+    def get_price_bars(self, symbol: str, known_at: datetime | None = None) -> pd.DataFrame:
+        """Kurse je Handelstag (aktuellste Version), optional point-in-time zu ``known_at``."""
+        columns = ["trade_date", "close", "adj_close", "dividend", "split", "first_seen_at"]
+        instrument = self.get_instrument(symbol)
+        if instrument is None:
+            return pd.DataFrame(columns=columns)
+        stmt = self._latest_prices_stmt(known_at).where(PriceBarRow.instrument_id == instrument.id)
+        return self._frame(stmt, columns)
+
+    def get_price_bar_history(self, symbol: str) -> pd.DataFrame:
+        """Alle Versionen - von Splits oder Korrekturen angepasste Tage als eigene Zeilen."""
+        stmt = (
+            select(
+                PriceBarRow.trade_date,
+                PriceBarRow.close,
+                PriceBarRow.adj_close,
+                PriceBarRow.dividend,
+                PriceBarRow.split,
+                PriceBarRow.first_seen_at,
+                PriceBarRow.first_seen_fetch_run_id,
+            )
+            .join(Instrument, Instrument.id == PriceBarRow.instrument_id)
+            .where(Instrument.symbol == symbol)
+            .order_by(PriceBarRow.trade_date, PriceBarRow.first_seen_at, PriceBarRow.id)
+        )
+        return self._frame(
+            stmt,
+            [
+                "trade_date",
+                "close",
+                "adj_close",
+                "dividend",
+                "split",
+                "first_seen_at",
+                "first_seen_fetch_run_id",
+            ],
+        )
+
+    def get_last_price_dates(self, symbols: Collection[str]) -> dict[str, date]:
+        """Letzter gespeicherter Handelstag je Symbol; Symbole ohne Kurse fehlen."""
+        stmt = (
+            select(Instrument.symbol, func.max(PriceBarRow.trade_date))
+            .join(PriceBarRow, PriceBarRow.instrument_id == Instrument.id)
+            .where(Instrument.symbol.in_(list(symbols)))
+            .group_by(Instrument.symbol)
+        )
+        return dict(self.session.execute(stmt).all())
+
+    def get_price_split_days(self, symbols: Collection[str]) -> dict[str, frozenset[date]]:
+        """Tage mit gespeichertem Split je Symbol; Symbole ohne Split fehlen."""
+        stmt = (
+            select(Instrument.symbol, PriceBarRow.trade_date)
+            .join(PriceBarRow, PriceBarRow.instrument_id == Instrument.id)
+            .where(Instrument.symbol.in_(list(symbols)), PriceBarRow.split > 0)
+            .distinct()
+        )
+        days: dict[str, set[date]] = {}
+        for symbol, day in self.session.execute(stmt):
+            days.setdefault(symbol, set()).add(day)
+        return {symbol: frozenset(found) for symbol, found in days.items()}
 
     # --- Wechselkurse -----------------------------------------------------------
 

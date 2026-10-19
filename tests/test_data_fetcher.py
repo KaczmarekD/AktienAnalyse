@@ -17,6 +17,7 @@ from src.consensus import CONSENSUS_KINDS, ConsensusEntry
 from src.data_fetcher import (
     CONSENSUS_FIELDS,
     FIELD_MAP,
+    PRICE_FIELDS,
     QUARTERLY_FIELDS,
     FetcherConfig,
     YahooResponseError,
@@ -33,6 +34,8 @@ from src.data_fetcher import (
     _statement_fx,
     fetch_all,
     fetch_one,
+    normalize_prices,
+    price_frames,
     provider_version,
     quarterly_frames,
     share_count_series,
@@ -61,6 +64,13 @@ def no_quarterly_network():
 def no_shares_network():
     """fetch_one holt zusaetzlich die Aktienanzahl (F1.3) - in Tests nie ueber das Netz."""
     with patch("src.data_fetcher.fetch_share_counts", return_value=None) as fake:
+        yield fake
+
+
+@pytest.fixture(autouse=True)
+def no_prices_network():
+    """fetch_one holt zusaetzlich die Kurshistorie (F1.4) - in Tests nie ueber das Netz."""
+    with patch("src.data_fetcher.fetch_prices", return_value=None) as fake:
         yield fake
 
 
@@ -190,6 +200,110 @@ class TestShareCountSeries:
         fake = _FakeSharesTicker(YFRateLimitError(), SHARES)
         assert share_count_series(fake, "SAP.DE", date(2000, 1, 1)) is None
         assert len(fake.starts) == 1
+
+
+def _bars(*days: str, split_on: str | None = None) -> pd.DataFrame:
+    index = pd.DatetimeIndex(list(days)).tz_localize("Europe/Berlin")
+    return pd.DataFrame(
+        {
+            "Close": [100.0] * len(days),
+            "Adj Close": [99.0] * len(days),
+            "Dividends": [0.0] * len(days),
+            "Stock Splits": [3.0 if d == split_on else 0.0 for d in days],
+        },
+        index=index,
+    )
+
+
+class _FakeHistoryTicker:
+    """Steht fuer ``yf.Ticker.history``, ganz ohne Netz."""
+
+    def __init__(self, *results: Any) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._results = list(results)
+
+    def history(self, **kwargs):
+        self.calls.append(kwargs)
+        result = self._results.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+FULL = {"period": "max", "auto_adjust": False, "actions": True}
+
+
+class TestNormalizePrices:
+    """Die yfinance-Spaltennamen der Kurshistorie stehen nur in PRICE_FIELDS (CLAUDE.md)."""
+
+    def test_columns_get_own_names(self):
+        frame = normalize_prices(_bars("2026-07-30", split_on="2026-07-30"))
+        assert frame is not None
+        assert list(frame.columns) == list(PRICE_FIELDS)
+        assert frame["split"].iloc[0] == 3.0
+
+    def test_missing_column_stays_empty(self):
+        frame = normalize_prices(_bars("2026-07-30").drop(columns="Adj Close"))
+        assert frame is not None
+        assert frame["adj_close"].isna().all()
+
+    def test_no_data(self):
+        assert normalize_prices(None) is None
+        assert normalize_prices(pd.DataFrame()) is None
+
+
+class TestPriceFrames:
+    """Der yfinance-Adapter fuer die Kurshistorie (F1.4)."""
+
+    def test_full_history_without_start(self):
+        frame = _bars("2026-07-30", "2026-07-31")
+        fake = _FakeHistoryTicker(frame)
+        assert price_frames(fake, "SAP.DE", None, frozenset()) is frame
+        assert fake.calls == [FULL]
+
+    def test_window_from_start(self):
+        frame = _bars("2026-07-30", "2026-07-31")
+        fake = _FakeHistoryTicker(frame)
+        assert price_frames(fake, "SAP.DE", date(2026, 6, 5), frozenset()) is frame
+        assert fake.calls == [{"start": date(2026, 6, 5), "auto_adjust": False, "actions": True}]
+
+    def test_new_split_in_the_window_reloads_the_full_history(self):
+        """Ein Split passt alle aelteren Kurse an - die neuen Versionen sollen vollstaendig sein."""
+        window = _bars("2026-07-30", "2026-07-31", split_on="2026-07-31")
+        full = _bars("1998-04-09", "2026-07-30", "2026-07-31", split_on="2026-07-31")
+        fake = _FakeHistoryTicker(window, full)
+        assert price_frames(fake, "SAP.DE", date(2026, 6, 5), frozenset()) is full
+        assert fake.calls[1] == FULL
+
+    def test_known_split_does_not_reload(self):
+        window = _bars("2026-07-30", "2026-07-31", split_on="2026-07-31")
+        fake = _FakeHistoryTicker(window)
+        known = frozenset({date(2026, 7, 31)})
+        assert price_frames(fake, "SAP.DE", date(2026, 6, 5), known) is window
+        assert len(fake.calls) == 1
+
+    def test_failed_reload_keeps_the_window(self, caplog):
+        window = _bars("2026-07-30", "2026-07-31", split_on="2026-07-31")
+        fake = _FakeHistoryTicker(window, ConnectionError("reset"), ConnectionError("reset"))
+        with patch("time.sleep"):
+            assert price_frames(fake, "SAP.DE", date(2026, 6, 5), frozenset()) is window
+        assert "SAP.DE" in caplog.text
+
+    def test_empty_answer_means_no_data(self):
+        fake = _FakeHistoryTicker(pd.DataFrame())
+        assert price_frames(fake, "SAP.DE", None, frozenset()) is None
+
+    def test_failure_is_retried_once_then_logged(self, caplog):
+        fake = _FakeHistoryTicker(ConnectionError("reset"), ConnectionError("reset"))
+        with patch("time.sleep"):
+            assert price_frames(fake, "SAP.DE", None, frozenset()) is None
+        assert len(fake.calls) == 2
+        assert "SAP.DE" in caplog.text
+
+    def test_rate_limit_is_not_retried(self):
+        fake = _FakeHistoryTicker(YFRateLimitError(), _bars("2026-07-31"))
+        assert price_frames(fake, "SAP.DE", None, frozenset()) is None
+        assert len(fake.calls) == 1
 
 
 class TestConsensusValue:
@@ -698,6 +812,27 @@ class TestFetchOneProvenanceAndRaw:
     def test_failed_base_fetch_skips_the_share_counts(self, no_shares_network):
         self._fetch(side_effect=RuntimeError("down"))
         no_shares_network.assert_not_called()
+
+    def test_prices_start_with_the_full_history(self, no_prices_network):
+        """F1.4: Beim ersten Abruf die ganze Kurshistorie - nur gespeichert, nicht ausgewertet."""
+        frame = _bars("2026-07-30", "2026-07-31")
+        no_prices_network.return_value = frame
+        f = self._fetch()
+        no_prices_network.assert_called_once_with("X.DE", None, frozenset())
+        assert f.raw is not None
+        assert f.raw.prices is frame
+        assert f.errors == []
+
+    def test_prices_overlap_eight_weeks_with_the_stored_history(self, no_prices_network):
+        """Ab dem letzten Tag minus 8 Wochen (~40 Handelstage): Korrekturen und Luecken."""
+        splits = frozenset({date(2000, 6, 26)})
+        state = HistoryState(last_price_date=date(2026, 7, 31), price_split_days=splits)
+        self._fetch(history=state)
+        no_prices_network.assert_called_once_with("X.DE", date(2026, 6, 5), splits)
+
+    def test_failed_base_fetch_skips_the_prices(self, no_prices_network):
+        self._fetch(side_effect=RuntimeError("down"))
+        no_prices_network.assert_not_called()
 
 
 class TestFetchOneInvalidPeriods:
