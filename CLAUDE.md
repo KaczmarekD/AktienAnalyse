@@ -158,8 +158,9 @@ Gemergt wird erst nach Abnahme durch den User. Abgehakt wird in
   die Stufe `j4125-check` des Dockerfiles (App-Image plus QEMU) und startet
   Python darin mit einem CPU-Modell ohne AVX (Denverton). Ein Paket, das AVX
   braucht, bricht dort mit „Illegal instruction“ ab.
-- DSM-Kernel 4.4: Ziel ist, Images nur für `linux/amd64` in CI zu bauen
-  statt auf der NAS (Roadmap Phase 0). Node/Bun laufen nie auf der NAS.
+- DSM-Kernel 4.4: Images entstehen nur in der CI (`linux/amd64`, Job
+  „Docker Build + J4125-Pruefung“) und liegen in GHCR. Die NAS zieht sie
+  (`make pull`) und baut nichts selbst. Node/Bun laufen nie auf der NAS.
 
 ## Was NICHT in dieses Projekt gehört
 

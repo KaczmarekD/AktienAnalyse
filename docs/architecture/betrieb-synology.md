@@ -35,10 +35,10 @@
    Ranking, Mail-Report, Parquet-Durchlauf. Ein Paket mit AVX-Code beendet den Lauf mit
    Exit-Code 132.
 
-   Bis die Images aus der CI kommen (P0.6b), baut die NAS ihr Image noch selbst. Der Build
-   braucht BuildKit (`RUN --mount` im Dockerfile); mit Docker 24 im Container Manager ist das
-   Standard. Nach jedem Build dort zusätzlich auf der echten CPU prüfen (ohne DB, ohne
-   Migration):
+   Seit P0.6b kommen die Images aus der CI: Der Job „Docker Build + J4125-Pruefung“ baut sie,
+   prüft sie (Smoke-Test, J4125) und schiebt sie bei einem Push auf `main` und bei Tags `v*`
+   nach `ghcr.io/kaczmarekd/value-analyzer` (`sha-<commit>`, `latest`, `<version>`). Nach jedem
+   `docker compose pull` zusätzlich auf der echten CPU prüfen (ohne DB, ohne Migration):
    ```
    docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
    ```

@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check check-j4125 clean build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -76,8 +76,14 @@ check-j4125: ## Nach make lock/upgrade und vor dem Deployment: Image unter QEMU 
 	docker run --rm --platform linux/amd64 value-analyzer:j4125-check
 
 # ---------- Docker auf Synology ---------------------------------------------
-build: ## Docker-Image bauen
-	docker compose build
+# Die NAS baut nicht selbst (ADR-0008): Images kommen aus der CI (GHCR).
+IMAGE ?= ghcr.io/kaczmarekd/value-analyzer:latest
+
+pull: ## Image aus GHCR laden (NAS: danach make up)
+	docker compose pull value-analyzer
+
+build: ## Image lokal bauen, unter dem Namen aus docker-compose.yml (nicht auf der NAS)
+	docker build --target runtime -t $(IMAGE) .
 
 up: ## Container starten (Cron-Mode)
 	docker compose up -d

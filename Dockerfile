@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
-# Ziel (ADR-0008): Images entstehen in der CI und die NAS laedt sie nur (P0.6).
-# Bis dahin baut die NAS wie bisher selbst (docker compose build).
+# Images entstehen in der CI und die NAS laedt sie aus GHCR (ADR-0008, P0.6b).
+# Lokal: make build.
 #
 # Stufen: base (alles fuer den Lauf) -> j4125-check (base + QEMU, nur zum Pruefen)
-#         base -> runtime (Standard-Ziel, docker-compose.yml nutzt target: runtime)
+#         base -> runtime (Standard-Ziel, das Image in GHCR)
 FROM python:3.14-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \

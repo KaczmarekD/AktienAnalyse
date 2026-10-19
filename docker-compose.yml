@@ -28,11 +28,10 @@ services:
     shm_size: 128mb
 
   value-analyzer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-    image: value-analyzer:0.3.0
+    # Fertiges Image aus der CI (P0.6b, ADR-0008) - die NAS baut nicht selbst.
+    # VERSION in der .env: latest folgt main, sha-<commit> oder eine Version pinnt.
+    # Lokal statt aus GHCR: make build (baut und taggt unter demselben Namen).
+    image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
     container_name: value-analyzer
     restart: unless-stopped
     depends_on:
