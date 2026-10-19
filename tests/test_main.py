@@ -470,6 +470,8 @@ class TestRunConfigError:
         monkeypatch.setenv("SMTP_PASSWORD", "dummy")
         monkeypatch.setenv("MAIL_TO", "r@example.com")
         monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://va_app:x@localhost/va")
+        monkeypatch.setenv("LOGS_DIR", str(tmp_path / "logs"))
+        monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
         monkeypatch.chdir(tmp_path)
         empty = pd.DataFrame(columns=["symbol", "market_cap", "composite_score"])
         with (
@@ -481,6 +483,8 @@ class TestRunConfigError:
         ):
             rc = run(dry_run=True)
         assert rc != 2
+        # Nichts ausserhalb von tmp_path: /app ist nur im Container beschreibbar
+        assert (tmp_path / "logs" / "value-analyzer.log").exists()
 
 
 # ---------------------------------------------------------------------------
