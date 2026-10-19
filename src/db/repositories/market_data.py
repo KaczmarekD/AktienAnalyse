@@ -25,6 +25,7 @@ from ..models import (
     StatementValue,
 )
 from ..models import UniverseMember as UniverseMemberRow
+from ..models.market_data import FREQUENCIES
 from ..serialization import json_safe, period_end, to_python
 
 if TYPE_CHECKING:
@@ -294,6 +295,9 @@ class MarketDataRepository:
         frequency: str = "annual",
     ) -> int:
         """Speichert nur neue oder geaenderte Werte. Liefert die Anzahl neuer Versionen."""
+        if frequency not in FREQUENCIES:
+            msg = f"unbekannte Frequenz {frequency!r}, erlaubt: {', '.join(FREQUENCIES)}"
+            raise ValueError(msg)
         incoming = _statement_rows(statements)
         if not incoming:
             return 0
@@ -357,9 +361,16 @@ class MarketDataRepository:
         return stmt
 
     def get_statement_history(
-        self, symbol: str, line_item: str, statement: str | None = None
+        self,
+        symbol: str,
+        line_item: str,
+        statement: str | None = None,
+        frequency: str = "annual",
     ) -> pd.DataFrame:
-        """Alle Versionen eines Postens - Restatements werden als eigene Zeilen sichtbar."""
+        """Alle Versionen eines Postens - Restatements werden als eigene Zeilen sichtbar.
+
+        Je Frequenz getrennt: Geschaeftsjahr und viertes Quartal enden am selben Tag.
+        """
         stmt = (
             select(
                 StatementValue.statement,
@@ -370,7 +381,11 @@ class MarketDataRepository:
                 StatementValue.first_seen_fetch_run_id,
             )
             .join(Instrument, Instrument.id == StatementValue.instrument_id)
-            .where(Instrument.symbol == symbol, StatementValue.line_item == line_item)
+            .where(
+                Instrument.symbol == symbol,
+                StatementValue.line_item == line_item,
+                StatementValue.frequency == frequency,
+            )
             .order_by(StatementValue.period_end, StatementValue.first_seen_at, StatementValue.id)
         )
         if statement is not None:

@@ -24,6 +24,7 @@ from .base import Base, in_values
 
 FETCH_ORIGINS = ("live", "import")
 STATEMENTS = ("income", "balance", "cashflow")
+FREQUENCIES = ("annual", "quarterly")  # geprueft im Repository, die Spalte ist freier Text
 
 
 class Instrument(Base):
@@ -152,7 +153,7 @@ class StatementValue(Base):
     id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
     instrument_id: Mapped[int] = mapped_column(ForeignKey("market_data.instrument.id"))
     statement: Mapped[str]
-    frequency: Mapped[str]  # annual (quarterly spaeter moeglich)
+    frequency: Mapped[str]  # annual oder quarterly (seit F1.2), siehe FREQUENCIES
     line_item: Mapped[str]  # Originalname des Providers
     period_end: Mapped[date]
     value: Mapped[float]

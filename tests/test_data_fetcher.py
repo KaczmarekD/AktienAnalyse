@@ -610,6 +610,7 @@ class TestFetchOneProvenanceAndRaw:
         self._fetch(side_effect=RuntimeError("down"))
         no_quarterly_network.assert_not_called()
 
+
 class TestFetchOneInvalidPeriods:
     """Spalten ohne Periodenende zaehlen fuer keine Kennzahl - wie in statement_value.
 

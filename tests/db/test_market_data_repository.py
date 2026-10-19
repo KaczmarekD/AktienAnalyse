@@ -321,7 +321,9 @@ class TestQuarterlyStatements:
                 "SAP.DE", T0, frequency="quarterly"
             )
         assert len(stored) == expected
-        assert set(stored["period_end"]) == {c.date() for c in quarters["income"].columns}
+        assert set(stored["period_end"]) == {
+            pd.Timestamp(c).date() for c in quarters["income"].columns
+        }
         revenue = stored[
             (stored["line_item"] == "Total Revenue") & (stored["period_end"] == date(2026, 6, 30))
         ]

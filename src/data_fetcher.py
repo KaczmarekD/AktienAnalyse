@@ -98,6 +98,13 @@ CONSENSUS_FIELDS: dict[str, str] = {
     "analyst_price_targets": "analyst_price_targets",
 }
 
+# Quartalsabschluesse (ADR-0010, F1.2): Statement -> Attribut von yf.Ticker.
+QUARTERLY_FIELDS: dict[str, str] = {
+    "income": "quarterly_income_stmt",
+    "balance": "quarterly_balance_sheet",
+    "cashflow": "quarterly_cashflow",
+}
+
 
 @dataclass
 class FetcherConfig:
@@ -294,6 +301,40 @@ def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
     return entries
 
 
+@retry(
+    retry=retry_if_not_exception_type(YFRateLimitError),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    reraise=True,
+)
+def _quarterly_frame(yt: Any, attr: str) -> pd.DataFrame | None:
+    frame = getattr(yt, attr)
+    return frame if isinstance(frame, pd.DataFrame) else None
+
+
+def quarterly_frames(yt: Any, symbol: str) -> dict[str, pd.DataFrame | None]:
+    """Quartalsabschluesse je Statement. Ein Fehler kostet nur diesen Abschluss.
+
+    Nach einem Rate-Limit bleiben die restlichen Abschluesse aus, damit der naechste
+    Titel nicht in eine andauernde Drosselung laeuft.
+    """
+    frames: dict[str, pd.DataFrame | None] = {}
+    for statement, attr in QUARTERLY_FIELDS.items():
+        try:
+            frames[statement] = _quarterly_frame(yt, attr)
+        except Exception as e:
+            log.warning("Quartalsabschluss %s %s nicht abrufbar: %s", symbol, statement, e)
+            frames[statement] = None
+            if isinstance(e, YFRateLimitError):
+                break
+    return frames
+
+
+def fetch_quarterly(symbol: str) -> dict[str, pd.DataFrame | None]:
+    """Quartalsabschluesse (ADR-0010, F1.2). Wirft nie: Fehlt einer, fehlt er diese Woche."""
+    return quarterly_frames(yf.Ticker(symbol), symbol)
+
+
 @lru_cache(maxsize=16)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
@@ -350,6 +391,7 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         info=info,
         statements={"income": income, "balance": balance, "cashflow": cashflow},
         consensus=fetch_consensus(ticker.symbol),
+        quarterly=fetch_quarterly(ticker.symbol),
     )
     # Rohdaten bleiben unveraendert, gerechnet wird nur mit datierten Spalten
     income = _dated_columns(income, "income", fund.errors)
