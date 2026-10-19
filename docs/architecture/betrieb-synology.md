@@ -127,7 +127,9 @@ Ablauf eines Updates:
 
 1. Tag oder Merge auf `main` → GitHub Actions baut alle geänderten Images (`linux/amd64`) und
    schiebt sie nach GHCR.
-2. Auf der NAS: `VERSION` in der `.env` setzen, dann `docker compose pull`.
+2. Auf der NAS: `git pull` (Compose-Datei, Fallback-CSV), `VERSION` in der `.env` setzen, dann
+   `docker compose pull`. Das Volume `./data` verdeckt die Fallback-CSV im Image, neue Fassungen
+   kommen also mit `git pull`.
 3. Import-Test (Regel 2), danach `docker compose up -d`.
 4. Jeder Service migriert beim Start sein eigenes Schema mit der Owner-Rolle.
 

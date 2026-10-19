@@ -44,9 +44,10 @@ Details: [Implementierungsplan, Phase 0](implementierungsplan.md#phase-0--fundam
 - [x] P0.6 J4125-Prüfung in CI und lokal ([ADR-0008](../adr/0008-zielhardware-j4125.md)) (`d4d029c`)
 - [x] P0.7 Fix-Paket Perioden und inf (`190a862`)
 - [ ] P0.6b Images aus der CI nach GHCR
-- [ ] NAS (du): Bis P0.6b baut die NAS selbst, ab jetzt mit BuildKit und uv. Nach dem Build
-      `import src.main` auf der echten CPU prüfen ([betrieb-synology.md](betrieb-synology.md))
-- [ ] NAS (du): Images aus GHCR laden statt auf der NAS zu bauen (nach P0.6b)
+- [ ] P0.8 Fix-Paket Infrastruktur (Gesamt-Review)
+- [ ] NAS (du): Images aus GHCR laden statt auf der NAS zu bauen (nach P0.6b): `git pull`, bei
+      privatem Paket `docker login ghcr.io`, `docker compose pull`, Import-Test, `up -d`
+      (README, Abschnitt „Update“)
 
 **Fertig, wenn:** dieselbe Mail wie vorher kommt (Golden-Master grün), die Images aus der CI
 stammen und die Tests auf Python 3.14 grün sind.

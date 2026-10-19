@@ -9,10 +9,10 @@ UV     ?= uv
 RUN    ?= $(UV) run --locked
 PYTHON ?= $(RUN) python
 # Python-Code fuer Ruff (Pyright: [tool.pyright] include in pyproject.toml)
-PY_PATHS = src tests docker packages services
+PY_PATHS = src tests docker packages services migrations
 
 help: ## Zeige verfuegbare Targets
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 # ---------- Dependencies (uv, ADR-0004) ----------------------------------------
 install: ## Runtime-Dependencies exakt aus uv.lock installieren
@@ -42,7 +42,7 @@ test: ## Tests laufen lassen
 	$(RUN) pytest
 
 test-cov: ## Tests mit Coverage-Report
-	$(RUN) pytest --cov=src --cov-report=term-missing --cov-report=html
+	$(RUN) pytest --cov=src --cov=va_contracts --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
 	$(RUN) ruff check $(PY_PATHS)
@@ -82,7 +82,11 @@ check-j4125: ## Nach make lock/upgrade und vor dem Deployment: Image unter QEMU 
 
 # ---------- Docker auf Synology ---------------------------------------------
 # Die NAS baut nicht selbst (ADR-0008): Images kommen aus der CI (GHCR).
-IMAGE ?= ghcr.io/kaczmarekd/value-analyzer:latest
+# Name wie in docker-compose.yml. Steht VERSION in der .env, nutzt Compose dieses Tag:
+# dann lokal z. B. make build VERSION=sha-1234567 (make liest die .env nicht).
+REG ?= ghcr.io/kaczmarekd
+VERSION ?= latest
+IMAGE ?= $(REG)/value-analyzer:$(VERSION)
 
 pull: ## Image aus GHCR laden (NAS: danach make up)
 	docker compose pull value-analyzer

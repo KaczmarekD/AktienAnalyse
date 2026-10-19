@@ -176,7 +176,9 @@ Eigenes Paket nach P0.6. F1 wartet nicht darauf.
 - **Review:** Gemessen am 19.10.2026: Das Image ist 818 MB groß. Größter Posten ist pyarrow mit
   156 MB von 460 MB Paketen, es wird nur für den Altdaten-Import gebraucht. Keine Secrets im
   Image: `.env` ist per `.dockerignore` ausgeschlossen, in `data/` liegt nur die Fallback-CSV.
-- **NAS (du):** einmalig `docker login ghcr.io`, danach `docker compose pull && docker compose up -d`.
+- **NAS (du):** `git pull` (neue Compose-Datei), bei privatem Paket einmalig
+  `docker login ghcr.io`, dann `docker compose pull`, Import-Test, `docker compose up -d`
+  (Ablauf im README unter „Update“).
 
 #### P0.7 Fix-Paket Perioden und inf
 
@@ -186,6 +188,25 @@ Aus dem Review von Phase 0 entstanden.
   `_safe_div` (rot).
 - **Implementierung:** Eine Periodenregel für Kennzahlen und `statement_value`, gerechnet wird nur
   mit datierten Spalten, `inf` wird zentral zu `None`.
+
+#### P0.8 Fix-Paket Infrastruktur
+
+Aus dem Gesamt-Review am 19.10.2026 entstanden (P0.6b, P1.1).
+
+- **Test:** `tests/test_image_tags.py` für die Image-Tags (rot). Gegenprobe zum Docker-Cache:
+  zwei Builds, dazwischen eine Code-Änderung in `packages/`.
+- **Implementierung:**
+  - `docker/image_tags.py`: `latest` nur, wenn der Commit noch der Kopf von `main` ist; ein
+    Versions-Tag muss `vX.Y.Z` sein und zu `pyproject.toml` passen, sonst kein Push.
+  - Dockerfile bindet beim `uv sync` nur die `pyproject.toml` der Mitglieder ein: Code-Änderungen
+    in `packages/` und `services/` lassen die Abhängigkeitsschicht im Cache (gemessen).
+    `.dockerignore` schließt `__pycache__` in allen Ebenen aus.
+  - CI: Workflow-Standard `contents: read`, Actions auf aktuelle Major-Versionen (Node 24),
+    `migrations/` in Ruff und Pyright, Coverage auch für `va_contracts`.
+  - Ruff kennt die Workspace-Pakete als first-party, `make help` zeigt auch Targets mit Ziffern,
+    `make build` taggt mit `REG`/`VERSION`.
+  - Doku: Update-Ablauf für die NAS (README), CI-Abschnitt, Projektbaum, Rezept für ein neues
+    Workspace-Mitglied (CLAUDE.md).
 
 ### Phase 1 – Modularer Monolith
 

@@ -19,6 +19,18 @@ from uuid import uuid4
 import pandas as pd
 import pytest
 from pydantic import BaseModel, ValidationError
+
+from src.fundamentals import (
+    Fundamentals,
+    Growth,
+    Identity,
+    MarketData,
+    Provenance,
+    QualityMetrics,
+    ValueMetrics,
+)
+from src.reporting import build_report
+from src.scoring import ScoringConfig, score
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
     EVENTS,
@@ -45,18 +57,6 @@ from va_contracts.events.v1 import (
     UniverseInfoV1,
     UniverseMemberV1,
 )
-
-from src.fundamentals import (
-    Fundamentals,
-    Growth,
-    Identity,
-    MarketData,
-    Provenance,
-    QualityMetrics,
-    ValueMetrics,
-)
-from src.reporting import build_report
-from src.scoring import ScoringConfig, score
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 GOLDEN_INPUT = GOLDEN_DIR / "input_fundamentals.json"
