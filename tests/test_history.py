@@ -7,6 +7,7 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+
 from src.history import HistoryState, daily_share_counts
 
 FIXTURES = Path(__file__).parent / "fixtures" / "shares"

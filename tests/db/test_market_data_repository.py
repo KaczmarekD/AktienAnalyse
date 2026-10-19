@@ -9,7 +9,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from sqlalchemy.exc import IntegrityError
-from src.history import daily_share_counts
 
 from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
@@ -23,6 +22,7 @@ from src.fundamentals import (
     QualityMetrics,
     ValueMetrics,
 )
+from src.history import daily_share_counts
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 WEEK = timedelta(days=7)

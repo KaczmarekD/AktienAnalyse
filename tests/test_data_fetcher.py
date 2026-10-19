@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from src.history import HistoryState
 from tenacity import wait_none
 from yfinance.exceptions import YFRateLimitError
 
@@ -40,6 +39,7 @@ from src.data_fetcher import (
     success_share,
 )
 from src.fundamentals import Fundamentals, Identity, MarketData
+from src.history import HistoryState
 from src.universe import Ticker
 
 
