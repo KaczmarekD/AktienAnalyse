@@ -16,9 +16,11 @@ import pandas as pd
 from sqlalchemy.exc import InterfaceError, OperationalError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from va_market_data.adapters.yahoo import PROVIDER, provider_version
+from va_market_data.application.fetch import success_share
+from va_market_data.domain.history import HistoryState, daily_price_bars, daily_share_counts
+
 from .. import __version__
-from ..data_fetcher import PROVIDER, provider_version, success_share
-from ..history import HistoryState, daily_price_bars, daily_share_counts
 from .engine import session_scope
 from .repositories.market_data import SNAPSHOT_COLUMNS, MarketDataRepository, UniverseMember
 from .repositories.reporting import ReportingRepository
@@ -30,10 +32,11 @@ if TYPE_CHECKING:
     from sqlalchemy import Engine
     from sqlalchemy.orm import Session
 
-    from ..fundamentals import Fundamentals
+    from va_market_data.domain.fundamentals import Fundamentals
+    from va_market_data.domain.universe import Ticker
+
     from ..reporting import ReportArtifacts
     from ..scoring import ScoringConfig
-    from ..universe import Ticker
     from .log_handler import LogEntry
 
 log = logging.getLogger(__name__)

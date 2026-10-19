@@ -183,6 +183,14 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel", "va_contracts.base.Contr
     "RUF059",       # unused tuple unpacking
     "PLC0415",      # local import in test methods OK
 ]
+"services/*/tests/**/*.py" = [
+    "ARG", "PLR2004", "S101",
+    "C408",         # dict(...) statt {} - lesbarer in Mock-Daten
+    "PT018",        # compound asserts
+    "B007",         # unused loop variable
+    "RUF059",       # unused tuple unpacking
+    "PLC0415",      # local import in test methods OK
+]
 "src/data_fetcher.py" = ["TC001", "TC003"]  # Ticker/Path werden zur Laufzeit gebraucht
 "src/healthcheck.py" = ["TC002"]
 "src/mailer.py" = ["TC001", "TC003"]

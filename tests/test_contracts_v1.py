@@ -20,15 +20,6 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from src.fundamentals import (
-    Fundamentals,
-    Growth,
-    Identity,
-    MarketData,
-    Provenance,
-    QualityMetrics,
-    ValueMetrics,
-)
 from src.reporting import build_report
 from src.scoring import ScoringConfig, score
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
@@ -56,6 +47,15 @@ from va_contracts.events.v1 import (
     SnapshotCompletedV1,
     UniverseInfoV1,
     UniverseMemberV1,
+)
+from va_market_data.domain.fundamentals import (
+    Fundamentals,
+    Growth,
+    Identity,
+    MarketData,
+    Provenance,
+    QualityMetrics,
+    ValueMetrics,
 )
 
 GOLDEN_DIR = Path(__file__).parent / "golden"

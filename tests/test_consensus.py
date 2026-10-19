@@ -14,7 +14,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.consensus import CONSENSUS_KINDS, ConsensusEntry, collect_consensus, to_payload
+from va_market_data.domain.consensus import (
+    CONSENSUS_KINDS,
+    ConsensusEntry,
+    collect_consensus,
+    to_payload,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "consensus"
 

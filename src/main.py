@@ -33,13 +33,14 @@ from .logging_setup import setup_logging
 from .mailer import send_report
 from .reporting import ReportArtifacts, build_report
 from .scoring import ScoringConfig, score
-from .universe import Ticker, load_universe
+from .universe import load_universe
 
 if TYPE_CHECKING:
     import pandas as pd
 
-    from .fundamentals import Fundamentals
-    from .history import HistoryState
+    from va_market_data.domain.fundamentals import Fundamentals
+    from va_market_data.domain.history import HistoryState
+    from va_market_data.domain.universe import Ticker
 
 EXIT_OK = 0
 EXIT_FAILED = 1

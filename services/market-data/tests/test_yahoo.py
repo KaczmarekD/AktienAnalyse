@@ -1,4 +1,7 @@
-"""Tests fuer Helper-Funktionen in data_fetcher (ohne yfinance-Netzcalls)."""
+"""Yahoo-Adapter (``va_market_data.adapters.yahoo``), ohne yfinance-Netzcalls.
+
+Die Abrufschleife testet test_fetch.py, die Kennzahlen test_metrics.py.
+"""
 
 from __future__ import annotations
 
@@ -16,13 +19,11 @@ from yfinance._http import HTTPError
 from yfinance.data import YfData
 from yfinance.exceptions import YFRateLimitError
 
-from src.consensus import CONSENSUS_KINDS, ConsensusEntry
-from src.data_fetcher import (
+from va_market_data.adapters.yahoo import (
     CONSENSUS_FIELDS,
     FIELD_MAP,
     PRICE_FIELDS,
     QUARTERLY_FIELDS,
-    FetcherConfig,
     YahooResponseError,
     _consensus_value,
     _dividend_yield,
@@ -31,7 +32,6 @@ from src.data_fetcher import (
     _pick,
     _statement_fx,
     _to_float,
-    fetch_all,
     fetch_consensus,
     fetch_one,
     normalize_prices,
@@ -40,11 +40,10 @@ from src.data_fetcher import (
     provider_version,
     quarterly_frames,
     share_count_series,
-    success_share,
 )
-from src.fundamentals import Fundamentals, Identity, MarketData
-from src.history import HistoryState
-from src.universe import Ticker
+from va_market_data.domain.consensus import CONSENSUS_KINDS, ConsensusEntry
+from va_market_data.domain.history import HistoryState
+from va_market_data.domain.universe import Ticker
 
 # Vor dem Patchen der Fixture gemerkt: einige Tests brauchen den echten Ablauf
 REAL_FETCH_CONSENSUS = fetch_consensus
@@ -53,28 +52,28 @@ REAL_FETCH_CONSENSUS = fetch_consensus
 @pytest.fixture(autouse=True)
 def no_consensus_network():
     """fetch_one holt zusaetzlich Konsensdaten (F1.1) - in Tests nie ueber das Netz."""
-    with patch("src.data_fetcher.fetch_consensus", return_value={}) as fake:
+    with patch("va_market_data.adapters.yahoo.fetch_consensus", return_value={}) as fake:
         yield fake
 
 
 @pytest.fixture(autouse=True)
 def no_quarterly_network():
     """fetch_one holt zusaetzlich Quartalsabschluesse (F1.2) - in Tests nie ueber das Netz."""
-    with patch("src.data_fetcher.fetch_quarterly", return_value={}) as fake:
+    with patch("va_market_data.adapters.yahoo.fetch_quarterly", return_value={}) as fake:
         yield fake
 
 
 @pytest.fixture(autouse=True)
 def no_shares_network():
     """fetch_one holt zusaetzlich die Aktienanzahl (F1.3) - in Tests nie ueber das Netz."""
-    with patch("src.data_fetcher.fetch_share_counts", return_value=None) as fake:
+    with patch("va_market_data.adapters.yahoo.fetch_share_counts", return_value=None) as fake:
         yield fake
 
 
 @pytest.fixture(autouse=True)
 def no_prices_network():
     """fetch_one holt zusaetzlich die Kurshistorie (F1.4) - in Tests nie ueber das Netz."""
-    with patch("src.data_fetcher.fetch_prices", return_value=None) as fake:
+    with patch("va_market_data.adapters.yahoo.fetch_prices", return_value=None) as fake:
         yield fake
 
 
@@ -428,7 +427,7 @@ class TestConsensusSharedSource:
             def __getattr__(self, attr):
                 return None
 
-        with patch("src.data_fetcher.yf.Ticker", return_value=NoCoverage()):
+        with patch("va_market_data.adapters.yahoo.yf.Ticker", return_value=NoCoverage()):
             entries = REAL_FETCH_CONSENSUS("SAP.DE")
         assert {e.status for e in entries.values()} == {"empty"}
 
@@ -440,7 +439,10 @@ class TestConsensusSharedSource:
                 if attr == "eps_revisions":
                     raise KeyError("trend")
 
-        with patch("src.data_fetcher.yf.Ticker", return_value=OneBroken()), patch("time.sleep"):
+        with (
+            patch("va_market_data.adapters.yahoo.yf.Ticker", return_value=OneBroken()),
+            patch("time.sleep"),
+        ):
             entries = REAL_FETCH_CONSENSUS("SAP.DE")
         assert entries["eps_revisions"].status == "error"
         assert entries["eps_trend"].status == "empty"
@@ -595,62 +597,6 @@ class TestFieldMap:
             assert all(isinstance(c, str) for c in candidates)
 
 
-class TestFetchAll:
-    """fetch_one wird gepatcht - kein yfinance-Netzcall, kein Datei-Cache mehr."""
-
-    TICKERS = tuple(Ticker(f"T{i}.DE", f"T{i}", "DAX") for i in range(5))
-    CFG = FetcherConfig(sleep_between=0)
-
-    @staticmethod
-    def _fake_fetch(failing: set[str]):
-        def fake(ticker, cfg=None, history=None):
-            fund = Fundamentals(identity=Identity(ticker.symbol, ticker.name, ticker.index))
-            if ticker.symbol in failing:
-                fund.errors.append("fetch failed: down")
-            else:
-                fund.market = MarketData(market_cap=1e9)
-            return fund
-
-        return fake
-
-    def test_returns_flat_frame_and_writes_no_files(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch({"T0.DE"})):
-            df = fetch_all(self.TICKERS, cfg=self.CFG)
-        assert len(df) == 5
-        assert "fetched_at" in df.columns
-        assert list(tmp_path.iterdir()) == []
-
-    def test_callback_receives_every_result_immediately(self):
-        seen: list[str] = []
-        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch({"T1.DE"})):
-            fetch_all(self.TICKERS, cfg=self.CFG, on_result=lambda f: seen.append(f.symbol))
-        assert seen == [t.symbol for t in self.TICKERS]
-
-    def test_callback_error_aborts(self):
-        def boom(_):
-            raise RuntimeError("db down")
-
-        with (
-            patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(set())),
-            pytest.raises(RuntimeError, match="db down"),
-        ):
-            fetch_all(self.TICKERS, cfg=self.CFG, on_result=boom)
-
-    def test_history_state_is_passed_per_symbol(self):
-        state = HistoryState(last_share_date=date(2026, 7, 29))
-        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(set())) as one:
-            fetch_all(self.TICKERS[:2], cfg=self.CFG, history={"T1.DE": state})
-        assert [c.kwargs["history"] for c in one.call_args_list] == [None, state]
-
-    def test_success_share(self):
-        failing = {t.symbol for t in self.TICKERS[:4]}
-        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(failing)):
-            df = fetch_all(self.TICKERS, cfg=self.CFG)
-        assert success_share(df) == pytest.approx(0.2)
-        assert success_share(pd.DataFrame()) == 0.0
-
-
 def _statement(values: dict[str, float]) -> pd.DataFrame:
     return pd.DataFrame({"2025-12-31": values})
 
@@ -663,14 +609,14 @@ class TestStatementFx:
         assert _statement_fx({"currency": "EUR"}, []) == 1.0
 
     def test_mismatch_uses_fx_rate(self):
-        with patch("src.data_fetcher._fx_rate", return_value=0.9) as fx_rate:
+        with patch("va_market_data.adapters.yahoo._fx_rate", return_value=0.9) as fx_rate:
             fx = _statement_fx({"currency": "EUR", "financialCurrency": "USD"}, [])
         assert fx == 0.9
         fx_rate.assert_called_once_with("USD", "EUR")
 
     def test_fx_failure_returns_none_and_logs_error(self):
         errors: list[str] = []
-        with patch("src.data_fetcher._fx_rate", side_effect=ValueError("down")):
+        with patch("va_market_data.adapters.yahoo._fx_rate", side_effect=ValueError("down")):
             fx = _statement_fx({"currency": "EUR", "financialCurrency": "USD"}, errors)
         assert fx is None
         assert errors
@@ -700,8 +646,8 @@ class TestFetchOneCurrencyMismatch:
     def _fetch(self, fx_rate):
         data = (QIAGEN_INFO, self.INCOME, self.BALANCE, self.CASHFLOW)
         with (
-            patch("src.data_fetcher._ticker_data", return_value=data),
-            patch("src.data_fetcher._fx_rate", **fx_rate),
+            patch("va_market_data.adapters.yahoo._ticker_data", return_value=data),
+            patch("va_market_data.adapters.yahoo._fx_rate", **fx_rate),
         ):
             return fetch_one(Ticker("QIA.DE", "Qiagen", "MDAX"))
 
@@ -740,7 +686,7 @@ class TestFetchOneShareholderYield:
             None,
             cashflow,
         )
-        with patch("src.data_fetcher._ticker_data", return_value=data):
+        with patch("va_market_data.adapters.yahoo._ticker_data", return_value=data):
             return fetch_one(Ticker("X.DE", "X", "MDAX"))
 
     def test_zero_yield_is_kept(self):
@@ -774,7 +720,7 @@ class TestFetchOneProvenanceAndRaw:
         kwargs: dict[str, Any] = (
             {"side_effect": side_effect} if side_effect else {"return_value": data}
         )
-        with patch("src.data_fetcher._ticker_data", **kwargs):
+        with patch("va_market_data.adapters.yahoo._ticker_data", **kwargs):
             return fetch_one(Ticker("X.DE", "X", "DAX"), history=history)
 
     def test_raw_data_is_kept(self):
@@ -888,7 +834,9 @@ class TestRateLimitPerTicker:
 
     def _fetch(self, symbol="X.DE"):
         info = {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0}
-        with patch("src.data_fetcher._ticker_data", return_value=(info, None, None, None)):
+        with patch(
+            "va_market_data.adapters.yahoo._ticker_data", return_value=(info, None, None, None)
+        ):
             return fetch_one(Ticker(symbol, "X", "DAX"))
 
     def test_rate_limit_in_the_consensus_skips_the_rest(
@@ -917,7 +865,7 @@ class TestRateLimitPerTicker:
                 raise YFRateLimitError
 
         no_consensus_network.side_effect = REAL_FETCH_CONSENSUS
-        with patch("src.data_fetcher.yf.Ticker", return_value=Throttled()):
+        with patch("va_market_data.adapters.yahoo.yf.Ticker", return_value=Throttled()):
             self._fetch()
         no_quarterly_network.assert_not_called()
         no_prices_network.assert_not_called()
@@ -995,7 +943,9 @@ class TestFetchOneInvalidPeriods:
 
     def _fetch(self, income):
         info = {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0}
-        with patch("src.data_fetcher._ticker_data", return_value=(info, income, None, None)):
+        with patch(
+            "va_market_data.adapters.yahoo._ticker_data", return_value=(info, income, None, None)
+        ):
             return fetch_one(Ticker("X.DE", "X", "DAX"))
 
     def test_metrics_ignore_undated_columns(self):

@@ -206,9 +206,8 @@ value-analyzer/
 ├── src/
 │   ├── main.py             # Orchestrator: verbindet alle Module
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
-│   ├── universe.py         # Index-Quellen iShares/Deka/CSV + Validierung
-│   ├── fundamentals.py     # Dataclasses: Identity/MarketData/Value/Quality/Growth
-│   ├── data_fetcher.py     # yfinance + FIELD_MAP, Rohdaten je Titel
+│   ├── universe.py         # Verdrahtung: Quellen-Kette + Pfad der Fallback-CSV
+│   ├── data_fetcher.py     # Verdrahtung: Yahoo-Adapter für den Batch
 │   ├── scoring.py          # ScoringConfig + Cross-sektionaler Composite Score
 │   ├── reporting.py        # HTML-Mail-Body + CSV-Vollranking
 │   ├── mailer.py           # SMTP-Versand (Gmail)
@@ -217,7 +216,8 @@ value-analyzer/
 │   └── db/                 # PostgreSQL: Modelle, Repositories (get/write), Recorder,
 │                           #   Migration, Löschschutz (ddl.py), Altdaten-Import
 ├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Infrastruktur)
-├── services/               # uv-Workspace: market-data, scoring, notification (Phase 1)
+├── services/               # uv-Workspace: market-data (Universum, Yahoo, Kennzahlen),
+│                           #   scoring, notification (Phase 1)
 ├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR
 ├── migrations/             # Alembic-Migrationen (nur additiv)
 ├── db/init/01_roles.sh     # Rollen va_app/va_read beim ersten DB-Start

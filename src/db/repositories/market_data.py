@@ -13,9 +13,10 @@ from sqlalchemy import func, insert, select, update
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ...consensus import ConsensusEntry
-from ...fundamentals import join_errors
-from ...history import PriceBar
+from va_market_data.domain.consensus import ConsensusEntry
+from va_market_data.domain.fundamentals import join_errors
+from va_market_data.domain.history import PriceBar
+
 from ..models import (
     ConsensusSnapshot,
     FetchRun,
@@ -34,7 +35,7 @@ from ..serialization import json_safe, period_end, to_python
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-    from ...consensus import ConsensusStatus
+    from va_market_data.domain.consensus import ConsensusStatus
 
 # Spalten, die write_snapshot annimmt (alles ausser den Schluesseln)
 SNAPSHOT_COLUMNS: tuple[str, ...] = tuple(

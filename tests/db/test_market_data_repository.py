@@ -10,11 +10,11 @@ import pandas as pd
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
 from src.db.recorder import snapshot_values
 from src.db.repositories.market_data import MarketDataRepository, UniverseMember
-from src.fundamentals import (
+from va_market_data.domain.consensus import ConsensusEntry
+from va_market_data.domain.fundamentals import (
     Fundamentals,
     Identity,
     MarketData,
@@ -22,7 +22,7 @@ from src.fundamentals import (
     QualityMetrics,
     ValueMetrics,
 )
-from src.history import PriceBar, daily_share_counts
+from va_market_data.domain.history import PriceBar, daily_share_counts
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 WEEK = timedelta(days=7)
