@@ -123,9 +123,12 @@ filterwarnings = [
 # Pyright: statische Typpruefung
 # ----------------------------------------------------------------------------
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "docker"]
 exclude = ["**/__pycache__", "data", "logs", "build"]
 # Keine pythonVersion: Pyright nimmt die Version des Interpreters aus .venv (uv run).
+# Linux fest: Der Code laeuft nur im Container; unter Windows prueft Pyright sonst
+# gegen andere Stubs (z. B. mmap ohne PROT_*) als in der CI.
+pythonPlatform = "Linux"
 typeCheckingMode = "standard"
 reportMissingImports = true
 reportMissingTypeStubs = false
