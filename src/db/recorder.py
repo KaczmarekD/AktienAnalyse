@@ -34,9 +34,9 @@ if TYPE_CHECKING:
 
     from va_market_data.domain.fundamentals import Fundamentals
     from va_market_data.domain.universe import Ticker
+    from va_scoring.domain.scoring import ScoringConfig
 
     from ..reporting import ReportArtifacts
-    from ..scoring import ScoringConfig
     from .log_handler import LogEntry
 
 log = logging.getLogger(__name__)

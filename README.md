@@ -208,7 +208,6 @@ value-analyzer/
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
 │   ├── universe.py         # Verdrahtung: Quellen-Kette + Pfad der Fallback-CSV
 │   ├── data_fetcher.py     # Verdrahtung: Yahoo-Adapter für den Batch
-│   ├── scoring.py          # ScoringConfig + Cross-sektionaler Composite Score
 │   ├── reporting.py        # HTML-Mail-Body + CSV-Vollranking
 │   ├── mailer.py           # SMTP-Versand (Gmail)
 │   ├── healthcheck.py      # Healthchecks.io Ping

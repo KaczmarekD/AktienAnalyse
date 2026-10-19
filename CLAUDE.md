@@ -85,7 +85,7 @@ zu ändernde Stelle.
 Konstanten. Wenn du eine Konstante brauchst und sie könnte sich je nach
 Deployment unterscheiden, geh durch `Settings`.
 
-**Magic Numbers in `scoring.py` gehören in `ScoringConfig`**. Wenn du einen
+**Magic Numbers im Scoring (`va_scoring.domain.scoring`) gehören in `ScoringConfig`**. Wenn du einen
 Schwellwert hardcoden willst, frag dich erst, ob `ScoringConfig` die richtige
 Heimat ist – meistens ja.
 
@@ -205,7 +205,7 @@ ADR-0001 und ADR-0002 aufgehoben.
 6. Spalte in `FundamentalSnapshot` (`src/db/models/market_data.py`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab
-7. Test in `tests/test_scoring.py`, Golden-Files der Kennzahlen
+7. Test in `services/scoring/tests/test_scoring.py`, Golden-Files der Kennzahlen
    (`tests/golden/metrics/`) bewusst mit `--update-golden` erneuern
 
 **Neues Universum (z.B. Stoxx 600)**:

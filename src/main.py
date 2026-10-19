@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
+from va_scoring.domain.scoring import ScoringConfig, score
+
 from . import __version__
 from .config import Settings, load_settings
 from .data_fetcher import FetcherConfig, fetch_all
@@ -32,7 +34,6 @@ from .healthcheck import ping, ping_target
 from .logging_setup import setup_logging
 from .mailer import send_report
 from .reporting import ReportArtifacts, build_report
-from .scoring import ScoringConfig, score
 from .universe import load_universe
 
 if TYPE_CHECKING:

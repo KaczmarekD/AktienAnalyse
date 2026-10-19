@@ -22,9 +22,9 @@ import pandas as pd
 import pytest
 
 from src.reporting import ReportArtifacts, build_report
-from src.scoring import ScoringConfig, score
 from tests.conftest import GOLDEN_DIR
 from va_market_data.domain.universe import FALLBACK_SOURCE
+from va_scoring.domain.scoring import ScoringConfig, score
 
 GOLDEN_INPUT = GOLDEN_DIR / "input_fundamentals.json"
 FIXED_NOW = datetime(2026, 10, 3, 7, 30)

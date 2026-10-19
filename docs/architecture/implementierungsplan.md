@@ -326,6 +326,9 @@ sich in ganz Phase 1 nicht ändern.**
 - **Test:** `test_scoring.py` zieht mit um. Ein Sicherungstest prüft, dass das Ranking für den
   Golden-Datensatz identisch bleibt.
 - **Implementierung:** `va_scoring.domain.scoring`.
+- **Umgesetzt (19.10.2026):** `src/scoring.py` unverändert verschoben, `va-scoring` ist
+  Laufzeitabhängigkeit (Image: `--refresh-package va-scoring`). Tests unter
+  `services/scoring/tests/`. Golden-Mail mit `ranking.csv` und Kennzahlen unverändert.
 
 #### P1.6 Notification-Modul
 

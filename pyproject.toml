@@ -23,6 +23,7 @@ dependencies = [
     "alembic>=1.20,<2",
     # Workspace-Mitglieder, die der Batch zur Laufzeit nutzt (ab P1.3)
     "va-market-data",
+    "va-scoring",
 ]
 
 [dependency-groups]
@@ -38,7 +39,6 @@ dev = [
     # kommen sie, sobald der Batch sie nutzt - dann oben unter dependencies.
     "va-contracts",
     "va-platform",
-    "va-scoring",
     "va-notification",
 ]
 
@@ -239,7 +239,7 @@ reportOptionalMemberAccess = "warning"
 # Coverage (optional, fuer 'make coverage')
 # ----------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["src", "va_contracts", "va_market_data"]
+source = ["src", "va_contracts", "va_market_data", "va_scoring"]
 omit = ["src/__init__.py", "tests/*"]
 
 [tool.coverage.report]
