@@ -11,7 +11,7 @@
 |---|---|---|
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
 | 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
-| 1 | Modularer Monolith mit den späteren Service-Grenzen | 🚧 P1.1 und P1.2 erledigt, ab P1.3 in Arbeit |
+| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.9), NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | offen |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
@@ -58,13 +58,13 @@ Details: [Implementierungsplan, Phase 1](implementierungsplan.md#phase-1--modula
 
 - [x] P1.1 Workspace-Pakete und Grenzen (`eda1b69`)
 - [x] P1.2 Contracts v1 (`2f40d43`)
-- [ ] P1.3 Kennzahlen als reine Funktionen
-- [ ] P1.4 Adapter für Yahoo und Universum hinter Ports
-- [ ] P1.5 Scoring-Modul
-- [ ] P1.6 Notification-Modul
-- [ ] P1.7 Datenbankzugriff je Modul
-- [ ] P1.8 Event-Bus im Prozess, Composition Root
-- [ ] P1.9 Aufräumen
+- [x] P1.3 Kennzahlen als reine Funktionen (`b7c1c0a`)
+- [x] P1.4 Adapter für Yahoo und Universum hinter Ports (`f7d081f`)
+- [x] P1.5 Scoring-Modul (`b7f71a4`)
+- [x] P1.6 Notification-Modul (`44ec184`)
+- [x] P1.7 Datenbankzugriff je Modul (`5cad2aa`)
+- [x] P1.8 Event-Bus im Prozess, Composition Root (`6d6286c`)
+- [x] P1.9 Aufräumen (`4f183d6`), Gesamt-Review Phase 1 (`cef8ebb`)
 
 **Fertig, wenn:** es weiterhin ein Container ist, die Golden-Files unverändert sind und die CI die
 Grenzen erzwingt.
