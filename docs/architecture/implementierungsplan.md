@@ -146,19 +146,34 @@ keine gemeinsamen Dateien anfassen.
 - **Grün:** Standard, Änderungen an Golden-Files nur mit Begründung.
 - **Review:** fachliche Auswirkung jeder Änderung an einem Golden-File.
 
-#### P0.6 Images aus der CI, geprüft für den J4125
+#### P0.6 J4125-Prüfung
 
-- **Test:**
-  - Smoke-Schritt im Workflow: `docker run --rm <image> python -c "import src.main"`.
-  - J4125-Prüfung (vorgezogen, `make check-j4125` und CI-Schritt): Stufe `j4125-check` im
-    Dockerfile, Python unter `qemu-x86_64 -cpu Denverton` (Goldmont, ohne AVX; ein
-    Goldmont-Plus-Modell hat QEMU nicht). Gegenprobe mit einer AVX2-Instruktion, die mit
-    SIGILL enden muss. Details in [Betrieb auf der Synology](betrieb-synology.md).
+- **Test:** J4125-Prüfung (`make check-j4125` und CI-Schritt): Stufe `j4125-check` im
+  Dockerfile, Python unter `qemu-x86_64 -cpu Denverton` (Goldmont, ohne AVX; ein
+  Goldmont-Plus-Modell hat QEMU nicht). Gegenprobe mit einer AVX2-Instruktion, die mit SIGILL
+  enden muss. Details in [Betrieb auf der Synology](betrieb-synology.md).
+- **Grün:** CI-Job „Docker Build + J4125-Pruefung“ grün.
+
+#### P0.6b Images aus der CI nach GHCR
+
+Eigenes Paket nach P0.6. F1 wartet nicht darauf.
+
+- **Test:** Smoke-Schritt im Workflow: `docker run --rm <image> python -c "import src.main"`.
+  Ohne `images.yml` gibt es weder Smoke-Schritt noch Image.
 - **Implementierung:** `images.yml` baut `linux/amd64` und schiebt nach GHCR (Tags: Commit und
   Version). Compose nutzt `image:` statt `build:`.
 - **Grün:** Workflow grün, Image liegt in GHCR.
 - **Review:** Image-Größe, keine Secrets im Image.
 - **NAS (du):** einmalig `docker login ghcr.io`, danach `docker compose pull && docker compose up -d`.
+
+#### P0.7 Fix-Paket Perioden und inf
+
+Aus dem Review von Phase 0 entstanden.
+
+- **Test:** Spalten ohne gültiges Periodenende (NaT, `None`, Zahlen-Labels) und ein Überlauf in
+  `_safe_div` (rot).
+- **Implementierung:** Eine Periodenregel für Kennzahlen und `statement_value`, gerechnet wird nur
+  mit datierten Spalten, `inf` wird zentral zu `None`.
 
 ### Phase 1 – Modularer Monolith
 

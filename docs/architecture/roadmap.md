@@ -1,6 +1,6 @@
 # Roadmap
 
-> Stand: 30.09.2026. Hier steht, *was* in welcher Phase passiert und was erledigt ist. *Wie*
+> Stand: 19.10.2026. Hier steht, *was* in welcher Phase passiert und was erledigt ist. *Wie*
 > jedes Arbeitspaket umgesetzt wird (Test → Implementierung → Grün → Review), steht im
 > [Implementierungsplan](implementierungsplan.md). Abgehakt wird nur hier, jeweils mit Commit.
 > Die Samstags-Mail muss nach jedem Paket unverändert funktionieren.
@@ -10,7 +10,7 @@
 | Phase | Ziel | Status |
 |---|---|---|
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
-| 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | offen |
+| 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | 🚧 P0.1–P0.7 auf `main`, P0.6b (GHCR) offen |
 | 1 | Modularer Monolith mit den späteren Service-Grenzen | offen |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | offen |
@@ -35,14 +35,18 @@
 
 Details: [Implementierungsplan, Phase 0](implementierungsplan.md#phase-0--fundament)
 
-- [ ] P0.1 Golden-Master für die Mail
-- [ ] P0.2 CI auf Feature-Branches
-- [ ] P0.3 uv-Workspace statt pip-tools ([ADR-0004](../adr/0004-uv-workspace-monorepo.md))
-- [ ] P0.4 Python 3.14
-- [ ] P0.5 pandas 3 und yfinance 1.x (lokal lief `score()` bereits mit pandas 3.0.0, die Suite
-      selbst noch nicht)
-- [ ] P0.6 Images aus der CI, geprüft für den J4125 ([ADR-0008](../adr/0008-zielhardware-j4125.md))
-- [ ] NAS (du): Images aus GHCR laden statt auf der NAS zu bauen
+- [x] P0.1 Golden-Master für die Mail (`cd21f50`)
+- [x] P0.2 CI auf Feature-Branches (`804d4eb`; die CI war seit dem 29.09. rot, ein Test schrieb
+      nach `/app`: `d3a0e4d`)
+- [x] P0.3 uv-Workspace statt pip-tools ([ADR-0004](../adr/0004-uv-workspace-monorepo.md)) (`a210e20`)
+- [x] P0.4 Python 3.14 (`aa49a0b`)
+- [x] P0.5 pandas 3 und yfinance 1.7 (`9504dd0`)
+- [x] P0.6 J4125-Prüfung in CI und lokal ([ADR-0008](../adr/0008-zielhardware-j4125.md)) (`d4d029c`)
+- [x] P0.7 Fix-Paket Perioden und inf (`190a862`)
+- [ ] P0.6b Images aus der CI nach GHCR
+- [ ] NAS (du): Bis P0.6b baut die NAS selbst, ab jetzt mit BuildKit und uv. Nach dem Build
+      `import src.main` auf der echten CPU prüfen ([betrieb-synology.md](betrieb-synology.md))
+- [ ] NAS (du): Images aus GHCR laden statt auf der NAS zu bauen (nach P0.6b)
 
 **Fertig, wenn:** dieselbe Mail wie vorher kommt (Golden-Master grün), die Images aus der CI
 stammen und die Tests auf Python 3.14 grün sind.
