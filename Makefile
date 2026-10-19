@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -53,7 +53,10 @@ format: ## Code automatisch formatieren
 typecheck: ## Statische Typpruefung
 	$(RUN) pyright
 
-check: lint typecheck test ## Alles in einem: lint + typecheck + test (DB-Tests nur mit TEST_DATABASE_URL)
+imports: ## Grenzen zwischen den Workspace-Paketen pruefen (import-linter)
+	$(RUN) lint-imports
+
+check: lint typecheck imports test ## Alles in einem: lint + typecheck + imports + test (DB-Tests nur mit TEST_DATABASE_URL)
 
 # DB-Tests laufen gegen ein echtes PostgreSQL (jede Testfunktion bekommt eine eigene DB).
 TEST_DATABASE_URL ?= postgresql+psycopg://postgres:test@localhost:55432/postgres

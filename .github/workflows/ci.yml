@@ -66,6 +66,9 @@ jobs:
       - name: Pyright Type-Check (wie make typecheck)
         run: uv run pyright
 
+      - name: Import-Grenzen (wie make imports)
+        run: uv run lint-imports
+
       - name: Migrationen gegen leere DB pruefen
         env:
           DATABASE_OWNER_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
