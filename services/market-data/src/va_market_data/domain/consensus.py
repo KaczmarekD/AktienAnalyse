@@ -2,7 +2,8 @@
 
 Nur speichern, nicht auswerten: Jede Art landet unveraendert als JSONB in
 ``market_data.consensus_snapshot``. Welche Kennzahlen daraus entstehen, entscheidet
-ADR-0011. Dieses Modul kennt yfinance nicht - den Abruf macht ``data_fetcher``
+ADR-0011. Dieses Modul kennt yfinance nicht - den Abruf macht
+``va_market_data.adapters.yahoo``
 (``CONSENSUS_FIELDS`` ordnet dort jeder Art ihr yfinance-Attribut zu).
 """
 

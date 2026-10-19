@@ -12,13 +12,13 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
+# Mehrere Fehler eines Titels stehen in DataFrame und CSV als ein Text (Contract)
+from va_contracts.events.v1 import ERRORS_SEPARATOR
+
 if TYPE_CHECKING:
     import pandas as pd
 
     from .consensus import ConsensusEntry
-
-# Mehrere Fehler eines Titels stehen in DataFrame und CSV als ein Text
-ERRORS_SEPARATOR = "; "
 
 
 def join_errors(errors: object) -> str:
@@ -103,7 +103,7 @@ class RawFetch:
     quarterly: dict[str, pd.DataFrame | None] = field(default_factory=dict)
     # Antwort von get_shares_full (ADR-0010, F1.3) - nur gespeichert, nicht ausgewertet
     shares: pd.Series | None = None
-    # Kurse je Tag (ADR-0010, F1.4), Spalten wie data_fetcher.PRICE_FIELDS - nur gespeichert
+    # Kurse je Tag (ADR-0010, F1.4), Spalten wie adapters.yahoo.PRICE_FIELDS - nur gespeichert
     prices: pd.DataFrame | None = None
 
 

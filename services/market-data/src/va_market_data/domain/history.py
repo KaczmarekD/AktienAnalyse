@@ -3,7 +3,7 @@
 Nur Parser und der gespeicherte Stand je Titel. Gespeichert wird im Repository,
 ausgewertet wird (noch) nichts - Ranking, Mail und CSV bleiben unveraendert.
 Die Parser kennen keine yfinance-Namen: Der Abruf benennt die Spalten vorher um
-(``data_fetcher.PRICE_FIELDS``).
+(``va_market_data.adapters.yahoo.PRICE_FIELDS``).
 """
 
 from __future__ import annotations

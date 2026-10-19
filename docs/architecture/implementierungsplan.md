@@ -419,6 +419,16 @@ sich in ganz Phase 1 nicht ändern.**
   Migration, Altdaten-Import). Der import-linter hält alle Verträge ohne Ausnahmen ein,
   `src` heißt dort jetzt „Batch“ statt „Altbestand“. CLAUDE.md (Architektur, Rezepte) und
   README (Projektstruktur) beschreiben den neuen Stand.
+- **Gesamt-Review Phase 1 (19.10.2026):**
+  - Ein unendlicher Wert (`inf`) wird beim Einlesen in den Contract zu `None` und kostet
+    nur dieses Feld, nicht mehr den Lauf (`missing_to_none`).
+  - Ein Fehler beim Melden des Fortschritts bricht den Abruf nicht mehr ab.
+  - `ERRORS_SEPARATOR` gibt es nur noch im Contract.
+  - va-platform deklariert numpy und pandas, der Batch va-contracts und va-platform als
+    Laufzeitabhängigkeit.
+  - Coverage schließt va_platform ein (pyproject, Makefile, CI).
+  - `mock_universe_df` hat eine Quelle (`services/scoring/tests/fixtures/mock_universe.json`).
+  - Veraltete Verweise in Docstrings und CLAUDE.md sind korrigiert.
 
 ### Phase 2b – Scoring-Profile
 

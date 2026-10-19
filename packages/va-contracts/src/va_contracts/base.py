@@ -27,7 +27,11 @@ class Contract(BaseModel):
 
 
 def missing_to_none(value: Any) -> Any:
-    """NaN (wie es pandas fuer fehlende Werte liefert) -> ``None``, alles andere bleibt."""
-    if isinstance(value, float) and math.isnan(value):
+    """NaN (wie es pandas fuer fehlende Werte liefert) und +-inf -> ``None``, alles andere bleibt.
+
+    inf kommt z. B. aus einer Division durch 0 in Altdaten. Es ist kein gueltiges JSON und
+    soll nur dieses eine Feld kosten, nicht den ganzen Titel oder Lauf.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
         return None
     return value

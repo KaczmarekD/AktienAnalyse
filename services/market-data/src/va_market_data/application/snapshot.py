@@ -62,7 +62,11 @@ def take_snapshot(
             log.exception("%s konnte nicht gespeichert werden - Titel entfaellt", fund.symbol)
             unsaved.add(fund.symbol)
         if on_result is not None:
-            on_result(fund)
+            try:
+                on_result(fund)
+            except Exception:
+                # Nur Fortschritt: Er darf den Abruf nicht abbrechen
+                log.warning("Fortschritt fuer %s nicht gemeldet", fund.symbol, exc_info=True)
 
     df = fetch(tickers, on_result=stored, history=_history_state(store, symbols))
     if unsaved and "symbol" in df.columns:
