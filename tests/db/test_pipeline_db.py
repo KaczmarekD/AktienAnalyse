@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
@@ -271,6 +271,25 @@ class TestFullRun:
             assert run.fetch_run_id is not None
             snapshots = MarketDataRepository(s).get_snapshots_df(run.fetch_run_id)
         assert len(snapshots) == len(TICKERS)
+
+    def test_data_error_in_additional_data_keeps_the_ticker(self, db_settings, engine):
+        """ADR-0010: Wegen Zusatzdaten geht kein Titel verloren - auch nicht wegen der DB."""
+
+        def broken(self, *args, **kwargs):
+            raise IntegrityError("INSERT INTO market_data.share_count", {}, Exception("check"))
+
+        with patch.object(MarketDataRepository, "write_share_counts", broken):
+            rc, _, _ = _patched_run(db_settings)
+        assert rc == 0
+        with session_scope(engine) as s:
+            run = RunRepository(s).get_latest_run()
+            assert run is not None
+            assert run.fetch_run_id is not None
+            md = MarketDataRepository(s)
+            assert len(md.get_snapshots_df(run.fetch_run_id)) == len(TICKERS)
+            assert md.get_share_counts("AAA.DE").empty
+            assert len(md.get_price_bars("AAA.DE")) == 2  # die anderen Zusatzdaten bleiben
+            assert md.get_consensus(run.fetch_run_id, "AAA.DE")
 
     def test_force_refresh_fetches_again_without_duplicating_statements(self, db_settings, engine):
         _patched_run(db_settings)
