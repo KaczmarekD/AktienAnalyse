@@ -112,7 +112,7 @@ def _safe_div(num: float | None, den: float | None) -> float | None:
         if not np.isfinite(nv) or not np.isfinite(dv) or dv == 0:
             return None
         return nv / dv
-    except (TypeError, ValueError, ZeroDivisionError):
+    except TypeError, ValueError, ZeroDivisionError:
         return None
 
 
@@ -125,7 +125,7 @@ def _f(value: Any) -> float | None:
         if not np.isfinite(v):
             return None
         return v
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -160,7 +160,7 @@ def _latest(series: pd.Series | None) -> float | None:
 def _period_end(label: Any) -> date | None:
     try:
         return pd.Timestamp(label).date()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -192,7 +192,7 @@ def _cagr(values: list[float]) -> float | None:
     years = len(values) - 1
     try:
         return float((first / last) ** (1.0 / years) - 1.0)
-    except (ZeroDivisionError, ValueError):
+    except ZeroDivisionError, ValueError:
         return None
 
 

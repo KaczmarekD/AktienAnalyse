@@ -3,7 +3,7 @@
 > Wöchentlicher Fundamentaldaten-Screener für DAX und MDAX. Läuft als Docker-Container auf einer Synology und verschickt jeden Samstag eine HTML-Mail mit den besten und schlechtesten Titeln nach Value- und Quality-Kriterien.
 
 [![CI](https://github.com/KaczmarekD/AktienAnalyse/actions/workflows/ci.yml/badge.svg)](https://github.com/KaczmarekD/AktienAnalyse/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+![Python](https://img.shields.io/badge/python-3.14-blue)
 ![Version](https://img.shields.io/badge/version-0.3.0-green)
 ![License](https://img.shields.io/badge/license-Proprietary-lightgrey)
 
@@ -228,7 +228,7 @@ make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 
 `.github/workflows/ci.yml` läuft bei jedem Push auf `main` und auf `feat/**`-Branches sowie bei Pull Requests gegen `main`:
 
-- Python 3.11 und 3.12 Matrix
+- Python 3.14, Abhängigkeiten per `uv sync` exakt aus `uv.lock`
 - `ruff check` + `ruff format --check`
 - `pyright` (statische Typprüfung)
 - Migration gegen leere DB + `alembic check` (Modelle ↔ Migration)
