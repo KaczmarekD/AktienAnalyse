@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import CheckConstraint, ForeignKey, Identity, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base, in_values
+from va_platform.db import Base, in_values
 
 SCORING_ORIGINS = ("live", "rescore", "import")
 

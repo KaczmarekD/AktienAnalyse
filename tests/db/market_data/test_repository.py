@@ -280,7 +280,7 @@ class TestStatementVersioning:
         assert len(after) == 4
 
 
-QUARTERLY_FIXTURES = Path(__file__).parents[1] / "fixtures" / "quarterly"
+QUARTERLY_FIXTURES = Path(__file__).parents[2] / "fixtures" / "quarterly"
 
 
 def _recorded_quarters(symbol: str) -> dict[str, pd.DataFrame]:
@@ -386,7 +386,7 @@ class TestQuarterlyStatements:
             )
 
 
-SHARES_FIXTURES = Path(__file__).parents[1] / "fixtures" / "shares"
+SHARES_FIXTURES = Path(__file__).parents[2] / "fixtures" / "shares"
 
 
 def _recorded_shares(symbol: str) -> pd.Series:

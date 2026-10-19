@@ -141,7 +141,7 @@ JOIN market_data.instrument i ON i.id = s.instrument_id
 WHERE i.symbol = 'SAP.DE' ORDER BY 1;
 ```
 
-In Python liefern die Repositories (`src/db/repositories/`) fertige DataFrames, z.B. `get_metric_history`, `get_score_history`, `get_statement_history`, `get_statements_as_of` (Abschlusswerte, wie sie an einem Stichtag bekannt waren).
+In Python liefern die Repositories (je Modul unter `adapters/postgres/`) fertige DataFrames, z.B. `get_metric_history`, `get_score_history`, `get_statement_history`, `get_statements_as_of` (Abschlusswerte, wie sie an einem Stichtag bekannt waren).
 
 `make db-backup` schreibt einen Dump nach `backups/`, `make db-shell` öffnet `psql`. Einen Reset gibt es bewusst nicht.
 
@@ -209,9 +209,10 @@ value-analyzer/
 │   ├── universe.py         # Verdrahtung: Quellen-Kette + Pfad der Fallback-CSV
 │   ├── data_fetcher.py     # Verdrahtung: Yahoo-Adapter für den Batch
 │   ├── logging_setup.py    # RotatingFileHandler (5 MB × 10)
-│   └── db/                 # PostgreSQL: Modelle, Repositories (get/write), Recorder,
-│                           #   Migration, Löschschutz (ddl.py), Altdaten-Import
-├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Infrastruktur)
+│   └── db/                 # PostgreSQL: Schema batch, Recorder, Migration,
+│                           #   Altdaten-Import (Modelle der Module: adapters/postgres/)
+├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Infrastruktur,
+│                           #   DB-Basis, Löschschutz in va_platform/db/ddl.py)
 ├── services/               # uv-Workspace: market-data (Universum, Yahoo, Kennzahlen),
 │                           #   scoring, notification (Phase 1)
 ├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR

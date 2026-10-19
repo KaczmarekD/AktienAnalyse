@@ -353,6 +353,23 @@ sich in ganz Phase 1 nicht ändern.**
 - **Implementierung:** Modelle und Repositories ziehen zu ihrem Besitzer-Modul. Engine, Session
   und DDL-Helfer kommen nach `va-platform`. Die Alembic-Historie bleibt vorerst eine einzige.
 - **Review:** Keine Fremdschlüssel über Schema-Grenzen.
+- **Umgesetzt (19.10.2026):**
+  - `va_platform.db`: Basis (`Base`, `APP_SCHEMAS`, `in_values`), Engine/Session, `ddl`
+    (Migrationen importieren von dort).
+  - `adapters/postgres` je Modul mit Modellen und Repository: `va_market_data` (dazu
+    `snapshot_row`/`snapshot_values`), `va_scoring`, `va_notification` (`reporting`).
+    `batch` und `RunRepository` bleiben bis P1.8 in `src/db`, ebenso Recorder und
+    Altdaten-Import. `src/db/models/__init__.py` sammelt alle Modelle für Alembic.
+  - scoring liest das Symbol aus `market_data.instrument` über eine schlanke
+    Tabellenreferenz (`sqlalchemy.table`), nicht über das Modell: kein Import über die
+    Service-Grenze, kein Fremdschlüssel. Übergang, bis die Symbole mit den Events kommen.
+  - Die Services deklarieren ihre Laufzeitabhängigkeiten selbst (u. a. `sqlalchemy`;
+    market-data zusätzlich pandas, yfinance, requests, tenacity, openpyxl, die seit P1.4
+    nur über das Root-Projekt kamen).
+  - Tests: `tests/db/{market_data,scoring,notification,batch}/`, Löschschutz,
+    Pipeline und Altdaten-Import übergreifend. Neu `test_schema_boundaries.py`: jedes
+    Schema hat genau ein Besitzer-Modul, keine Fremdschlüssel über Schema-Grenzen (Modelle
+    und migrierte DB). `alembic check` meldet keine Abweichung der Modelle.
 
 #### P1.8 Event-Bus im Prozess, Composition Root
 

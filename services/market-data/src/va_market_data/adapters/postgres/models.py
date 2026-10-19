@@ -20,8 +20,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_market_data.domain.consensus import CONSENSUS_KINDS, CONSENSUS_STATUSES
-
-from .base import Base, in_values
+from va_platform.db import Base, in_values
 
 FETCH_ORIGINS = ("live", "import")
 STATEMENTS = ("income", "balance", "cashflow")

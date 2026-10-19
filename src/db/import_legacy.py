@@ -26,15 +26,14 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from va_market_data.adapters.postgres import MarketDataRepository, snapshot_row
 from va_market_data.domain.fundamentals import ERRORS_SEPARATOR
+from va_platform.db import create_db_engine, session_scope
+from va_platform.serialization import to_python
+from va_scoring.adapters.postgres import ScoreRow, ScoringRepository
 
 from ..config import DatabaseSettings
-from .engine import create_db_engine, session_scope
-from .recorder import snapshot_row
-from .repositories.market_data import MarketDataRepository
 from .repositories.runs import RunRepository
-from .repositories.scoring import ScoreRow, ScoringRepository
-from .serialization import to_python
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session

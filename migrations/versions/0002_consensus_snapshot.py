@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from src.db.ddl import grant_statements, protect_table
+from va_platform.db.ddl import grant_statements, protect_table
 
 revision: str = "0002"
 down_revision: str | None = "0001"

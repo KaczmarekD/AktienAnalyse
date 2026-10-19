@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import insert, select
 
-from ..models import Delivery, Report
+from .models import Delivery, Report
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session

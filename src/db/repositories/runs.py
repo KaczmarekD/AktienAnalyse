@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import func, insert, select, update
 
 from ..log_handler import LogEntry
-from ..models import ImportFile, Run, RunLog
+from ..models.batch import ImportFile, Run, RunLog
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session

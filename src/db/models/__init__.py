@@ -1,8 +1,9 @@
-"""Alle ORM-Modelle - der Import registriert sie in ``Base.metadata``."""
+"""Alle ORM-Modelle - der Import registriert sie in ``Base.metadata`` (fuer Alembic).
 
-from .base import APP_SCHEMAS, Base
-from .batch import ImportFile, Run, RunLog
-from .market_data import (
+Die Modelle liegen bei ihrem Besitzer-Modul (P1.7); hier steht nur noch ``batch``.
+"""
+
+from va_market_data.adapters.postgres.models import (
     ConsensusSnapshot,
     FetchRun,
     FundamentalSnapshot,
@@ -14,8 +15,11 @@ from .market_data import (
     StatementValue,
     UniverseMember,
 )
-from .reporting import Delivery, Report
-from .scoring import FactorScore, ScoreResult, ScoringRun
+from va_notification.adapters.postgres.models import Delivery, Report
+from va_platform.db import APP_SCHEMAS, Base
+from va_scoring.adapters.postgres.models import FactorScore, ScoreResult, ScoringRun
+
+from .batch import ImportFile, Run, RunLog
 
 __all__ = [
     "APP_SCHEMAS",

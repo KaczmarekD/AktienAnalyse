@@ -12,8 +12,8 @@ import os
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from src.db.engine import normalize_url
 from src.db.models import APP_SCHEMAS, Base
+from va_platform.db import normalize_url
 
 config = context.config
 

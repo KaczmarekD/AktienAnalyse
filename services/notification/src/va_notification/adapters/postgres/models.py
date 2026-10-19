@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import CheckConstraint, ForeignKey, Identity, LargeBinary, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base, in_values
+from va_platform.db import Base, in_values
 
 CHANNELS = ("mail", "healthcheck")
 DELIVERY_KINDS = ("report", "error", "ping_ok", "ping_fail")
