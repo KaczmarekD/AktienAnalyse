@@ -14,7 +14,7 @@ from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.runs import RunRepository
 from src.db.repositories.scoring import ScoringRepository
 from src.reporting import build_report
-from src.scoring import ScoringConfig, score
+from va_scoring.domain.scoring import ScoringConfig, score
 
 
 def _write_legacy_files(directory, universe_df: pd.DataFrame, day: date, *, parquet: bool = True):

@@ -94,7 +94,6 @@ import pyarrow as pa  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
 
 from src.reporting import build_report  # noqa: E402
-from src.scoring import ScoringConfig, score  # noqa: E402
 from va_market_data.domain.fundamentals import (  # noqa: E402
     Fundamentals,
     Identity,
@@ -102,6 +101,7 @@ from va_market_data.domain.fundamentals import (  # noqa: E402
     QualityMetrics,
     ValueMetrics,
 )
+from va_scoring.domain.scoring import ScoringConfig, score  # noqa: E402
 
 # Zufaellige Titel ueber die Dataclass wie in fetch_all: So hat der Frame immer genau
 # die Spalten, die Scoring und Mail-Template erwarten, auch wenn Felder dazukommen.

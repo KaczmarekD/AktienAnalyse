@@ -51,7 +51,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --no-install-project --no-editable \
         --refresh-package va-contracts --refresh-package va-platform \
-        --refresh-package va-market-data
+        --refresh-package va-market-data --refresh-package va-scoring
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/

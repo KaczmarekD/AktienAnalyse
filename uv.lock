@@ -1149,12 +1149,16 @@ name = "va-scoring"
 version = "0.1.0"
 source = { editable = "services/scoring" }
 dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
     { name = "va-contracts" },
     { name = "va-platform" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "numpy", specifier = ">=2.3.2,<3" },
+    { name = "pandas", specifier = ">=3.0,<4" },
     { name = "va-contracts", editable = "packages/va-contracts" },
     { name = "va-platform", editable = "packages/va-platform" },
 ]
@@ -1178,6 +1182,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tenacity" },
     { name = "va-market-data" },
+    { name = "va-scoring" },
     { name = "yfinance" },
 ]
 
@@ -1193,7 +1198,6 @@ dev = [
     { name = "va-contracts" },
     { name = "va-notification" },
     { name = "va-platform" },
-    { name = "va-scoring" },
 ]
 
 [package.metadata]
@@ -1212,6 +1216,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.1,<3" },
     { name = "tenacity", specifier = ">=9,<10" },
     { name = "va-market-data", editable = "services/market-data" },
+    { name = "va-scoring", editable = "services/scoring" },
     { name = "yfinance", specifier = ">=1.7,<2" },
 ]
 
@@ -1227,7 +1232,6 @@ dev = [
     { name = "va-contracts", editable = "packages/va-contracts" },
     { name = "va-notification", editable = "services/notification" },
     { name = "va-platform", editable = "packages/va-platform" },
-    { name = "va-scoring", editable = "services/scoring" },
 ]
 
 [[package]]
