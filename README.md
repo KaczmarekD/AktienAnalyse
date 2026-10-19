@@ -89,10 +89,20 @@ docker compose logs -f
 ```
 
 Das Image `ghcr.io/kaczmarekd/value-analyzer` entsteht in GitHub Actions bei jedem Push auf
-`main` (`latest`, `sha-<commit>`) und bei Tags `v<version>`. `VERSION` in der `.env` pinnt eine
-bestimmte Fassung. Der Import-Test in der zweiten Zeile prüft das Image auf der echten CPU der NAS
-(kein AVX, ADR-0008). Ist das Paket in GHCR privat, einmalig `docker login ghcr.io` mit einem
-Token, das nur `read:packages` darf. Lokal baut `make build` dasselbe Image.
+`main` (`latest`, `sha-<commit>`) und bei Tags `vX.Y.Z` passend zur Version in `pyproject.toml`.
+`VERSION` in der `.env` pinnt eine bestimmte Fassung. Der Import-Test prüft das Image auf der
+echten CPU der NAS (kein AVX, ADR-0008). Ist das Paket in GHCR privat, vorher einmalig
+`docker login ghcr.io` mit einem Token, das nur `read:packages` darf. Lokal baut `make build`
+dasselbe Image.
+
+**Update** (nach einem Merge auf `main`):
+```bash
+cd /volume1/docker/value-analyzer
+git pull               # Compose-Datei, Fallback-CSV, Doku (die CSV im Image wird von ./data verdeckt)
+docker compose pull
+docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
+docker compose up -d
+```
 
 **Altdaten übernehmen** (vorhandene `fundamentals_*.parquet` / `value_ranking_*.csv` in `data/`, auch aus Mails gespeicherte CSVs – mehrfach ausführbar, Dateien bleiben liegen):
 ```bash
@@ -178,6 +188,8 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 | `DATABASE_URL` | von Compose gesetzt | Nur lokal nötig: `postgresql+psycopg://va_app:<pw>@host:5432/value_analyzer` |
 | `HEALTHCHECK_URL` | – | Optional: `https://hc-ping.com/<uuid>` |
 | `TZ` | `Europe/Berlin` | Container-Zeitzone |
+| `REG` | `ghcr.io/kaczmarekd` | Registry des Images (Compose) |
+| `VERSION` | `latest` | Image-Tag: `latest` folgt `main`, `sha-<commit>` oder `X.Y.Z` pinnt |
 
 ### Gmail App-Passwort einrichten
 
@@ -204,6 +216,9 @@ value-analyzer/
 │   ├── logging_setup.py    # RotatingFileHandler (5 MB × 10)
 │   └── db/                 # PostgreSQL: Modelle, Repositories (get/write), Recorder,
 │                           #   Migration, Löschschutz (ddl.py), Altdaten-Import
+├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Infrastruktur)
+├── services/               # uv-Workspace: market-data, scoring, notification (Phase 1)
+├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR
 ├── migrations/             # Alembic-Migrationen (nur additiv)
 ├── db/init/01_roles.sh     # Rollen va_app/va_read beim ersten DB-Start
 ├── tests/                  # pytest-Suite; tests/db/ gegen echtes PostgreSQL
@@ -239,9 +254,11 @@ make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 - Python 3.14, Abhängigkeiten per `uv sync` exakt aus `uv.lock`
 - `ruff check` + `ruff format --check`
 - `pyright` (statische Typprüfung)
+- `lint-imports` (Grenzen zwischen den Workspace-Paketen)
 - Migration gegen leere DB + `alembic check` (Modelle ↔ Migration)
 - `pytest` mit Coverage, DB-Tests gegen einen PostgreSQL-18-Service-Container
-- Docker-Build als Smoke-Test
+- Docker-Build mit Smoke-Test, Compose-Prüfung und J4125-Prüfung (QEMU ohne AVX)
+- Push des geprüften Images nach GHCR, nur auf `main` und bei Tags `vX.Y.Z`
 
 ---
 

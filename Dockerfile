@@ -23,14 +23,19 @@ WORKDIR /app
 # --locked: Abbruch, wenn uv.lock nicht zu pyproject.toml passt.
 # --inexact: Pakete des Basis-Images (z. B. pip) bleiben erhalten.
 # uv selbst und seine Variablen gibt es nur in diesem Schritt, nicht im Image.
-# packages/ und services/ (uv-Workspace, P1.1) braucht uv nur zum Lesen der
-# Mitglieder, damit --locked zum Lockfile passt; installiert werden sie noch nicht.
+# Von den Workspace-Mitgliedern (P1.1) braucht uv nur die pyproject.toml, damit
+# --locked zum Lockfile passt; installiert werden sie noch nicht. Nur diese Dateien
+# einbinden: Eine Code-Aenderung in packages/ oder services/ laesst die grosse
+# Abhaengigkeitsschicht sonst jedes Mal neu entstehen.
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=packages,target=packages \
-    --mount=type=bind,source=services,target=services \
+    --mount=type=bind,source=packages/va-contracts/pyproject.toml,target=packages/va-contracts/pyproject.toml \
+    --mount=type=bind,source=packages/va-platform/pyproject.toml,target=packages/va-platform/pyproject.toml \
+    --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
+    --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
+    --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --no-install-project
 

@@ -130,9 +130,9 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 inkonsistente Daten zurück, ETF-Anbieter bauen Websites um. Jeder externe Call hat
 Retry+Fallback. Lieber einen Ticker verlieren als den ganzen Batch.
 
-**Python 3.14**: Die Version steht an genau drei Stellen:
-`requires-python` in `pyproject.toml`, `.python-version` und `FROM` im
-Dockerfile. Ruff, Pyright und die CI leiten sie davon ab. Ab 3.14 schreibt der
+**Python 3.14**: Die Version steht in `requires-python` der `pyproject.toml`
+(Root und jedes Workspace-Mitglied), in `.python-version` und im `FROM` des
+Dockerfiles. Ruff, Pyright und die CI leiten sie davon ab. Ab 3.14 schreibt der
 Formatter Ausnahmen ohne Klammern (`except TypeError, ValueError:`, PEP 758).
 Das fängt beide Typen ab und ist kein Python-2-Binding.
 
@@ -205,6 +205,16 @@ ADR-0001 und ADR-0002 aufgehoben.
 2. Fallback-CSV in `data/` inkl. ISIN-Spalte
 3. ENV `UNIVERSE` in `config.py` um neuen Literal-Wert erweitern
 4. Branch in `main.py:_run`
+
+**Neues Workspace-Mitglied** (Paket oder Service, ADR-0004):
+1. Verzeichnis unter `packages/` oder `services/` mit `pyproject.toml`
+   (Name `va-<name>`, Build-Backend `uv_build`), Code unter `src/va_<name>/`
+2. Root-`pyproject.toml`: in die Dev-Gruppe und unter `[tool.uv.sources]`
+   (`workspace = true`), Import-Name in `known-first-party`
+3. import-linter: Import-Name in `root_packages` und in die passenden Verträge
+4. Dockerfile: seine `pyproject.toml` beim `uv sync` einbinden, sonst scheitert
+   `--locked`
+5. `make lock`
 
 **Neue Mail-Empfänger**: `MAIL_TO` ist heute Single-Recipient. Wenn mehrere,
 auf Liste umstellen (`pydantic.EmailStr` → `list[EmailStr]`, `;`-getrennt

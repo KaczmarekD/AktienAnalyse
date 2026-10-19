@@ -150,6 +150,17 @@ ignore = [
     "B008",        # function call in default arg (Depends pattern)
 ]
 
+[tool.ruff.lint.isort]
+# Eigene Pakete: der Altbestand und die Workspace-Mitglieder (P1.1)
+known-first-party = [
+    "src",
+    "va_contracts",
+    "va_platform",
+    "va_market_data",
+    "va_scoring",
+    "va_notification",
+]
+
 [tool.ruff.lint.flake8-type-checking]
 # Pydantic wertet Annotationen zur Laufzeit aus: Ihre Imports bleiben ausserhalb von
 # TYPE_CHECKING (sonst scheitert das Modell erst beim Validieren)
@@ -194,7 +205,7 @@ filterwarnings = [
 # Pyright: statische Typpruefung
 # ----------------------------------------------------------------------------
 [tool.pyright]
-include = ["src", "tests", "docker", "packages", "services"]
+include = ["src", "tests", "docker", "packages", "services", "migrations"]
 exclude = ["**/__pycache__", "data", "logs", "build"]
 # Keine pythonVersion: Pyright nimmt die Version des Interpreters aus .venv (uv run).
 # Linux fest: Der Code laeuft nur im Container; unter Windows prueft Pyright sonst
@@ -212,7 +223,7 @@ reportOptionalMemberAccess = "warning"
 # Coverage (optional, fuer 'make coverage')
 # ----------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "va_contracts"]
 omit = ["src/__init__.py", "tests/*"]
 
 [tool.coverage.report]
