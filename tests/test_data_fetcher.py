@@ -10,7 +10,9 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
+import yfinance as yf
 from tenacity import wait_none
+from yfinance.data import YfData
 from yfinance.exceptions import YFRateLimitError
 
 from src.consensus import CONSENSUS_KINDS, ConsensusEntry
@@ -35,6 +37,7 @@ from src.data_fetcher import (
     fetch_all,
     fetch_one,
     normalize_prices,
+    note_rate_limit,
     price_frames,
     provider_version,
     quarterly_frames,
@@ -304,6 +307,85 @@ class TestPriceFrames:
         fake = _FakeHistoryTicker(YFRateLimitError(), _bars("2026-07-31"))
         assert price_frames(fake, "SAP.DE", None, frozenset()) is None
         assert len(fake.calls) == 1
+
+
+class _SwallowingTicker:
+    """Verhaelt sich bei Fehlern wie yfinance 1.7.
+
+    Mit ``config.debug.hide_exceptions`` (Standard) wird ein Fehler verschluckt und es
+    kommt eine leere Antwort, sonst wird er geworfen.
+    """
+
+    def __init__(self, error: Exception) -> None:
+        self.calls = 0
+        self._error = error
+
+    def _fail(self, empty: Any) -> Any:
+        self.calls += 1
+        if yf.config.debug.hide_exceptions:
+            return empty
+        raise self._error
+
+    def get_shares_full(self, start=None, end=None):
+        return self._fail(None)
+
+    def history(self, **kwargs):
+        return self._fail(pd.DataFrame())
+
+    @property
+    def quarterly_income_stmt(self):
+        return self._fail(pd.DataFrame())
+
+    quarterly_balance_sheet = quarterly_income_stmt
+    quarterly_cashflow = quarterly_income_stmt
+
+
+class TestYahooErrorsReachTheAdapters:
+    """Review F1.2-F1.4: Die Zusatzabrufe sehen Fehler, die yfinance sonst verschluckt.
+
+    Gebraucht fuer Retry, Abbruch nach Rate-Limit und Log.
+    """
+
+    def test_rate_limit_stops_the_quarters_on_the_http_level(self, caplog):
+        requests: list[str] = []
+
+        def throttled(self, url, params=None, timeout=30, **kwargs):
+            requests.append(url)
+            raise YFRateLimitError
+
+        with patch.object(YfData, "get", throttled), patch("time.sleep"):
+            frames = quarterly_frames(yf.Ticker("SAP.DE"), "SAP.DE")
+        assert frames == {"income": None}  # Bilanz und Cashflow nicht mehr angefragt
+        assert len(requests) <= 2  # yfinance probiert intern einmal den Chunk-Fallback
+        assert "SAP.DE" in caplog.text
+        assert yf.config.debug.hide_exceptions is True  # danach wieder Standard
+
+    def test_quarter_failure_is_retried_and_logged(self, caplog):
+        fake = _SwallowingTicker(ConnectionError("reset"))
+        with patch("time.sleep"):
+            frames = quarterly_frames(fake, "SAP.DE")
+        assert frames == {"income": None, "balance": None, "cashflow": None}
+        assert fake.calls == 6  # je Abschluss ein Retry
+        assert "Quartalsabschluss SAP.DE" in caplog.text
+
+    def test_share_count_failure_is_retried_and_logged(self, caplog):
+        fake = _SwallowingTicker(ConnectionError("reset"))
+        with patch("time.sleep"):
+            assert share_count_series(fake, "SAP.DE", date(2000, 1, 1)) is None
+        assert fake.calls == 2
+        assert "Aktienanzahl SAP.DE" in caplog.text
+
+    def test_price_failure_is_retried_and_logged(self, caplog):
+        fake = _SwallowingTicker(ConnectionError("reset"))
+        with patch("time.sleep"):
+            assert price_frames(fake, "SAP.DE", None, frozenset()) is None
+        assert fake.calls == 2
+        assert "Kurshistorie SAP.DE" in caplog.text
+
+    def test_hide_exceptions_is_restored_after_a_failure(self):
+        with patch("time.sleep"):
+            price_frames(_SwallowingTicker(ConnectionError("reset")), "SAP.DE", None, frozenset())
+        assert yf.config.debug.hide_exceptions is True
 
 
 class TestConsensusValue:
@@ -833,6 +915,65 @@ class TestFetchOneProvenanceAndRaw:
     def test_failed_base_fetch_skips_the_prices(self, no_prices_network):
         self._fetch(side_effect=RuntimeError("down"))
         no_prices_network.assert_not_called()
+
+
+class TestRateLimitPerTicker:
+    """Review F1.2-F1.4: Nach einem Rate-Limit bleibt der Rest des Titels aus.
+
+    Sonst liefen die uebrigen Zusatzabrufe weiter in die Drosselung.
+    """
+
+    def _fetch(self, symbol="X.DE"):
+        info = {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0}
+        with patch("src.data_fetcher._ticker_data", return_value=(info, None, None, None)):
+            return fetch_one(Ticker(symbol, "X", "DAX"))
+
+    def test_rate_limit_in_the_consensus_skips_the_rest(
+        self, no_consensus_network, no_quarterly_network, no_shares_network, no_prices_network
+    ):
+        def throttled(symbol):
+            note_rate_limit(YFRateLimitError())
+            return {}
+
+        no_consensus_network.side_effect = throttled
+        f = self._fetch()
+        no_quarterly_network.assert_not_called()
+        no_shares_network.assert_not_called()
+        no_prices_network.assert_not_called()
+        assert f.raw is not None
+        assert (f.raw.quarterly, f.raw.shares, f.raw.prices) == ({}, None, None)
+        assert f.errors == []  # die CSV bleibt gleich
+
+    def test_rate_limit_in_the_quarters_skips_shares_and_prices(
+        self, no_quarterly_network, no_shares_network, no_prices_network
+    ):
+        throttled = _FakeQuarterlyTicker(quarterly_income_stmt=_raise(YFRateLimitError()))
+        no_quarterly_network.side_effect = lambda symbol: quarterly_frames(throttled, symbol)
+        self._fetch()
+        no_shares_network.assert_not_called()
+        no_prices_network.assert_not_called()
+
+    def test_next_ticker_starts_fresh(self, no_consensus_network, no_quarterly_network):
+        def throttled(symbol):
+            note_rate_limit(YFRateLimitError())
+            return {}
+
+        no_consensus_network.side_effect = throttled
+        self._fetch("A.DE")
+        no_consensus_network.side_effect = None
+        self._fetch("B.DE")
+        no_quarterly_network.assert_called_once_with("B.DE")
+
+    def test_other_errors_do_not_count(self):
+        assert note_rate_limit(ConnectionError("reset")) is False
+        assert note_rate_limit(YFRateLimitError()) is True
+
+
+def _raise(error: Exception) -> Callable[[], Any]:
+    def fail() -> Any:
+        raise error
+
+    return fail
 
 
 class TestFetchOneInvalidPeriods:

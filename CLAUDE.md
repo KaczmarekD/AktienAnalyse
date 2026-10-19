@@ -203,7 +203,12 @@ parsen) und `mailer.py` anpassen.
 
 - **yfinance** (Yahoo Finance): kostenlos, kein Vertrag. Kann jederzeit
   rate-limiten oder umbenennen. Wenn das chronisch wird, Wechsel zu FMP
-  oder EODHD über ein neues `data_fetcher_*.py`-Modul.
+  oder EODHD über ein neues `data_fetcher_*.py`-Modul. Achtung:
+  yfinance verschluckt Fehler standardmäßig (`config.debug.hide_exceptions`)
+  und liefert dann leer, auch bei einem Rate-Limit. Abrufe, die Retry oder
+  Abbruch brauchen, laufen deshalb in `_yahoo_errors_raised()`. Tests dafür
+  modellieren dieses Verhalten (siehe `_SwallowingTicker`), statt direkt
+  aus dem Attribut zu werfen.
 - **iShares-Holdings (EXS1/EXS3)**: undokumentierte Frontend-API von
   BlackRock, liefert Ticker + ISIN. Kann jederzeit umziehen – dann URL/Params
   am Kopf von `universe.py` anpassen.

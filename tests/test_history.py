@@ -72,6 +72,12 @@ class TestDailyShareCounts:
         )
         assert daily_share_counts(series) == {date(2026, 1, 8): 1_000}
 
+    def test_values_outside_the_database_range_are_skipped(self):
+        """Review: Ein Wert, der als 0 oder ueber BIGINT gespeichert wuerde, kostete sonst
+        den ganzen Titel (CHECK bzw. Ueberlauf in der Transaktion)."""
+        series = _series(("2026-01-07", 0.4), ("2026-01-08", 1e19), ("2026-01-09", 1_000.4))
+        assert daily_share_counts(series) == {date(2026, 1, 9): 1_000}
+
     def test_invalid_value_does_not_hide_a_valid_one_of_the_same_day(self):
         series = _series(("2026-01-08 09:00", 1_000), ("2026-01-08 17:00", float("nan")))
         assert daily_share_counts(series) == {date(2026, 1, 8): 1_000}

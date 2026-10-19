@@ -97,6 +97,12 @@ Auswertung ein.
 | `market_data.share_count` | instrument_id, as_of (Tag in der Zeitzone der Börse), shares (> 0), first_seen_fetch_run_id, first_seen_at | anfügen, neue Zeile nur bei neuem Datum oder geändertem Wert. Ein Tag, der im Abruf fehlt, bleibt mit seinem letzten Wert stehen. Liefert Yahoo einen Tag mehrfach, gilt der letzte Wert. Abgerufen wird beim ersten Mal ab 2000-01-01, danach ab dem letzten gespeicherten Tag (`get_last_share_dates`). `get_share_counts(symbol, known_at=…)` liefert den Stand zu einem Zeitpunkt, `get_share_count_history` alle Versionen. |
 | `market_data.price_bar` | instrument_id, trade_date (Handelstag, Zeitzone der Börse), close (split-, nicht dividendenbereinigt, > 0), adj_close (zusätzlich dividendenbereinigt, im Stand des Abrufs, kann fehlen), dividend und split (je ≥ 0, 0 ohne Ereignis), first_seen_fetch_run_id, first_seen_at | wie `share_count`, aber verglichen mit relativer Toleranz `1e-5` gegen das Float-Rauschen von Yahoo. Beim ersten Abruf die ganze Historie, danach ab dem letzten Tag minus 8 Wochen; ein neuer Split lädt alles neu, die angepassten Altkurse werden neue Versionen. Der laufende Handelstag wird nicht gespeichert. `adj_close` ändert sich bei Yahoo mit jeder Dividende für alle früheren Tage, gespeichert werden solche Anpassungen nur im Fenster. Eine durchgehend bereinigte Reihe rechnet man aus close, dividend und split. `get_price_bars(symbol, known_at=…)` liefert den Stand zu einem Zeitpunkt, `get_price_bar_history` alle Versionen. |
 
+**Fehler der Zusatzquellen** (Konsens, Quartale, Aktienanzahl, Kurse) stehen nicht in der
+Snapshot-Spalte `errors`, sonst änderte sich die CSV der Mail. Sie stehen im Log
+(`batch.run_log`), beim Konsens zusätzlich als `status = 'error'`. Ein Datenfehler beim Speichern
+(CHECK, Überlauf) kostet nur diese Zusatzdaten, nicht den Titel, denn jede Zusatzquelle wird in
+einem eigenen Savepoint geschrieben.
+
 ## Speicherbedarf
 
 Kennzahlen, Rohdaten und Statement-Werte für 90 Titel ergeben grob wenige MB pro Woche. Postgres

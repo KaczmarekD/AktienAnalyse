@@ -19,6 +19,9 @@ from .db.serialization import period_end
 if TYPE_CHECKING:
     from datetime import date, datetime
 
+# Groesste Zahl in einer BIGINT-Spalte; darueber scheiterte das Speichern des Titels
+MAX_BIGINT = 2**63 - 1
+
 # Spalten der Kurshistorie nach dem Abruf
 PRICE_COLUMNS = ("close", "adj_close", "dividend", "split")
 
@@ -76,7 +79,8 @@ def daily_share_counts(series: pd.Series | None) -> dict[date, int]:
       (zeitlich sortiert). Yahoo liefert manche Tage doppelt, teils mit zwei Werten.
     - Der Tag ist der Kalendertag in der Zeitzone der Boerse, wie yfinance ihn liefert,
       nicht nach UTC umgerechnet (dieselbe Datumsregel wie fuer Abschluesse).
-    - Fehlende, unendliche und nicht positive Werte zaehlen nicht.
+    - Fehlende und unendliche Werte zaehlen nicht, ebenso Werte, die gerundet nicht
+      in ``share_count.shares`` passen (0 oder groesser als BIGINT).
     """
     counts: dict[date, int] = {}
     if series is None:
@@ -87,9 +91,11 @@ def daily_share_counts(series: pd.Series | None) -> dict[date, int]:
             shares = float(value)
         except TypeError, ValueError:
             continue
-        if day is None or not math.isfinite(shares) or shares <= 0:
+        if day is None or not math.isfinite(shares):
             continue
-        counts[day] = round(shares)
+        count = round(shares)
+        if 0 < count <= MAX_BIGINT:
+            counts[day] = count
     return counts
 
 

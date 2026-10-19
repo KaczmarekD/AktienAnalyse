@@ -447,6 +447,13 @@ class TestShareCounts:
         july = history[history["as_of"] == date(2026, 7, 29)]
         assert list(july["shares"]) == [1_154_204_232, 1_154_000_000]
 
+    def test_day_added_later_is_missing_in_the_earlier_state(self, engine):
+        self._write(engine, SHARE_COUNTS)
+        self._write(engine, {date(2026, 10, 1): 1_150_000_000}, started_at=T0 + WEEK)
+        with session_scope(engine) as s:
+            before = MarketDataRepository(s).get_share_counts("SAP.DE", known_at=T0)
+        assert set(before["as_of"]) == set(SHARE_COUNTS)
+
     def test_counts_are_kept_per_instrument(self, engine):
         self._write(engine, SHARE_COUNTS)
         assert self._write(engine, SHARE_COUNTS, symbol="ALV.DE") == 2
@@ -528,6 +535,13 @@ class TestPriceBars:
         assert len(history) == 5
         july_28 = history[history["trade_date"] == date(2026, 7, 28)]
         assert list(july_28["close"]) == [300.0, 100.0]
+
+    def test_day_added_later_is_missing_in_the_earlier_state(self, engine):
+        self._write(engine, PRE_SPLIT)
+        self._write(engine, {date(2026, 7, 30): _bar(305.0)}, started_at=T0 + WEEK)
+        with session_scope(engine) as s:
+            before = MarketDataRepository(s).get_price_bars("SAP.DE", known_at=T0)
+        assert list(before["trade_date"]) == list(PRE_SPLIT)
 
     def test_dividend_adjustment_of_adj_close_is_a_new_version(self, engine):
         self._write(engine, PRE_SPLIT)
