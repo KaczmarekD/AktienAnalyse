@@ -156,6 +156,7 @@ class BatchRecorder:
             if fund.raw is None or fetched_at is None:
                 return
             repo.write_raw_info(fetch_run_id, instrument_id, fund.raw.info, fetched_at)
+            repo.write_consensus(fetch_run_id, instrument_id, fund.raw.consensus, fetched_at)
             repo.write_statements(
                 fetch_run_id,
                 instrument_id,

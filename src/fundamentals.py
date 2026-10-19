@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import pandas as pd
 
+    from .consensus import ConsensusEntry
+
 # Mehrere Fehler eines Titels stehen in DataFrame und CSV als ein Text
 ERRORS_SEPARATOR = "; "
 
@@ -95,6 +97,8 @@ class RawFetch:
     provider_version: str
     info: dict[str, Any]
     statements: dict[str, pd.DataFrame | None]  # "income" / "balance" / "cashflow"
+    # Konsens-Snapshots je Art (ADR-0010) - nur gespeichert, nicht ausgewertet
+    consensus: dict[str, ConsensusEntry] = field(default_factory=dict)
 
 
 @dataclass

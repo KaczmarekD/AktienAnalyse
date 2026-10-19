@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 
+from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
 from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.runs import RunRepository
 from src.db.repositories.scoring import ScoreRow, ScoringRepository
 
 APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting")
+T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
+
+
+def _fetch_run(repo: MarketDataRepository) -> int:
+    return repo.write_fetch_run_start(
+        provider="yfinance",
+        provider_version="0.2.66",
+        universe_source="iShares",
+        universe_size=1,
+        started_at=T0,
+    )
 
 
 def _start_run(engine: Engine) -> int:
@@ -80,6 +94,17 @@ class TestTriggers:
         with pytest.raises(DBAPIError, match="verboten"):
             _exec(engine, "UPDATE scoring.score_result SET composite_score = 0.9")
 
+    def test_consensus_snapshot_rejects_update(self, engine):
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            repo.write_consensus(
+                fid, iid, {"eps_trend": ConsensusEntry("ok", {"0y": {"current": 1.0}}, None)}, T0
+            )
+        with pytest.raises(DBAPIError, match="verboten"):
+            _exec(engine, "UPDATE market_data.consensus_snapshot SET status = 'empty'")
+
     def test_running_run_may_be_finished_once(self, engine):
         run_id = _start_run(engine)
         with session_scope(engine) as s:
@@ -103,6 +128,18 @@ class TestRoles:
         with session_scope(app_engine) as s:
             RunRepository(s).write_run_finish(run_id, status="success", exit_code=0)
             assert RunRepository(s).get_run(run_id) is not None
+
+    def test_app_role_can_write_consensus_snapshots(self, app_engine, read_engine):
+        """Tabellen aus spaeteren Migrationen bekommen dieselben Rechte wie die ersten."""
+        with session_scope(app_engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            repo.write_consensus(fid, iid, {"eps_trend": ConsensusEntry("empty", None, None)}, T0)
+        with session_scope(read_engine) as s:
+            assert MarketDataRepository(s).get_consensus(fid, "SAP.DE") == {
+                "eps_trend": ConsensusEntry("empty", None, None)
+            }
 
     def test_app_role_has_no_delete_privilege(self, engine, app_engine):
         _start_run(engine)

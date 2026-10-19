@@ -3,6 +3,7 @@
 from .base import APP_SCHEMAS, Base
 from .batch import ImportFile, Run, RunLog
 from .market_data import (
+    ConsensusSnapshot,
     FetchRun,
     FundamentalSnapshot,
     FxRate,
@@ -17,6 +18,7 @@ from .scoring import FactorScore, ScoreResult, ScoringRun
 __all__ = [
     "APP_SCHEMAS",
     "Base",
+    "ConsensusSnapshot",
     "Delivery",
     "FactorScore",
     "FetchRun",
