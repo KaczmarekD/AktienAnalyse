@@ -21,9 +21,9 @@ import pandas as pd
 import pytest
 
 from src.main import _run, _try_send_error_mail, run
-from src.reporting import build_report
 from va_market_data.domain.history import HistoryState
 from va_market_data.domain.universe import Ticker, Universe
+from va_notification.domain.report import build_report
 
 
 def _universe(tickers, **kwargs):

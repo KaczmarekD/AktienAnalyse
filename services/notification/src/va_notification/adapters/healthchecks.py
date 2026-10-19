@@ -44,3 +44,13 @@ def ping(url: str | None, success: bool, message: str | None = None) -> bool | N
 def ping_target(url: str | None) -> str | None:
     """Nur der Host - der Pfad (UUID) ist ein Geheimnis und gehoert weder ins Log noch in die DB."""
     return urlsplit(url).hostname if url else None
+
+
+class HealthchecksHeartbeat:
+    """``Heartbeat`` ueber Healthchecks.io; ohne URL passiert nichts."""
+
+    def __init__(self, url: str | None) -> None:
+        self._url = url
+
+    def ping(self, success: bool, message: str | None = None) -> bool | None:
+        return ping(self._url, success, message)

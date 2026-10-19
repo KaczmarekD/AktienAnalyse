@@ -2,7 +2,7 @@
 
 Die Modelle liegen in ``va_contracts`` und duerfen den Altbestand ``src`` nicht kennen
 (import-linter). Die Tests pruefen deshalb hier, dass sie zu ``src.fundamentals``, zur
-Ausgabe von ``va_scoring.domain.scoring.score`` und zu ``src.reporting.build_report`` passen - mit dem
+Ausgabe von ``va_scoring.domain.scoring.score`` und zu ``va_notification.domain.report.build_report`` passen - mit dem
 eingefrorenen Golden-Datensatz.
 """
 
@@ -20,7 +20,6 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from src.reporting import build_report
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
     EVENTS,
@@ -56,6 +55,7 @@ from va_market_data.domain.fundamentals import (
     QualityMetrics,
     ValueMetrics,
 )
+from va_notification.domain.report import build_report
 from va_scoring.domain.scoring import ScoringConfig, score
 
 GOLDEN_DIR = Path(__file__).parent / "golden"

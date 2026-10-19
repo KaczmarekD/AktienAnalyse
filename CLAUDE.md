@@ -228,7 +228,8 @@ ADR-0001 und ADR-0002 aufgehoben.
 
 **Neue Mail-Empfänger**: `MAIL_TO` ist heute Single-Recipient. Wenn mehrere,
 auf Liste umstellen (`pydantic.EmailStr` → `list[EmailStr]`, `;`-getrennt
-parsen) und `mailer.py` anpassen.
+parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `src/mailer.py`
+anpassen.
 
 ## Externe Quellen, von denen wir abhängen
 

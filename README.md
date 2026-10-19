@@ -208,9 +208,6 @@ value-analyzer/
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
 │   ├── universe.py         # Verdrahtung: Quellen-Kette + Pfad der Fallback-CSV
 │   ├── data_fetcher.py     # Verdrahtung: Yahoo-Adapter für den Batch
-│   ├── reporting.py        # HTML-Mail-Body + CSV-Vollranking
-│   ├── mailer.py           # SMTP-Versand (Gmail)
-│   ├── healthcheck.py      # Healthchecks.io Ping
 │   ├── logging_setup.py    # RotatingFileHandler (5 MB × 10)
 │   └── db/                 # PostgreSQL: Modelle, Repositories (get/write), Recorder,
 │                           #   Migration, Löschschutz (ddl.py), Altdaten-Import

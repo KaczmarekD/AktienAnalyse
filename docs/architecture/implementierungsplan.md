@@ -341,6 +341,11 @@ sich in ganz Phase 1 nicht ändern.**
   - Ports `ReportSender` und `Heartbeat`
   - Adapter für SMTP und Healthchecks.io
 - **Review:** Der Fehlermail-Pfad (`_try_send_error_mail`) ist abgedeckt.
+- **Umgesetzt (19.10.2026):** `va_notification.domain.report` (Template als Paketdatei
+  `templates/report.html.j2`, im Image geprüft), Ports `ReportSender`/`Heartbeat`, Adapter
+  `smtp` (eigene `SmtpConfig` statt der Settings) und `healthchecks`. `src/mailer.py`
+  verdrahtet bis P1.8. Der Name der Fallback-Quelle steht in notification eigens, ein Test
+  vergleicht ihn mit market-data. Golden-Mail unverändert.
 
 #### P1.7 Datenbankzugriff je Modul
 

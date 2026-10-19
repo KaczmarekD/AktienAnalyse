@@ -1,15 +1,26 @@
-"""SMTP-Mailversand fuer Reports und Fehler-Notifications."""
+"""Uebergang bis P1.8: verdrahtet den SMTP-Adapter mit den Settings des Batches."""
 
 from __future__ import annotations
 
-import logging
-import smtplib
-import ssl
-from email.message import EmailMessage
+from typing import TYPE_CHECKING
 
-from .config import Settings
+from va_notification.adapters.smtp import SmtpConfig, SmtpSender
 
-log = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from .config import Settings
+
+
+def smtp_config(settings: Settings) -> SmtpConfig:
+    return SmtpConfig(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        user=settings.smtp_user,
+        password=settings.smtp_password.get_secret_value(),
+        use_tls=settings.smtp_use_tls,
+        mail_from=settings.effective_mail_from,
+        mail_to=str(settings.mail_to),
+        subject_prefix=settings.mail_subject_prefix,
+    )
 
 
 def send_report(
@@ -19,43 +30,4 @@ def send_report(
     attachment: tuple[str, bytes] | None = None,
 ) -> None:
     """Versendet den Report. ``attachment`` = (Dateiname, CSV-Bytes)."""
-    msg = EmailMessage()
-    full_subject = f"{settings.mail_subject_prefix} {subject}".strip()
-    msg["Subject"] = full_subject
-    msg["From"] = settings.effective_mail_from
-    msg["To"] = str(settings.mail_to)
-
-    msg.set_content(
-        "Dieser Report enthaelt HTML. Bitte in einem Mail-Client mit HTML-Anzeige oeffnen. "
-        "Das vollstaendige Ranking liegt als CSV-Anhang bei.",
-    )
-    msg.add_alternative(html_body, subtype="html")
-
-    if attachment:
-        filename, data = attachment
-        msg.add_attachment(data, maintype="text", subtype="csv", filename=filename)
-        log.info("CSV-Anhang angehaengt: %s (%.1f KB)", filename, len(data) / 1024)
-
-    log.info(
-        "Verbinde zu SMTP %s:%d (TLS=%s)",
-        settings.smtp_host,
-        settings.smtp_port,
-        settings.smtp_use_tls,
-    )
-    context = ssl.create_default_context()
-    password = settings.smtp_password.get_secret_value()
-
-    if settings.smtp_use_tls:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as s:
-            s.ehlo()
-            s.starttls(context=context)
-            s.ehlo()
-            s.login(settings.smtp_user, password)
-            s.send_message(msg)
-    else:
-        with smtplib.SMTP_SSL(
-            settings.smtp_host, settings.smtp_port, context=context, timeout=30
-        ) as s:
-            s.login(settings.smtp_user, password)
-            s.send_message(msg)
-    log.info("Mail an %s versendet: %s", settings.mail_to, full_subject)
+    SmtpSender(smtp_config(settings)).send(subject, html_body, attachment)

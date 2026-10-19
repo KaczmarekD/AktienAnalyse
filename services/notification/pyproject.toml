@@ -6,6 +6,9 @@ requires-python = ">=3.14"
 dependencies = [
     "va-contracts",
     "va-platform",
+    "jinja2>=3.1,<4",  # wie im Root-Projekt
+    "pandas>=3.0,<4",
+    "requests>=2.32,<3",
 ]
 
 [build-system]
