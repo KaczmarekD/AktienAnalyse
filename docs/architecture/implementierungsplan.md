@@ -412,6 +412,13 @@ sich in ganz Phase 1 nicht ändern.**
 - **Test:** keine neuen. Der import-linter läuft ohne Ausnahmen durch.
 - **Implementierung:** Die alten Module in `src/` entfernen. CLAUDE.md anpassen (Ort von
   `FIELD_MAP`, Ablauf „Neuer Scoring-Faktor“) und die Projektstruktur im README aktualisieren.
+- **Umgesetzt (19.10.2026):** `src/universe.py`, `src/data_fetcher.py` und `src/mailer.py` sind
+  in `src/composition.py` aufgegangen (`load_universe`, `DEFAULT_FALLBACK_CSV`, Abruf über
+  `YahooFundamentals`, `smtp_config`). In `src/` bleiben der Batch-Einstieg (`main`,
+  `composition`, `run_tracker`, `config`, `logging_setup`) und `db` (Schema `batch`,
+  Migration, Altdaten-Import). Der import-linter hält alle Verträge ohne Ausnahmen ein,
+  `src` heißt dort jetzt „Batch“ statt „Altbestand“. CLAUDE.md (Architektur, Rezepte) und
+  README (Projektstruktur) beschreiben den neuen Stand.
 
 ### Phase 2b – Scoring-Profile
 

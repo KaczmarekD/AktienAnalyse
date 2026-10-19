@@ -11,6 +11,7 @@ import pytest
 
 from src.composition import alert_channels
 
+
 def send_report(settings, subject, html_body, attachment=None):
     sender, _ = alert_channels(settings)
     sender.send(subject, html_body, attachment)

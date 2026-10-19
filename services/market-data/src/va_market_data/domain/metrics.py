@@ -1,7 +1,7 @@
 """Kennzahlen eines Titels als reine Funktionen (P1.3).
 
-Keine Ein-/Ausgabe, kein Provider: Der Abruf (heute ``src.data_fetcher``, ab P1.4 der
-Yahoo-Adapter) liest die Zahlen aus und uebergibt sie als ``StatementFigures`` und
+Keine Ein-/Ausgabe, kein Provider: Der Abruf (Adapter
+``va_market_data.adapters.yahoo``) liest die Zahlen aus und uebergibt sie als ``StatementFigures`` und
 ``MarketFigures``. Fehlt ein Wert, ist er ``None``; jede Kennzahl, die ihn braucht, auch.
 """
 

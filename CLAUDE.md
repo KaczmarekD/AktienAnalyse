@@ -95,7 +95,7 @@ Heimat ist – meistens ja.
 
 **Universum-Quellen: iShares → Deka → Fallback-CSV** (Kette in
 `va_market_data.application.universe`, Quellen in `va_market_data.adapters`,
-Verdrahtung mit dem CSV-Pfad in `src/universe.py`).
+Verdrahtung mit dem CSV-Pfad in `src/composition.py`).
 Wikipedia wurde ersetzt, weil die englische MDAX-Seite nachweislich veraltet
 war und die deutsche keine Ticker hat. Jede Live-Quelle wird hart validiert
 (lesbares JSON/XLSX, exakt 40/50 Aktien; iShares zusätzlich Stichtag
@@ -211,7 +211,7 @@ ADR-0001 und ADR-0002 aufgehoben.
    Schema-Golden-Files unter `tests/golden/contracts/v1/` (additiv)
 4. Auslesen der Rohwerte in `va_market_data.adapters.yahoo.fetch_one()` (`StatementFigures`
    bzw. `MarketFigures`; `FIELD_MAP` erweitern, falls yfinance-Roh-Feld nötig)
-5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS`
+5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS` (`va_scoring.domain.scoring`)
 6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab
@@ -221,10 +221,11 @@ ADR-0001 und ADR-0002 aufgehoben.
 **Neues Universum (z.B. Stoxx 600)**:
 1. Quelle als Adapter in `va_market_data.adapters` (Klasse mit `name` und
    `load()`, Port `UniverseSource`; URL-Konstanten am Dateikopf), Soll-Anzahl
-   in `UniverseConfig.expected_counts`, Reihenfolge der Kette in `src/universe.py`
+   in `UniverseConfig.expected_counts`, Reihenfolge der Kette in `src/composition.py` (`load_universe`)
 2. Fallback-CSV in `data/` inkl. ISIN-Spalte
 3. ENV `UNIVERSE` in `config.py` um neuen Literal-Wert erweitern
-4. Branch in `main.py:_run`
+4. Filter im Handler von market-data (`RunRequestedHandler`, heute `dax_only`) und
+   seine Verdrahtung in `src/composition.py:wire`
 
 **Neues Workspace-Mitglied** (Paket oder Service, ADR-0004):
 1. Verzeichnis unter `packages/` oder `services/` mit `pyproject.toml`
@@ -238,8 +239,8 @@ ADR-0001 und ADR-0002 aufgehoben.
 
 **Neue Mail-Empfänger**: `MAIL_TO` ist heute Single-Recipient. Wenn mehrere,
 auf Liste umstellen (`pydantic.EmailStr` → `list[EmailStr]`, `;`-getrennt
-parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `src/mailer.py`
-anpassen.
+parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `smtp_config` in
+`src/composition.py` anpassen.
 
 ## Externe Quellen, von denen wir abhängen
 
