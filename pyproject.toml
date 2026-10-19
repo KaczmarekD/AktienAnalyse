@@ -189,7 +189,8 @@ indent-style = "space"
 # ----------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = ["tests"]
+# Service-Tests liegen beim Service (code-struktur.md), Rest unter tests/
+testpaths = ["tests", "services/market-data/tests"]
 addopts = [
     "-ra",
     "--strict-markers",

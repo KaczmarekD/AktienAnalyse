@@ -1,0 +1,43 @@
+{
+ "errors": [],
+ "fiscal_period_end": "2025-12-31",
+ "growth": {
+  "eps_growth_5y": 1.3908603000295985,
+  "revenue_growth_5y": 0.060727275484627974
+ },
+ "identity": {
+  "currency": "EUR",
+  "financial_currency": "EUR",
+  "index": "DAX",
+  "industry": "Internet Retail",
+  "name": "ZAL.DE",
+  "sector": "Consumer Cyclical",
+  "symbol": "ZAL.DE"
+ },
+ "market": {
+  "enterprise_value": 6192849920.0,
+  "market_cap": 6244772864.0,
+  "price": 25.57,
+  "shares_outstanding": 244222642.0
+ },
+ "quality": {
+  "debt_to_equity": 0.510156415882228,
+  "earnings_stability": 0.32582450005414687,
+  "fcf_margin": 0.07320471076120588,
+  "gross_margin": 0.3988109701770585,
+  "net_debt_ebitda": -0.521167184883999,
+  "operating_margin": 0.031369976187004905,
+  "roa": 0.023234712725622993,
+  "roic": 0.05998126132966544
+ },
+ "statement_fx": 1.0,
+ "value": {
+  "buyback_yield": 0.015725151600966217,
+  "dividend_yield": 0.0,
+  "ev_ebit": 14.358566937166705,
+  "p_fcf": 6.909463226377517,
+  "pb_ratio": 2.4815605,
+  "pe_ratio": 69.10811,
+  "shareholder_yield": 0.015725151600966217
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "errors": [],
+ "fiscal_period_end": "2025-12-31",
+ "growth": {
+  "eps_growth_5y": 0.09245454995918623,
+  "revenue_growth_5y": 0.06389517926644728
+ },
+ "identity": {
+  "currency": "EUR",
+  "financial_currency": "EUR",
+  "index": "DAX",
+  "industry": "Banks - Regional",
+  "name": "DBK.DE",
+  "sector": "Financial Services",
+  "symbol": "DBK.DE"
+ },
+ "market": {
+  "enterprise_value": -34864930816.0,
+  "market_cap": 54002462720.0,
+  "price": 28.74,
+  "shares_outstanding": 1879000000.0
+ },
+ "quality": {
+  "debt_to_equity": 2.091173815185463,
+  "earnings_stability": 0.7497859234167359,
+  "fcf_margin": 1.4524128477522664,
+  "gross_margin": null,
+  "net_debt_ebitda": null,
+  "operating_margin": null,
+  "roa": 0.004829739656754702,
+  "roic": null
+ },
+ "statement_fx": 1.0,
+ "value": {
+  "buyback_yield": 0.03007270258062779,
+  "dividend_yield": 0.034094784,
+  "ev_ebit": null,
+  "p_fcf": 1.158329137513138,
+  "pb_ratio": 0.6851013,
+  "pe_ratio": 8.735562,
+  "shareholder_yield": 0.06416748658062779
+ }
+}
