@@ -2,13 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # Feature-Branches: Ein Paket wird erst gepusht, wenn es lokal gruen ist,
+    # die CI bestaetigt das vor dem Merge (Implementierungsplan, Arbeitsweise).
+    branches: [main, master, "feat/**"]
+    # Bewusst ohne Pfad-Filter: Jeder Stand bekommt einen Status, auch reine
+    # Doku-Aenderungen (sonst haengen Pflicht-Checks). Filter erst mit mehreren
+    # Workflows (Python, Frontend, Images).
   pull_request:
     branches: [main, master]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Pro Branch: Push- und PR-Lauf desselben Branches ersetzen sich gegenseitig
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:

@@ -224,7 +224,7 @@ make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 
 ## CI
 
-`.github/workflows/ci.yml` läuft bei jedem Push:
+`.github/workflows/ci.yml` läuft bei jedem Push auf `main` und auf `feat/**`-Branches sowie bei Pull Requests gegen `main`:
 
 - Python 3.11 und 3.12 Matrix
 - `ruff check` + `ruff format --check`
