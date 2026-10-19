@@ -17,16 +17,24 @@ import logging
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache, partial
 from typing import Any
 
-import numpy as np
 import pandas as pd
 import yfinance as yf
 from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 from yfinance.exceptions import YFRateLimitError
+
+from va_market_data.domain.metrics import (
+    HISTORY_YEARS,
+    MarketFigures,
+    Metrics,
+    StatementFigures,
+    compute_metrics,
+    to_float,
+)
 
 from .consensus import MAX_ERROR_LENGTH, ConsensusEntry, collect_consensus, to_payload
 from .db.serialization import period_end
@@ -151,33 +159,6 @@ def provider_version() -> str:
 # ---------------------------------------------------------------------------
 
 
-def _safe_div(num: float | None, den: float | None) -> float | None:
-    try:
-        if num is None or den is None:
-            return None
-        nv, dv = float(num), float(den)
-        if not np.isfinite(nv) or not np.isfinite(dv) or dv == 0:
-            return None
-        result = nv / dv
-        # Float-Division laeuft bei winzigem Nenner ueber (inf) statt zu werfen
-        return result if np.isfinite(result) else None
-    except TypeError, ValueError, ZeroDivisionError:
-        return None
-
-
-def _f(value: Any) -> float | None:
-    """Robuste Konvertierung zu float oder None."""
-    if value is None:
-        return None
-    try:
-        v = float(value)
-        if not np.isfinite(v):
-            return None
-        return v
-    except TypeError, ValueError:
-        return None
-
-
 def _pick(df: pd.DataFrame | None, key: str) -> pd.Series | None:
     """Findet die yfinance-Zeile fuer einen logischen Feldnamen aus FIELD_MAP."""
     if df is None or df.empty:
@@ -203,7 +184,22 @@ def _latest(series: pd.Series | None) -> float | None:
     cleaned = series.dropna()
     if cleaned.empty:
         return None
-    return _f(cleaned.iloc[0])
+    return to_float(cleaned.iloc[0])
+
+
+def _history(series: pd.Series | None) -> list[float]:
+    """Gueltige Werte der letzten ``HISTORY_YEARS`` Jahre (juengstes zuerst)."""
+    if series is None:
+        return []
+    values = (to_float(x) for x in series.iloc[:HISTORY_YEARS].tolist())
+    return [v for v in values if v is not None]
+
+
+def _fields_of(
+    metrics: Metrics, group: type[ValueMetrics | QualityMetrics | Growth]
+) -> dict[str, Any]:
+    """Die Kennzahlen, die zu einer Gruppe in ``Fundamentals`` gehoeren."""
+    return {f.name: getattr(metrics, f.name) for f in fields(group)}
 
 
 def _dated_columns(
@@ -233,25 +229,6 @@ def _fiscal_period_end(income: pd.DataFrame | None) -> date | None:
         labels += [c for c in income.columns if income[c].notna().any()]
     # Erstes gueltiges Label - eine Spalte ohne Datum darf das Jahr nicht kosten
     return next((d for d in map(period_end, labels) if d is not None), None)
-
-
-def _series_n(series: pd.Series | None, n: int) -> list[float] | None:
-    if series is None:
-        return None
-    vals = [v for v in (_f(x) for x in series.iloc[:n].tolist()) if v is not None]
-    return vals if len(vals) >= max(2, n - 1) else None
-
-
-def _cagr(values: list[float]) -> float | None:
-    """CAGR aus Zeitreihe (juengstes Element zuerst). None bei Vorzeichenwechsel."""
-    if not values or len(values) < 2:
-        return None
-    # _safe_div: None bei 0 und bei Ueberlauf (aeltester Wert fast 0 -> inf)
-    ratio = _safe_div(values[0], values[-1])
-    if ratio is None or ratio <= 0:
-        return None
-    years = len(values) - 1
-    return float(ratio ** (1.0 / years) - 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -523,7 +500,7 @@ def fetch_prices(
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
     """Wechselkurs 1 from_ccy -> to_ccy (z.B. USD -> EUR). Pro Run gecached."""
-    rate = _f(yf.Ticker(f"{from_ccy}{to_ccy}=X").fast_info.get("lastPrice"))
+    rate = to_float(yf.Ticker(f"{from_ccy}{to_ccy}=X").fast_info.get("lastPrice"))
     if rate is None or rate <= 0:
         msg = f"kein Kurs fuer {from_ccy}{to_ccy}=X"
         raise ValueError(msg)
@@ -547,12 +524,6 @@ def _statement_fx(info: dict[str, Any], errors: list[str]) -> float | None:
         errors.append(f"fx {reporting}->{trading} failed: {e}")
         log.warning("Wechselkurs %s->%s fehlgeschlagen: %s", reporting, trading, e)
         return None
-
-
-def _to_trading(value: float | None, fx: float | None) -> float | None:
-    if value is None or fx is None:
-        return None
-    return value * fx
 
 
 def _additional[T](label: str, symbol: str, fetch: Callable[[], T], fallback: T) -> T:
@@ -630,161 +601,50 @@ def fetch_one(
     fund.identity.industry = info.get("industry")
 
     fund.market = MarketData(
-        price=_f(info.get("currentPrice") or info.get("regularMarketPrice")),
-        market_cap=_f(info.get("marketCap")),
-        enterprise_value=_f(info.get("enterpriseValue")),
-        shares_outstanding=_f(info.get("sharesOutstanding")),
+        price=to_float(info.get("currentPrice") or info.get("regularMarketPrice")),
+        market_cap=to_float(info.get("marketCap")),
+        enterprise_value=to_float(info.get("enterpriseValue")),
+        shares_outstanding=to_float(info.get("sharesOutstanding")),
     )
 
-    # Statement-Werte
-    revenue = _latest(_pick(income, "revenue"))
-    ebit = _latest(_pick(income, "ebit"))
-    ebitda = _latest(_pick(income, "ebitda"))
-    gross_profit = _latest(_pick(income, "gross_profit"))
-    operating_inc = _latest(_pick(income, "operating_inc"))
-    net_income = _latest(_pick(income, "net_income"))
-    pretax_income = _latest(_pick(income, "pretax_income"))
-    tax_expense = _latest(_pick(income, "tax_expense"))
-    total_assets = _latest(_pick(balance, "total_assets"))
-    total_equity = _latest(_pick(balance, "total_equity"))
-    total_debt = _latest(_pick(balance, "total_debt"))
-    cash = _latest(_pick(balance, "cash"))
-
-    fcf = _latest(_pick(cashflow, "fcf"))
-    if fcf is None:
-        op_cf = _latest(_pick(cashflow, "op_cash"))
-        capex = _latest(_pick(cashflow, "capex"))
-        if op_cf is not None and capex is not None:
-            fcf = op_cf + capex  # capex i.d.R. negativ in yfinance
-
-    buybacks = _latest(_pick(cashflow, "buybacks"))
-
-    # --- Value ---
-    # Marktdaten sind in Handelswaehrung, Abschluesse in Berichtswaehrung (z.B.
-    # Qiagen: EUR vs. USD). Fuer Multiples Abschlusswerte umrechnen. Yahoos
-    # enterpriseValue/priceToBook/trailingPE mischen die Waehrungen dann
-    # unkonvertiert - selbst berechnen.
+    statements = StatementFigures(
+        revenue=_latest(_pick(income, "revenue")),
+        ebit=_latest(_pick(income, "ebit")),
+        ebitda=_latest(_pick(income, "ebitda")),
+        gross_profit=_latest(_pick(income, "gross_profit")),
+        operating_income=_latest(_pick(income, "operating_inc")),
+        net_income=_latest(_pick(income, "net_income")),
+        pretax_income=_latest(_pick(income, "pretax_income")),
+        tax_expense=_latest(_pick(income, "tax_expense")),
+        total_assets=_latest(_pick(balance, "total_assets")),
+        total_equity=_latest(_pick(balance, "total_equity")),
+        total_debt=_latest(_pick(balance, "total_debt")),
+        cash=_latest(_pick(balance, "cash")),
+        fcf=_latest(_pick(cashflow, "fcf")),
+        operating_cash_flow=_latest(_pick(cashflow, "op_cash")),
+        capex=_latest(_pick(cashflow, "capex")),
+        buybacks=_latest(_pick(cashflow, "buybacks")),
+        revenue_history=_history(_pick(income, "revenue")),
+        eps_history=_history(_pick(income, "diluted_eps")),
+        net_income_history=_history(_pick(income, "net_income")),
+    )
+    market = MarketFigures(
+        market_cap=fund.market.market_cap,
+        enterprise_value=fund.market.enterprise_value,
+        trailing_pe=to_float(info.get("trailingPE")),
+        price_to_book=to_float(info.get("priceToBook")),
+        trailing_dividend_yield=to_float(info.get("trailingAnnualDividendYield")),
+        dividend_yield_percent=to_float(info.get("dividendYield")),
+    )
     fx = _statement_fx(info, fund.errors)
     fund.provenance.statement_fx = fx
-    mcap = fund.market.market_cap
-    ebit_t = _to_trading(ebit, fx)
-    fcf_t = _to_trading(fcf, fx)
-    equity_t = _to_trading(total_equity, fx)
-    net_income_t = _to_trading(net_income, fx)
-    buybacks_t = _to_trading(buybacks, fx)
-
-    if fx == 1.0:  # gleiche Waehrung - _statement_fx liefert exakt 1.0
-        pe_ratio = _f(info.get("trailingPE"))
-        pb_ratio = _f(info.get("priceToBook")) or _safe_div(mcap, equity_t)
-    else:
-        debt_t, cash_t = _to_trading(total_debt, fx), _to_trading(cash, fx)
-        fund.market.enterprise_value = (
-            mcap + debt_t - cash_t
-            if mcap is not None and debt_t is not None and cash_t is not None
-            else None
-        )
-        pe_ratio = (
-            _safe_div(mcap, net_income_t) if net_income_t is not None and net_income_t > 0 else None
-        )
-        pb_ratio = _safe_div(mcap, equity_t)
-
-    div_yield = _dividend_yield(info)
-    buyback_yield = _safe_div(abs(buybacks_t), mcap) if buybacks_t is not None else None
-    # 0 % ist ein echter Wert (keine Dividende, keine Rueckkaeufe) - nur None, wenn beides fehlt
-    yields = [v for v in (div_yield, buyback_yield) if v is not None]
-    shareholder_yield = sum(yields) if yields else None
-
-    fund.value = ValueMetrics(
-        ev_ebit=_safe_div(fund.market.enterprise_value, ebit_t),
-        pe_ratio=pe_ratio,
-        pb_ratio=pb_ratio,
-        p_fcf=_safe_div(mcap, fcf_t),
-        dividend_yield=div_yield,
-        buyback_yield=buyback_yield,
-        shareholder_yield=shareholder_yield,
-    )
-
-    # --- Quality ---
-    roic = _roic(
-        ebit=ebit,
-        equity=total_equity,
-        debt=total_debt,
-        pretax=pretax_income,
-        tax=tax_expense,
-        default_tax_rate=cfg.default_tax_rate,
-    )
-
-    fund.quality = QualityMetrics(
-        roic=roic,
-        roa=_safe_div(net_income, total_assets),
-        fcf_margin=_safe_div(fcf, revenue),
-        gross_margin=_safe_div(gross_profit, revenue),
-        operating_margin=_safe_div(operating_inc, revenue),
-        net_debt_ebitda=(
-            _safe_div((total_debt - cash), ebitda)
-            if total_debt is not None and cash is not None and ebitda
-            else None
-        ),
-        debt_to_equity=_safe_div(total_debt, total_equity),
-        earnings_stability=_earnings_stability(income),
-    )
-
-    # --- Growth ---
-    fund.growth = Growth(
-        revenue_growth_5y=_cagr(_series_n(_pick(income, "revenue"), 5) or []),
-        eps_growth_5y=_cagr(_series_n(_pick(income, "diluted_eps"), 5) or []),
-    )
-
+    metrics = compute_metrics(statements, market, fx=fx, default_tax_rate=cfg.default_tax_rate)
+    # Bei abweichender Berichtswaehrung aus umgerechneten Abschluessen neu berechnet
+    fund.market.enterprise_value = metrics.enterprise_value
+    fund.value = ValueMetrics(**_fields_of(metrics, ValueMetrics))
+    fund.quality = QualityMetrics(**_fields_of(metrics, QualityMetrics))
+    fund.growth = Growth(**_fields_of(metrics, Growth))
     return fund
-
-
-def _dividend_yield(info: dict[str, Any]) -> float | None:
-    """Dividendenrendite als Dezimal (0.03 = 3 %).
-
-    ``trailingAnnualDividendYield`` ist dezimal und hat Vorrang. ``dividendYield``
-    liefert yfinance seit 0.2.5x in Prozent (1.36 = 1,36 %) - daher immer / 100,
-    ein Schwellwert wie "> 1" wuerde Renditen unter 1 % um Faktor 100 aufblaehen.
-    Mit yfinance 1.7 unveraendert: Live-Vergleich gegen 0.2.66 am 30.09.2026 ergab
-    fuer alle 90 Titel identische Werte.
-    """
-    trailing = _f(info.get("trailingAnnualDividendYield"))
-    if trailing is not None:
-        return trailing
-    pct = _f(info.get("dividendYield"))
-    return pct / 100.0 if pct is not None else None
-
-
-def _roic(
-    *,
-    ebit: float | None,
-    equity: float | None,
-    debt: float | None,
-    pretax: float | None,
-    tax: float | None,
-    default_tax_rate: float,
-) -> float | None:
-    """ROIC = NOPAT / Invested Capital. Effektive Steuerquote wenn moeglich."""
-    if ebit is None or equity is None:
-        return None
-    if pretax and pretax > 0 and tax is not None and tax >= 0:
-        eff_tax = min(0.6, max(0.0, tax / pretax))
-    else:
-        eff_tax = default_tax_rate
-    nopat = ebit * (1.0 - eff_tax)
-    invested = equity + (debt or 0.0)
-    return _safe_div(nopat, invested)
-
-
-def _earnings_stability(income: pd.DataFrame | None) -> float | None:
-    ni_series = _series_n(_pick(income, "net_income"), 5)
-    if not ni_series:
-        return None
-    arr = np.array(ni_series, dtype=float)
-    mean_abs = float(np.mean(np.abs(arr)))
-    if mean_abs <= 0:
-        return None
-    cv = float(np.std(arr) / mean_abs)
-    return max(0.0, 1.0 - min(cv, 1.0))
 
 
 # ---------------------------------------------------------------------------

@@ -274,7 +274,19 @@ sich in ganz Phase 1 nicht ändern.**
   dabei weiterhin nicht gemockt.
 - **Implementierung:** `va_market_data.domain.metrics`. `data_fetcher` ruft die Funktionen auf,
   bis P1.4 den Adapter einführt.
-- **Review:** Im Domain-Code gibt es keine Ein-/Ausgabe.
+  - `compute_metrics(StatementFigures, MarketFigures, fx=…)` rechnet alle Kennzahlen inklusive
+    FX-Umrechnung und Free-Cash-Flow-Ersatz. `data_fetcher` liest nur noch aus (`FIELD_MAP`,
+    `info`, Periodenregel, FX-Abruf) und übernimmt das Ergebnis in die `Fundamentals`.
+  - Sicherungstests: Rohdaten von sieben echten Titeln (`tests/fixtures/metrics/`, darunter Bank,
+    Versicherer, Immobilien und Qiagen mit USD-Abschluss), Erwartungswerte als Golden-Files aus
+    dem Code vor dem Umbau (`tests/golden/metrics/`). Sie blieben unverändert grün, ebenso die
+    Golden-Mail.
+  - Service-Tests liegen unter `services/market-data/tests/` (in `testpaths`).
+  - `va-market-data` ist seit P1.3 eine Laufzeitabhängigkeit. Das Dockerfile installiert erst
+    die Fremdpakete ohne Workspace (`--no-install-workspace`, große Schicht, bleibt im Cache),
+    dann die Mitglieder nicht-editierbar (`--no-editable`, kleine Schicht).
+- **Review:** Im Domain-Code gibt es keine Ein-/Ausgabe. Ein import-linter-Vertrag verbietet
+  yfinance, requests, SQLAlchemy, psycopg und Alembic in allen `domain`-Schichten.
 
 #### P1.4 Adapter für Yahoo und Universum hinter Ports
 

@@ -23,10 +23,12 @@ WORKDIR /app
 # --locked: Abbruch, wenn uv.lock nicht zu pyproject.toml passt.
 # --inexact: Pakete des Basis-Images (z. B. pip) bleiben erhalten.
 # uv selbst und seine Variablen gibt es nur in diesem Schritt, nicht im Image.
-# Von den Workspace-Mitgliedern (P1.1) braucht uv nur die pyproject.toml, damit
-# --locked zum Lockfile passt; installiert werden sie noch nicht. Nur diese Dateien
-# einbinden: Eine Code-Aenderung in packages/ oder services/ laesst die grosse
-# Abhaengigkeitsschicht sonst jedes Mal neu entstehen.
+# Zwei Schritte, damit eine Code-Aenderung in packages/ oder services/ die grosse
+# Abhaengigkeitsschicht nicht neu entstehen laesst:
+# 1. alle Fremdpakete, ohne Workspace-Mitglieder - dafuer braucht uv von den
+#    Mitgliedern nur die pyproject.toml (sonst passt --locked nicht zum Lockfile)
+# 2. die Workspace-Mitglieder, die der Batch nutzt (ab P1.3), nicht-editierbar:
+#    Ein editierbarer Eintrag zeigte auf den Bind-Mount, den es nach RUN nicht mehr gibt.
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
@@ -37,7 +39,15 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
-    uv sync --locked --inexact --no-dev --no-install-project
+    uv sync --locked --inexact --no-dev --no-install-project --no-install-workspace
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --no-install-project --no-editable
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/

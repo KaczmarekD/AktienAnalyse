@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "va-contracts",
     "va-platform",
+    "numpy>=2.3.2,<3",  # wie im Root-Projekt
 ]
 
 [build-system]
