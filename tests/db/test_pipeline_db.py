@@ -5,6 +5,7 @@ yfinance und SMTP bleiben gemockt, die Datenbank ist echt.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from unittest.mock import Mock, patch
 
@@ -13,6 +14,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+from src.composition import build_adapters
 from src.db.repositories.runs import RunRepository
 from src.main import _run
 from va_market_data.adapters.postgres import MarketDataRepository
@@ -132,8 +134,15 @@ def db_settings(tmp_path, monkeypatch, db_url):
 def _patched_run(
     settings, *, force_refresh=False, dry_run=False, shares=_fake_shares, prices=_fake_prices
 ):
+    """Echte Adapter (PostgreSQL, Yahoo mit gepatchter HTTP-Schicht), Universum und Versand fest."""
+    send = Mock()
+    adapters = replace(
+        build_adapters(settings),
+        load_universe=lambda: UNIVERSE,
+        sender=Mock(send=send),
+        heartbeat=Mock(**{"ping.return_value": None}),
+    )
     with (
-        patch("src.main.load_universe", return_value=UNIVERSE),
         patch(
             "va_market_data.adapters.yahoo._ticker_data", side_effect=_fake_ticker_data
         ) as ticker_data,
@@ -142,10 +151,8 @@ def _patched_run(
         patch("va_market_data.adapters.yahoo.fetch_share_counts", side_effect=shares),
         patch("va_market_data.adapters.yahoo.fetch_prices", side_effect=prices),
         patch("va_market_data.application.fetch.time.sleep"),
-        patch("src.main.send_report") as send,
-        patch("src.main.ping", return_value=None),
     ):
-        rc = _run(settings, force_refresh=force_refresh, dry_run=dry_run)
+        rc = _run(settings, force_refresh=force_refresh, dry_run=dry_run, adapters=adapters)
     return rc, ticker_data, send
 
 
@@ -295,7 +302,10 @@ class TestFullRun:
 
     def test_check_violation_in_additional_data_keeps_the_ticker(self, db_settings, engine):
         """Ein echter CHECK-Verstoss aus Postgres (Aktienanzahl 0), nicht nur ein Python-Fehler."""
-        with patch("src.db.recorder.daily_share_counts", return_value={date(2026, 7, 29): 0}):
+        with patch(
+            "va_market_data.adapters.postgres.store.daily_share_counts",
+            return_value={date(2026, 7, 29): 0},
+        ):
             rc, _, _ = _patched_run(db_settings)
         assert rc == 0
         with session_scope(engine) as s:
@@ -310,7 +320,10 @@ class TestFullRun:
     def test_unexpected_error_while_storing_additional_data_keeps_the_ticker(
         self, db_settings, engine
     ):
-        with patch("src.db.recorder.daily_price_bars", side_effect=KeyError("unerwartet")):
+        with patch(
+            "va_market_data.adapters.postgres.store.daily_price_bars",
+            side_effect=KeyError("unerwartet"),
+        ):
             rc, _, _ = _patched_run(db_settings)
         assert rc == 0
         with session_scope(engine) as s:

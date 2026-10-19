@@ -205,7 +205,7 @@ indent-style = "space"
 [tool.pytest.ini_options]
 minversion = "7.0"
 # Service-Tests liegen beim Service (code-struktur.md), Rest unter tests/
-testpaths = ["tests", "services/market-data/tests", "services/scoring/tests", "services/notification/tests"]
+testpaths = ["tests", "packages/va-platform/tests", "services/market-data/tests", "services/scoring/tests", "services/notification/tests"]
 addopts = [
     "-ra",
     "--strict-markers",

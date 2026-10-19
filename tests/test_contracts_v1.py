@@ -469,6 +469,8 @@ class TestReceivingSide:
         received = parse_envelope(sent.model_dump_json())
         assert isinstance(received.data, spec.model)
         assert received == sent
+        # Weitergereicht (Relay, Bus) muss die Payload erhalten bleiben
+        assert received.model_dump_json() == sent.model_dump_json()
 
     def test_unknown_event_is_rejected(self):
         sent = new_envelope(RUN_FAILED, _examples()[RUN_FAILED.type], source="va/web-api")  # type: ignore[arg-type]
