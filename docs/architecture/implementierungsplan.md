@@ -518,6 +518,8 @@ unverändert.
   - F3.1 folgt nach P2b.2, F3.2 nach P3.7.
 - **Tests ohne yfinance-Mocks** (CLAUDE.md): Parser und Kennzahlen werden gegen aufgezeichnete
   Rohdaten als JSON-Fixtures geprüft. Die Abruf-Funktionen selbst gehören nicht zur Test-Suite.
+  Das Fehlerverhalten der Adapter (Retry, Rate-Limit, verschluckte Fehler) prüfen Fakes, die
+  yfinance nachbilden, oder echtes yfinance mit gepatchter HTTP-Schicht.
 
 #### F1.1 Konsens-Snapshots
 
@@ -659,6 +661,35 @@ Aus dem Review von F1.2 bis F1.4 entstanden.
   Daten“ bleibt ein leeres Ergebnis und wird kein Fehler, etwa der fehlende Quartals-Cashflow bei
   Banken und Versicherern (24 leere Quartalsabschlüsse).
 
+#### F1.6 Fix-Paket Gesamt-Review Track F
+
+Aus dem Gesamt-Review am 19.10.2026 entstanden.
+
+- **Test:**
+  - Scheitert nach einem neuen Split der Vollabruf, wurde bisher das Fenster gespeichert. Der
+    Split galt damit als bekannt, und die Altkurse blieben dauerhaft unbereinigt.
+  - Konsens: yfinance liest `eps_trend`, `eps_revisions`, `earnings_estimate`,
+    `revenue_estimate` und `growth_estimates` aus einem gemeinsamen Abruf und loggt dessen
+    Fehler nur einmal. Die anderen Arten standen dann als `empty` statt `error` in der DB (Test
+    mit echtem yfinance und gepatchter HTTP-Schicht).
+  - Ein unerwarteter Python-Fehler in einem Zusatzabruf oder beim Speichern der Zusatzdaten
+    kostete den Titel (Pipeline-Test gegen Postgres).
+  - Sicherungstests: echter CHECK-Verstoß im Savepoint, Rate-Limit-Verdrahtung bei Konsens und
+    Aktienanzahl.
+- **Implementierung:**
+  - Gescheiterter Vollabruf nach Split: diese Woche keine Kurse. Der Split steht nächste Woche
+    wieder im Fenster.
+  - `CONSENSUS_SHARED_SOURCE`: Ist der gemeinsame Abruf mit `YahooResponseError` gescheitert,
+    werden leere Arten der Gruppe zum Folgefehler. Ein Fehler beim Parsen einer einzelnen Art
+    zählt nicht.
+  - `fetch_one` ruft jede Zusatzquelle über `_additional()` auf, der Recorder schreibt sie über
+    `_OptionalWrites`: Ein unerwarteter Fehler kostet nur diese Daten. Vorübergehende
+    DB-Störungen laufen weiter in den Retry der ganzen Transaktion.
+  - Docstring: Der Retry hilft nur bei Netzfehlern, HTTP-Fehlerantworten cacht yfinance.
+- **Bewusst offen:** Yahoo-Anpassungen ohne Split-Marker an Tagen vor dem Fenster werden nicht
+  erkannt. Die Aktienanzahl wird ab dem letzten gespeicherten Tag ohne Überlappung geholt,
+  spätere Korrekturen an älteren Tagen kommen nicht an.
+
 #### F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme
 
 - **Voraussetzung:** P1.3, P1.5, P2b.2.
@@ -694,8 +725,10 @@ Aus dem Review von F1.2 bis F1.4 entstanden.
 
 - **Voraussetzung:** F1.4, F2.1, P2b.2.
 - **Test:**
-  - Das 12-1-Momentum aus Fixture-Kursen: auf Basis von `adj_close`, der letzte Monat ausgelassen.
-    Eine zu kurze Historie ergibt `None`.
+  - Das 12-1-Momentum aus Fixture-Kursen, der letzte Monat ausgelassen. Eine zu kurze Historie
+    ergibt `None`. Gerechnet wird aus `close`, `dividend` und `split`, nicht aus dem
+    gespeicherten `adj_close`: Das wird nur im 8-Wochen-Fenster nachgezogen, über zwölf Monate
+    mischt es Bereinigungsstände (Fehler etwa in Höhe der Dividendenrendite).
   - Flag-Tests: Nur die Kombination aus hohem Value-Score, schwachem Momentum und schwachem F-Score
     setzt die neue Regel. Das Ergebnis nennt den Grund („quality“ oder „momentum“).
   - Mit abgeschalteter Regel (v1) bleiben die Golden-Files unverändert.

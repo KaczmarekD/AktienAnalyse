@@ -426,10 +426,27 @@ class TestConsensusSharedSource:
         assert "Folgefehler" in (entries["eps_revisions"].error or "")
 
     def test_real_empty_answer_stays_empty(self):
-        """Ohne Fehler bleibt "empty" (keine Analystenabdeckung) erhalten."""
-        fake = _FakeTicker(lambda: None)
-        with patch("src.data_fetcher.yf.Ticker", return_value=fake):
+        """Ohne Abruffehler bleibt "empty" (keine Analystenabdeckung) erhalten."""
+
+        class NoCoverage:
+            def __getattr__(self, attr):
+                return None
+
+        with patch("src.data_fetcher.yf.Ticker", return_value=NoCoverage()):
             entries = REAL_FETCH_CONSENSUS("SAP.DE")
+        assert {e.status for e in entries.values()} == {"empty"}
+
+    def test_error_of_a_single_kind_is_no_follow_up_error(self):
+        """Ein Fehler beim Parsen einer Art betrifft nicht die anderen der Gruppe."""
+
+        class OneBroken:
+            def __getattr__(self, attr):
+                if attr == "eps_revisions":
+                    raise KeyError("trend")
+
+        with patch("src.data_fetcher.yf.Ticker", return_value=OneBroken()), patch("time.sleep"):
+            entries = REAL_FETCH_CONSENSUS("SAP.DE")
+        assert entries["eps_revisions"].status == "error"
         assert entries["eps_trend"].status == "empty"
 
 

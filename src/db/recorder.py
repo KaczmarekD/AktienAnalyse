@@ -13,7 +13,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from sqlalchemy.exc import DataError, IntegrityError, InterfaceError, OperationalError
+from sqlalchemy.exc import InterfaceError, OperationalError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .. import __version__
@@ -46,9 +46,6 @@ MIN_REUSE_SUCCESS_SHARE = 0.8
 # Voruebergehende DB-Stoerungen (Verbindungsabbruch, NAS-I/O) - kein Retry bei Datenfehlern
 _TRANSIENT_DB_ERRORS = (OperationalError, InterfaceError)
 
-# Datenfehler (CHECK, Ueberlauf): In Zusatzdaten kosten sie nur diese Daten, nie den Titel
-_DATA_ERRORS = (IntegrityError, DataError)
-
 
 def snapshot_row(
     flat: Mapping[Any, Any], errors: Iterable[str], *, drop_unknown: bool = False
@@ -79,8 +76,8 @@ def scoring_config_dict(cfg: ScoringConfig) -> dict[str, Any]:
 class _OptionalWrites:
     """Schreibt Zusatzdaten eines Titels (ADR-0010) je in einem Savepoint.
 
-    Ein Datenfehler kostet nur diese Daten: Der Titel bleibt in Report und Datenbank.
-    Voruebergehende Stoerungen laufen weiter in den Retry der ganzen Transaktion.
+    Ein Fehler kostet nur diese Daten: Der Titel bleibt in Report und Datenbank.
+    Voruebergehende DB-Stoerungen laufen weiter in den Retry der ganzen Transaktion.
     """
 
     def __init__(self, session: Session, symbol: str) -> None:
@@ -91,7 +88,9 @@ class _OptionalWrites:
         try:
             with self._session.begin_nested():
                 write()
-        except _DATA_ERRORS:
+        except _TRANSIENT_DB_ERRORS:
+            raise
+        except Exception:
             log.warning(
                 "%s fuer %s nicht gespeichert - der Titel bleibt",
                 label,

@@ -75,10 +75,11 @@ Schema) färbt sie rot, ohne dass sich der Vertrag ändert. Events per
 Konstruktor erzeugen: `model_validate` ignoriert unbekannte Felder, also auch
 Tippfehler.
 
-**yfinance-Feldnamen** stehen ausschließlich in `FIELD_MAP` am Kopf von
-`data_fetcher.py`. yfinance benennt Statement-Zeilen unangekündigt um
-("Total Revenue" → "TotalRevenue") – wenn das passiert, ist FIELD_MAP die
-einzige zu ändernde Stelle.
+**yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
+`data_fetcher.py`: `FIELD_MAP` (Statement-Zeilen), `CONSENSUS_FIELDS`,
+`QUARTERLY_FIELDS` und `PRICE_FIELDS`. yfinance benennt unangekündigt um
+("Total Revenue" → "TotalRevenue") – wenn das passiert, ist dort die einzige
+zu ändernde Stelle.
 
 **Konfiguration kommt aus Pydantic Settings**, niemals aus eingebetteten
 Konstanten. Wenn du eine Konstante brauchst und sie könnte sich je nach
@@ -237,8 +238,11 @@ parsen) und `mailer.py` anpassen.
 dasselbe bei jedem Push auf `main` und `feat/**` sowie bei Pull Requests.
 Tests in `tests/` decken Scoring-Logik, CSV-Load,
 Reporting-Struktur und Config-Validierung ab. yfinance-Calls werden in
-Tests *nicht* gemockt – die Funktionen, die sie aufrufen, sind kein Teil
-der Test-Suite (zu viel Mocking-Overhead, zu wenig Wert).
+Tests *nicht* gemockt – die Funktionen, die nur abrufen, sind kein Teil
+der Test-Suite (zu viel Mocking-Overhead, zu wenig Wert). Ausnahme sind die
+Adapter der Zusatzdaten (Retry, Rate-Limit, Fehler): Sie laufen gegen kleine
+Fakes, die das Verhalten von yfinance nachbilden, oder gegen echtes yfinance
+mit gepatchter HTTP-Schicht (`YfData`), ohne Netz.
 
 DB-Tests (`tests/db/`) laufen gegen ein echtes PostgreSQL, nicht gegen
 SQLite oder Mocks – Trigger, Rollenrechte und `DISTINCT ON` sind der
