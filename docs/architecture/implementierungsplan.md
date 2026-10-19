@@ -585,6 +585,33 @@ unverändert.
   - Ein Folgeabruf direkt danach erzeugte 0 neue Zeilen, die Toleranz greift.
 - **NAS (du):** Der erste Lauf nach dem Deployment dauert wegen der Erstbefüllung länger.
 
+#### F1.5 Fix-Paket Zusatzdaten
+
+Aus dem Review von F1.2 bis F1.4 entstanden.
+
+- **Test:**
+  - yfinance verschluckt Fehler standardmäßig (`config.debug.hide_exceptions`) und liefert leer.
+    Ein Test auf HTTP-Ebene (`YfData.get` gepatcht) zeigt, dass Retry, Abbruch nach Rate-Limit
+    und Log der Quartalsabschlüsse nie griffen. Dasselbe gilt für Netzfehler bei Aktienanzahl und
+    Kursen.
+  - Nach einem Rate-Limit liefen die übrigen Zusatzabrufe des Titels weiter.
+  - Ein Datenfehler beim Speichern von Zusatzdaten kostete den ganzen Titel, nachgewiesen mit einem
+    Pipeline-Test gegen Postgres. Auslöser waren eine Aktienanzahl, die gerundet 0 ergibt, und
+    Werte über BIGINT.
+  - Sicherungstests: Der Stand zu einem früheren Zeitpunkt enthält keine später neuen Tage.
+- **Implementierung:**
+  - `_yahoo_errors_raised()` schaltet `hide_exceptions` während der Zusatzabrufe ab (Quartale,
+    Aktienanzahl, Kurse). Der Konsens erkennt geloggte HTTP-Fehler weiter über
+    `_YfErrorCapture`.
+  - `note_rate_limit` merkt sich ein Rate-Limit je Titel. `fetch_one` lässt danach die
+    restlichen Zusatzabrufe aus und setzt den Zustand für den nächsten Titel zurück.
+  - Der Recorder schreibt Konsens, Quartale, Aktienanzahl und Kurse je in einem Savepoint. Ein
+    Datenfehler (`IntegrityError`, `DataError`) wird geloggt und kostet nur diese Daten.
+  - `daily_share_counts` prüft nach dem Runden auf `0 < n <= 2**63 - 1`.
+- **Review:** Live mit allen 90 Titeln am 19.10.2026: keine Warnung, kein Rate-Limit. „Keine
+  Daten“ bleibt ein leeres Ergebnis und wird kein Fehler, etwa der fehlende Quartals-Cashflow bei
+  Banken und Versicherern (24 leere Quartalsabschlüsse).
+
 #### F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme
 
 - **Voraussetzung:** P1.3, P1.5, P2b.2.

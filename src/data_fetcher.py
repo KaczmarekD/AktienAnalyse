@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache, partial
@@ -258,6 +259,46 @@ def _ticker_data(symbol: str) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFram
     return info, income, balance, cashflow
 
 
+class _RateLimitGuard:
+    """Merkt sich ein Rate-Limit waehrend der Zusatzabrufe eines Titels (ADR-0010).
+
+    Danach bleiben die restlichen Zusatzabrufe dieses Titels aus, statt weiter in die
+    Drosselung zu laufen. ``fetch_one`` setzt den Zustand je Titel zurueck, der Batch
+    laeuft in einem Thread.
+    """
+
+    def __init__(self) -> None:
+        self.hit = False
+
+
+_RATE_LIMIT = _RateLimitGuard()
+
+
+def note_rate_limit(error: BaseException) -> bool:
+    """True bei einem Rate-Limit. Es gilt dann fuer die restlichen Zusatzabrufe des Titels."""
+    if isinstance(error, YFRateLimitError):
+        _RATE_LIMIT.hit = True
+        return True
+    return False
+
+
+@contextmanager
+def _yahoo_errors_raised() -> Iterator[None]:
+    """Fehler von yfinance durchreichen statt verschlucken.
+
+    yfinance faengt Fehler standardmaessig ab (``config.debug.hide_exceptions``) und
+    liefert eine leere Antwort, auch bei einem Rate-Limit. In den Zusatzabrufen sollen
+    sie ankommen: fuer Retry, Abbruch nach Rate-Limit und Log.
+    """
+    debug = yf.config.debug
+    hidden = debug.hide_exceptions
+    debug.hide_exceptions = False
+    try:
+        yield
+    finally:
+        debug.hide_exceptions = hidden
+
+
 class YahooResponseError(Exception):
     """yfinance hat einen HTTP-Fehler nur geloggt und eine leere Antwort geliefert."""
 
@@ -308,7 +349,7 @@ def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
     yt = yf.Ticker(symbol)
     entries = collect_consensus(
         {kind: partial(_consensus_value, yt, attr) for kind, attr in CONSENSUS_FIELDS.items()},
-        stop_after=lambda e: isinstance(e, YFRateLimitError),
+        stop_after=note_rate_limit,
     )
     failed = [kind for kind, entry in entries.items() if entry.status == "error"]
     if failed:
@@ -323,7 +364,8 @@ def fetch_consensus(symbol: str) -> dict[str, ConsensusEntry]:
     reraise=True,
 )
 def _quarterly_frame(yt: Any, attr: str) -> pd.DataFrame | None:
-    frame = getattr(yt, attr)
+    with _yahoo_errors_raised():
+        frame = getattr(yt, attr)
     return frame if isinstance(frame, pd.DataFrame) else None
 
 
@@ -340,7 +382,7 @@ def quarterly_frames(yt: Any, symbol: str) -> dict[str, pd.DataFrame | None]:
         except Exception as e:
             log.warning("Quartalsabschluss %s %s nicht abrufbar: %s", symbol, statement, e)
             frames[statement] = None
-            if isinstance(e, YFRateLimitError):
+            if note_rate_limit(e):
                 break
     return frames
 
@@ -357,7 +399,8 @@ def fetch_quarterly(symbol: str) -> dict[str, pd.DataFrame | None]:
     reraise=True,
 )
 def _shares_full(yt: Any, start: date) -> pd.Series | None:
-    series = yt.get_shares_full(start=start)
+    with _yahoo_errors_raised():
+        series = yt.get_shares_full(start=start)
     return series if isinstance(series, pd.Series) else None
 
 
@@ -370,6 +413,7 @@ def share_count_series(yt: Any, symbol: str, start: date) -> pd.Series | None:
     try:
         return _shares_full(yt, start)
     except Exception as e:
+        note_rate_limit(e)
         log.warning("Aktienanzahl %s nicht abrufbar: %s", symbol, e)
         return None
 
@@ -395,7 +439,8 @@ def normalize_prices(frame: pd.DataFrame | None) -> pd.DataFrame | None:
 )
 def _price_history(yt: Any, start: date | None) -> pd.DataFrame | None:
     window: dict[str, Any] = {"period": "max"} if start is None else {"start": start}
-    frame = yt.history(**window, auto_adjust=False, actions=True)
+    with _yahoo_errors_raised():
+        frame = yt.history(**window, auto_adjust=False, actions=True)
     return frame if isinstance(frame, pd.DataFrame) and not frame.empty else None
 
 
@@ -411,6 +456,7 @@ def price_frames(
     try:
         frame = _price_history(yt, start)
     except Exception as e:
+        note_rate_limit(e)
         log.warning("Kurshistorie %s nicht abrufbar: %s", symbol, e)
         return None
     if frame is None or start is None:
@@ -422,6 +468,7 @@ def price_frames(
     try:
         full = _price_history(yt, None)
     except Exception as e:
+        note_rate_limit(e)
         log.warning("Kurshistorie %s nach Split nicht vollstaendig: %s", symbol, e)
         return frame
     return frame if full is None else full
@@ -475,6 +522,7 @@ def fetch_one(
 ) -> Fundamentals:
     """Ein Titel. ``history`` sagt, bis wann seine Zeitreihen schon gespeichert sind."""
     cfg = cfg or FetcherConfig()
+    _RATE_LIMIT.hit = False
     fund = Fundamentals(
         identity=Identity(symbol=ticker.symbol, name=ticker.name, index=ticker.index),
         provenance=Provenance(fetched_at=datetime.now(UTC)),
@@ -495,15 +543,26 @@ def fetch_one(
         if state.last_price_date is None
         else state.last_price_date - timedelta(days=cfg.price_overlap_days)
     )
+    # Zusatzdaten (ADR-0010): nach einem Rate-Limit bleibt der Rest dieses Titels aus
+    consensus = fetch_consensus(ticker.symbol)
+    quarterly = {} if _RATE_LIMIT.hit else fetch_quarterly(ticker.symbol)
+    shares = None if _RATE_LIMIT.hit else fetch_share_counts(ticker.symbol, shares_start)
+    prices = (
+        None
+        if _RATE_LIMIT.hit
+        else fetch_prices(ticker.symbol, price_start, state.price_split_days)
+    )
+    if _RATE_LIMIT.hit:
+        log.warning("Rate-Limit bei %s - restliche Zusatzdaten fehlen diese Woche", ticker.symbol)
     fund.raw = RawFetch(
         provider=PROVIDER,
         provider_version=provider_version(),
         info=info,
         statements={"income": income, "balance": balance, "cashflow": cashflow},
-        consensus=fetch_consensus(ticker.symbol),
-        quarterly=fetch_quarterly(ticker.symbol),
-        shares=fetch_share_counts(ticker.symbol, shares_start),
-        prices=fetch_prices(ticker.symbol, price_start, state.price_split_days),
+        consensus=consensus,
+        quarterly=quarterly,
+        shares=shares,
+        prices=prices,
     )
     # Rohdaten bleiben unveraendert, gerechnet wird nur mit datierten Spalten
     income = _dated_columns(income, "income", fund.errors)

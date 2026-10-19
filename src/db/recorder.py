@@ -7,13 +7,13 @@ Titel 80 verliert nichts von dem, was bis dahin abgerufen wurde.
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import DataError, IntegrityError, InterfaceError, OperationalError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .. import __version__
@@ -28,6 +28,7 @@ from .serialization import to_python
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
+    from sqlalchemy.orm import Session
 
     from ..fundamentals import Fundamentals
     from ..reporting import ReportArtifacts
@@ -44,6 +45,9 @@ MIN_REUSE_SUCCESS_SHARE = 0.8
 
 # Voruebergehende DB-Stoerungen (Verbindungsabbruch, NAS-I/O) - kein Retry bei Datenfehlern
 _TRANSIENT_DB_ERRORS = (OperationalError, InterfaceError)
+
+# Datenfehler (CHECK, Ueberlauf): In Zusatzdaten kosten sie nur diese Daten, nie den Titel
+_DATA_ERRORS = (IntegrityError, DataError)
 
 
 def snapshot_row(
@@ -70,6 +74,30 @@ def snapshot_values(fund: Fundamentals) -> dict[str, Any]:
 
 def scoring_config_dict(cfg: ScoringConfig) -> dict[str, Any]:
     return asdict(cfg)
+
+
+class _OptionalWrites:
+    """Schreibt Zusatzdaten eines Titels (ADR-0010) je in einem Savepoint.
+
+    Ein Datenfehler kostet nur diese Daten: Der Titel bleibt in Report und Datenbank.
+    Voruebergehende Stoerungen laufen weiter in den Retry der ganzen Transaktion.
+    """
+
+    def __init__(self, session: Session, symbol: str) -> None:
+        self._session = session
+        self._symbol = symbol
+
+    def write(self, label: str, write: Callable[[], object]) -> None:
+        try:
+            with self._session.begin_nested():
+                write()
+        except _DATA_ERRORS:
+            log.warning(
+                "%s fuer %s nicht gespeichert - der Titel bleibt",
+                label,
+                self._symbol,
+                exc_info=True,
+            )
 
 
 class BatchRecorder:
@@ -172,34 +200,51 @@ class BatchRecorder:
             fetched_at = fund.provenance.fetched_at
             if fund.raw is None or fetched_at is None:
                 return
-            repo.write_raw_info(fetch_run_id, instrument_id, fund.raw.info, fetched_at)
-            repo.write_consensus(fetch_run_id, instrument_id, fund.raw.consensus, fetched_at)
+            raw = fund.raw
+            repo.write_raw_info(fetch_run_id, instrument_id, raw.info, fetched_at)
             repo.write_statements(
                 fetch_run_id,
                 instrument_id,
-                fund.raw.statements,
+                raw.statements,
                 currency=fund.identity.financial_currency,
                 fetched_at=fetched_at,
             )
-            repo.write_statements(
-                fetch_run_id,
-                instrument_id,
-                fund.raw.quarterly,
-                currency=fund.identity.financial_currency,
-                fetched_at=fetched_at,
-                frequency="quarterly",
+            # Zusatzdaten (ADR-0010) je in einem Savepoint
+            optional = _OptionalWrites(s, fund.symbol)
+            optional.write(
+                "Konsens",
+                lambda: repo.write_consensus(
+                    fetch_run_id, instrument_id, raw.consensus, fetched_at
+                ),
             )
-            repo.write_share_counts(
-                fetch_run_id,
-                instrument_id,
-                daily_share_counts(fund.raw.shares),
-                fetched_at=fetched_at,
+            optional.write(
+                "Quartale",
+                lambda: repo.write_statements(
+                    fetch_run_id,
+                    instrument_id,
+                    raw.quarterly,
+                    currency=fund.identity.financial_currency,
+                    fetched_at=fetched_at,
+                    frequency="quarterly",
+                ),
             )
-            repo.write_price_bars(
-                fetch_run_id,
-                instrument_id,
-                daily_price_bars(fund.raw.prices, fetched_at=fetched_at),
-                fetched_at=fetched_at,
+            optional.write(
+                "Aktienanzahl",
+                lambda: repo.write_share_counts(
+                    fetch_run_id,
+                    instrument_id,
+                    daily_share_counts(raw.shares),
+                    fetched_at=fetched_at,
+                ),
+            )
+            optional.write(
+                "Kurse",
+                lambda: repo.write_price_bars(
+                    fetch_run_id,
+                    instrument_id,
+                    daily_price_bars(raw.prices, fetched_at=fetched_at),
+                    fetched_at=fetched_at,
+                ),
             )
             reporting_ccy = fund.identity.financial_currency
             trading_ccy = fund.identity.currency

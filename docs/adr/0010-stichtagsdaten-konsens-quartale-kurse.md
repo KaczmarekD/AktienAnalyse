@@ -50,6 +50,11 @@
 [Implementierungsplan](../architecture/implementierungsplan.md). Sie sind vorgezogen wie Phase 2 und
 können parallel zu Phase 0 laufen.
 
+**Nachtrag zur Umsetzung (19.10.2026, F1.1 bis F1.5):** Fehler der Zusatzquellen landen nicht in
+`errors`, weil sich sonst die CSV der Mail änderte. Sie stehen im Log (`batch.run_log`), beim
+Konsens zusätzlich in `consensus_snapshot.status`. Ein Datenfehler beim Speichern kostet nur die
+betroffenen Zusatzdaten, nie den Titel.
+
 ## Konsequenzen
 
 - ✅ Ab F1 geht keine Woche Konsens- und Quartalsdaten mehr verloren. Spätere Analysen wie

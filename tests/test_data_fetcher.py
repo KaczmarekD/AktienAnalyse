@@ -310,8 +310,11 @@ class TestPriceFrames:
 
 
 class _SwallowingTicker:
-    """Verhaelt sich wie yfinance 1.7: Mit ``config.debug.hide_exceptions`` (Standard) wird
-    ein Fehler verschluckt und es kommt eine leere Antwort, sonst wird er geworfen."""
+    """Verhaelt sich bei Fehlern wie yfinance 1.7.
+
+    Mit ``config.debug.hide_exceptions`` (Standard) wird ein Fehler verschluckt und es
+    kommt eine leere Antwort, sonst wird er geworfen.
+    """
 
     def __init__(self, error: Exception) -> None:
         self.calls = 0
@@ -338,8 +341,10 @@ class _SwallowingTicker:
 
 
 class TestYahooErrorsReachTheAdapters:
-    """Review F1.2-F1.4: yfinance verschluckt Fehler standardmaessig. Die Zusatzabrufe
-    muessen sie trotzdem sehen - fuer Retry, Abbruch nach Rate-Limit und Log."""
+    """Review F1.2-F1.4: Die Zusatzabrufe sehen Fehler, die yfinance sonst verschluckt.
+
+    Gebraucht fuer Retry, Abbruch nach Rate-Limit und Log.
+    """
 
     def test_rate_limit_stops_the_quarters_on_the_http_level(self, caplog):
         requests: list[str] = []
@@ -913,8 +918,10 @@ class TestFetchOneProvenanceAndRaw:
 
 
 class TestRateLimitPerTicker:
-    """Review F1.2-F1.4: Nach einem Rate-Limit bleiben die restlichen Zusatzabrufe des
-    Titels aus, statt weiter in die Drosselung zu laufen."""
+    """Review F1.2-F1.4: Nach einem Rate-Limit bleibt der Rest des Titels aus.
+
+    Sonst liefen die uebrigen Zusatzabrufe weiter in die Drosselung.
+    """
 
     def _fetch(self, symbol="X.DE"):
         info = {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0}
