@@ -103,6 +103,18 @@ jobs:
           cache-from: type=gha,scope=runtime
           cache-to: type=gha,scope=runtime,mode=max
 
+      # P0.6b: Die App muss im fertigen Image starten koennen (ohne DB, ohne Migration)
+      - name: Smoke-Test im Image
+        run: docker run --rm --entrypoint python value-analyzer:ci -c "import src.main"
+
+      # P0.6b: Die NAS baut nicht selbst, Compose zieht das Image aus GHCR
+      - name: Compose nutzt das Image aus GHCR
+        run: |
+          cp .env.example .env
+          images=$(docker compose config --images)
+          echo "$images"
+          grep -qx "ghcr.io/kaczmarekd/value-analyzer:latest" <<< "$images"
+
       # ADR-0008: dieselben Pakete wie im Laufzeit-Image, unter QEMU mit einem
       # CPU-Modell ohne AVX (J4125 der NAS). Wie make check-j4125.
       - name: J4125-Image bauen
