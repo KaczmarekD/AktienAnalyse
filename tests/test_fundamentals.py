@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 import pandas as pd
 import pytest
 
-from src.fundamentals import (
+from va_market_data.domain.fundamentals import (
     Fundamentals,
     Growth,
     Identity,

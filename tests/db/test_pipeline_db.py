@@ -13,14 +13,14 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from src.consensus import ConsensusEntry
 from src.db.engine import session_scope
 from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.reporting import ReportingRepository
 from src.db.repositories.runs import RunRepository
 from src.db.repositories.scoring import ScoringRepository
 from src.main import _run
-from src.universe import Ticker, Universe
+from va_market_data.domain.consensus import ConsensusEntry
+from va_market_data.domain.universe import Ticker, Universe
 
 TICKERS = [
     Ticker("AAA.DE", "Alpha", "DAX", isin="DE000AAA0001"),
@@ -134,12 +134,14 @@ def _patched_run(
 ):
     with (
         patch("src.main.load_universe", return_value=UNIVERSE),
-        patch("src.data_fetcher._ticker_data", side_effect=_fake_ticker_data) as ticker_data,
-        patch("src.data_fetcher.fetch_consensus", side_effect=_fake_consensus),
-        patch("src.data_fetcher.fetch_quarterly", side_effect=_fake_quarterly),
-        patch("src.data_fetcher.fetch_share_counts", side_effect=shares),
-        patch("src.data_fetcher.fetch_prices", side_effect=prices),
-        patch("src.data_fetcher.time.sleep"),
+        patch(
+            "va_market_data.adapters.yahoo._ticker_data", side_effect=_fake_ticker_data
+        ) as ticker_data,
+        patch("va_market_data.adapters.yahoo.fetch_consensus", side_effect=_fake_consensus),
+        patch("va_market_data.adapters.yahoo.fetch_quarterly", side_effect=_fake_quarterly),
+        patch("va_market_data.adapters.yahoo.fetch_share_counts", side_effect=shares),
+        patch("va_market_data.adapters.yahoo.fetch_prices", side_effect=prices),
+        patch("va_market_data.application.fetch.time.sleep"),
         patch("src.main.send_report") as send,
         patch("src.main.ping", return_value=None),
     ):

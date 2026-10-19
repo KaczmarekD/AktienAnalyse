@@ -18,7 +18,7 @@ from typing import Any
 import pandas as pd
 from jinja2 import Template
 
-from .universe import FALLBACK_SOURCE
+from va_market_data.domain.universe import FALLBACK_SOURCE
 
 log = logging.getLogger(__name__)
 

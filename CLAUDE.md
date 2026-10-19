@@ -76,7 +76,7 @@ Konstruktor erzeugen: `model_validate` ignoriert unbekannte Felder, also auch
 Tippfehler.
 
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
-`data_fetcher.py`: `FIELD_MAP` (Statement-Zeilen), `CONSENSUS_FIELDS`,
+`services/market-data/src/va_market_data/adapters/yahoo.py`: `FIELD_MAP` (Statement-Zeilen), `CONSENSUS_FIELDS`,
 `QUARTERLY_FIELDS` und `PRICE_FIELDS`. yfinance benennt unangekündigt um
 ("Total Revenue" → "TotalRevenue") – wenn das passiert, ist dort die einzige
 zu ändernde Stelle.
@@ -89,7 +89,9 @@ Deployment unterscheiden, geh durch `Settings`.
 Schwellwert hardcoden willst, frag dich erst, ob `ScoringConfig` die richtige
 Heimat ist – meistens ja.
 
-**Universum-Quellen: iShares → Deka → Fallback-CSV** (`src/universe.py`).
+**Universum-Quellen: iShares → Deka → Fallback-CSV** (Kette in
+`va_market_data.application.universe`, Quellen in `va_market_data.adapters`,
+Verdrahtung mit dem CSV-Pfad in `src/universe.py`).
 Wikipedia wurde ersetzt, weil die englische MDAX-Seite nachweislich veraltet
 war und die deutsche keine Ticker hat. Jede Live-Quelle wird hart validiert
 (lesbares JSON/XLSX, exakt 40/50 Aktien; iShares zusätzlich Stichtag
@@ -190,14 +192,14 @@ ADR-0001 und ADR-0002 aufgehoben.
 ## Wenn du was änderst
 
 **Neuer Scoring-Faktor**:
-1. Feld in passende `*Metrics`-Dataclass in `fundamentals.py`
+1. Feld in passende `*Metrics`-Dataclass in `va_market_data.domain.fundamentals`
 2. Berechnung als reine Funktion in `va_market_data.domain.metrics`
    (`Metrics`, `compute_metrics`), Test unter `services/market-data/tests/`.
    Der Feldname muss in `Metrics` und in der Dataclass gleich sein, ein Test
    prüft das
 3. Feld im Contract `FundamentalsV1` (`va_contracts`) und dessen
    Schema-Golden-Files unter `tests/golden/contracts/v1/` (additiv)
-4. Auslesen der Rohwerte in `data_fetcher.fetch_one()` (`StatementFigures`
+4. Auslesen der Rohwerte in `va_market_data.adapters.yahoo.fetch_one()` (`StatementFigures`
    bzw. `MarketFigures`; `FIELD_MAP` erweitern, falls yfinance-Roh-Feld nötig)
 5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS`
 6. Spalte in `FundamentalSnapshot` (`src/db/models/market_data.py`) und
@@ -207,8 +209,9 @@ ADR-0001 und ADR-0002 aufgehoben.
    (`tests/golden/metrics/`) bewusst mit `--update-golden` erneuern
 
 **Neues Universum (z.B. Stoxx 600)**:
-1. Quelle(n) in `src/universe.py` (URL-Konstanten am Dateikopf, Soll-Anzahl
-   in `UniverseConfig.expected_counts`)
+1. Quelle als Adapter in `va_market_data.adapters` (Klasse mit `name` und
+   `load()`, Port `UniverseSource`; URL-Konstanten am Dateikopf), Soll-Anzahl
+   in `UniverseConfig.expected_counts`, Reihenfolge der Kette in `src/universe.py`
 2. Fallback-CSV in `data/` inkl. ISIN-Spalte
 3. ENV `UNIVERSE` in `config.py` um neuen Literal-Wert erweitern
 4. Branch in `main.py:_run`
@@ -231,7 +234,7 @@ parsen) und `mailer.py` anpassen.
 
 - **yfinance** (Yahoo Finance): kostenlos, kein Vertrag. Kann jederzeit
   rate-limiten oder umbenennen. Wenn das chronisch wird, Wechsel zu FMP
-  oder EODHD über ein neues `data_fetcher_*.py`-Modul. Achtung:
+  oder EODHD über einen neuen Adapter hinter dem Port `FundamentalsProvider`. Achtung:
   yfinance verschluckt Fehler standardmäßig (`config.debug.hide_exceptions`)
   und liefert dann leer, auch bei einem Rate-Limit. Abrufe, die Retry oder
   Abbruch brauchen, laufen deshalb in `_yahoo_errors_raised()`. Tests dafür
@@ -239,7 +242,7 @@ parsen) und `mailer.py` anpassen.
   aus dem Attribut zu werfen.
 - **iShares-Holdings (EXS1/EXS3)**: undokumentierte Frontend-API von
   BlackRock, liefert Ticker + ISIN. Kann jederzeit umziehen – dann URL/Params
-  am Kopf von `universe.py` anpassen.
+  am Kopf von `va_market_data/adapters/ishares.py` anpassen.
 - **Deka-ETF-XLSX**: Blatt „Indexzusammensetzung“, nur ISIN/WKN.
 - **OpenFIGI**: ISIN → Xetra-Ticker für Neuaufnahmen, die noch nicht in der
   CSV stehen; ohne API-Key (10 ISINs pro Request).

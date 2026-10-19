@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.data_fetcher import normalize_prices
-from src.history import (
+from va_market_data.adapters.yahoo import normalize_prices
+from va_market_data.domain.history import (
     HistoryState,
     PriceBar,
     daily_price_bars,

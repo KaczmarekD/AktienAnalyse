@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from .db.serialization import period_end
+from .periods import period_end
 
 if TYPE_CHECKING:
     from datetime import date, datetime

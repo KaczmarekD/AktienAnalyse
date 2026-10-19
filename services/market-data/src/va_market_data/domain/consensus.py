@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from .db.serialization import json_safe, to_python
+from va_platform.serialization import json_safe, to_python
 
 # Stabile Namen der Arten - zugleich die erlaubten Werte der Spalte ``kind``
 CONSENSUS_KINDS: tuple[str, ...] = (

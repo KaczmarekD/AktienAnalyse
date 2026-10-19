@@ -8,7 +8,7 @@ import pytest
 
 from src.reporting import _build_subject, _fmt_num, _fmt_pct, build_report
 from src.scoring import ScoringConfig, score
-from src.universe import FALLBACK_SOURCE
+from va_market_data.domain.universe import FALLBACK_SOURCE
 
 
 class TestFormatters:

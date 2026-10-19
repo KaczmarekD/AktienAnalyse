@@ -306,6 +306,20 @@ sich in ganz Phase 1 nicht ändern.**
   - Ports `UniverseSource` und `FundamentalsProvider`
   - Adapter `ishares`, `deka`, `csv_universe`, `openfigi` sowie `yahoo` (mit `FIELD_MAP`)
 - **Review:** Validierungsregeln unverändert (40/50 Aktien, Stichtag höchstens 10 Tage alt).
+- **Umgesetzt (19.10.2026):**
+  - `domain`: `fundamentals`, `consensus`, `history`, `periods` (Periodenregel), `universe`
+    (Ticker, Validierung, Abgleich mit der CSV). `va_platform.serialization`: `json_safe`,
+    `to_python`.
+  - `application`: Ports `UniverseSource`, `FundamentalsProvider`; Kette `load_universe`,
+    Abrufschleife `fetch_all`.
+  - `adapters`: `yahoo` (`YahooFundamentals`, `FIELD_MAP`), `ishares`, `deka`, `openfigi`,
+    `csv_universe`, `http`.
+  - `src/universe.py` und `src/data_fetcher.py` verdrahten bis P1.8 mit unveränderter
+    Schnittstelle; der Pfad der Fallback-CSV kommt von dort, weil das Paket im Image in
+    site-packages liegt. `src/db/serialization.py` reicht bis P1.7 weiter.
+  - Tests: Kette und Schleife mit Fakes (neu, rot zuerst), Parser- und Adaptertests unter
+    `services/market-data/tests/`; `consensus`/`history` bleiben vorerst unter `tests/`, weil
+    sie Fixtures mit den DB-Tests teilen. Live geprüft: iShares liefert 90 Titel.
 
 #### P1.5 Scoring-Modul
 

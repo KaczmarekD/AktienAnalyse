@@ -26,8 +26,9 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from va_market_data.domain.fundamentals import ERRORS_SEPARATOR
+
 from ..config import DatabaseSettings
-from ..fundamentals import ERRORS_SEPARATOR
 from .engine import create_db_engine, session_scope
 from .recorder import snapshot_row
 from .repositories.market_data import MarketDataRepository

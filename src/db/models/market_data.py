@@ -19,7 +19,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ...consensus import CONSENSUS_KINDS, CONSENSUS_STATUSES
+from va_market_data.domain.consensus import CONSENSUS_KINDS, CONSENSUS_STATUSES
+
 from .base import Base, in_values
 
 FETCH_ORIGINS = ("live", "import")

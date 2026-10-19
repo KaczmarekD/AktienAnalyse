@@ -20,10 +20,10 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.history import HistoryState
 from src.main import _run, _try_send_error_mail, run
 from src.reporting import build_report
-from src.universe import Ticker, Universe
+from va_market_data.domain.history import HistoryState
+from va_market_data.domain.universe import Ticker, Universe
 
 
 def _universe(tickers, **kwargs):
@@ -255,7 +255,7 @@ class TestRunWithMail:
         recorder = FakeRecorder(failing_symbols=frozenset({"TRAP.DE"}))
 
         def fake_fetch_all(tickers, *, cfg, on_result, history):
-            from src.fundamentals import Fundamentals, Identity
+            from va_market_data.domain.fundamentals import Fundamentals, Identity
 
             for t in tickers:
                 on_result(Fundamentals(identity=Identity(t.symbol, t.name, t.index)))
@@ -287,7 +287,7 @@ class TestRunWithMail:
         self, settings, recorder, mock_tickers, mock_universe_df
     ):
         def fake_fetch_all(tickers, *, cfg, on_result, history):
-            from src.fundamentals import Fundamentals, Identity
+            from va_market_data.domain.fundamentals import Fundamentals, Identity
 
             for t in tickers:
                 on_result(Fundamentals(identity=Identity(t.symbol, t.name, t.index)))
