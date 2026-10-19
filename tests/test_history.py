@@ -1,16 +1,23 @@
-"""Parser fuer Zeitreihen (ADR-0010): Aktienanzahl (F1.3)."""
+"""Parser fuer Zeitreihen (ADR-0010): Aktienanzahl (F1.3) und Kurshistorie (F1.4)."""
 
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pandas as pd
 
-from src.history import HistoryState, daily_share_counts
+from src.history import (
+    HistoryState,
+    PriceBar,
+    daily_price_bars,
+    daily_share_counts,
+    split_days,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "shares"
+PRICE_FIXTURES = Path(__file__).parent / "fixtures" / "prices"
 
 
 def _recorded_shares(symbol: str) -> pd.Series:
@@ -73,6 +80,109 @@ class TestDailyShareCounts:
         assert daily_share_counts(pd.Series(dtype="int64")) == {}
 
 
+def _recorded_prices(name: str) -> pd.DataFrame:
+    """Echte Antwort von ``history(auto_adjust=False, actions=True)`` (yfinance 1.7)."""
+    doc = json.loads((PRICE_FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
+    index = pd.to_datetime(doc["index"], utc=True).tz_convert(doc["tz"])
+    return pd.DataFrame(doc["data"], index=index, columns=doc["columns"])
+
+
+# Abruf am Samstag nach dem Fenster: alle Tage im Fixture sind abgeschlossen
+AFTER = datetime(2026, 10, 17, 5, 30, tzinfo=UTC)
+
+
+class TestDailyPriceBars:
+    def test_recorded_window_gives_one_bar_per_trading_day(self):
+        frame = _recorded_prices("SAP.DE_dividende_2025")
+        bars = daily_price_bars(frame, fetched_at=AFTER)
+        assert len(bars) == len(frame)
+        assert min(bars) == date(2025, 4, 28)
+        assert all(isinstance(b, PriceBar) for b in bars.values())
+
+    def test_columns_are_mapped(self):
+        frame = _recorded_prices("SAP.DE_dividende_2025")
+        row = frame.iloc[0]
+        bar = daily_price_bars(frame, fetched_at=AFTER)[date(2025, 4, 28)]
+        assert bar == PriceBar(
+            close=row["Close"],
+            adj_close=row["Adj Close"],
+            dividend=0.0,
+            split=0.0,
+        )
+
+    def test_dividend_day(self):
+        bars = daily_price_bars(_recorded_prices("SAP.DE_dividende_2025"), fetched_at=AFTER)
+        assert bars[date(2025, 5, 14)].dividend == 2.35
+        assert sum(b.dividend > 0 for b in bars.values()) == 1
+
+    def test_split_day(self):
+        frame = _recorded_prices("SAP.DE_split_2000")
+        bars = daily_price_bars(frame, fetched_at=AFTER)
+        assert bars[date(2000, 6, 26)].split == 3.0
+        assert split_days(frame) == {date(2000, 6, 26)}
+
+    def test_day_of_the_fetch_is_not_complete_and_skipped(self):
+        frame = _recorded_prices("SAP.DE_dividende_2025")
+        # Abruf am 14.05.2025 um 10:00 Uhr in Frankfurt: Der Tag laeuft noch
+        during = datetime(2025, 5, 14, 8, 0, tzinfo=UTC)
+        bars = daily_price_bars(frame, fetched_at=during)
+        assert max(bars) == date(2025, 5, 13)
+
+    def test_day_is_taken_in_the_exchange_timezone(self):
+        # 23:30 UTC ist in Frankfurt schon der naechste Tag - der 14.05. ist dann abgeschlossen
+        frame = _recorded_prices("SAP.DE_dividende_2025")
+        late = datetime(2025, 5, 14, 22, 30, tzinfo=UTC)
+        assert max(daily_price_bars(frame, fetched_at=late)) == date(2025, 5, 14)
+
+    def test_missing_close_is_skipped_missing_adj_close_is_kept_empty(self):
+        index = pd.DatetimeIndex(["2026-01-05", "2026-01-06"]).tz_localize("Europe/Berlin")
+        frame = pd.DataFrame(
+            {
+                "Close": [float("nan"), 101.0],
+                "Adj Close": [100.0, float("nan")],
+                "Dividends": [0.0, 0.0],
+                "Stock Splits": [0.0, 0.0],
+            },
+            index=index,
+        )
+        bars = daily_price_bars(frame, fetched_at=AFTER)
+        assert bars == {date(2026, 1, 6): PriceBar(101.0, None, 0.0, 0.0)}
+
+    def test_nothing_to_parse(self):
+        assert daily_price_bars(None, fetched_at=AFTER) == {}
+        assert daily_price_bars(pd.DataFrame(), fetched_at=AFTER) == {}
+        assert split_days(None) == set()
+
+
+CLOSE, ADJ = 181.6999969482422, 179.1234567
+
+
+class TestPriceBarComparison:
+    BAR = PriceBar(close=CLOSE, adj_close=ADJ, dividend=0.0, split=0.0)
+
+    def test_float_noise_of_yahoo_is_no_change(self):
+        # Gemessen: Adj Close weicht zwischen zwei Abrufen um bis zu 6e-7 relativ ab
+        noisy = PriceBar(CLOSE, ADJ * (1 + 6e-7), 0.0, 0.0)
+        assert noisy.same_as(self.BAR)
+
+    def test_adjustment_by_a_dividend_is_a_change(self):
+        adjusted = PriceBar(CLOSE, ADJ * 0.99, 0.0, 0.0)
+        assert not adjusted.same_as(self.BAR)
+
+    def test_split_adjusted_close_is_a_change(self):
+        assert not PriceBar(CLOSE / 3, None, 0.0, 0.0).same_as(PriceBar(CLOSE, None, 0.0, 0.0))
+
+    def test_new_dividend_or_split_is_a_change(self):
+        assert not PriceBar(CLOSE, None, 2.35, 0.0).same_as(PriceBar(CLOSE, None, 0.0, 0.0))
+        assert not PriceBar(CLOSE, None, 0.0, 3.0).same_as(PriceBar(CLOSE, None, 0.0, 0.0))
+
+    def test_adj_close_appearing_is_a_change(self):
+        assert not PriceBar(1.0, 1.0, 0.0, 0.0).same_as(PriceBar(1.0, None, 0.0, 0.0))
+
+
 class TestHistoryState:
     def test_default_means_nothing_stored_yet(self):
-        assert HistoryState().last_share_date is None
+        state = HistoryState()
+        assert state.last_share_date is None
+        assert state.last_price_date is None
+        assert state.price_split_days == frozenset()
