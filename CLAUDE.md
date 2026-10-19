@@ -233,8 +233,9 @@ ADR-0001 und ADR-0002 aufgehoben.
 2. Root-`pyproject.toml`: in die Dev-Gruppe und unter `[tool.uv.sources]`
    (`workspace = true`), Import-Name in `known-first-party`
 3. import-linter: Import-Name in `root_packages` und in die passenden Verträge
-4. Dockerfile: seine `pyproject.toml` beim `uv sync` einbinden, sonst scheitert
-   `--locked`
+4. Dockerfile: seine `pyproject.toml` beim ersten `uv sync` einbinden, sonst scheitert
+   `--locked`, und `--refresh-package va-<name>` beim zweiten, sonst baut uv aus dem
+   Cache einen alten Stand ins Image
 5. `make lock`
 
 **Neue Mail-Empfänger**: `MAIL_TO` ist heute Single-Recipient. Wenn mehrere,
@@ -268,8 +269,9 @@ parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `smtp_config` in
 
 `make check` läuft Ruff + Pyright + import-linter + Pytest. CI auf GitHub Actions macht
 dasselbe bei jedem Push auf `main` und `feat/**` sowie bei Pull Requests.
-Tests in `tests/` decken Scoring-Logik, CSV-Load,
-Reporting-Struktur und Config-Validierung ab. yfinance-Calls werden in
+Die Tests der Module liegen bei ihnen (`services/*/tests/`, `packages/va-platform/tests/`:
+Kennzahlen, Scoring, Report, Handler, Bus-Verträge), übergreifende unter `tests/`
+(Golden-Master, Contracts, Batch-Ablauf, Config, DB). yfinance-Calls werden in
 Tests *nicht* gemockt – die Funktionen, die nur abrufen, sind kein Teil
 der Test-Suite (zu viel Mocking-Overhead, zu wenig Wert). Ausnahme sind die
 Adapter der Zusatzdaten (Retry, Rate-Limit, Fehler): Sie laufen gegen kleine

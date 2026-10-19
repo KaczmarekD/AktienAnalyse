@@ -1,6 +1,7 @@
 """Fundamentaldaten eines Titels, wie market-data sie im Snapshot-Event mitschickt.
 
-Dieselben Gruppen und Feldnamen wie die Dataclasses in ``src.fundamentals``, aber ohne
+Dieselben Gruppen und Feldnamen wie die Dataclasses in
+``va_market_data.domain.fundamentals``, aber ohne
 Rohdaten. Flach (``to_flat``) entsprechen sie den Spalten von DataFrame und CSV.
 """
 

@@ -1,7 +1,7 @@
 """Contracts v1 (P1.2): Datenformate zwischen den Services, siehe docs/architecture/events.md.
 
 Die Modelle liegen in ``va_contracts`` und duerfen den Altbestand ``src`` nicht kennen
-(import-linter). Die Tests pruefen deshalb hier, dass sie zu ``src.fundamentals``, zur
+(import-linter). Die Tests pruefen deshalb hier, dass sie zu ``va_market_data.domain.fundamentals``, zur
 Ausgabe von ``va_scoring.domain.scoring.score`` und zu ``va_notification.domain.report.build_report`` passen - mit dem
 eingefrorenen Golden-Datensatz.
 """
@@ -62,7 +62,7 @@ GOLDEN_DIR = Path(__file__).parent / "golden"
 GOLDEN_INPUT = GOLDEN_DIR / "input_fundamentals.json"
 FETCHED = datetime(2026, 10, 17, 5, 30, tzinfo=UTC)
 
-# Gruppe im Contract -> Dataclass in src.fundamentals
+# Gruppe im Contract -> Dataclass in va_market_data.domain.fundamentals
 GROUPS: dict[str, type] = {
     "identity": Identity,
     "market": MarketData,
@@ -123,7 +123,7 @@ def _same(a: Any, b: Any) -> bool:
 
 class TestFundamentalsV1:
     def test_fields_match_the_dataclass(self):
-        """Ein neues Feld in src.fundamentals ohne Contract faellt hier auf (und umgekehrt)."""
+        """Ein neues Feld in va_market_data.domain.fundamentals ohne Contract faellt hier auf (und umgekehrt)."""
         top = {f.name for f in fields(Fundamentals)} - {"raw"}
         assert set(FundamentalsV1.model_fields) == top
         for name, cls in GROUPS.items():
@@ -156,6 +156,13 @@ class TestFundamentalsV1:
         v1 = FundamentalsV1.from_flat(row)
         assert (v1.identity.sector, v1.market.price, v1.quality.roic) == (None, None, None)
         assert v1.errors == ["income: kein Periodenende", "fx: Kurs fehlt"]
+
+    def test_back_from_a_row_with_infinity(self):
+        """Ein unendlicher Wert (Division durch 0 in Altdaten) kostet nur dieses Feld."""
+        frame = pd.DataFrame([f.to_flat_dict() for f in _golden_fundamentals()])
+        frame.loc[0, ["ev_ebit", "roic"]] = [float("inf"), float("-inf")]
+        v1 = FundamentalsV1.from_flat(frame.to_dict("records")[0])
+        assert (v1.value.ev_ebit, v1.quality.roic) == (None, None)
 
     @pytest.mark.parametrize("bad", [float("nan"), float("inf")])
     def test_non_finite_numbers_are_rejected(self, bad):

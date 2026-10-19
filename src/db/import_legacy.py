@@ -26,8 +26,8 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from va_contracts.events.v1 import ERRORS_SEPARATOR
 from va_market_data.adapters.postgres import MarketDataRepository, snapshot_row
-from va_market_data.domain.fundamentals import ERRORS_SEPARATOR
 from va_platform.db import create_db_engine, session_scope
 from va_platform.serialization import to_python
 from va_scoring.adapters.postgres import ScoreRow, ScoringRepository

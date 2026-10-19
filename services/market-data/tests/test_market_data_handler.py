@@ -207,6 +207,19 @@ class TestSnapshot:
         assert [t.symbol for t in fetch.calls[0]["tickers"]] == ["AAA.DE", "CCC.DE"]
         assert seen[0].data.universe.size == 2
 
+    def test_failing_progress_report_does_not_stop_the_fetch(self, bus):
+        store, fetch = FakeStore(), FakeFetch()
+        handler = _handler(bus, store, fetch)
+        handler._progress = lambda env, total: _broken_progress  # type: ignore[method-assign]
+        seen = _probe(bus, SNAPSHOT_COMPLETED, RUN_FAILED)
+        _request(bus)
+        assert [e.type for e in seen] == [SNAPSHOT_COMPLETED.type]
+        assert len(seen[0].data.fundamentals) == 3
+
+
+def _broken_progress(fund: Fundamentals) -> None:
+    raise ValueError("Fortschritt kaputt")
+
 
 class TestReuse:
     def test_reuses_todays_fetch(self, bus):
