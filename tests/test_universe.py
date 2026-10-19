@@ -1,4 +1,4 @@
-"""Universum im Batch (P1.4): die Repo-CSV und die Verdrahtung in ``src.universe``.
+"""Universum im Batch (P1.4): die Repo-CSV und die Verdrahtung in ``src.composition``.
 
 Kette iShares -> Deka -> CSV mit den echten Adaptern, nur ihr Netzzugriff ist ersetzt.
 """
@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.universe import DEFAULT_FALLBACK_CSV, load_universe
+from src.composition import DEFAULT_FALLBACK_CSV, load_universe
 from va_market_data.adapters.csv_universe import load_fallback
 from va_market_data.domain.universe import (
     FALLBACK_SOURCE,
@@ -153,7 +153,7 @@ class TestLoadUniverse:
         with (
             patch("va_market_data.adapters.ishares.fetch_ishares_json", side_effect=ishares),
             patch("va_market_data.adapters.deka.fetch_deka_xlsx", side_effect=deka),
-            patch("src.universe.resolve_isins_openfigi", return_value=figi),
+            patch("src.composition.resolve_isins_openfigi", return_value=figi),
         ):
             return load_universe(cfg=CFG, fallback_csv=fallback_csv, today=TODAY)
 

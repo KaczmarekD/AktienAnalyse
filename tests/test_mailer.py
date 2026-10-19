@@ -1,4 +1,4 @@
-"""Tests fuer den SMTP-Mailversand (src/mailer.py).
+"""SMTP-Versand, wie ihn der Batch verdrahtet (``src.composition.alert_channels``).
 
 smtplib.SMTP wird vollstaendig gemockt - kein echter Netz-Call.
 """
@@ -9,7 +9,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.mailer import send_report
+from src.composition import alert_channels
+
+def send_report(settings, subject, html_body, attachment=None):
+    sender, _ = alert_channels(settings)
+    sender.send(subject, html_body, attachment)
+
 
 # ---------------------------------------------------------------------------
 # Hilfs-Fixture: minimale Settings
