@@ -1,23 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# ---------- Builder-Stage --------------------------------------------------
-FROM python:3.12-slim AS builder
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-COPY requirements.lock requirements.in ./
-
-# Wheels in /wheels vorbauen, damit der Runtime-Stage sie ohne Compiler installieren kann.
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.lock
-
-# ---------- Runtime-Stage --------------------------------------------------
+# Ziel (ADR-0008): Images entstehen in der CI und die NAS laedt sie nur (P0.6).
+# Bis dahin baut die NAS wie bisher selbst (docker compose build).
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
@@ -32,11 +15,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Wheels aus Builder kopieren und ohne Netzzugriff installieren
-COPY --from=builder /wheels /wheels
-COPY requirements.lock .
-RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.lock \
-    && rm -rf /wheels
+# Abhaengigkeiten exakt aus uv.lock (ohne Dev-Tools) direkt ins System-Python
+# (/usr/local): entrypoint.sh und Cron rufen /usr/local/bin/python auf.
+# --locked: Abbruch, wenn uv.lock nicht zu pyproject.toml passt.
+# --inexact: Pakete des Basis-Images (z. B. pip) bleiben erhalten.
+# uv selbst und seine Variablen gibt es nur in diesem Schritt, nicht im Image.
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --no-install-project
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/
