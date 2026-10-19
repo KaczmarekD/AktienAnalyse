@@ -157,6 +157,13 @@ class TestFundamentalsV1:
         assert (v1.identity.sector, v1.market.price, v1.quality.roic) == (None, None, None)
         assert v1.errors == ["income: kein Periodenende", "fx: Kurs fehlt"]
 
+    def test_back_from_a_row_with_infinity(self):
+        """Ein unendlicher Wert (Division durch 0 in Altdaten) kostet nur dieses Feld."""
+        frame = pd.DataFrame([f.to_flat_dict() for f in _golden_fundamentals()])
+        frame.loc[0, ["ev_ebit", "roic"]] = [float("inf"), float("-inf")]
+        v1 = FundamentalsV1.from_flat(frame.to_dict("records")[0])
+        assert (v1.value.ev_ebit, v1.quality.roic) == (None, None)
+
     @pytest.mark.parametrize("bad", [float("nan"), float("inf")])
     def test_non_finite_numbers_are_rejected(self, bad):
         """Fehlt ein Wert, steht im Contract None - NaN und inf sind kein gueltiges JSON."""
