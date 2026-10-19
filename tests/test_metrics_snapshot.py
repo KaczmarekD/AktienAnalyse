@@ -9,7 +9,7 @@ Rohdaten statt des Abrufs.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -18,8 +18,9 @@ import pandas as pd
 import pytest
 
 from src.data_fetcher import fetch_one
-from src.fundamentals import Fundamentals
+from src.fundamentals import Fundamentals, Growth, QualityMetrics, ValueMetrics
 from src.universe import Ticker
+from va_market_data.domain.metrics import Metrics
 
 FIXTURES = Path(__file__).parent / "fixtures" / "metrics"
 SYMBOLS = sorted(p.stem for p in FIXTURES.glob("*.json"))
@@ -32,7 +33,7 @@ def _frame(part: dict[str, Any] | None) -> pd.DataFrame:
     return pd.DataFrame(part["data"], index=part["index"], columns=columns, dtype=float)
 
 
-def _fetch(symbol: str) -> Fundamentals:
+def _fetch(symbol: str, *, fx_available: bool = True) -> Fundamentals:
     doc = json.loads((FIXTURES / f"{symbol}.json").read_text(encoding="utf-8"))
     statements = doc["statements"]
     raw = (
@@ -43,6 +44,9 @@ def _fetch(symbol: str) -> Fundamentals:
     )
 
     def fx_rate(from_ccy: str, to_ccy: str) -> float:
+        if not fx_available:
+            msg = "kein Kurs"
+            raise ValueError(msg)
         return doc["fx"][f"{from_ccy}->{to_ccy}"]
 
     with (
@@ -81,7 +85,18 @@ def test_metrics_stay_the_same(golden, symbol):
     golden(f"metrics/{symbol}.json", _snapshot(_fetch(symbol)))
 
 
+def test_without_exchange_rate(golden):
+    """Qiagen berichtet in USD: Ohne Wechselkurs entfallen alle gemischten Multiples."""
+    golden("metrics/QIA.DE-ohne-Kurs.json", _snapshot(_fetch("QIA.DE", fx_available=False)))
+
+
+def test_metric_names_match_the_groups():
+    """fetch_one uebernimmt die Kennzahlen ueber gleiche Feldnamen in die drei Gruppen."""
+    groups = {f.name for cls in (ValueMetrics, QualityMetrics, Growth) for f in fields(cls)}
+    assert {f.name for f in fields(Metrics)} == groups | {"enterprise_value"}
+
+
 def test_no_stale_metric_files():
-    expected = {f"{s}.json" for s in SYMBOLS}
+    expected = {f"{s}.json" for s in SYMBOLS} | {"QIA.DE-ohne-Kurs.json"}
     actual = {p.name for p in (Path(__file__).parent / "golden" / "metrics").iterdir()}
     assert actual == expected

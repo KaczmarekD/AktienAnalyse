@@ -25,10 +25,12 @@ from src.data_fetcher import (
     FetcherConfig,
     YahooResponseError,
     _consensus_value,
+    _dividend_yield,
     _fiscal_period_end,
     _latest,
     _pick,
     _statement_fx,
+    _to_float,
     fetch_all,
     fetch_consensus,
     fetch_one,
@@ -494,6 +496,39 @@ class TestConsensusValue:
         no_wait = _consensus_value.retry_with(wait=wait_none())  # type: ignore[attr-defined]
         assert no_wait(fake, "eps_trend") is frame
         assert fake.calls == 2
+
+
+class TestToFloat:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(3.5, 3.5), (5, 5.0), (None, None), (float("nan"), None), (float("inf"), None)],
+    )
+    def test_cases(self, value, expected):
+        assert _to_float(value) == expected
+
+    def test_garbage_returns_none(self):
+        assert _to_float("not a number") is None
+
+
+class TestDividendYield:
+    """Eigenheit von yfinance: dividendYield in Prozent, trailingAnnualDividendYield dezimal."""
+
+    def test_prefers_trailing_decimal(self):
+        info = {"trailingAnnualDividendYield": 0.0136, "dividendYield": 1.36}
+        assert _dividend_yield(info) == pytest.approx(0.0136)
+
+    def test_percent_fallback_below_one_percent(self):
+        # 0.8 bedeutet 0,8 % - nicht 80 %
+        assert _dividend_yield({"dividendYield": 0.8}) == pytest.approx(0.008)
+
+    def test_percent_fallback_above_one_percent(self):
+        assert _dividend_yield({"dividendYield": 4.02}) == pytest.approx(0.0402)
+
+    def test_zero_trailing_is_kept(self):
+        assert _dividend_yield({"trailingAnnualDividendYield": 0.0}) == 0.0
+
+    def test_missing_returns_none(self):
+        assert _dividend_yield({}) is None
 
 
 class TestFiscalPeriodEnd:
