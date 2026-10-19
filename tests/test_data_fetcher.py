@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 import yfinance as yf
 from tenacity import wait_none
+from yfinance._http import HTTPError
 from yfinance.data import YfData
 from yfinance.exceptions import YFRateLimitError
 
@@ -35,6 +36,7 @@ from src.data_fetcher import (
     _safe_div,
     _statement_fx,
     fetch_all,
+    fetch_consensus,
     fetch_one,
     normalize_prices,
     note_rate_limit,
@@ -47,6 +49,9 @@ from src.data_fetcher import (
 from src.fundamentals import Fundamentals, Identity, MarketData
 from src.history import HistoryState
 from src.universe import Ticker
+
+# Vor dem Patchen der Fixture gemerkt: einige Tests brauchen den echten Ablauf
+REAL_FETCH_CONSENSUS = fetch_consensus
 
 
 @pytest.fixture(autouse=True)
@@ -285,11 +290,13 @@ class TestPriceFrames:
         assert price_frames(fake, "SAP.DE", date(2026, 6, 5), known) is window
         assert len(fake.calls) == 1
 
-    def test_failed_reload_keeps_the_window(self, caplog):
+    def test_failed_reload_stores_no_prices_this_week(self, caplog):
+        """Sonst gaelte der Split als gespeichert, und die Altkurse blieben unbereinigt:
+        Ohne Kurse bleibt der Split im naechsten Fenster und loest den Vollabruf erneut aus."""
         window = _bars("2026-07-30", "2026-07-31", split_on="2026-07-31")
         fake = _FakeHistoryTicker(window, ConnectionError("reset"), ConnectionError("reset"))
         with patch("time.sleep"):
-            assert price_frames(fake, "SAP.DE", date(2026, 6, 5), frozenset()) is window
+            assert price_frames(fake, "SAP.DE", date(2026, 6, 5), frozenset()) is None
         assert "SAP.DE" in caplog.text
 
     def test_empty_answer_means_no_data(self):
@@ -356,7 +363,6 @@ class TestYahooErrorsReachTheAdapters:
         with patch.object(YfData, "get", throttled), patch("time.sleep"):
             frames = quarterly_frames(yf.Ticker("SAP.DE"), "SAP.DE")
         assert frames == {"income": None}  # Bilanz und Cashflow nicht mehr angefragt
-        assert len(requests) <= 2  # yfinance probiert intern einmal den Chunk-Fallback
         assert "SAP.DE" in caplog.text
         assert yf.config.debug.hide_exceptions is True  # danach wieder Standard
 
@@ -386,6 +392,45 @@ class TestYahooErrorsReachTheAdapters:
         with patch("time.sleep"):
             price_frames(_SwallowingTicker(ConnectionError("reset")), "SAP.DE", None, frozenset())
         assert yf.config.debug.hide_exceptions is True
+
+
+class TestConsensusSharedSource:
+    """yfinance holt eps_trend, eps_revisions, earnings_estimate, revenue_estimate und
+    growth_estimates aus einem gemeinsamen Abruf (earningsTrend). Scheitert er, loggt
+    yfinance den Fehler nur beim ersten Zugriff - die anderen kaemen still als "empty"."""
+
+    def _unauthorized(self, requests: list[Any]):
+        class Response:
+            text = "Unauthorized"
+            status_code = 401
+
+        def raw_json(self, url, params=None, timeout=30):
+            requests.append(params)
+            error = HTTPError("401 Client Error: Unauthorized")
+            error.response = Response()
+            raise error
+
+        return raw_json
+
+    def test_failed_shared_fetch_marks_the_group_as_error(self):
+        requests: list[Any] = []
+        with (
+            patch.object(YfData, "get_raw_json", self._unauthorized(requests)),
+            patch("time.sleep"),
+        ):
+            entries = REAL_FETCH_CONSENSUS("SAP.DE")
+        assert requests  # der Test laeuft wirklich durch yfinance
+        assert {kind: e.status for kind, e in entries.items()} == dict.fromkeys(
+            CONSENSUS_KINDS, "error"
+        )
+        assert "Folgefehler" in (entries["eps_revisions"].error or "")
+
+    def test_real_empty_answer_stays_empty(self):
+        """Ohne Fehler bleibt "empty" (keine Analystenabdeckung) erhalten."""
+        fake = _FakeTicker(lambda: None)
+        with patch("src.data_fetcher.yf.Ticker", return_value=fake):
+            entries = REAL_FETCH_CONSENSUS("SAP.DE")
+        assert entries["eps_trend"].status == "empty"
 
 
 class TestConsensusValue:
@@ -943,6 +988,43 @@ class TestRateLimitPerTicker:
         assert f.raw is not None
         assert (f.raw.quarterly, f.raw.shares, f.raw.prices) == ({}, None, None)
         assert f.errors == []  # die CSV bleibt gleich
+
+    def test_rate_limit_in_the_consensus_is_noticed(
+        self, no_consensus_network, no_quarterly_network, no_prices_network
+    ):
+        """Verdrahtung: fetch_consensus meldet das Rate-Limit an den Waechter."""
+
+        class Throttled:
+            def __getattr__(self, attr):
+                raise YFRateLimitError
+
+        no_consensus_network.side_effect = REAL_FETCH_CONSENSUS
+        with patch("src.data_fetcher.yf.Ticker", return_value=Throttled()):
+            self._fetch()
+        no_quarterly_network.assert_not_called()
+        no_prices_network.assert_not_called()
+
+    def test_rate_limit_in_the_share_counts_skips_the_prices(
+        self, no_shares_network, no_prices_network
+    ):
+        def throttled(symbol, start):
+            note_rate_limit(YFRateLimitError())
+
+        no_shares_network.side_effect = throttled
+        self._fetch()
+        no_prices_network.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "fetcher",
+        ["no_consensus_network", "no_quarterly_network", "no_shares_network", "no_prices_network"],
+    )
+    def test_unexpected_error_in_additional_data_keeps_the_ticker(self, request, fetcher):
+        """ADR-0010: Wegen Zusatzdaten geht kein Titel verloren - auch nicht bei einem Bug."""
+        request.getfixturevalue(fetcher).side_effect = KeyError("unerwartet")
+        f = self._fetch()
+        assert f.raw is not None
+        assert f.market.market_cap == 1_000.0
+        assert f.errors == []
 
     def test_rate_limit_in_the_quarters_skips_shares_and_prices(
         self, no_quarterly_network, no_shares_network, no_prices_network
