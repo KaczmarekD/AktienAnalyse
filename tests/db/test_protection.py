@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import Engine, text
@@ -105,6 +105,32 @@ class TestTriggers:
         with pytest.raises(DBAPIError, match="verboten"):
             _exec(engine, "UPDATE market_data.consensus_snapshot SET status = 'empty'")
 
+    def test_share_count_rejects_update_and_delete(self, engine):
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            repo.write_share_counts(fid, iid, {date(2026, 7, 29): 1_154_204_232}, fetched_at=T0)
+        with pytest.raises(DBAPIError, match="verboten"):
+            _exec(engine, "UPDATE market_data.share_count SET shares = 1")
+        with pytest.raises(DBAPIError, match="verboten"):
+            _exec(engine, "DELETE FROM market_data.share_count")
+
+    def test_share_count_must_be_positive(self, engine):
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+        with pytest.raises(DBAPIError, match="share_count_shares"):
+            _exec(
+                engine,
+                "INSERT INTO market_data.share_count "
+                "(instrument_id, as_of, shares, first_seen_fetch_run_id, first_seen_at) "
+                "VALUES (:iid, '2026-07-29', 0, :fid, now())",
+                iid=iid,
+                fid=fid,
+            )
+
     def test_running_run_may_be_finished_once(self, engine):
         run_id = _start_run(engine)
         with session_scope(engine) as s:
@@ -140,6 +166,16 @@ class TestRoles:
             assert MarketDataRepository(s).get_consensus(fid, "SAP.DE") == {
                 "eps_trend": ConsensusEntry("empty", None, None)
             }
+
+    def test_app_role_can_write_share_counts(self, app_engine, read_engine):
+        with session_scope(app_engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            repo.write_share_counts(fid, iid, {date(2026, 7, 29): 1_154_204_232}, fetched_at=T0)
+        with session_scope(read_engine) as s:
+            stored = MarketDataRepository(s).get_share_counts("SAP.DE")
+        assert list(stored["shares"]) == [1_154_204_232]
 
     def test_app_role_has_no_delete_privilege(self, engine, app_engine):
         _start_run(engine)

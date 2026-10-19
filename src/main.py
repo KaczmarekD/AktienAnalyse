@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     import pandas as pd
 
     from .fundamentals import Fundamentals
+    from .history import HistoryState
 
 EXIT_OK = 0
 EXIT_FAILED = 1
@@ -244,11 +245,25 @@ def _fetch_and_store(
         tickers,
         cfg=FetcherConfig(default_tax_rate=settings.default_tax_rate),
         on_result=store,
+        history=_history_state(recorder, tickers),
     )
     if unsaved and "symbol" in df.columns:
         df = df[~df["symbol"].isin(unsaved)].reset_index(drop=True)
     recorder.finish_fetch(fetch_run_id, df)
     return df
+
+
+def _history_state(recorder: BatchRecorder, tickers: list[Ticker]) -> dict[str, HistoryState]:
+    """Gespeicherter Stand der Zeitreihen je Titel.
+
+    Ist er nicht lesbar, wird die ganze Historie geholt. Die Versionierung verhindert
+    Dubletten, es kostet nur Zeit.
+    """
+    try:
+        return recorder.history_state([t.symbol for t in tickers])
+    except Exception:
+        log.warning("Stand der Zeitreihen nicht lesbar - rufe die ganze Historie ab", exc_info=True)
+        return {}
 
 
 def _ticker_label(t: Ticker) -> str:

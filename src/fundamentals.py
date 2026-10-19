@@ -101,6 +101,8 @@ class RawFetch:
     consensus: dict[str, ConsensusEntry] = field(default_factory=dict)
     # Quartalsabschluesse wie ``statements`` (ADR-0010) - nur gespeichert, nicht ausgewertet
     quarterly: dict[str, pd.DataFrame | None] = field(default_factory=dict)
+    # Antwort von get_shares_full (ADR-0010, F1.3) - nur gespeichert, nicht ausgewertet
+    shares: pd.Series | None = None
 
 
 @dataclass

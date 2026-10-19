@@ -9,7 +9,7 @@ from datetime import date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
 import pandas as pd
-from sqlalchemy import insert, select, update
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -22,6 +22,7 @@ from ..models import (
     FxRate,
     Instrument,
     RawInfo,
+    ShareCount,
     StatementValue,
 )
 from ..models import UniverseMember as UniverseMemberRow
@@ -414,6 +415,91 @@ class MarketDataRepository:
             StatementValue.instrument_id == instrument.id
         )
         return self._frame(stmt, columns)
+
+    # --- Aktienanzahl (F1.3) -----------------------------------------------------
+
+    def write_share_counts(
+        self,
+        fetch_run_id: int,
+        instrument_id: int,
+        counts: Mapping[date, int],
+        *,
+        fetched_at: datetime,
+    ) -> int:
+        """Speichert nur neue Tage oder geaenderte Werte. Liefert die Anzahl neuer Zeilen.
+
+        Ein Tag, der im Abruf fehlt, bleibt mit seinem letzten Wert stehen.
+        """
+        if not counts:
+            return 0
+        current = {
+            row.as_of: row.shares
+            for row in self.session.execute(
+                self._latest_shares_stmt(None).where(
+                    ShareCount.instrument_id == instrument_id, ShareCount.as_of >= min(counts)
+                )
+            )
+        }
+        new_rows = [
+            {
+                "instrument_id": instrument_id,
+                "as_of": day,
+                "shares": shares,
+                "first_seen_fetch_run_id": fetch_run_id,
+                "first_seen_at": fetched_at,
+            }
+            for day, shares in sorted(counts.items())
+            if current.get(day) != shares
+        ]
+        if new_rows:
+            self.session.execute(insert(ShareCount), new_rows)
+        return len(new_rows)
+
+    @staticmethod
+    def _latest_shares_stmt(known_at: datetime | None):
+        """Letzte Version je Tag; mit ``known_at`` so, wie sie damals bekannt war."""
+        stmt = (
+            select(ShareCount.as_of, ShareCount.shares, ShareCount.first_seen_at)
+            .ext(distinct_on(ShareCount.as_of))
+            .order_by(ShareCount.as_of, ShareCount.first_seen_at.desc(), ShareCount.id.desc())
+        )
+        if known_at is not None:
+            stmt = stmt.where(ShareCount.first_seen_at <= known_at)
+        return stmt
+
+    def get_share_counts(self, symbol: str, known_at: datetime | None = None) -> pd.DataFrame:
+        """Aktienanzahl je Tag (aktuellste Version), optional point-in-time zu ``known_at``."""
+        columns = ["as_of", "shares", "first_seen_at"]
+        instrument = self.get_instrument(symbol)
+        if instrument is None:
+            return pd.DataFrame(columns=columns)
+        stmt = self._latest_shares_stmt(known_at).where(ShareCount.instrument_id == instrument.id)
+        return self._frame(stmt, columns)
+
+    def get_share_count_history(self, symbol: str) -> pd.DataFrame:
+        """Alle Versionen - korrigierte Tage werden als eigene Zeilen sichtbar."""
+        stmt = (
+            select(
+                ShareCount.as_of,
+                ShareCount.shares,
+                ShareCount.first_seen_at,
+                ShareCount.first_seen_fetch_run_id,
+            )
+            .join(Instrument, Instrument.id == ShareCount.instrument_id)
+            .where(Instrument.symbol == symbol)
+            .order_by(ShareCount.as_of, ShareCount.first_seen_at, ShareCount.id)
+        )
+        return self._frame(stmt, ["as_of", "shares", "first_seen_at", "first_seen_fetch_run_id"])
+
+    def get_last_share_dates(self, symbols: Collection[str]) -> dict[str, date]:
+        """Letzter gespeicherter Tag je Symbol; Symbole ohne Aktienanzahl fehlen."""
+        stmt = (
+            select(Instrument.symbol, func.max(ShareCount.as_of))
+            .join(ShareCount, ShareCount.instrument_id == Instrument.id)
+            .where(Instrument.symbol.in_(list(symbols)))
+            .group_by(Instrument.symbol)
+        )
+        return dict(self.session.execute(stmt).all())
 
     # --- Wechselkurse -----------------------------------------------------------
 

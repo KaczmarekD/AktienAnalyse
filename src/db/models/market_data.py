@@ -162,6 +162,28 @@ class StatementValue(Base):
     first_seen_at: Mapped[datetime]
 
 
+class ShareCount(Base):
+    """Versionierte Aktienanzahl je Tag (ADR-0010, F1.3), Quelle ``get_shares_full``.
+
+    Wie ``statement_value``: Eine Zeile entsteht nur fuer einen neuen Tag oder einen
+    geaenderten Wert, korrigierte Tage bleiben so als eigene Version sichtbar.
+    """
+
+    __tablename__ = "share_count"
+    __table_args__ = (
+        CheckConstraint("shares > 0", name="shares"),
+        Index("ix_share_count_key", "instrument_id", "as_of", "first_seen_at"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("market_data.instrument.id"))
+    as_of: Mapped[date]  # Tag der Angabe, Zeitzone der Boerse
+    shares: Mapped[int]
+    first_seen_fetch_run_id: Mapped[int] = mapped_column(ForeignKey("market_data.fetch_run.id"))
+    first_seen_at: Mapped[datetime]
+
+
 class FxRate(Base):
     __tablename__ = "fx_rate"
     __table_args__ = (

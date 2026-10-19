@@ -6,7 +6,7 @@ yfinance und SMTP bleiben gemockt, die Datenbank ist echt.
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
@@ -91,6 +91,17 @@ def _fake_quarterly(symbol: str) -> dict[str, pd.DataFrame | None]:
     return {"income": income, "balance": pd.DataFrame(), "cashflow": cashflow}
 
 
+SHARE_DAYS = pd.DatetimeIndex(["2026-03-11", "2026-07-29"]).tz_localize("Europe/Berlin")
+
+
+def _fake_shares(symbol: str, start: date) -> pd.Series | None:
+    """Aktienanzahl ab ``start``; fuer CCC.DE kennt Yahoo keine."""
+    if symbol == "CCC.DE":
+        return None
+    days = SHARE_DAYS[[d.date() >= start for d in SHARE_DAYS]]
+    return pd.Series([1_000_000] * len(days), index=days)
+
+
 @pytest.fixture
 def db_settings(tmp_path, monkeypatch, db_url):
     monkeypatch.setenv("SMTP_USER", "test@gmail.com")
@@ -104,12 +115,13 @@ def db_settings(tmp_path, monkeypatch, db_url):
     return s.model_copy(update={"data_dir": tmp_path / "data", "logs_dir": tmp_path / "logs"})
 
 
-def _patched_run(settings, *, force_refresh=False, dry_run=False):
+def _patched_run(settings, *, force_refresh=False, dry_run=False, shares=_fake_shares):
     with (
         patch("src.main.load_universe", return_value=UNIVERSE),
         patch("src.data_fetcher._ticker_data", side_effect=_fake_ticker_data) as ticker_data,
         patch("src.data_fetcher.fetch_consensus", side_effect=_fake_consensus),
         patch("src.data_fetcher.fetch_quarterly", side_effect=_fake_quarterly),
+        patch("src.data_fetcher.fetch_share_counts", side_effect=shares),
         patch("src.data_fetcher.time.sleep"),
         patch("src.main.send_report") as send,
         patch("src.main.ping", return_value=None),
@@ -156,6 +168,9 @@ class TestFullRun:
             assert set(quarterly["period_end"]) == {q.date() for q in QUARTERS}
             ccc = md.get_statements_as_of("CCC.DE", now, frequency="quarterly")
             assert set(ccc["statement"]) == {"income"}
+            shares = md.get_share_counts("AAA.DE")
+            assert list(shares["as_of"]) == [d.date() for d in SHARE_DAYS]
+            assert md.get_share_counts("CCC.DE").empty
             fetch_run = md.get_fetch_run(run.fetch_run_id)
             assert fetch_run is not None
             assert fetch_run.success_share == 1.0
@@ -249,6 +264,23 @@ class TestFullRun:
             assert conn.execute(text("SELECT count(*) FROM market_data.fetch_run")).scalar() == 2
             again = conn.execute(text("SELECT count(*) FROM market_data.statement_value")).scalar()
         assert again == statements
+
+    def test_share_counts_continue_from_the_last_stored_day(self, db_settings, engine):
+        first = Mock(side_effect=_fake_shares)
+        _patched_run(db_settings, shares=first)
+        assert {c.args[1] for c in first.call_args_list} == {date(2000, 1, 1)}
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT count(*) FROM market_data.share_count")).scalar()
+        again = Mock(side_effect=_fake_shares)
+        rc, _, _ = _patched_run(db_settings, force_refresh=True, shares=again)
+        assert rc == 0
+        starts = {c.args[0]: c.args[1] for c in again.call_args_list}
+        assert starts["AAA.DE"] == date(2026, 7, 29)
+        assert starts["CCC.DE"] == date(2000, 1, 1)  # noch nichts gespeichert
+        with engine.connect() as conn:
+            assert (
+                conn.execute(text("SELECT count(*) FROM market_data.share_count")).scalar() == rows
+            )
 
     def test_dry_run_writes_preview_and_records_no_delivery(self, db_settings, engine):
         rc, _, send = _patched_run(db_settings, dry_run=True)

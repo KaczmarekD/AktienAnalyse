@@ -22,6 +22,7 @@ from src.fundamentals import (
     QualityMetrics,
     ValueMetrics,
 )
+from src.history import daily_share_counts
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 WEEK = timedelta(days=7)
@@ -384,6 +385,83 @@ class TestQuarterlyStatements:
                 fetched_at=T0,
                 frequency="monthly",
             )
+
+
+SHARES_FIXTURES = Path(__file__).parents[1] / "fixtures" / "shares"
+
+
+def _recorded_shares(symbol: str) -> pd.Series:
+    """Echte Antwort von ``get_shares_full`` (yfinance 1.7, aufgezeichnet am 19.10.2026)."""
+    doc = json.loads((SHARES_FIXTURES / f"{symbol}.json").read_text(encoding="utf-8"))
+    stamps, values = zip(*doc["series"], strict=True)
+    # Sommer- und Winterzeit wechseln, yfinance liefert den Index in der Zeitzone der Boerse
+    index = pd.to_datetime(list(stamps), utc=True).tz_convert(doc["tz"])
+    return pd.Series(values, index=index)
+
+
+SHARE_COUNTS = {date(2026, 3, 11): 1_167_559_048, date(2026, 7, 29): 1_154_204_232}
+
+
+class TestShareCounts:
+    """F1.3: Historie der Aktienanzahl - neue Zeile nur bei neuem Datum oder neuem Wert."""
+
+    def _write(self, engine, counts, *, started_at=T0, symbol="SAP.DE") -> int:
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo, started_at=started_at)
+            iid = repo.get_or_create_instruments([symbol])[symbol]
+            return repo.write_share_counts(fid, iid, counts, fetched_at=started_at)
+
+    def test_first_write_stores_every_day(self, engine):
+        assert self._write(engine, SHARE_COUNTS) == 2
+        with session_scope(engine) as s:
+            stored = MarketDataRepository(s).get_share_counts("SAP.DE")
+        assert dict(zip(stored["as_of"], stored["shares"], strict=True)) == SHARE_COUNTS
+
+    def test_recorded_history_is_stored_completely(self, engine):
+        counts = daily_share_counts(_recorded_shares("SAP.DE"))
+        assert self._write(engine, counts) == len(counts)
+        assert self._write(engine, counts, started_at=T0 + WEEK) == 0
+
+    def test_unchanged_days_are_not_duplicated(self, engine):
+        self._write(engine, SHARE_COUNTS)
+        assert self._write(engine, SHARE_COUNTS, started_at=T0 + WEEK) == 0
+
+    def test_new_day_adds_one_row(self, engine):
+        self._write(engine, SHARE_COUNTS)
+        later = {**SHARE_COUNTS, date(2026, 10, 1): 1_150_000_000}
+        assert self._write(engine, later, started_at=T0 + WEEK) == 1
+
+    def test_changed_value_creates_new_version_and_keeps_the_old(self, engine):
+        self._write(engine, SHARE_COUNTS)
+        revised = {date(2026, 7, 29): 1_154_000_000}
+        assert self._write(engine, revised, started_at=T0 + WEEK) == 1
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            now = repo.get_share_counts("SAP.DE").set_index("as_of")["shares"]
+            before = repo.get_share_counts("SAP.DE", known_at=T0).set_index("as_of")["shares"]
+            history = repo.get_share_count_history("SAP.DE")
+        assert now[date(2026, 7, 29)] == 1_154_000_000
+        assert now[date(2026, 3, 11)] == 1_167_559_048  # fehlt im Abruf, bleibt stehen
+        assert before[date(2026, 7, 29)] == 1_154_204_232
+        july = history[history["as_of"] == date(2026, 7, 29)]
+        assert list(july["shares"]) == [1_154_204_232, 1_154_000_000]
+
+    def test_counts_are_kept_per_instrument(self, engine):
+        self._write(engine, SHARE_COUNTS)
+        assert self._write(engine, SHARE_COUNTS, symbol="ALV.DE") == 2
+
+    def test_last_dates_per_symbol(self, engine):
+        self._write(engine, SHARE_COUNTS)
+        self._write(engine, {date(2025, 11, 17): 1_000}, symbol="KGX.DE")
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            repo.get_or_create_instruments(["ALV.DE"])  # bekannt, aber ohne Aktienanzahl
+            last = repo.get_last_share_dates(["SAP.DE", "KGX.DE", "ALV.DE", "NEU.DE"])
+        assert last == {"SAP.DE": date(2026, 7, 29), "KGX.DE": date(2025, 11, 17)}
+
+    def test_nothing_to_write(self, engine):
+        assert self._write(engine, {}) == 0
 
 
 class TestFxRates:

@@ -35,9 +35,11 @@ from src.data_fetcher import (
     fetch_one,
     provider_version,
     quarterly_frames,
+    share_count_series,
     success_share,
 )
 from src.fundamentals import Fundamentals, Identity, MarketData
+from src.history import HistoryState
 from src.universe import Ticker
 
 
@@ -52,6 +54,13 @@ def no_consensus_network():
 def no_quarterly_network():
     """fetch_one holt zusaetzlich Quartalsabschluesse (F1.2) - in Tests nie ueber das Netz."""
     with patch("src.data_fetcher.fetch_quarterly", return_value={}) as fake:
+        yield fake
+
+
+@pytest.fixture(autouse=True)
+def no_shares_network():
+    """fetch_one holt zusaetzlich die Aktienanzahl (F1.3) - in Tests nie ueber das Netz."""
+    with patch("src.data_fetcher.fetch_share_counts", return_value=None) as fake:
         yield fake
 
 
@@ -131,6 +140,56 @@ class _FakeTicker:
     def eps_trend(self) -> Any:
         self.calls += 1
         return self._behaviour()
+
+
+SHARES = pd.Series(
+    [1_167_559_048, 1_154_204_232],
+    index=pd.DatetimeIndex(["2026-03-11", "2026-07-29"]).tz_localize("Europe/Berlin"),
+)
+
+
+class _FakeSharesTicker:
+    """Steht fuer ``yf.Ticker.get_shares_full``, ganz ohne Netz."""
+
+    def __init__(self, *results: Any) -> None:
+        self.starts: list[Any] = []
+        self._results = list(results)
+
+    def get_shares_full(self, start=None, end=None):
+        self.starts.append(start)
+        result = self._results.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+class TestShareCountSeries:
+    """Der yfinance-Adapter fuer die Historie der Aktienanzahl (F1.3)."""
+
+    def test_series_comes_back_from_the_start_date(self):
+        fake = _FakeSharesTicker(SHARES)
+        assert share_count_series(fake, "SAP.DE", date(2000, 1, 1)) is SHARES
+        assert fake.starts == [date(2000, 1, 1)]
+
+    def test_no_series_means_no_data(self):
+        assert share_count_series(_FakeSharesTicker(None), "SAP.DE", date(2000, 1, 1)) is None
+
+    def test_failure_is_retried_once_then_logged(self, caplog):
+        fake = _FakeSharesTicker(ConnectionError("reset"), ConnectionError("reset"))
+        with patch("time.sleep"):
+            assert share_count_series(fake, "SAP.DE", date(2000, 1, 1)) is None
+        assert len(fake.starts) == 2
+        assert "SAP.DE" in caplog.text
+
+    def test_transient_failure_recovers(self):
+        fake = _FakeSharesTicker(ConnectionError("reset"), SHARES)
+        with patch("time.sleep"):
+            assert share_count_series(fake, "SAP.DE", date(2000, 1, 1)) is SHARES
+
+    def test_rate_limit_is_not_retried(self):
+        fake = _FakeSharesTicker(YFRateLimitError(), SHARES)
+        assert share_count_series(fake, "SAP.DE", date(2000, 1, 1)) is None
+        assert len(fake.starts) == 1
 
 
 class TestConsensusValue:
@@ -385,7 +444,7 @@ class TestFetchAll:
 
     @staticmethod
     def _fake_fetch(failing: set[str]):
-        def fake(ticker, cfg=None):
+        def fake(ticker, cfg=None, history=None):
             fund = Fundamentals(identity=Identity(ticker.symbol, ticker.name, ticker.index))
             if ticker.symbol in failing:
                 fund.errors.append("fetch failed: down")
@@ -418,6 +477,12 @@ class TestFetchAll:
             pytest.raises(RuntimeError, match="db down"),
         ):
             fetch_all(self.TICKERS, cfg=self.CFG, on_result=boom)
+
+    def test_history_state_is_passed_per_symbol(self):
+        state = HistoryState(last_share_date=date(2026, 7, 29))
+        with patch("src.data_fetcher.fetch_one", side_effect=self._fake_fetch(set())) as one:
+            fetch_all(self.TICKERS[:2], cfg=self.CFG, history={"T1.DE": state})
+        assert [c.kwargs["history"] for c in one.call_args_list] == [None, state]
 
     def test_success_share(self):
         failing = {t.symbol for t in self.TICKERS[:4]}
@@ -540,7 +605,7 @@ class TestFetchOneProvenanceAndRaw:
         index=["Total Revenue", "EBIT"],
     )
 
-    def _fetch(self, income=None, side_effect=None):
+    def _fetch(self, income=None, side_effect=None, history=None):
         data = (
             {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0},
             self.INCOME if income is None else income,
@@ -551,7 +616,7 @@ class TestFetchOneProvenanceAndRaw:
             {"side_effect": side_effect} if side_effect else {"return_value": data}
         )
         with patch("src.data_fetcher._ticker_data", **kwargs):
-            return fetch_one(Ticker("X.DE", "X", "DAX"))
+            return fetch_one(Ticker("X.DE", "X", "DAX"), history=history)
 
     def test_raw_data_is_kept(self):
         f = self._fetch()
@@ -609,6 +674,30 @@ class TestFetchOneProvenanceAndRaw:
     def test_failed_base_fetch_skips_the_quarters(self, no_quarterly_network):
         self._fetch(side_effect=RuntimeError("down"))
         no_quarterly_network.assert_not_called()
+
+    def test_share_counts_start_in_2000_without_history(self, no_shares_network):
+        """F1.3: Beim ersten Abruf die ganze Historie - nur gespeichert, nicht ausgewertet."""
+        no_shares_network.return_value = SHARES
+        f = self._fetch()
+        no_shares_network.assert_called_once_with("X.DE", date(2000, 1, 1))
+        assert f.raw is not None
+        assert f.raw.shares is SHARES
+        assert f.errors == []
+
+    def test_share_counts_continue_from_the_last_stored_day(self, no_shares_network):
+        self._fetch(history=HistoryState(last_share_date=date(2026, 7, 29)))
+        no_shares_network.assert_called_once_with("X.DE", date(2026, 7, 29))
+
+    def test_missing_share_counts_cost_nothing(self, no_shares_network):
+        no_shares_network.return_value = None
+        f = self._fetch()
+        assert f.raw is not None
+        assert f.raw.shares is None
+        assert f.errors == []
+
+    def test_failed_base_fetch_skips_the_share_counts(self, no_shares_network):
+        self._fetch(side_effect=RuntimeError("down"))
+        no_shares_network.assert_not_called()
 
 
 class TestFetchOneInvalidPeriods:

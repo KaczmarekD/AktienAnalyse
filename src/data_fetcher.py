@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from functools import lru_cache, partial
@@ -39,6 +39,7 @@ from .fundamentals import (
     RawFetch,
     ValueMetrics,
 )
+from .history import HistoryState
 from .universe import Ticker
 
 log = logging.getLogger(__name__)
@@ -110,6 +111,8 @@ QUARTERLY_FIELDS: dict[str, str] = {
 class FetcherConfig:
     sleep_between: float = 0.4
     default_tax_rate: float = 0.27
+    # Erster Abruf der Aktienanzahl (F1.3); Yahoo liefert meist erst ab 2015
+    shares_history_start: date = date(2000, 1, 1)
 
 
 PROVIDER = "yfinance"
@@ -335,6 +338,35 @@ def fetch_quarterly(symbol: str) -> dict[str, pd.DataFrame | None]:
     return quarterly_frames(yf.Ticker(symbol), symbol)
 
 
+@retry(
+    retry=retry_if_not_exception_type(YFRateLimitError),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    reraise=True,
+)
+def _shares_full(yt: Any, start: date) -> pd.Series | None:
+    series = yt.get_shares_full(start=start)
+    return series if isinstance(series, pd.Series) else None
+
+
+def share_count_series(yt: Any, symbol: str, start: date) -> pd.Series | None:
+    """Historie der Aktienanzahl ab ``start``. Ein Fehler kostet nur diese Woche.
+
+    Nach einem Rate-Limit wird nicht sofort wiederholt. Die Luecke schliesst der
+    naechste Lauf, weil er ab dem letzten gespeicherten Tag abruft.
+    """
+    try:
+        return _shares_full(yt, start)
+    except Exception as e:
+        log.warning("Aktienanzahl %s nicht abrufbar: %s", symbol, e)
+        return None
+
+
+def fetch_share_counts(symbol: str, start: date) -> pd.Series | None:
+    """Aktienanzahl (ADR-0010, F1.3). Wirft nie: Fehlt sie, fehlt sie diese Woche."""
+    return share_count_series(yf.Ticker(symbol), symbol, start)
+
+
 @lru_cache(maxsize=16)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
@@ -371,7 +403,10 @@ def _to_trading(value: float | None, fx: float | None) -> float | None:
     return value * fx
 
 
-def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
+def fetch_one(
+    ticker: Ticker, cfg: FetcherConfig | None = None, history: HistoryState | None = None
+) -> Fundamentals:
+    """Ein Titel. ``history`` sagt, bis wann seine Zeitreihen schon gespeichert sind."""
     cfg = cfg or FetcherConfig()
     fund = Fundamentals(
         identity=Identity(symbol=ticker.symbol, name=ticker.name, index=ticker.index),
@@ -385,6 +420,8 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         log.warning("Fetch %s fehlgeschlagen: %s", ticker.symbol, e)
         return fund
 
+    # Ab dem letzten gespeicherten Tag: Er kommt erneut mit, eine Korrektur wird sichtbar
+    shares_start = (history.last_share_date if history else None) or cfg.shares_history_start
     fund.raw = RawFetch(
         provider=PROVIDER,
         provider_version=provider_version(),
@@ -392,6 +429,7 @@ def fetch_one(ticker: Ticker, cfg: FetcherConfig | None = None) -> Fundamentals:
         statements={"income": income, "balance": balance, "cashflow": cashflow},
         consensus=fetch_consensus(ticker.symbol),
         quarterly=fetch_quarterly(ticker.symbol),
+        shares=fetch_share_counts(ticker.symbol, shares_start),
     )
     # Rohdaten bleiben unveraendert, gerechnet wird nur mit datierten Spalten
     income = _dated_columns(income, "income", fund.errors)
@@ -571,19 +609,22 @@ def fetch_all(
     tickers: Iterable[Ticker],
     cfg: FetcherConfig | None = None,
     on_result: Callable[[Fundamentals], None] | None = None,
+    history: Mapping[str, HistoryState] | None = None,
 ) -> pd.DataFrame:
     """Holt alle Ticker und liefert einen flachen DataFrame.
 
     ``on_result`` bekommt jedes Ergebnis sofort - so ist ein Titel gespeichert,
     bevor der naechste abgerufen wird. Fehler im Callback brechen den Batch ab:
     lieber keinen Report als Daten, die nicht in der Historie landen.
+    ``history``: gespeicherter Stand je Symbol; fehlt ein Symbol, gilt die ganze Historie.
     """
+    history = history or {}
     cfg = cfg or FetcherConfig()
     ticker_list = list(tickers)
     rows: list[dict[str, Any]] = []
     for i, t in enumerate(ticker_list, 1):
         log.info("(%d/%d) %s", i, len(ticker_list), t.symbol)
-        fund = fetch_one(t, cfg)
+        fund = fetch_one(t, cfg, history=history.get(t.symbol))
         if on_result is not None:
             on_result(fund)
         rows.append(fund.to_flat_dict())
