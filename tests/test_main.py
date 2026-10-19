@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
+from src.history import HistoryState
 
 from src.main import _run, _try_send_error_mail, run
 from src.reporting import build_report
@@ -39,6 +40,8 @@ class FakeRecorder:
         fail_start: bool = False,
         fail_finish: bool = False,
         failing_symbols: frozenset[str] = frozenset(),
+        history: dict[str, HistoryState] | None = None,
+        fail_history: bool = False,
     ) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.reusable = reusable
@@ -46,6 +49,8 @@ class FakeRecorder:
         self.fail_start = fail_start
         self.fail_finish = fail_finish
         self.failing_symbols = failing_symbols
+        self.history = history or {}
+        self.fail_history = fail_history
 
     def _names(self) -> list[str]:
         return [name for name, _ in self.calls]
@@ -70,6 +75,12 @@ class FakeRecorder:
     def start_fetch(self, tickers, source, as_of=None):
         self.calls.append(("start_fetch", (list(tickers), source, as_of)))
         return 10
+
+    def history_state(self, symbols):
+        self.calls.append(("history_state", list(symbols)))
+        if self.fail_history:
+            raise ConnectionError("db hiccup")
+        return self.history
 
     def record_fundamentals(self, fetch_run_id, fund):
         if fund.symbol in self.failing_symbols:
@@ -339,6 +350,28 @@ class TestReuse:
         m["fetch_all"].assert_called_once()
         assert recorder.get("find_reusable_fetch") == []
         assert recorder.get("start_run")[0]["force_refresh"] is True
+
+
+class TestHistoryState:
+    """F1.3: Vor dem Abruf liest der Lauf, bis wann die Historie schon gespeichert ist."""
+
+    def test_stored_history_is_passed_to_the_fetch(self, settings, mock_tickers, mock_universe_df):
+        state = {"VAL.DE": HistoryState(last_share_date=date(2026, 7, 29))}
+        recorder = FakeRecorder(history=state)
+        _, m = _run_with(settings, recorder, mock_tickers, {"return_value": mock_universe_df})
+        assert recorder.get("history_state") == [[t.symbol for t in mock_tickers]]
+        assert m["fetch_all"].call_args.kwargs["history"] == state
+
+    def test_unreadable_history_means_full_history(self, settings, mock_tickers, mock_universe_df):
+        recorder = FakeRecorder(fail_history=True)
+        rc, m = _run_with(settings, recorder, mock_tickers, {"return_value": mock_universe_df})
+        assert rc == 0
+        assert m["fetch_all"].call_args.kwargs["history"] == {}
+
+    def test_reused_fetch_needs_no_history(self, settings, mock_tickers, mock_universe_df):
+        recorder = FakeRecorder(reusable=99, snapshots=mock_universe_df)
+        _run_with(settings, recorder, mock_tickers, {})
+        assert recorder.get("history_state") == []
 
 
 # ---------------------------------------------------------------------------
