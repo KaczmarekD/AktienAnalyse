@@ -1,6 +1,7 @@
 """Events v1: Payloads, Bestandteile und Katalog (docs/architecture/events.md)."""
 
 from .catalog import (
+    BY_DATASCHEMA,
     EVENTS,
     FETCH_PROGRESSED,
     PROFILE_ACTIVATED,
@@ -29,16 +30,20 @@ from .payloads import (
     ProfileSavedV1,
     ReportSentV1,
     RunFailedV1,
+    RunOptionsV1,
     RunTrigger,
     ScoringRunCompletedV1,
     ScoringTrigger,
     ScreeningRunRequestedV1,
     SnapshotCompletedV1,
     Stage,
+    UniverseInfoV1,
+    UniverseMemberV1,
 )
 from .ranking import RankingRowV1
 
 __all__ = [
+    "BY_DATASCHEMA",
     "ERRORS_SEPARATOR",
     "EVENTS",
     "FETCH_PROGRESSED",
@@ -63,11 +68,14 @@ __all__ = [
     "RankingRowV1",
     "ReportSentV1",
     "RunFailedV1",
+    "RunOptionsV1",
     "RunTrigger",
     "ScoringRunCompletedV1",
     "ScoringTrigger",
     "ScreeningRunRequestedV1",
     "SnapshotCompletedV1",
     "Stage",
+    "UniverseInfoV1",
+    "UniverseMemberV1",
     "ValueMetricsV1",
 ]

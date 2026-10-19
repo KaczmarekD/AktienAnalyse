@@ -231,9 +231,16 @@ sich in ganz Phase 1 nicht ändern.**
     `tests/golden/contracts/v1/`. `va_contracts` darf `src` nicht kennen, deshalb prüfen die
     Tests die Passung zu `src.fundamentals` und `score()` von außen, mit dem Golden-Datensatz.
 - **Review:** Feldnamen stabil, optionale Felder bewusst gewählt.
-  - Pflicht sind nur Symbol, Name und Index sowie die IDs der Events. `run_id` darf nur bei
-    `scoring.run.completed` leer sein (Rescore), muss dort aber angegeben werden. `profile`
-    bleibt bis Phase 2b leer.
+  - Pflicht sind nur Symbol, Name und Index sowie die IDs der Events (ab 1). `run_id` ist
+    genau bei einem Rescore leer, ein Validator prüft das. `profile` bleibt bis Phase 2b leer.
+  - Nachgeschärft nach dem Gesamt-Review (19.10.2026), solange noch kein Event gespeichert
+    wird: Trigger und Run-Optionen reisen mit, `scoring.run.completed` enthält Universum,
+    Gewichte, `fetch_run_id` und `as_of`, das Ranking ist nie leer, `composite_score` hat keine
+    Obergrenze (Gewichte werden erst ab 1 % Abweichung normiert), `dataschema` ist eine URN,
+    `parse_envelope` wählt auf der Empfängerseite das Modell, `from_flat` macht aus NaN wieder
+    `None`. Ein Test rendert die Golden-Mail allein aus `scoring.run.completed`. Ein weiterer
+    import-linter-Vertrag hält pandas, numpy, SQLAlchemy, psycopg und yfinance aus
+    `va_contracts` heraus.
   - `ERRORS_SEPARATOR` steht wegen der Import-Grenze zweimal (`src.fundamentals` und
     `va_contracts`). Der Flat-Test bemerkt, wenn beide auseinanderlaufen. Mit P1.9 entfällt die
     Kopie in `src`.

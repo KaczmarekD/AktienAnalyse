@@ -3,7 +3,14 @@
 Nur Pydantic-Modelle, keine Fachlogik und keine Infrastruktur (import-linter).
 """
 
-from .base import Contract
-from .envelope import Envelope, new_envelope
+from .base import Contract, PositiveId
+from .envelope import Envelope, UnknownEventError, new_envelope, parse_envelope
 
-__all__ = ["Contract", "Envelope", "new_envelope"]
+__all__ = [
+    "Contract",
+    "Envelope",
+    "PositiveId",
+    "UnknownEventError",
+    "new_envelope",
+    "parse_envelope",
+]

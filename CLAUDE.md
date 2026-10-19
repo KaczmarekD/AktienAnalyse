@@ -69,7 +69,11 @@ gewollt: Sub-Dataclasses für Lesbarkeit, flat dict für DataFrame-Effizienz.
 **Contracts** (`packages/va-contracts`, Events zwischen den Services) ändern
 sich nur additiv: neue Felder optional, sonst eine neue Version (`v2`). Die
 JSON-Schemas liegen als Golden-Files unter `tests/golden/contracts/v1/`. Eine
-Änderung dort braucht `--update-golden` und eine Begründung im Review.
+Änderung dort braucht `--update-golden` und eine Begründung im Review. Auch ein
+Pydantic-Update oder eine geänderte Docstring (landet als `description` im
+Schema) färbt sie rot, ohne dass sich der Vertrag ändert. Events per
+Konstruktor erzeugen: `model_validate` ignoriert unbekannte Felder, also auch
+Tippfehler.
 
 **yfinance-Feldnamen** stehen ausschließlich in `FIELD_MAP` am Kopf von
 `data_fetcher.py`. yfinance benennt Statement-Zeilen unangekündigt um

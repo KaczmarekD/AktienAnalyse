@@ -1099,7 +1099,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.7,<3" }]
+requires-dist = [{ name = "pydantic", specifier = ">=2.13,<3" }]
 
 [[package]]
 name = "va-market-data"

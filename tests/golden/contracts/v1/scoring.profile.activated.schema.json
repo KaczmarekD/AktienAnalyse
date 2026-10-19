@@ -2,6 +2,7 @@
   "description": "scoring -> web-api: eine Profil-Version ist jetzt aktiv.",
   "properties": {
     "profile_id": {
+      "minimum": 1,
       "title": "Profile Id",
       "type": "integer"
     },

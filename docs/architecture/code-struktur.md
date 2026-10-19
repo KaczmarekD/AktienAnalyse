@@ -147,7 +147,6 @@ wandert nie in diese beiden Pakete.
   lokal per `make test-db-up`, in der CI als Service-Container. Ein Test prüft den Löschschutz
   jeder Tabelle.
 - **Contracts:** JSON-Schema-Snapshots der Pydantic-Modelle (`tests/golden/contracts/v1/`,
-  seit P1.2). Jede Schema-Änderung ist im Diff
-  sichtbar.
+  seit P1.2). Jede Schema-Änderung ist im Diff sichtbar.
 - **web-api:** OpenAPI-Snapshot plus `oasdiff breaking` gegen den letzten Release
   ([frontend.md](frontend.md)).

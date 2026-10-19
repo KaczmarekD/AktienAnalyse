@@ -370,6 +370,106 @@
       "title": "QualityMetricsV1",
       "type": "object"
     },
+    "RunOptionsV1": {
+      "description": "Optionen eines Runs. Sie reisen mit, damit jede Stufe allein entscheiden kann.",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "title": "Dry Run",
+          "type": "boolean"
+        },
+        "force_refresh": {
+          "default": false,
+          "title": "Force Refresh",
+          "type": "boolean"
+        },
+        "notify": {
+          "default": true,
+          "title": "Notify",
+          "type": "boolean"
+        }
+      },
+      "title": "RunOptionsV1",
+      "type": "object"
+    },
+    "UniverseInfoV1": {
+      "description": "Woher das Universum kam. Der Report zeigt es, ``size`` zaehlt fuer partial/ok.",
+      "properties": {
+        "added": {
+          "items": {
+            "$ref": "#/$defs/UniverseMemberV1"
+          },
+          "title": "Added",
+          "type": "array"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "As Of"
+        },
+        "removed": {
+          "items": {
+            "$ref": "#/$defs/UniverseMemberV1"
+          },
+          "title": "Removed",
+          "type": "array"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source"
+        }
+      },
+      "required": [
+        "source",
+        "as_of",
+        "size"
+      ],
+      "title": "UniverseInfoV1",
+      "type": "object"
+    },
+    "UniverseMemberV1": {
+      "description": "Ein Titel, der in der Indexquelle gegenueber der Fallback-CSV neu ist oder fehlt.",
+      "properties": {
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "name",
+        "index"
+      ],
+      "title": "UniverseMemberV1",
+      "type": "object"
+    },
     "ValueMetricsV1": {
       "properties": {
         "buyback_yield": {
@@ -469,6 +569,7 @@
       "type": "string"
     },
     "fetch_run_id": {
+      "minimum": 1,
       "title": "Fetch Run Id",
       "type": "integer"
     },
@@ -479,7 +580,11 @@
       "title": "Fundamentals",
       "type": "array"
     },
+    "options": {
+      "$ref": "#/$defs/RunOptionsV1"
+    },
     "run_id": {
+      "minimum": 1,
       "title": "Run Id",
       "type": "integer"
     },
@@ -489,17 +594,26 @@
       "title": "Success Share",
       "type": "number"
     },
-    "universe_source": {
-      "title": "Universe Source",
+    "trigger": {
+      "enum": [
+        "scheduled",
+        "manual"
+      ],
+      "title": "Trigger",
       "type": "string"
+    },
+    "universe": {
+      "$ref": "#/$defs/UniverseInfoV1"
     }
   },
   "required": [
     "run_id",
+    "trigger",
+    "options",
     "fetch_run_id",
     "as_of",
     "success_share",
-    "universe_source",
+    "universe",
     "fundamentals"
   ],
   "title": "SnapshotCompletedV1",

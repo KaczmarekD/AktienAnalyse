@@ -6,12 +6,13 @@ Rohdaten. Flach (``to_flat``) entsprechen sie den Spalten von DataFrame und CSV.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
 from pydantic import AwareDatetime, Field
 
-from ...base import Contract
+from ...base import Contract, missing_to_none
 
 # Mehrere Fehler eines Titels stehen flach (DataFrame, CSV) als ein Text
 ERRORS_SEPARATOR = "; "
@@ -66,6 +67,17 @@ class ProvenanceV1(Contract):
     statement_fx: float | None = None  # Faktor Berichts- -> Handelswaehrung
 
 
+# Gruppen in der Reihenfolge der flachen Spalten (wie Fundamentals.to_flat_dict)
+_GROUPS: dict[str, type[Contract]] = {
+    "identity": IdentityV1,
+    "market": MarketDataV1,
+    "value": ValueMetricsV1,
+    "quality": QualityMetricsV1,
+    "growth": GrowthV1,
+    "provenance": ProvenanceV1,
+}
+
+
 class FundamentalsV1(Contract):
     """Ein Titel. Fehlende Werte sind ``None``; Fehler des Abrufs stehen in ``errors``."""
 
@@ -84,14 +96,23 @@ class FundamentalsV1(Contract):
     def to_flat(self) -> dict[str, Any]:
         """Eine Zeile wie in DataFrame und CSV: alle Gruppen nebeneinander, Fehler als Text."""
         flat: dict[str, Any] = {}
-        for group in (
-            self.identity,
-            self.market,
-            self.value,
-            self.quality,
-            self.growth,
-            self.provenance,
-        ):
-            flat.update(group.model_dump())
+        for name in _GROUPS:
+            flat.update(getattr(self, name).model_dump())
         flat["errors"] = ERRORS_SEPARATOR.join(self.errors)
         return flat
+
+    @classmethod
+    def from_flat(cls, flat: Mapping[Any, Any]) -> FundamentalsV1:
+        """Zurueck aus einer flachen Zeile (DataFrame, DB-Snapshot): NaN wird ``None``.
+
+        Die Fehler stehen flach als ein Text und werden am ``ERRORS_SEPARATOR`` getrennt;
+        ein Fehlertext, der selbst den Separator enthaelt, zerfaellt dabei in Teile.
+        """
+        groups = {
+            name: {key: missing_to_none(flat[key]) for key in model.model_fields if key in flat}
+            for name, model in _GROUPS.items()
+        }
+        errors = missing_to_none(flat.get("errors")) or ""
+        return cls.model_validate(
+            {**groups, "errors": [e for e in str(errors).split(ERRORS_SEPARATOR) if e]}
+        )

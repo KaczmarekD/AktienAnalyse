@@ -11,6 +11,7 @@
       "type": "boolean"
     },
     "run_id": {
+      "minimum": 1,
       "title": "Run Id",
       "type": "integer"
     },

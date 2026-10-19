@@ -227,7 +227,20 @@
     "ProfileRefV1": {
       "description": "Ein Scoring-Profil in einer bestimmten Version (Phase 2b).",
       "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
         "profile_id": {
+          "minimum": 1,
           "title": "Profile Id",
           "type": "integer"
         },
@@ -391,12 +404,11 @@
       "type": "object"
     },
     "RankingRowV1": {
-      "description": "Fundamentaldaten plus Bewertung. notification rendert Mail und CSV allein daraus.\n\nDie Scores sind Perzentilraenge zwischen 0 und 1, ``None`` ohne genug Faktoren.\n``factor_ranks`` haelt die Raenge je Faktor, Schluessel wie im Scoring-Profil\n(z. B. ``ev_ebit``, ``roic``).",
+      "description": "Fundamentaldaten plus Bewertung. notification rendert Mail und CSV allein daraus.\n\nValue- und Quality-Score sind Perzentilraenge zwischen 0 und 1, ``None`` ohne genug\nFaktoren. Der Composite-Score ist ihr gewichtetes Mittel. Er hat bewusst keine\nObergrenze: Die Gewichte werden erst ab 1 % Abweichung normiert, ein Wert knapp\nueber 1 darf den Lauf nicht kippen. ``factor_ranks`` haelt die Raenge je Faktor,\nSchluessel wie im Scoring-Profil (z. B. ``ev_ebit``, ``roic``).",
       "properties": {
         "composite_score": {
           "anyOf": [
             {
-              "maximum": 1,
               "minimum": 0,
               "type": "number"
             },
@@ -468,6 +480,106 @@
         "rank_overall"
       ],
       "title": "RankingRowV1",
+      "type": "object"
+    },
+    "RunOptionsV1": {
+      "description": "Optionen eines Runs. Sie reisen mit, damit jede Stufe allein entscheiden kann.",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "title": "Dry Run",
+          "type": "boolean"
+        },
+        "force_refresh": {
+          "default": false,
+          "title": "Force Refresh",
+          "type": "boolean"
+        },
+        "notify": {
+          "default": true,
+          "title": "Notify",
+          "type": "boolean"
+        }
+      },
+      "title": "RunOptionsV1",
+      "type": "object"
+    },
+    "UniverseInfoV1": {
+      "description": "Woher das Universum kam. Der Report zeigt es, ``size`` zaehlt fuer partial/ok.",
+      "properties": {
+        "added": {
+          "items": {
+            "$ref": "#/$defs/UniverseMemberV1"
+          },
+          "title": "Added",
+          "type": "array"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "As Of"
+        },
+        "removed": {
+          "items": {
+            "$ref": "#/$defs/UniverseMemberV1"
+          },
+          "title": "Removed",
+          "type": "array"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source"
+        }
+      },
+      "required": [
+        "source",
+        "as_of",
+        "size"
+      ],
+      "title": "UniverseInfoV1",
+      "type": "object"
+    },
+    "UniverseMemberV1": {
+      "description": "Ein Titel, der in der Indexquelle gegenueber der Fallback-CSV neu ist oder fehlt.",
+      "properties": {
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "name",
+        "index"
+      ],
+      "title": "UniverseMemberV1",
       "type": "object"
     },
     "ValueMetricsV1": {
@@ -561,8 +673,21 @@
       "type": "object"
     }
   },
-  "description": "scoring -> notification, web-api: das Ranking eines Bewertungslaufs.",
+  "description": "scoring -> notification, web-api: das Ranking eines Bewertungslaufs.\n\nEnthaelt alles, was notification fuer Mail und CSV braucht. Keine bewertbaren Daten\nsind kein leeres Ranking, sondern ``screening.run.failed`` mit ``reason=\"no_data\"``.",
   "properties": {
+    "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+    },
+    "fetch_run_id": {
+      "minimum": 1,
+      "title": "Fetch Run Id",
+      "type": "integer"
+    },
+    "options": {
+      "$ref": "#/$defs/RunOptionsV1"
+    },
     "profile": {
       "anyOf": [
         {
@@ -574,16 +699,24 @@
       ],
       "default": null
     },
+    "quality_weight": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Quality Weight",
+      "type": "number"
+    },
     "ranking": {
       "items": {
         "$ref": "#/$defs/RankingRowV1"
       },
+      "minItems": 1,
       "title": "Ranking",
       "type": "array"
     },
     "run_id": {
       "anyOf": [
         {
+          "minimum": 1,
           "type": "integer"
         },
         {
@@ -593,6 +726,7 @@
       "title": "Run Id"
     },
     "scoring_run_id": {
+      "minimum": 1,
       "title": "Scoring Run Id",
       "type": "integer"
     },
@@ -604,12 +738,28 @@
       ],
       "title": "Trigger",
       "type": "string"
+    },
+    "universe": {
+      "$ref": "#/$defs/UniverseInfoV1"
+    },
+    "value_weight": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Value Weight",
+      "type": "number"
     }
   },
   "required": [
     "run_id",
+    "trigger",
+    "options",
     "scoring_run_id",
-    "trigger"
+    "fetch_run_id",
+    "as_of",
+    "universe",
+    "value_weight",
+    "quality_weight",
+    "ranking"
   ],
   "title": "ScoringRunCompletedV1",
   "type": "object"

@@ -1,22 +1,40 @@
 {
+  "$defs": {
+    "RunOptionsV1": {
+      "description": "Optionen eines Runs. Sie reisen mit, damit jede Stufe allein entscheiden kann.",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "title": "Dry Run",
+          "type": "boolean"
+        },
+        "force_refresh": {
+          "default": false,
+          "title": "Force Refresh",
+          "type": "boolean"
+        },
+        "notify": {
+          "default": true,
+          "title": "Notify",
+          "type": "boolean"
+        }
+      },
+      "title": "RunOptionsV1",
+      "type": "object"
+    }
+  },
   "description": "web-api -> market-data: einen Run starten.",
   "properties": {
-    "dry_run": {
-      "default": false,
-      "title": "Dry Run",
-      "type": "boolean"
-    },
-    "force_refresh": {
-      "default": false,
-      "title": "Force Refresh",
-      "type": "boolean"
-    },
-    "notify": {
-      "default": true,
-      "title": "Notify",
-      "type": "boolean"
+    "options": {
+      "$ref": "#/$defs/RunOptionsV1",
+      "default": {
+        "dry_run": false,
+        "force_refresh": false,
+        "notify": true
+      }
     },
     "run_id": {
+      "minimum": 1,
       "title": "Run Id",
       "type": "integer"
     },

@@ -1,13 +1,61 @@
 {
-  "description": "jede Stufe, Watchdog -> notification, web-api: ein Run ist gescheitert.",
+  "$defs": {
+    "RunOptionsV1": {
+      "description": "Optionen eines Runs. Sie reisen mit, damit jede Stufe allein entscheiden kann.",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "title": "Dry Run",
+          "type": "boolean"
+        },
+        "force_refresh": {
+          "default": false,
+          "title": "Force Refresh",
+          "type": "boolean"
+        },
+        "notify": {
+          "default": true,
+          "title": "Notify",
+          "type": "boolean"
+        }
+      },
+      "title": "RunOptionsV1",
+      "type": "object"
+    }
+  },
+  "description": "jede Stufe, Watchdog -> notification, web-api: ein Run ist gescheitert.\n\n``options`` entscheidet ueber die Fehlermail (nicht bei ``dry_run`` oder ohne\n``notify``), ``trigger`` ueber den Healthcheck-Ping (nur bei ``scheduled``).",
   "properties": {
+    "options": {
+      "$ref": "#/$defs/RunOptionsV1"
+    },
     "reason": {
       "title": "Reason",
       "type": "string"
     },
     "run_id": {
-      "title": "Run Id",
-      "type": "integer"
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Run Id"
+    },
+    "scoring_run_id": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scoring Run Id"
     },
     "stage": {
       "enum": [
@@ -18,10 +66,21 @@
       ],
       "title": "Stage",
       "type": "string"
+    },
+    "trigger": {
+      "enum": [
+        "scheduled",
+        "manual",
+        "rescore"
+      ],
+      "title": "Trigger",
+      "type": "string"
     }
   },
   "required": [
     "run_id",
+    "trigger",
+    "options",
     "stage",
     "reason"
   ],

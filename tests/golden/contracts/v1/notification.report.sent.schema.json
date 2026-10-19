@@ -6,10 +6,12 @@
       "type": "boolean"
     },
     "report_id": {
+      "minimum": 1,
       "title": "Report Id",
       "type": "integer"
     },
     "run_id": {
+      "minimum": 1,
       "title": "Run Id",
       "type": "integer"
     },

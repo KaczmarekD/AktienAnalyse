@@ -2,6 +2,7 @@
   "description": "scoring -> web-api: eine neue Profil-Version wurde gespeichert.",
   "properties": {
     "profile_id": {
+      "minimum": 1,
       "title": "Profile Id",
       "type": "integer"
     },
