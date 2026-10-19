@@ -205,18 +205,18 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 value-analyzer/
 ├── src/
 │   ├── main.py             # Einstieg: Lauf anlegen, Event-Kette starten, abschließen
-│   ├── composition.py      # Adapter bauen, Handler der Module an den Bus hängen
+│   ├── composition.py      # Adapter bauen (DB, Yahoo, Universum-Kette, SMTP), Handler
+│   │                       #   der Module an den Bus hängen
 │   ├── run_tracker.py      # Abschluss von batch.run aus den Events
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
-│   ├── universe.py         # Verdrahtung: Quellen-Kette + Pfad der Fallback-CSV
-│   ├── data_fetcher.py     # Verdrahtung: Yahoo-Adapter für den Batch
 │   ├── logging_setup.py    # RotatingFileHandler (5 MB × 10)
 │   └── db/                 # PostgreSQL: Schema batch, Recorder, Migration,
 │                           #   Altdaten-Import (Modelle der Module: adapters/postgres/)
-├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Infrastruktur,
+├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Event-Bus,
 │                           #   DB-Basis, Löschschutz in va_platform/db/ddl.py)
-├── services/               # uv-Workspace: market-data (Universum, Yahoo, Kennzahlen),
-│                           #   scoring, notification (Phase 1)
+├── services/               # uv-Workspace, je domain/application/adapters/entrypoints:
+│                           #   market-data (Universum, Yahoo, Kennzahlen), scoring,
+│                           #   notification (Mail, Healthcheck); Handler am Event-Bus
 ├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR
 ├── migrations/             # Alembic-Migrationen (nur additiv)
 ├── db/init/01_roles.sh     # Rollen va_app/va_read beim ersten DB-Start

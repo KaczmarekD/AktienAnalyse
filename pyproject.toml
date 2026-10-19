@@ -75,7 +75,7 @@ root_packages = [
     "va_market_data",
     "va_scoring",
     "va_notification",
-    "src",  # Altbestand, bis Phase 1 ihn aufgeloest hat
+    "src",  # Batch: Einstieg, Konfiguration, Composition Root, Schema batch
 ]
 # Auch Drittpakete im Graphen, damit Vertraege sie verbieten koennen
 include_external_packages = true
@@ -116,7 +116,7 @@ source_modules = ["va_market_data.domain", "va_scoring.domain", "va_notification
 forbidden_modules = ["yfinance", "requests", "sqlalchemy", "psycopg", "alembic"]
 
 [[tool.importlinter.contracts]]
-name = "Neue Pakete haengen nicht am Altbestand src"
+name = "Pakete und Services haengen nicht am Batch src"
 type = "forbidden"
 source_modules = ["va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification"]
 forbidden_modules = ["src"]
@@ -158,7 +158,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-# Eigene Pakete: der Altbestand und die Workspace-Mitglieder (P1.1)
+# Eigene Pakete: der Batch (src) und die Workspace-Mitglieder (P1.1)
 known-first-party = [
     "src",
     "va_contracts",
@@ -191,9 +191,6 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel", "va_contracts.base.Contr
     "RUF059",       # unused tuple unpacking
     "PLC0415",      # local import in test methods OK
 ]
-"src/data_fetcher.py" = ["TC001", "TC003"]  # Ticker/Path werden zur Laufzeit gebraucht
-"src/healthcheck.py" = ["TC002"]
-"src/mailer.py" = ["TC001", "TC003"]
 
 [tool.ruff.format]
 quote-style = "double"

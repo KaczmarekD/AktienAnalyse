@@ -8,15 +8,28 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
+from va_market_data.adapters.csv_universe import load_fallback
+from va_market_data.adapters.deka import DekaSource
+from va_market_data.adapters.ishares import IsharesSource
+from va_market_data.adapters.openfigi import resolve_isins_openfigi
 from va_market_data.adapters.postgres.store import PostgresSnapshotStore
-from va_market_data.adapters.yahoo import PROVIDER, FetcherConfig, provider_version
+from va_market_data.adapters.yahoo import (
+    PROVIDER,
+    FetcherConfig,
+    YahooFundamentals,
+    provider_version,
+)
+from va_market_data.application.fetch import fetch_all
+from va_market_data.application.universe import load_universe as load_universe_chain
+from va_market_data.domain.universe import UniverseConfig
 from va_market_data.entrypoints.handlers import RunRequestedHandler
 from va_notification.adapters.healthchecks import HealthchecksHeartbeat, ping_target
 from va_notification.adapters.postgres.store import PostgresReportStore
-from va_notification.adapters.smtp import SmtpSender
+from va_notification.adapters.smtp import SmtpConfig, SmtpSender
 from va_notification.entrypoints.handlers import NotificationConfig, NotificationHandler
 from va_platform.db import create_db_engine
 from va_scoring.adapters.postgres.store import PostgresScoringStore
@@ -24,10 +37,7 @@ from va_scoring.domain.scoring import ScoringConfig
 from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
 
 from . import __version__
-from .data_fetcher import fetch_all
 from .db.recorder import BatchRecorder
-from .mailer import smtp_config
-from .universe import load_universe
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -44,6 +54,11 @@ if TYPE_CHECKING:
 
     from .config import Settings
     from .db.log_handler import LogEntry
+
+
+# Von Hand gepflegt, liegt im Repo (im Image unter /app/data). Das Paket market-data liegt
+# installiert in site-packages und kennt den Pfad deshalb nicht selbst.
+DEFAULT_FALLBACK_CSV = Path(__file__).resolve().parent.parent / "data" / "dax_mdax_fallback.csv"
 
 
 class BatchStore(Protocol):
@@ -93,7 +108,13 @@ def build_adapters(settings: Settings) -> Adapters:
         on_result: Callable[[Fundamentals], None],
         history: Mapping[str, HistoryState],
     ) -> pd.DataFrame:
-        return fetch_all(tickers, fetcher, on_result=on_result, history=history)
+        return fetch_all(
+            tickers,
+            YahooFundamentals(fetcher),
+            sleep_between=fetcher.sleep_between,
+            on_result=on_result,
+            history=history,
+        )
 
     return Adapters(
         batch=BatchRecorder(engine),
@@ -106,6 +127,35 @@ def build_adapters(settings: Settings) -> Adapters:
         fetch=fetch,
         sender=sender,
         heartbeat=heartbeat,
+    )
+
+
+def load_universe(
+    cfg: UniverseConfig | None = None,
+    fallback_csv: Path | None = None,
+    force_fallback: bool = False,
+    today: date | None = None,
+) -> Universe:
+    """DAX + MDAX aus der ersten gueltigen Quelle: iShares -> Deka -> Fallback-CSV."""
+    return load_universe_chain(
+        [IsharesSource(), DekaSource(resolver=resolve_isins_openfigi)],
+        load_fallback(fallback_csv or DEFAULT_FALLBACK_CSV),
+        cfg or UniverseConfig(),
+        today or date.today(),
+        force_fallback=force_fallback,
+    )
+
+
+def smtp_config(settings: Settings) -> SmtpConfig:
+    return SmtpConfig(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        user=settings.smtp_user,
+        password=settings.smtp_password.get_secret_value(),
+        use_tls=settings.smtp_use_tls,
+        mail_from=settings.effective_mail_from,
+        mail_to=str(settings.mail_to),
+        subject_prefix=settings.mail_subject_prefix,
     )
 
 
