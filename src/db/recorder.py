@@ -18,6 +18,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from .. import __version__
 from ..data_fetcher import PROVIDER, provider_version, success_share
+from ..history import HistoryState, daily_share_counts
 from .engine import session_scope
 from .repositories.market_data import SNAPSHOT_COLUMNS, MarketDataRepository, UniverseMember
 from .repositories.reporting import ReportingRepository
@@ -119,6 +120,12 @@ class BatchRecorder:
             )
             return fetch_run.id if fetch_run else None
 
+    def history_state(self, symbols: Collection[str]) -> dict[str, HistoryState]:
+        """Bis wann die Zeitreihen je Titel gespeichert sind; fehlt ein Titel, gilt alles."""
+        with session_scope(self._engine) as s:
+            last_share = MarketDataRepository(s).get_last_share_dates(symbols)
+        return {symbol: HistoryState(last_share_date=day) for symbol, day in last_share.items()}
+
     def load_snapshots(self, fetch_run_id: int, symbols: Collection[str]) -> pd.DataFrame:
         with session_scope(self._engine) as s:
             return MarketDataRepository(s).get_snapshots_df(fetch_run_id, symbols)
@@ -171,6 +178,12 @@ class BatchRecorder:
                 currency=fund.identity.financial_currency,
                 fetched_at=fetched_at,
                 frequency="quarterly",
+            )
+            repo.write_share_counts(
+                fetch_run_id,
+                instrument_id,
+                daily_share_counts(fund.raw.shares),
+                fetched_at=fetched_at,
             )
             reporting_ccy = fund.identity.financial_currency
             trading_ccy = fund.identity.currency

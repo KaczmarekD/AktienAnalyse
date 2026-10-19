@@ -9,6 +9,7 @@ from .market_data import (
     FxRate,
     Instrument,
     RawInfo,
+    ShareCount,
     StatementValue,
     UniverseMember,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "RunLog",
     "ScoreResult",
     "ScoringRun",
+    "ShareCount",
     "StatementValue",
     "UniverseMember",
 ]

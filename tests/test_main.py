@@ -19,8 +19,8 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from src.history import HistoryState
 
+from src.history import HistoryState
 from src.main import _run, _try_send_error_mail, run
 from src.reporting import build_report
 from src.universe import Ticker, Universe
@@ -254,7 +254,7 @@ class TestRunWithMail:
     ):
         recorder = FakeRecorder(failing_symbols=frozenset({"TRAP.DE"}))
 
-        def fake_fetch_all(tickers, *, cfg, on_result):
+        def fake_fetch_all(tickers, *, cfg, on_result, history):
             from src.fundamentals import Fundamentals, Identity
 
             for t in tickers:
@@ -286,7 +286,7 @@ class TestRunWithMail:
     def test_every_fetched_ticker_goes_through_recorder(
         self, settings, recorder, mock_tickers, mock_universe_df
     ):
-        def fake_fetch_all(tickers, *, cfg, on_result):
+        def fake_fetch_all(tickers, *, cfg, on_result, history):
             from src.fundamentals import Fundamentals, Identity
 
             for t in tickers:

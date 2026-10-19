@@ -530,9 +530,25 @@ unverändert.
   - Parser-Test: Eine aufgezeichnete `get_shares_full`-Serie wird zu einem Wert je Tag (bei
     mehreren Werten am selben Tag gilt der letzte).
   - DB-Tests: Eine Zeile entsteht nur für ein neues Datum oder einen geänderten Wert.
-- **Implementierung:** Tabelle `market_data.share_count` (`instrument_id`, `as_of`, `shares`,
-  `first_seen_fetch_run_id`, `first_seen_at`) mit `protect_table()`. Beim ersten Abruf ab
-  2000-01-01, danach ab dem letzten gespeicherten Datum.
+- **Implementierung:**
+  - Tabelle `market_data.share_count` (`instrument_id`, `as_of`, `shares`,
+    `first_seen_fetch_run_id`, `first_seen_at`) mit `protect_table()`, Migration `0003`.
+  - Beim ersten Abruf ab 2000-01-01 (`FetcherConfig.shares_history_start`), danach ab dem
+    letzten gespeicherten Datum. Den Stand je Titel liest `BatchRecorder.history_state` vor dem
+    Abruf und reicht ihn als `HistoryState` über `fetch_all` an `fetch_one` weiter. Ist er nicht
+    lesbar, wird die ganze Historie geholt.
+  - Parser `daily_share_counts` im neuen Modul `src/history.py`. Der Tag ist der Kalendertag in
+    der Zeitzone der Börse (dieselbe Datumsregel wie für Abschlüsse). Fehlende und nicht positive
+    Werte zählen nicht.
+  - Ein Fehler kostet nur die Aktienanzahl dieser Woche, der nächste Lauf holt die Lücke nach.
+- **Review:** Gemessen am 19.10.2026 mit yfinance 1.7:
+  - Der Abruf kostet 0,1 bis 0,5 s je Titel, beim ersten Titel eines Laufs bis 2,4 s.
+  - Yahoo liefert die Aktienanzahl ab 2015/2016, rund 700 Tage je Titel. Danach kommen wenige
+    Zeilen pro Woche hinzu.
+  - Rund 60 Tage je Titel liefert Yahoo doppelt, teils mit zwei abwechselnden Werten.
+    yfinance sortiert nicht stabil. Deshalb wurde verglichen, ob ein kurzes Fenster wie im
+    Wochenlauf denselben „letzten“ Wert ergibt wie der Vollabruf: 36 Stichproben bei SAP,
+    Allianz und Telekom, keine Abweichung.
 
 #### F1.4 Kurshistorie
 

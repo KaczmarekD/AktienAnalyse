@@ -394,7 +394,9 @@ def _recorded_shares(symbol: str) -> pd.Series:
     """Echte Antwort von ``get_shares_full`` (yfinance 1.7, aufgezeichnet am 19.10.2026)."""
     doc = json.loads((SHARES_FIXTURES / f"{symbol}.json").read_text(encoding="utf-8"))
     stamps, values = zip(*doc["series"], strict=True)
-    return pd.Series(values, index=pd.DatetimeIndex([pd.Timestamp(s) for s in stamps]))
+    # Sommer- und Winterzeit wechseln, yfinance liefert den Index in der Zeitzone der Boerse
+    index = pd.to_datetime(list(stamps), utc=True).tz_convert(doc["tz"])
+    return pd.Series(values, index=index)
 
 
 SHARE_COUNTS = {date(2026, 3, 11): 1_167_559_048, date(2026, 7, 29): 1_154_204_232}

@@ -16,7 +16,9 @@ def _recorded_shares(symbol: str) -> pd.Series:
     """Echte Antwort von ``get_shares_full(start='2000-01-01')`` (yfinance 1.7)."""
     doc = json.loads((FIXTURES / f"{symbol}.json").read_text(encoding="utf-8"))
     stamps, values = zip(*doc["series"], strict=True)
-    return pd.Series(values, index=pd.DatetimeIndex([pd.Timestamp(s) for s in stamps]))
+    # Sommer- und Winterzeit wechseln, yfinance liefert den Index in der Zeitzone der Boerse
+    index = pd.to_datetime(list(stamps), utc=True).tz_convert(doc["tz"])
+    return pd.Series(values, index=index)
 
 
 def _series(*points: tuple[str, float]) -> pd.Series:
