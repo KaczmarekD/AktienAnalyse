@@ -13,14 +13,14 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from src.db.engine import session_scope
-from src.db.repositories.market_data import MarketDataRepository
-from src.db.repositories.reporting import ReportingRepository
 from src.db.repositories.runs import RunRepository
-from src.db.repositories.scoring import ScoringRepository
 from src.main import _run
+from va_market_data.adapters.postgres import MarketDataRepository
 from va_market_data.domain.consensus import ConsensusEntry
 from va_market_data.domain.universe import Ticker, Universe
+from va_notification.adapters.postgres import ReportingRepository
+from va_platform.db import session_scope
+from va_scoring.adapters.postgres import ScoringRepository
 
 TICKERS = [
     Ticker("AAA.DE", "Alpha", "DAX", isin="DE000AAA0001"),
