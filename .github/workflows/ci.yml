@@ -81,7 +81,7 @@ jobs:
           uv run alembic check
 
       - name: Pytest
-        run: uv run pytest --cov=src --cov=va_contracts --cov=va_market_data --cov=va_scoring --cov-report=xml --cov-report=term
+        run: uv run pytest --cov=src --cov=va_contracts --cov=va_market_data --cov=va_scoring --cov=va_notification --cov-report=xml --cov-report=term
 
       - name: Upload coverage
         uses: actions/upload-artifact@v7

@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
+from va_notification.adapters.healthchecks import ping, ping_target
+from va_notification.domain.report import ReportArtifacts, build_report
 from va_scoring.domain.scoring import ScoringConfig, score
 
 from . import __version__
@@ -30,10 +32,8 @@ from .data_fetcher import FetcherConfig, fetch_all
 from .db.engine import create_db_engine
 from .db.log_handler import BufferingLogHandler
 from .db.recorder import BatchRecorder
-from .healthcheck import ping, ping_target
 from .logging_setup import setup_logging
 from .mailer import send_report
-from .reporting import ReportArtifacts, build_report
 from .universe import load_universe
 
 if TYPE_CHECKING:

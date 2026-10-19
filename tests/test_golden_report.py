@@ -21,9 +21,9 @@ from datetime import date, datetime
 import pandas as pd
 import pytest
 
-from src.reporting import ReportArtifacts, build_report
 from tests.conftest import GOLDEN_DIR
 from va_market_data.domain.universe import FALLBACK_SOURCE
+from va_notification.domain.report import ReportArtifacts, build_report
 from va_scoring.domain.scoring import ScoringConfig, score
 
 GOLDEN_INPUT = GOLDEN_DIR / "input_fundamentals.json"

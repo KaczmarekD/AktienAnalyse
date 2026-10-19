@@ -13,7 +13,7 @@ from src.db.import_legacy import import_directory
 from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.runs import RunRepository
 from src.db.repositories.scoring import ScoringRepository
-from src.reporting import build_report
+from va_notification.domain.report import build_report
 from va_scoring.domain.scoring import ScoringConfig, score
 
 
