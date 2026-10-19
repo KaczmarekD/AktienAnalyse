@@ -224,7 +224,7 @@ parsen) und `mailer.py` anpassen.
 
 ## Qualitätssicherung
 
-`make check` läuft Ruff + Pyright + Pytest. CI auf GitHub Actions macht
+`make check` läuft Ruff + Pyright + import-linter + Pytest. CI auf GitHub Actions macht
 dasselbe bei jedem Push auf `main` und `feat/**` sowie bei Pull Requests.
 Tests in `tests/` decken Scoring-Logik, CSV-Load,
 Reporting-Struktur und Config-Validierung ab. yfinance-Calls werden in

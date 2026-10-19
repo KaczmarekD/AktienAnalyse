@@ -23,10 +23,14 @@ WORKDIR /app
 # --locked: Abbruch, wenn uv.lock nicht zu pyproject.toml passt.
 # --inexact: Pakete des Basis-Images (z. B. pip) bleiben erhalten.
 # uv selbst und seine Variablen gibt es nur in diesem Schritt, nicht im Image.
+# packages/ und services/ (uv-Workspace, P1.1) braucht uv nur zum Lesen der
+# Mitglieder, damit --locked zum Lockfile passt; installiert werden sie noch nicht.
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --no-install-project
 

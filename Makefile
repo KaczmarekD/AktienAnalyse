@@ -8,6 +8,8 @@
 UV     ?= uv
 RUN    ?= $(UV) run --locked
 PYTHON ?= $(RUN) python
+# Python-Code fuer Ruff (Pyright: [tool.pyright] include in pyproject.toml)
+PY_PATHS = src tests docker packages services
 
 help: ## Zeige verfuegbare Targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -43,12 +45,12 @@ test-cov: ## Tests mit Coverage-Report
 	$(RUN) pytest --cov=src --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
-	$(RUN) ruff check src tests docker
-	$(RUN) ruff format --check src tests docker
+	$(RUN) ruff check $(PY_PATHS)
+	$(RUN) ruff format --check $(PY_PATHS)
 
 format: ## Code automatisch formatieren
-	$(RUN) ruff format src tests docker
-	$(RUN) ruff check --fix src tests docker
+	$(RUN) ruff format $(PY_PATHS)
+	$(RUN) ruff check --fix $(PY_PATHS)
 
 typecheck: ## Statische Typpruefung
 	$(RUN) pyright

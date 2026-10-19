@@ -7,6 +7,16 @@ resolution-markers = [
     "sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[manifest]
+members = [
+    "va-contracts",
+    "va-market-data",
+    "va-notification",
+    "va-platform",
+    "va-scoring",
+    "value-analyzer",
+]
+
 [[package]]
 name = "alembic"
 version = "1.20.0"
@@ -1081,6 +1091,67 @@ wheels = [
 ]
 
 [[package]]
+name = "va-contracts"
+version = "0.1.0"
+source = { editable = "packages/va-contracts" }
+
+[[package]]
+name = "va-market-data"
+version = "0.1.0"
+source = { editable = "services/market-data" }
+dependencies = [
+    { name = "va-contracts" },
+    { name = "va-platform" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "va-contracts", editable = "packages/va-contracts" },
+    { name = "va-platform", editable = "packages/va-platform" },
+]
+
+[[package]]
+name = "va-notification"
+version = "0.1.0"
+source = { editable = "services/notification" }
+dependencies = [
+    { name = "va-contracts" },
+    { name = "va-platform" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "va-contracts", editable = "packages/va-contracts" },
+    { name = "va-platform", editable = "packages/va-platform" },
+]
+
+[[package]]
+name = "va-platform"
+version = "0.1.0"
+source = { editable = "packages/va-platform" }
+dependencies = [
+    { name = "va-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "va-contracts", editable = "packages/va-contracts" }]
+
+[[package]]
+name = "va-scoring"
+version = "0.1.0"
+source = { editable = "services/scoring" }
+dependencies = [
+    { name = "va-contracts" },
+    { name = "va-platform" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "va-contracts", editable = "packages/va-contracts" },
+    { name = "va-platform", editable = "packages/va-platform" },
+]
+
+[[package]]
 name = "value-analyzer"
 version = "0.3.0"
 source = { virtual = "." }
@@ -1110,6 +1181,11 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
     { name = "types-requests" },
+    { name = "va-contracts" },
+    { name = "va-market-data" },
+    { name = "va-notification" },
+    { name = "va-platform" },
+    { name = "va-scoring" },
 ]
 
 [package.metadata]
@@ -1139,6 +1215,11 @@ dev = [
     { name = "pytest-cov", specifier = ">=5.0" },
     { name = "ruff", specifier = ">=0.6" },
     { name = "types-requests", specifier = ">=2.32" },
+    { name = "va-contracts", editable = "packages/va-contracts" },
+    { name = "va-market-data", editable = "services/market-data" },
+    { name = "va-notification", editable = "services/notification" },
+    { name = "va-platform", editable = "packages/va-platform" },
+    { name = "va-scoring", editable = "services/scoring" },
 ]
 
 [[package]]

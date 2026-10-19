@@ -1,0 +1,17 @@
+[project]
+name = "va-scoring"
+version = "0.1.0"
+description = "Service scoring: Value-/Quality-Ranking"
+requires-python = ">=3.14"
+dependencies = [
+    "va-contracts",
+    "va-platform",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+va-contracts = { workspace = true }
+va-platform = { workspace = true }
