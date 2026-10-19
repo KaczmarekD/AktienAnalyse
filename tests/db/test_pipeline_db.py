@@ -109,10 +109,11 @@ def _fake_prices(symbol: str, start: date | None, known_splits: frozenset[date])
     """Zwei Handelstage; fuer CCC.DE liefert Yahoo keine Kurse."""
     if symbol == "CCC.DE":
         return None
+    # fetch_prices liefert die Spalten schon umbenannt (PRICE_FIELDS)
     return pd.DataFrame(
-        {"Close": [10.0, 10.5], "Adj Close": [9.8, 10.3], "Dividends": [0.0, 0.2]},
+        {"close": [10.0, 10.5], "adj_close": [9.8, 10.3], "dividend": [0.0, 0.2], "split": 0.0},
         index=PRICE_DAYS,
-    ).assign(**{"Stock Splits": 0.0})
+    )
 
 
 @pytest.fixture

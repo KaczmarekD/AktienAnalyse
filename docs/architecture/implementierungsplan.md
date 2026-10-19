@@ -541,6 +541,8 @@ unverändert.
     der Zeitzone der Börse (dieselbe Datumsregel wie für Abschlüsse). Fehlende und nicht positive
     Werte zählen nicht.
   - Ein Fehler kostet nur die Aktienanzahl dieser Woche, der nächste Lauf holt die Lücke nach.
+- **NAS (du):** Nur deployen, die Migration läuft beim Start. Der erste Lauf holt die Historie ab
+  2015, das kostet je Titel unter einer Sekunde.
 - **Review:** Gemessen am 19.10.2026 mit yfinance 1.7:
   - Der Abruf kostet 0,1 bis 0,5 s je Titel, beim ersten Titel eines Laufs bis 2,4 s.
   - Yahoo liefert die Aktienanzahl ab 2015/2016, rund 700 Tage je Titel. Danach kommen wenige
@@ -558,11 +560,29 @@ unverändert.
     `history(auto_adjust=False, actions=True)`.
   - DB-Tests: die Erstbefüllung, die inkrementelle Ergänzung und der Split-Fall. Ändern sich alte
     Kurse durch einen Split, entstehen neue Versionen, und die alten bleiben erhalten.
-- **Implementierung:** Tabelle `market_data.price_bar` (`instrument_id`, `trade_date`, `close`,
-  `adj_close`, `dividend`, `split`, `first_seen_fetch_run_id`, `first_seen_at`) mit
-  `protect_table()`. Der erste Abruf holt `period="max"`, danach die letzten 40 Handelstage.
-- **Review:** Den Speicherbedarf nach der Erstbefüllung messen. Erwartet werden rund 0,7 Mio. Zeilen
-  im niedrigen zweistelligen MB-Bereich.
+- **Implementierung:**
+  - Tabelle `market_data.price_bar` (`instrument_id`, `trade_date`, `close`, `adj_close`,
+    `dividend`, `split`, `first_seen_fetch_run_id`, `first_seen_at`) mit `protect_table()`,
+    Migration `0004`.
+  - Der erste Abruf holt `period="max"`. Danach beginnt das Fenster beim letzten gespeicherten Tag
+    minus 8 Wochen (`FetcherConfig.price_overlap_days = 56`, rund 40 Handelstage). Anders als
+    „die letzten 40 Handelstage“ hinterlassen so auch ausgefallene Läufe keine Lücke.
+  - Steht im Fenster ein Split, der noch nicht gespeichert ist, wird die ganze Historie geholt.
+    Yahoo passt bei einem Split alle früheren Kurse an, so entstehen für alle Tage neue Versionen.
+  - Der Tag des Abrufs (Börsenzeit) zählt nicht, er läuft noch. Sonst landete bei einem Lauf unter
+    der Woche ein Intraday-Stand als Schlusskurs.
+  - Die yfinance-Spaltennamen stehen in `data_fetcher.PRICE_FIELDS`. `fetch_prices` benennt sie
+    um, der Parser `daily_price_bars` in `src/history.py` kennt nur die eigenen Namen.
+  - Verglichen wird mit relativer Toleranz `1e-5` (`PriceBar.same_as`): Yahoo liefert `Adj Close`
+    bei jedem Abruf minimal anders (gemessen bis `6e-7` relativ, an rund 4.800 von 7.300 Tagen bei
+    SAP). Ein exakter Vergleich erzeugte jede Woche Schein-Versionen.
+- **Review:** Gemessen am 19.10.2026 mit allen 90 Titeln und yfinance 1.7:
+  - Erstbefüllung: 499.871 Zeilen ab 1996, Tabelle 51 MB, mit Indizes 92 MB. Das ist mehr als die
+    geschätzten „niedrig zweistelligen MB“, für die NAS aber unkritisch. Danach kommen rund
+    450 Zeilen pro Woche hinzu, nach Dividenden zusätzlich neue Versionen von `adj_close` im
+    Fenster.
+  - Abruf im Median 0,4 s je Titel, die Erstbefüllung verlängert den Lauf um rund 1,5 Minuten.
+  - Ein Folgeabruf direkt danach erzeugte 0 neue Zeilen, die Toleranz greift.
 - **NAS (du):** Der erste Lauf nach dem Deployment dauert wegen der Erstbefüllung länger.
 
 #### F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme

@@ -523,7 +523,7 @@ class TestPriceBars:
             before = repo.get_price_bars("SAP.DE", known_at=T0).set_index("trade_date")
             history = repo.get_price_bar_history("SAP.DE")
         assert list(now["close"]) == [100.0, 101.0, 102.0]
-        assert now.loc[date(2026, 7, 30), "split"] == 3.0
+        assert now.at[date(2026, 7, 30), "split"] == 3.0
         assert list(before["close"]) == [300.0, 303.0]
         assert len(history) == 5
         july_28 = history[history["trade_date"] == date(2026, 7, 28)]

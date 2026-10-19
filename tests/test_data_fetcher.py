@@ -17,6 +17,7 @@ from src.consensus import CONSENSUS_KINDS, ConsensusEntry
 from src.data_fetcher import (
     CONSENSUS_FIELDS,
     FIELD_MAP,
+    PRICE_FIELDS,
     QUARTERLY_FIELDS,
     FetcherConfig,
     YahooResponseError,
@@ -33,6 +34,7 @@ from src.data_fetcher import (
     _statement_fx,
     fetch_all,
     fetch_one,
+    normalize_prices,
     price_frames,
     provider_version,
     quarterly_frames,
@@ -229,6 +231,25 @@ class _FakeHistoryTicker:
 
 
 FULL = {"period": "max", "auto_adjust": False, "actions": True}
+
+
+class TestNormalizePrices:
+    """Die yfinance-Spaltennamen der Kurshistorie stehen nur in PRICE_FIELDS (CLAUDE.md)."""
+
+    def test_columns_get_own_names(self):
+        frame = normalize_prices(_bars("2026-07-30", split_on="2026-07-30"))
+        assert frame is not None
+        assert list(frame.columns) == list(PRICE_FIELDS)
+        assert frame["split"].iloc[0] == 3.0
+
+    def test_missing_column_stays_empty(self):
+        frame = normalize_prices(_bars("2026-07-30").drop(columns="Adj Close"))
+        assert frame is not None
+        assert frame["adj_close"].isna().all()
+
+    def test_no_data(self):
+        assert normalize_prices(None) is None
+        assert normalize_prices(pd.DataFrame()) is None
 
 
 class TestPriceFrames:

@@ -1,8 +1,8 @@
 # Datenhaltung
 
 > **Status:** Die Postgres-Persistenz ist seit `261dc8f` auf `main` umgesetzt (Phase 2).
-> Maßgeblich für Tabellen und Spalten ist die Alembic-Migration
-> `migrations/versions/0001_initial_schema.py`. Dieses Dokument beschreibt das Konzept und wie es
+> Maßgeblich für Tabellen und Spalten sind die Alembic-Migrationen unter
+> `migrations/versions/` (`0001` Grundschema, `0002` bis `0004` Track F1). Dieses Dokument beschreibt das Konzept und wie es
 > in die Zielarchitektur wächst. Entscheidung:
 > [ADR-0003](../adr/0003-postgresql-schema-pro-service.md).
 
@@ -86,15 +86,16 @@ vorhandenen `config_hash`.
 
 Die Tabellen sind mit [ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)
 beschlossen. Umgesetzt sind bisher `consensus_snapshot` (F1.1, Migration `0002`), die Quartale
-in `statement_value` (F1.2, ohne Migration) und `share_count` (F1.3, Migration `0003`). Die
-Tabellen speichern nur und fließen noch in keine Auswertung ein.
+in `statement_value` (F1.2, ohne Migration), `share_count` (F1.3, Migration `0003`) und
+`price_bar` (F1.4, Migration `0004`). Die Tabellen speichern nur und fließen noch in keine
+Auswertung ein.
 
 | Tabelle | Inhalt | Schreibweise |
 |---|---|---|
 | `market_data.consensus_snapshot` | fetch_run_id, instrument_id, kind (`eps_trend`, `eps_revisions`, `earnings_estimate`, `revenue_estimate`, `growth_estimates`, `analyst_price_targets`), fetched_at, status (`ok`, `empty`, `error`), payload (JSONB, nur bei `ok`), error (nur bei `error`) | anfügen, eine Zeile je Abruf, Titel und Art, auch für leere und gescheiterte Abrufe. `error` erfasst auch HTTP-Fehler, die yfinance nur loggt, sowie Arten, die nach einem Rate-Limit übersprungen wurden. DataFrames liegen als `{Zeile: {Spalte: Wert}}` vor, z. B. `payload -> '+1y' ->> 'current'`. Bei doppelten Beschriftungen gilt das Split-Format mit `"format": "split"`. |
 | `market_data.statement_value` | wie bisher, zusätzlich `frequency = 'quarterly'` (erlaubt sind `annual` und `quarterly`, geprüft im Repository) | versioniert wie `annual`, aber getrennt davon: Geschäftsjahr und viertes Quartal enden am selben Tag. `get_statements_as_of` und `get_statement_history` fragen je Frequenz ab, Standard ist `annual`. |
 | `market_data.share_count` | instrument_id, as_of (Tag in der Zeitzone der Börse), shares (> 0), first_seen_fetch_run_id, first_seen_at | anfügen, neue Zeile nur bei neuem Datum oder geändertem Wert. Ein Tag, der im Abruf fehlt, bleibt mit seinem letzten Wert stehen. Liefert Yahoo einen Tag mehrfach, gilt der letzte Wert. Abgerufen wird beim ersten Mal ab 2000-01-01, danach ab dem letzten gespeicherten Tag (`get_last_share_dates`). `get_share_counts(symbol, known_at=…)` liefert den Stand zu einem Zeitpunkt, `get_share_count_history` alle Versionen. |
-| `market_data.price_bar` | instrument_id, trade_date, close, adj_close, dividend, split, first_seen_fetch_run_id, first_seen_at | wie `share_count`, beim ersten Abruf die ganze Historie |
+| `market_data.price_bar` | instrument_id, trade_date (Handelstag, Zeitzone der Börse), close (split-, nicht dividendenbereinigt, > 0), adj_close (zusätzlich dividendenbereinigt, im Stand des Abrufs, kann fehlen), dividend und split (je ≥ 0, 0 ohne Ereignis), first_seen_fetch_run_id, first_seen_at | wie `share_count`, aber verglichen mit relativer Toleranz `1e-5` gegen das Float-Rauschen von Yahoo. Beim ersten Abruf die ganze Historie, danach ab dem letzten Tag minus 8 Wochen; ein neuer Split lädt alles neu, die angepassten Altkurse werden neue Versionen. Der laufende Handelstag wird nicht gespeichert. `adj_close` ändert sich bei Yahoo mit jeder Dividende für alle früheren Tage, gespeichert werden solche Anpassungen nur im Fenster. Eine durchgehend bereinigte Reihe rechnet man aus close, dividend und split. `get_price_bars(symbol, known_at=…)` liefert den Stand zu einem Zeitpunkt, `get_price_bar_history` alle Versionen. |
 
 ## Speicherbedarf
 

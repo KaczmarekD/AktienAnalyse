@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.data_fetcher import normalize_prices
 from src.history import (
     HistoryState,
     PriceBar,
@@ -81,10 +82,15 @@ class TestDailyShareCounts:
 
 
 def _recorded_prices(name: str) -> pd.DataFrame:
-    """Echte Antwort von ``history(auto_adjust=False, actions=True)`` (yfinance 1.7)."""
+    """Echte Antwort von ``history(auto_adjust=False, actions=True)`` (yfinance 1.7).
+
+    So, wie ``fetch_prices`` sie weitergibt: mit eigenen Spaltennamen (``PRICE_FIELDS``).
+    """
     doc = json.loads((PRICE_FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
     index = pd.to_datetime(doc["index"], utc=True).tz_convert(doc["tz"])
-    return pd.DataFrame(doc["data"], index=index, columns=doc["columns"])
+    frame = normalize_prices(pd.DataFrame(doc["data"], index=index, columns=doc["columns"]))
+    assert frame is not None
+    return frame
 
 
 # Abruf am Samstag nach dem Fenster: alle Tage im Fixture sind abgeschlossen
@@ -104,10 +110,7 @@ class TestDailyPriceBars:
         row = frame.iloc[0]
         bar = daily_price_bars(frame, fetched_at=AFTER)[date(2025, 4, 28)]
         assert bar == PriceBar(
-            close=row["Close"],
-            adj_close=row["Adj Close"],
-            dividend=0.0,
-            split=0.0,
+            close=row["close"], adj_close=row["adj_close"], dividend=0.0, split=0.0
         )
 
     def test_dividend_day(self):
@@ -138,10 +141,10 @@ class TestDailyPriceBars:
         index = pd.DatetimeIndex(["2026-01-05", "2026-01-06"]).tz_localize("Europe/Berlin")
         frame = pd.DataFrame(
             {
-                "Close": [float("nan"), 101.0],
-                "Adj Close": [100.0, float("nan")],
-                "Dividends": [0.0, 0.0],
-                "Stock Splits": [0.0, 0.0],
+                "close": [float("nan"), 101.0],
+                "adj_close": [100.0, float("nan")],
+                "dividend": [0.0, 0.0],
+                "split": [0.0, 0.0],
             },
             index=index,
         )

@@ -18,7 +18,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from .. import __version__
 from ..data_fetcher import PROVIDER, provider_version, success_share
-from ..history import HistoryState, daily_share_counts
+from ..history import HistoryState, daily_price_bars, daily_share_counts
 from .engine import session_scope
 from .repositories.market_data import SNAPSHOT_COLUMNS, MarketDataRepository, UniverseMember
 from .repositories.reporting import ReportingRepository
@@ -123,8 +123,18 @@ class BatchRecorder:
     def history_state(self, symbols: Collection[str]) -> dict[str, HistoryState]:
         """Bis wann die Zeitreihen je Titel gespeichert sind; fehlt ein Titel, gilt alles."""
         with session_scope(self._engine) as s:
-            last_share = MarketDataRepository(s).get_last_share_dates(symbols)
-        return {symbol: HistoryState(last_share_date=day) for symbol, day in last_share.items()}
+            repo = MarketDataRepository(s)
+            last_share = repo.get_last_share_dates(symbols)
+            last_price = repo.get_last_price_dates(symbols)
+            splits = repo.get_price_split_days(symbols)
+        return {
+            symbol: HistoryState(
+                last_share_date=last_share.get(symbol),
+                last_price_date=last_price.get(symbol),
+                price_split_days=splits.get(symbol, frozenset()),
+            )
+            for symbol in last_share.keys() | last_price.keys()
+        }
 
     def load_snapshots(self, fetch_run_id: int, symbols: Collection[str]) -> pd.DataFrame:
         with session_scope(self._engine) as s:
@@ -183,6 +193,12 @@ class BatchRecorder:
                 fetch_run_id,
                 instrument_id,
                 daily_share_counts(fund.raw.shares),
+                fetched_at=fetched_at,
+            )
+            repo.write_price_bars(
+                fetch_run_id,
+                instrument_id,
+                daily_price_bars(fund.raw.prices, fetched_at=fetched_at),
                 fetched_at=fetched_at,
             )
             reporting_ccy = fund.identity.financial_currency
