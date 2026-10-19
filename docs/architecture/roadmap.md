@@ -10,14 +10,14 @@
 | Phase | Ziel | Status |
 |---|---|---|
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
-| 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | 🚧 P0.1–P0.7 auf `main`, P0.6b (GHCR) offen |
-| 1 | Modularer Monolith mit den späteren Service-Grenzen | offen |
+| 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
+| 1 | Modularer Monolith mit den späteren Service-Grenzen | 🚧 P1.1 und P1.2 erledigt, ab P1.3 in Arbeit |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | offen |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
-| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | offen |
+| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
 
 **Reihenfolge:**
 - Phase 2 wurde vorgezogen, weil jede Woche ohne Stichtagsdaten verloren ist.
@@ -43,8 +43,8 @@ Details: [Implementierungsplan, Phase 0](implementierungsplan.md#phase-0--fundam
 - [x] P0.5 pandas 3 und yfinance 1.7 (`9504dd0`)
 - [x] P0.6 J4125-Prüfung in CI und lokal ([ADR-0008](../adr/0008-zielhardware-j4125.md)) (`d4d029c`)
 - [x] P0.7 Fix-Paket Perioden und inf (`190a862`)
-- [ ] P0.6b Images aus der CI nach GHCR
-- [ ] P0.8 Fix-Paket Infrastruktur (Gesamt-Review)
+- [x] P0.6b Images aus der CI nach GHCR (`f9ee183`)
+- [x] P0.8 Fix-Paket Infrastruktur (Gesamt-Review) (`d14a859`)
 - [ ] NAS (du): Images aus GHCR laden statt auf der NAS zu bauen (nach P0.6b): `git pull`, bei
       privatem Paket `docker login ghcr.io`, `docker compose pull`, Import-Test, `up -d`
       (README, Abschnitt „Update“)
@@ -56,8 +56,8 @@ stammen und die Tests auf Python 3.14 grün sind.
 
 Details: [Implementierungsplan, Phase 1](implementierungsplan.md#phase-1--modularer-monolith)
 
-- [ ] P1.1 Workspace-Pakete und Grenzen
-- [ ] P1.2 Contracts v1
+- [x] P1.1 Workspace-Pakete und Grenzen (`eda1b69`)
+- [x] P1.2 Contracts v1 (`2f40d43`)
 - [ ] P1.3 Kennzahlen als reine Funktionen
 - [ ] P1.4 Adapter für Yahoo und Universum hinter Ports
 - [ ] P1.5 Scoring-Modul
@@ -148,12 +148,12 @@ Details: [Implementierungsplan, Track F](implementierungsplan.md#track-f--fundam
 **F1 – Stichtagsdaten sichern** ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md),
 beschlossen, vorgezogen):
 
-- [ ] F1.1 Konsens-Snapshots
-- [ ] F1.2 Quartalsabschlüsse
-- [ ] F1.3 Historie der Aktienanzahl
-- [ ] F1.4 Kurshistorie
-- [ ] F1.5 Fix-Paket Zusatzdaten (Review F1.2 bis F1.4)
-- [ ] F1.6 Fix-Paket Gesamt-Review Track F
+- [x] F1.1 Konsens-Snapshots (`65ad20f`)
+- [x] F1.2 Quartalsabschlüsse (`d032b7c`)
+- [x] F1.3 Historie der Aktienanzahl (`22e5306`)
+- [x] F1.4 Kurshistorie (`c2691f3`)
+- [x] F1.5 Fix-Paket Zusatzdaten (Review F1.2 bis F1.4) (`b5fb3f6`)
+- [x] F1.6 Fix-Paket Gesamt-Review Track F (`27ca2ae`)
 - [ ] NAS (du): Deployment. Der erste Lauf danach dauert länger, weil die Kurshistorie erstmals
       gefüllt wird.
 
