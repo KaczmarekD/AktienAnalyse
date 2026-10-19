@@ -82,10 +82,17 @@ git clone https://github.com/KaczmarekD/AktienAnalyse.git value-analyzer
 cd value-analyzer
 cp .env.example .env
 nano .env          # SMTP_*, MAIL_TO und die drei DB-Passwörter setzen
-docker compose build
+docker compose pull    # fertiges Image aus der CI (GHCR); die NAS baut nichts selbst
+docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
 docker compose up -d   # startet Postgres (db) und den Batch; Schema wird beim Start migriert
 docker compose logs -f
 ```
+
+Das Image `ghcr.io/kaczmarekd/value-analyzer` entsteht in GitHub Actions bei jedem Push auf
+`main` (`latest`, `sha-<commit>`) und bei Tags `v<version>`. `VERSION` in der `.env` pinnt eine
+bestimmte Fassung. Der Import-Test in der zweiten Zeile prüft das Image auf der echten CPU der NAS
+(kein AVX, ADR-0008). Ist das Paket in GHCR privat, einmalig `docker login ghcr.io` mit einem
+Token, das nur `read:packages` darf. Lokal baut `make build` dasselbe Image.
 
 **Altdaten übernehmen** (vorhandene `fundamentals_*.parquet` / `value_ranking_*.csv` in `data/`, auch aus Mails gespeicherte CSVs – mehrfach ausführbar, Dateien bleiben liegen):
 ```bash

@@ -5,6 +5,8 @@ on:
     # Feature-Branches: Ein Paket wird erst gepusht, wenn es lokal gruen ist,
     # die CI bestaetigt das vor dem Merge (Implementierungsplan, Arbeitsweise).
     branches: [main, master, "feat/**"]
+    # Tag v<Version>: zusaetzlich ein Image mit der Versionsnummer (P0.6b)
+    tags: ["v*"]
     # Bewusst ohne Pfad-Filter: Jeder Stand bekommt einen Status, auch reine
     # Doku-Aenderungen (sonst haengen Pflicht-Checks). Filter erst mit mehreren
     # Workflows (Python, Frontend, Images).
@@ -81,10 +83,15 @@ jobs:
           path: coverage.xml
           if-no-files-found: ignore
 
+  # Images entstehen nur hier und nur fuer getestete Commits (needs: quality). Die NAS
+  # baut nichts selbst, sie zieht das Image aus GHCR (P0.6b, ADR-0008).
   docker-build:
     name: Docker Build + J4125-Pruefung
     runs-on: ubuntu-latest
     needs: quality
+    permissions:
+      contents: read
+      packages: write  # nur fuer den Push nach GHCR auf main und bei Tags
     steps:
       - uses: actions/checkout@v4
 
@@ -99,9 +106,24 @@ jobs:
           target: runtime
           platforms: linux/amd64
           push: false
+          load: true
           tags: value-analyzer:ci
+          # Verknuepft das Paket in GHCR mit dem Repository
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=runtime
           cache-to: type=gha,scope=runtime,mode=max
+
+      # P0.6b: Die App muss im fertigen Image starten koennen (ohne DB, ohne Migration)
+      - name: Smoke-Test im Image
+        run: docker run --rm --entrypoint python value-analyzer:ci -c "import src.main"
+
+      # P0.6b: Die NAS baut nicht selbst, Compose zieht das Image aus GHCR
+      - name: Compose nutzt das Image aus GHCR
+        run: |
+          cp .env.example .env
+          images=$(docker compose config --images)
+          echo "$images"
+          grep -qx "ghcr.io/kaczmarekd/value-analyzer:latest" <<< "$images"
 
       # ADR-0008: dieselben Pakete wie im Laufzeit-Image, unter QEMU mit einem
       # CPU-Modell ohne AVX (J4125 der NAS). Wie make check-j4125.
@@ -122,3 +144,25 @@ jobs:
         # Lokal unter 20 Sekunden; die Grenze faengt nur einen haengenden Lauf ab
         timeout-minutes: 10
         run: docker run --rm value-analyzer:j4125-check
+
+      - name: Bei GHCR anmelden
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Getestet ist genau dieses Image: Smoke-Test und J4125-Pruefung liefen oben.
+      # Tags: sha-<commit> immer, latest von main, <version> bei einem Git-Tag v<version>.
+      - name: Image nach GHCR schieben
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/value-analyzer"
+          tags=("sha-${GITHUB_SHA::7}")
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then tags+=("latest"); fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tags+=("${GITHUB_REF_NAME#v}"); fi
+          for tag in "${tags[@]}"; do
+            docker tag value-analyzer:ci "$image:$tag"
+            docker push "$image:$tag"
+          done

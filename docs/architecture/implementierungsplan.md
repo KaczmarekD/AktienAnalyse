@@ -158,12 +158,24 @@ keine gemeinsamen Dateien anfassen.
 
 Eigenes Paket nach P0.6. F1 wartet nicht darauf.
 
-- **Test:** Smoke-Schritt im Workflow: `docker run --rm <image> python -c "import src.main"`.
-  Ohne `images.yml` gibt es weder Smoke-Schritt noch Image.
-- **Implementierung:** `images.yml` baut `linux/amd64` und schiebt nach GHCR (Tags: Commit und
-  Version). Compose nutzt `image:` statt `build:`.
-- **Grün:** Workflow grün, Image liegt in GHCR.
-- **Review:** Image-Größe, keine Secrets im Image.
+- **Test:** zwei CI-Schritte, beide rot ohne die Änderung:
+  - Smoke-Test `docker run --rm --entrypoint python value-analyzer:ci -c "import src.main"`. Das
+    Image wurde bisher gebaut, aber nicht geladen.
+  - `docker compose config --images` muss `ghcr.io/kaczmarekd/value-analyzer:latest` liefern.
+- **Implementierung:**
+  - Statt einer eigenen `images.yml` schiebt der Job „Docker Build + J4125-Pruefung“ in `ci.yml`
+    das geprüfte Image nach GHCR. Er läuft nach `quality` (`needs`), also bekommen nur getestete
+    Commits ein Image. Ein paralleler zweiter Workflow könnte ein Image eines roten Commits
+    veröffentlichen. Getrennte Workflows mit Pfadfiltern kommen mit mehreren Images (P5.1).
+  - Gepusht wird nur auf `main` und bei Tags `v*`. Tags: `sha-<commit>` immer, `latest` von
+    `main`, `<version>` bei einem Git-Tag `v<version>`. Eine Versionsnummer wird so nicht von
+    jedem Merge überschrieben.
+  - Compose nutzt `image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}` ohne
+    `build:`. `make build` baut lokal unter demselben Namen, `make pull` lädt aus GHCR.
+- **Grün:** Workflow grün, Image liegt in GHCR. Der Push läuft erst nach dem Merge auf `main`.
+- **Review:** Gemessen am 19.10.2026: Das Image ist 818 MB groß. Größter Posten ist pyarrow mit
+  156 MB von 460 MB Paketen, es wird nur für den Altdaten-Import gebraucht. Keine Secrets im
+  Image: `.env` ist per `.dockerignore` ausgeschlossen, in `data/` liegt nur die Fallback-CSV.
 - **NAS (du):** einmalig `docker login ghcr.io`, danach `docker compose pull && docker compose up -d`.
 
 #### P0.7 Fix-Paket Perioden und inf
