@@ -137,3 +137,10 @@ class TestUniverseSourceNote:
     def test_escapes_names(self, mock_universe_df):
         html = self._html(mock_universe_df, universe_source="iShares", universe_added=["<b>X</b>"])
         assert "<b>X</b>" not in html
+
+
+def test_fallback_source_is_the_same_in_both_services():
+    """notification kennt market-data nicht (import-linter) - der Name muss trotzdem passen."""
+    from va_notification.domain.report import FALLBACK_SOURCE as REPORT_FALLBACK
+
+    assert REPORT_FALLBACK == FALLBACK_SOURCE
