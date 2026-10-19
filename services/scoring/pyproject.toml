@@ -8,6 +8,7 @@ dependencies = [
     "va-platform",
     "numpy>=2.3.2,<3",  # wie im Root-Projekt
     "pandas>=3.0,<4",
+    "sqlalchemy>=2.1,<3",  # Adapter postgres (P1.7)
 ]
 
 [build-system]

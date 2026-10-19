@@ -5,7 +5,7 @@ Revises:
 Erstellt: 2026-09-30
 
 Nur additiv: keine Tabelle/Spalte mit Daten entfernen. Neue Tabellen mit
-``protect_table()`` aus ``src.db.ddl`` schuetzen.
+``protect_table()`` aus ``va_platform.db.ddl`` schuetzen.
 """
 
 from collections.abc import Sequence
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from src.db.ddl import CREATE_FUNCTIONS, SCHEMAS, grant_statements, protect_table
+from va_platform.db.ddl import CREATE_FUNCTIONS, SCHEMAS, grant_statements, protect_table
 
 revision: str = "0001"
 down_revision: str | None = None

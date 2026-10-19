@@ -19,8 +19,8 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from src.db.engine import create_db_engine, normalize_url
 from src.db.migrate import upgrade
+from va_platform.db import create_db_engine, normalize_url
 
 ADMIN_URL = os.environ.get("TEST_DATABASE_URL")
 ROLE_PASSWORDS = {"va_app": "va_app_test", "va_read": "va_read_test"}

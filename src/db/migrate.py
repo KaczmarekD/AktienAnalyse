@@ -16,8 +16,9 @@ from alembic import command
 from alembic.config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from va_platform.db import normalize_url
+
 from ..config import DatabaseSettings
-from .engine import normalize_url
 
 log = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ Titel 80 verliert nichts von dem, was bis dahin abgerufen wurde.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import asdict
 from datetime import date
 from typing import TYPE_CHECKING, Any
@@ -16,17 +16,17 @@ import pandas as pd
 from sqlalchemy.exc import InterfaceError, OperationalError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from va_market_data.adapters.postgres import MarketDataRepository, UniverseMember, snapshot_values
 from va_market_data.adapters.yahoo import PROVIDER, provider_version
 from va_market_data.application.fetch import success_share
 from va_market_data.domain.history import HistoryState, daily_price_bars, daily_share_counts
+from va_notification.adapters.postgres import ReportingRepository
+from va_platform.db import session_scope
+from va_platform.serialization import to_python
+from va_scoring.adapters.postgres import FactorScoreRow, ScoreRow, ScoringRepository
 
 from .. import __version__
-from .engine import session_scope
-from .repositories.market_data import SNAPSHOT_COLUMNS, MarketDataRepository, UniverseMember
-from .repositories.reporting import ReportingRepository
 from .repositories.runs import RunRepository
-from .repositories.scoring import FactorScoreRow, ScoreRow, ScoringRepository
-from .serialization import to_python
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
@@ -48,28 +48,6 @@ MIN_REUSE_SUCCESS_SHARE = 0.8
 
 # Voruebergehende DB-Stoerungen (Verbindungsabbruch, NAS-I/O) - kein Retry bei Datenfehlern
 _TRANSIENT_DB_ERRORS = (OperationalError, InterfaceError)
-
-
-def snapshot_row(
-    flat: Mapping[Any, Any], errors: Iterable[str], *, drop_unknown: bool = False
-) -> dict[str, Any]:
-    """Flaches Dict (``to_flat_dict``/Altdatei-Zeile) -> Spalten von ``fundamental_snapshot``.
-
-    ``drop_unknown`` nur fuer Altdateien: im Live-Pfad soll eine neue Kennzahl ohne
-    Migration auffallen (``write_snapshot`` lehnt sie ab).
-    """
-    row = {str(k): v for k, v in flat.items() if k not in {"symbol", "errors"}}
-    row["index_name"] = row.pop("index", None)
-    row["errors"] = [e for e in errors if e]
-    row["fetch_ok"] = to_python(row.get("market_cap")) is not None
-    if drop_unknown:
-        row = {k: v for k, v in row.items() if k in SNAPSHOT_COLUMNS}
-    return row
-
-
-def snapshot_values(fund: Fundamentals) -> dict[str, Any]:
-    """``Fundamentals`` -> Spalten von ``market_data.fundamental_snapshot``."""
-    return snapshot_row(fund.to_flat_dict(), fund.errors)
 
 
 def scoring_config_dict(cfg: ScoringConfig) -> dict[str, Any]:

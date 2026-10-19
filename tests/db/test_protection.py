@@ -8,12 +8,12 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 
-from src.db.engine import session_scope
-from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.runs import RunRepository
-from src.db.repositories.scoring import ScoreRow, ScoringRepository
+from va_market_data.adapters.postgres import MarketDataRepository
 from va_market_data.domain.consensus import ConsensusEntry
 from va_market_data.domain.history import PriceBar
+from va_platform.db import session_scope
+from va_scoring.adapters.postgres import ScoreRow, ScoringRepository
 
 APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting")
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)

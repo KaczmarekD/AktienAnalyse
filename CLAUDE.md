@@ -111,8 +111,14 @@ einzige Quelle der Wahrheit (keine Parquet-Caches, kein Housekeeping mehr).
 Warum: Snapshots sind nicht rekonstruierbar – yfinance liefert nur den
 aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`.
-  Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID.
-- Die DB erzwingt „niemals löschen“ selbst (`src/db/ddl.py`): Trigger gegen
+  Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID
+  (`tests/db/test_schema_boundaries.py` prüft Modelle und migrierte DB).
+- Jedes Schema gehört einem Modul, Modelle und Repository liegen dort unter
+  `adapters/postgres/`: `market_data` → `va_market_data`, `scoring` → `va_scoring`,
+  `reporting` → `va_notification`, `batch` → `src/db` (Ablaufsteuerung). Basis,
+  Engine/Session und DDL-Helfer stehen in `va_platform.db`. Die Alembic-Historie
+  ist eine; `src/db/models/__init__.py` sammelt alle Modelle für sie.
+- Die DB erzwingt „niemals löschen“ selbst (`va_platform.db.ddl`): Trigger gegen
   DELETE/TRUNCATE auf jeder Tabelle, Faktentabellen zusätzlich gegen UPDATE.
   Einzige UPDATEs: einmaliger Abschluss von `batch.run`/`market_data.fetch_run`
   und das Nachtragen einer ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur
@@ -121,7 +127,7 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
   Abfrage „Stand zu Datum X“ über `get_statements_as_of`).
-- Zugriffe nur über die Repositories in `src/db/repositories/` (`get_*`/`write_*`,
+- Zugriffe nur über die Repositories der Module (`get_*`/`write_*`,
   bewusst ohne delete). Jeder Titel wird sofort nach dem Abruf gespeichert.
 - Migrationen (Alembic, `migrations/`) sind nur additiv; jede neue Tabelle
   braucht `protect_table()` – `tests/db/test_protection.py` prüft das.
@@ -202,7 +208,7 @@ ADR-0001 und ADR-0002 aufgehoben.
 4. Auslesen der Rohwerte in `va_market_data.adapters.yahoo.fetch_one()` (`StatementFigures`
    bzw. `MarketFigures`; `FIELD_MAP` erweitern, falls yfinance-Roh-Feld nötig)
 5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS`
-6. Spalte in `FundamentalSnapshot` (`src/db/models/market_data.py`) und
+6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab
 7. Test in `services/scoring/tests/test_scoring.py`, Golden-Files der Kennzahlen

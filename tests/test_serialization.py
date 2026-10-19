@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.db.serialization import json_safe, period_end, to_python
+from va_market_data.domain.periods import period_end
+from va_platform.serialization import json_safe, to_python
 
 NUL = chr(0)
 

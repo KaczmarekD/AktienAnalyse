@@ -8,12 +8,12 @@ from datetime import date
 import pandas as pd
 from sqlalchemy import text
 
-from src.db.engine import session_scope
 from src.db.import_legacy import import_directory
-from src.db.repositories.market_data import MarketDataRepository
 from src.db.repositories.runs import RunRepository
-from src.db.repositories.scoring import ScoringRepository
+from va_market_data.adapters.postgres import MarketDataRepository
 from va_notification.domain.report import build_report
+from va_platform.db import session_scope
+from va_scoring.adapters.postgres import ScoringRepository
 from va_scoring.domain.scoring import ScoringConfig, score
 
 

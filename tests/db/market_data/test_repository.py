@@ -10,9 +10,7 @@ import pandas as pd
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.db.engine import session_scope
-from src.db.recorder import snapshot_values
-from src.db.repositories.market_data import MarketDataRepository, UniverseMember
+from va_market_data.adapters.postgres import MarketDataRepository, UniverseMember, snapshot_values
 from va_market_data.domain.consensus import ConsensusEntry
 from va_market_data.domain.fundamentals import (
     Fundamentals,
@@ -23,6 +21,7 @@ from va_market_data.domain.fundamentals import (
     ValueMetrics,
 )
 from va_market_data.domain.history import PriceBar, daily_share_counts
+from va_platform.db import session_scope
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 WEEK = timedelta(days=7)
@@ -281,7 +280,7 @@ class TestStatementVersioning:
         assert len(after) == 4
 
 
-QUARTERLY_FIXTURES = Path(__file__).parents[1] / "fixtures" / "quarterly"
+QUARTERLY_FIXTURES = Path(__file__).parents[2] / "fixtures" / "quarterly"
 
 
 def _recorded_quarters(symbol: str) -> dict[str, pd.DataFrame]:
@@ -387,7 +386,7 @@ class TestQuarterlyStatements:
             )
 
 
-SHARES_FIXTURES = Path(__file__).parents[1] / "fixtures" / "shares"
+SHARES_FIXTURES = Path(__file__).parents[2] / "fixtures" / "shares"
 
 
 def _recorded_shares(symbol: str) -> pd.Series:

@@ -16,8 +16,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from va_market_data.domain.consensus import ConsensusEntry
 from va_market_data.domain.fundamentals import join_errors
 from va_market_data.domain.history import PriceBar
+from va_market_data.domain.periods import period_end
+from va_platform.serialization import json_safe, to_python
 
-from ..models import (
+from .models import (
+    FREQUENCIES,
     ConsensusSnapshot,
     FetchRun,
     FundamentalSnapshot,
@@ -27,15 +30,14 @@ from ..models import (
     ShareCount,
     StatementValue,
 )
-from ..models import PriceBar as PriceBarRow
-from ..models import UniverseMember as UniverseMemberRow
-from ..models.market_data import FREQUENCIES
-from ..serialization import json_safe, period_end, to_python
+from .models import PriceBar as PriceBarRow
+from .models import UniverseMember as UniverseMemberRow
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from va_market_data.domain.consensus import ConsensusStatus
+    from va_market_data.domain.fundamentals import Fundamentals
 
 # Spalten, die write_snapshot annimmt (alles ausser den Schluesseln)
 SNAPSHOT_COLUMNS: tuple[str, ...] = tuple(
@@ -49,6 +51,28 @@ SNAPSHOT_METRICS: frozenset[str] = frozenset(
     for c in FundamentalSnapshot.__table__.columns
     if c.type.python_type is float and c.name not in {"fetch_run_id", "instrument_id"}
 )
+
+
+def snapshot_row(
+    flat: Mapping[Any, Any], errors: Iterable[str], *, drop_unknown: bool = False
+) -> dict[str, Any]:
+    """Flaches Dict (``to_flat_dict``/Altdatei-Zeile) -> Spalten von ``fundamental_snapshot``.
+
+    ``drop_unknown`` nur fuer Altdateien: im Live-Pfad soll eine neue Kennzahl ohne
+    Migration auffallen (``write_snapshot`` lehnt sie ab).
+    """
+    row = {str(k): v for k, v in flat.items() if k not in {"symbol", "errors"}}
+    row["index_name"] = row.pop("index", None)
+    row["errors"] = [e for e in errors if e]
+    row["fetch_ok"] = to_python(row.get("market_cap")) is not None
+    if drop_unknown:
+        row = {k: v for k, v in row.items() if k in SNAPSHOT_COLUMNS}
+    return row
+
+
+def snapshot_values(fund: Fundamentals) -> dict[str, Any]:
+    """``Fundamentals`` -> Spalten von ``market_data.fundamental_snapshot``."""
+    return snapshot_row(fund.to_flat_dict(), fund.errors)
 
 
 @dataclass(frozen=True)

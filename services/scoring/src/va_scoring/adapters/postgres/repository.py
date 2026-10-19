@@ -10,13 +10,26 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from sqlalchemy import insert, select
+from sqlalchemy import BigInteger, Text, column, insert, select, table
 
-from ..models import FactorScore, Instrument, ScoreResult, ScoringRun
-from ..serialization import json_safe, to_python
+from va_platform.serialization import json_safe, to_python
+
+from .models import FactorScore, ScoreResult, ScoringRun
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+
+
+# Das Symbol steht in market_data.instrument. Gelesen wird es ueber eine schlanke
+# Tabellenreferenz statt ueber das Modell von market-data: kein Import ueber die
+# Service-Grenze, kein Fremdschluessel. Uebergang, bis scoring die Symbole mit den
+# Events bekommt (P1.8/Phase 2).
+_instrument = table(
+    "instrument",
+    column("id", BigInteger),
+    column("symbol", Text),
+    schema="market_data",
+)
 
 
 @dataclass(frozen=True)
@@ -107,10 +120,10 @@ class ScoringRepository:
             "rank_overall",
         ]
         stmt = (
-            select(Instrument.symbol, *(getattr(ScoreResult, c) for c in columns))
-            .join(Instrument, Instrument.id == ScoreResult.instrument_id)
+            select(_instrument.c.symbol, *(getattr(ScoreResult, c) for c in columns))
+            .join(_instrument, _instrument.c.id == ScoreResult.instrument_id)
             .where(ScoreResult.scoring_run_id == scoring_run_id)
-            .order_by(ScoreResult.rank_overall.asc().nulls_last(), Instrument.symbol)
+            .order_by(ScoreResult.rank_overall.asc().nulls_last(), _instrument.c.symbol)
         )
         return _frame(self.session, stmt, ["symbol", *columns])
 
@@ -124,10 +137,10 @@ class ScoringRepository:
             "percentile_rank",
         ]
         stmt = (
-            select(Instrument.symbol, *(getattr(FactorScore, c) for c in columns))
-            .join(Instrument, Instrument.id == FactorScore.instrument_id)
+            select(_instrument.c.symbol, *(getattr(FactorScore, c) for c in columns))
+            .join(_instrument, _instrument.c.id == FactorScore.instrument_id)
             .where(FactorScore.scoring_run_id == scoring_run_id)
-            .order_by(Instrument.symbol, FactorScore.factor_key)
+            .order_by(_instrument.c.symbol, FactorScore.factor_key)
         )
         return _frame(self.session, stmt, ["symbol", *columns])
 
@@ -148,8 +161,8 @@ class ScoringRepository:
                 *(getattr(ScoreResult, c) for c in columns),
             )
             .join(ScoreResult, ScoreResult.scoring_run_id == ScoringRun.id)
-            .join(Instrument, Instrument.id == ScoreResult.instrument_id)
-            .where(Instrument.symbol == symbol)
+            .join(_instrument, _instrument.c.id == ScoreResult.instrument_id)
+            .where(_instrument.c.symbol == symbol)
             .order_by(ScoringRun.created_at, ScoringRun.id)
         )
         return _frame(self.session, stmt, ["scoring_run_id", "created_at", "origin", *columns])

@@ -6,7 +6,7 @@ from datetime import date
 
 import pandas as pd
 
-from src.db.repositories.market_data import _statement_rows
+from va_market_data.adapters.postgres.repository import _statement_rows
 
 
 def test_columns_without_valid_period_are_skipped():
