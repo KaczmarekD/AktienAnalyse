@@ -66,6 +66,11 @@ ValueMetrics/QualityMetrics/Growth). An der Grenze zu pandas (Scoring,
 Reporting) wird via `to_flat_dict()` flachgeklopft. Diese Trennung ist
 gewollt: Sub-Dataclasses für Lesbarkeit, flat dict für DataFrame-Effizienz.
 
+**Contracts** (`packages/va-contracts`, Events zwischen den Services) ändern
+sich nur additiv: neue Felder optional, sonst eine neue Version (`v2`). Die
+JSON-Schemas liegen als Golden-Files unter `tests/golden/contracts/v1/`. Eine
+Änderung dort braucht `--update-golden` und eine Begründung im Review.
+
 **yfinance-Feldnamen** stehen ausschließlich in `FIELD_MAP` am Kopf von
 `data_fetcher.py`. yfinance benennt Statement-Zeilen unangekündigt um
 ("Total Revenue" → "TotalRevenue") – wenn das passiert, ist FIELD_MAP die

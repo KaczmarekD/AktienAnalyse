@@ -1,0 +1,36 @@
+{
+  "description": "market-data -> web-api: Fortschritt des Abrufs (fluechtig, ausserhalb des Streams).",
+  "properties": {
+    "done": {
+      "minimum": 0,
+      "title": "Done",
+      "type": "integer"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "integer"
+    },
+    "symbol": {
+      "title": "Symbol",
+      "type": "string"
+    },
+    "total": {
+      "minimum": 0,
+      "title": "Total",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "run_id",
+    "done",
+    "total",
+    "symbol",
+    "ok"
+  ],
+  "title": "FetchProgressedV1",
+  "type": "object"
+}

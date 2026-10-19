@@ -142,6 +142,11 @@ ignore = [
     "B008",        # function call in default arg (Depends pattern)
 ]
 
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic wertet Annotationen zur Laufzeit aus: Ihre Imports bleiben ausserhalb von
+# TYPE_CHECKING (sonst scheitert das Modell erst beim Validieren)
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "va_contracts.base.Contract"]
+
 [tool.ruff.lint.per-file-ignores]
 # Tests duerfen "dict(...)" verwenden, lokale Imports nutzen, etc.
 "tests/**/*.py" = [

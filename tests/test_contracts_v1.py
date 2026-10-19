@@ -18,7 +18,7 @@ from uuid import uuid4
 import pandas as pd
 import pytest
 from pydantic import BaseModel, ValidationError
-from va_contracts import Envelope, new_envelope
+from va_contracts import Contract, Envelope, new_envelope
 from va_contracts.events.v1 import (
     EVENTS,
     FETCH_PROGRESSED,
@@ -53,7 +53,8 @@ from src.fundamentals import (
 )
 from src.scoring import score
 
-GOLDEN_INPUT = Path(__file__).parent / "golden" / "input_fundamentals.json"
+GOLDEN_DIR = Path(__file__).parent / "golden"
+GOLDEN_INPUT = GOLDEN_DIR / "input_fundamentals.json"
 FETCHED = datetime(2026, 10, 17, 5, 30, tzinfo=UTC)
 
 # Gruppe im Contract -> Dataclass in src.fundamentals
@@ -196,7 +197,7 @@ class TestRankingRowV1:
             RankingRowV1.model_validate({**rows[0].model_dump(), "rank_overall": 0})
 
 
-def _examples() -> dict[str, BaseModel]:
+def _examples() -> dict[str, Contract]:
     """Je Event ein vollstaendig befuelltes Beispiel."""
     funds = [FundamentalsV1.model_validate(_nested(f)) for f in _golden_fundamentals()[:2]]
     _, ranking = _ranking_rows()
@@ -334,6 +335,11 @@ class TestJsonSchemas:
     def test_envelope_schema(self, golden):
         schema = Envelope[dict[str, Any]].model_json_schema()
         golden("contracts/v1/envelope.schema.json", _schema_bytes(schema))
+
+    def test_no_stale_schema_files(self):
+        expected = {f"{t}.schema.json" for t in EVENTS} | {"envelope.schema.json"}
+        actual = {p.name for p in (GOLDEN_DIR / "contracts" / "v1").iterdir()}
+        assert actual == expected, f"Unerwartet: {actual - expected}, fehlt: {expected - actual}"
 
 
 def _schema_bytes(schema: dict[str, Any]) -> bytes:

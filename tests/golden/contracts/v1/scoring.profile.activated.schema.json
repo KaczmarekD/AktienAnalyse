@@ -1,0 +1,20 @@
+{
+  "description": "scoring -> web-api: eine Profil-Version ist jetzt aktiv.",
+  "properties": {
+    "profile_id": {
+      "title": "Profile Id",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "profile_id",
+    "version"
+  ],
+  "title": "ProfileActivatedV1",
+  "type": "object"
+}

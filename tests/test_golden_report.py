@@ -124,5 +124,5 @@ def test_no_stale_golden_files():
     expected = {"input_fundamentals.json", "ranking.csv", "mail_meta.json"} | {
         f"mail_{case}.html" for case in CASES
     }
-    actual = {path.name for path in GOLDEN_DIR.iterdir()}
+    actual = {path.name for path in GOLDEN_DIR.iterdir() if path.is_file()}
     assert actual == expected, f"Unerwartet: {actual - expected}, fehlt: {expected - actual}"

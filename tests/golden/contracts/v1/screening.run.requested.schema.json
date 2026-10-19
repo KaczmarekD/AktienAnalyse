@@ -1,0 +1,38 @@
+{
+  "description": "web-api -> market-data: einen Run starten.",
+  "properties": {
+    "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "force_refresh": {
+      "default": false,
+      "title": "Force Refresh",
+      "type": "boolean"
+    },
+    "notify": {
+      "default": true,
+      "title": "Notify",
+      "type": "boolean"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "integer"
+    },
+    "trigger": {
+      "enum": [
+        "scheduled",
+        "manual"
+      ],
+      "title": "Trigger",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "trigger"
+  ],
+  "title": "ScreeningRunRequestedV1",
+  "type": "object"
+}

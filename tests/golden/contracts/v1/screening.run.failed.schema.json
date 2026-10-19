@@ -1,0 +1,30 @@
+{
+  "description": "jede Stufe, Watchdog -> notification, web-api: ein Run ist gescheitert.",
+  "properties": {
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "integer"
+    },
+    "stage": {
+      "enum": [
+        "market-data",
+        "scoring",
+        "notification",
+        "watchdog"
+      ],
+      "title": "Stage",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "stage",
+    "reason"
+  ],
+  "title": "RunFailedV1",
+  "type": "object"
+}

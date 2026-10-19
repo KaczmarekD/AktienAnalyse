@@ -71,7 +71,9 @@ Request/Reply über Core-NATS:
 ## Envelope
 
 Jedes Event steckt in einer Hülle nach CloudEvents 1.0. Die Payload-Modelle liegen versioniert
-in `packages/va-contracts`.
+in `packages/va-contracts` (seit P1.2: `va_contracts.events.v1`, Hülle `va_contracts.Envelope`,
+Katalog `va_contracts.events.v1.EVENTS`). Ihre JSON-Schemas stehen als Golden-Files unter
+`tests/golden/contracts/v1/`.
 
 ```python
 class Envelope(BaseModel, Generic[T]):

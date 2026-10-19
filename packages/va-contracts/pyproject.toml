@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Gemeinsame Datenformate (Pydantic) - keine Fachlogik, keine Infrastruktur"
 requires-python = ">=3.14"
 dependencies = [
+    "pydantic>=2.7,<3",
 ]
 
 [build-system]

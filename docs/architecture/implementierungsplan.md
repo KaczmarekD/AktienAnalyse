@@ -219,7 +219,24 @@ sich in ganz Phase 1 nicht ändern.**
   Ranking-Zeilen, Event-Payloads und die Envelope.
 - **Implementierung:** Pydantic-Modelle in `va_contracts.events.v1`
   ([events.md](events.md)).
+  - `FundamentalsV1` hat dieselben Gruppen und Feldnamen wie die Dataclasses, ohne Rohdaten.
+    `to_flat()` ergibt die Spalten von DataFrame und CSV. `RankingRowV1` enthält
+    Fundamentaldaten plus Scores, flach entspricht es der Ausgabe von `score()`.
+  - Der Katalog (`EVENTS`, je Event ein `EventSpec`) legt Typ, Subject, Payload-Modell und
+    Dataschema fest. `new_envelope(spec, data, source=…)` erzeugt die Hülle mit UUIDv7
+    (`uuid.uuid7()` aus Python 3.14).
+  - Alle Modelle erben von `Contract`: unveränderlich, unbekannte Felder werden ignoriert
+    (additive Weiterentwicklung), NaN und inf werden abgelehnt.
+  - Die Tests liegen in `tests/test_contracts_v1.py`, die JSON-Schemas als Golden-Files unter
+    `tests/golden/contracts/v1/`. `va_contracts` darf `src` nicht kennen, deshalb prüfen die
+    Tests die Passung zu `src.fundamentals` und `score()` von außen, mit dem Golden-Datensatz.
 - **Review:** Feldnamen stabil, optionale Felder bewusst gewählt.
+  - Pflicht sind nur Symbol, Name und Index sowie die IDs der Events. `run_id` darf nur bei
+    `scoring.run.completed` leer sein (Rescore), muss dort aber angegeben werden. `profile`
+    bleibt bis Phase 2b leer.
+  - `ERRORS_SEPARATOR` steht wegen der Import-Grenze zweimal (`src.fundamentals` und
+    `va_contracts`). Der Flat-Test bemerkt, wenn beide auseinanderlaufen. Mit P1.9 entfällt die
+    Kopie in `src`.
 
 #### P1.3 Kennzahlen als reine Funktionen
 
