@@ -45,6 +45,15 @@ class TestPercentileRank:
         r = _percentile_rank(s, direction="high", drop_non_positive=False)
         assert not pd.isna(r.iloc[1])
 
+    def test_inf_is_not_ranked(self):
+        # inf ist kein Messwert (z. B. Ueberlauf) - weder Bestwert noch Schlusslicht
+        s = pd.Series([1.0, np.inf, 3.0, -np.inf])
+        r = _percentile_rank(s, direction="high", drop_non_positive=False)
+        assert pd.isna(r.iloc[1])
+        assert pd.isna(r.iloc[3])
+        assert r.iloc[0] == 0.5
+        assert r.iloc[2] == 1.0
+
 
 class TestCompositeMean:
     def test_min_share_filters_sparse_rows(self):

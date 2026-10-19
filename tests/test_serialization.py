@@ -7,10 +7,36 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from src.db.serialization import json_safe, to_python
+from src.db.serialization import json_safe, period_end, to_python
 
 NUL = chr(0)
+
+
+class TestPeriodEnd:
+    @pytest.mark.parametrize(
+        ("label", "expected"),
+        [
+            (pd.Timestamp("2025-12-31"), date(2025, 12, 31)),
+            ("2025-12-31", date(2025, 12, 31)),
+            (date(2025, 12, 31), date(2025, 12, 31)),
+            (np.datetime64("2025-12-31"), date(2025, 12, 31)),
+            # pd.Timestamp wirft hier nicht, sondern liefert NaT - das ist keine Periode
+            (None, None),
+            (float("nan"), None),
+            ("NaT", None),
+            (pd.NaT, None),
+            ("keine Periode", None),
+            # Zahlen liest pandas als Nanosekunden seit 1970 - kein Periodenende
+            (0, None),
+            (2023, None),
+            (np.int64(1), None),
+            (2023.0, None),
+        ],
+    )
+    def test_cases(self, label, expected):
+        assert period_end(label) == expected
 
 
 class TestToPython:

@@ -23,7 +23,7 @@ from ..models import (
     StatementValue,
 )
 from ..models import UniverseMember as UniverseMemberRow
-from ..serialization import json_safe, to_python
+from ..serialization import json_safe, period_end, to_python
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -257,14 +257,14 @@ class MarketDataRepository:
                 "statement": statement,
                 "frequency": frequency,
                 "line_item": line_item,
-                "period_end": period_end,
+                "period_end": period,
                 "value": value,
                 "currency": currency,
                 "first_seen_fetch_run_id": fetch_run_id,
                 "first_seen_at": fetched_at,
             }
-            for (statement, line_item, period_end), value in incoming.items()
-            if current.get((statement, line_item, period_end)) != value
+            for (statement, line_item, period), value in incoming.items()
+            if current.get((statement, line_item, period)) != value
         ]
         if new_rows:
             self.session.execute(insert(StatementValue), new_rows)
@@ -449,9 +449,8 @@ def _statement_rows(
         if df is None or df.empty:
             continue
         for period_label in df.columns:
-            try:
-                period_end = pd.Timestamp(period_label).date()
-            except TypeError, ValueError:
+            period = period_end(period_label)
+            if period is None:
                 continue
             for line_item, raw in df[period_label].items():
                 value = to_python(raw)
@@ -459,5 +458,5 @@ def _statement_rows(
                     continue
                 if not math.isfinite(value):
                     continue
-                out.setdefault((statement, str(line_item), period_end), float(value))
+                out.setdefault((statement, str(line_item), period), float(value))
     return out
