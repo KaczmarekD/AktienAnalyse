@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.scoring import (
+from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
     DEFAULT_VALUE_FACTORS,
     ScoringConfig,
