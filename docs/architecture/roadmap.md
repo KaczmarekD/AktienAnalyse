@@ -11,7 +11,7 @@
 |---|---|---|
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
 | 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
-| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.9), Fix-Paket P1.10 aus dem Spec-Abgleich offen, NAS: neues Image laden |
+| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1), NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | offen |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
@@ -23,8 +23,8 @@
 - Phase 2 wurde vorgezogen, weil jede Woche ohne Stichtagsdaten verloren ist.
 - Phase 0 beginnt mit P0.1: Der Golden-Master ist das Sicherungsnetz für alle späteren Umbauten.
 - Ab Phase 1 ist die Reihenfolge verbindlich.
-- P1.10 kommt vor P2b.1: P2b.1 legt neue Tabellen an und verlässt sich auf den Löschschutz-Test,
-  der heute den Schutz gegen UPDATE nicht prüft.
+- P1.10 kam vor P2b.1: P2b.1 legt neue Tabellen an und verlässt sich auf den Löschschutz-Test,
+  der vor P1.10 den Schutz gegen UPDATE nicht prüfte.
 - Track F1 ist aus demselben Grund vorgezogen wie Phase 2 und kann parallel zu Phase 0 laufen.
   F2 und F3 beginnen erst, wenn ADR-0011 angenommen ist, frühestens nach P1.5 und P2b.2.
 
@@ -67,9 +67,9 @@ Details: [Implementierungsplan, Phase 1](implementierungsplan.md#phase-1--modula
 - [x] P1.7 Datenbankzugriff je Modul (`5cad2aa`)
 - [x] P1.8 Event-Bus im Prozess, Composition Root (`6d6286c`)
 - [x] P1.9 Aufräumen (`4f183d6`), Gesamt-Review Phase 1 (`cef8ebb`)
-- [ ] P1.10 Fix-Paket Spec-Abgleich (Abgleich vom 30.10.2026): Jahresabschlüsse ohne verschluckte
+- [x] P1.10 Fix-Paket Spec-Abgleich (Abgleich vom 30.10.2026): Jahresabschlüsse ohne verschluckte
       Abruffehler, Löschschutz-Test mit UPDATE, Trigger für den Abschluss eines Laufs, Doku auf
-      den Stand nach Phase 1
+      den Stand nach Phase 1 (`e338045`)
 - [x] Entscheidung (du): Titel ohne Quality-Score bekommen heute den Value-Score als Composite.
       Entschieden am 30.10.2026 für Variante 1, umgesetzt in M1 (siehe unten)
 
@@ -81,7 +81,7 @@ Grenzen erzwingt.
 Bewusste Änderungen am Ranking außerhalb von ADR-0011. Details:
 [Implementierungsplan, Methodik-Korrekturen](implementierungsplan.md#methodik-korrekturen)
 
-- [ ] M1 Kein Composite ohne beide Teilscores (nach P1.10)
+- [x] M1 Kein Composite ohne beide Teilscores (`25c260b`)
 
 ## Phase 2 – Postgres (Code fertig, Deployment offen)
 
