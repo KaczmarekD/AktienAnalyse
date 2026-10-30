@@ -13,7 +13,7 @@
 | 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
 | 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1), NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
-| 2b | Scoring-Profile in der DB | offen |
+| 2b | Scoring-Profile in der DB | 🚧 P2b.0 Replay-Regression erledigt, ab P2b.1 offen |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
@@ -103,8 +103,8 @@ Umgesetzt in `261dc8f`. Details in [datenhaltung.md](datenhaltung.md).
 
 Details: [Implementierungsplan, Phase 2b](implementierungsplan.md#phase-2b--scoring-profile)
 
-- [ ] P2b.0 Replay-Regression über gespeicherte Wochen ([Konzept](regressionstest.md),
-      Vorschlag B)
+- [x] P2b.0 Replay-Regression über gespeicherte Wochen ([Konzept](regressionstest.md),
+      Vorschlag B) (`e222564`)
 - [ ] P2b.1 Profil-Tabellen
 - [ ] P2b.2 ScoringProfileParams
 - [ ] P2b.3 Profil-Version im Lauf und in der Mail
