@@ -153,6 +153,38 @@ class TestMissingSubscore:
         assert float(t0["composite_score"]) == pytest.approx(expected)
 
 
+class TestDeterministicOrder:
+    """Gefunden mit der Replay-Regression (P2b.0): Titel ohne Composite standen in der
+    Reihenfolge, in der sie hereinkamen. Der Abruf liefert sie in der Reihenfolge des
+    Universums, ein wiederverwendeter Abruf vom selben Tag alphabetisch aus der Datenbank.
+    Derselbe Tag ergab so verschiedene Raenge (Deutsche Bank und Commerzbank, 89/90)."""
+
+    # Zwei Titel ohne Composite und zwei mit gleichem Composite
+    UNIVERSE = _UNIVERSE | {
+        "ABANK.DE": _UNIVERSE["BANK.DE"],
+        "ZZ.DE": _UNIVERSE["T1.DE"],
+        "AA.DE": _UNIVERSE["T1.DE"],
+    }
+
+    def test_rank_does_not_depend_on_input_order(self):
+        forward = score(_frame(self.UNIVERSE), ScoringConfig())
+        backward = score(_frame(dict(reversed(self.UNIVERSE.items()))), ScoringConfig())
+        assert dict(zip(forward["symbol"], forward["rank_overall"], strict=True)) == dict(
+            zip(backward["symbol"], backward["rank_overall"], strict=True)
+        )
+
+    def test_titles_without_composite_are_ordered_by_symbol(self):
+        out = score(_frame(self.UNIVERSE), ScoringConfig())  # BANK.DE kommt vor ABANK.DE
+        assert list(out["symbol"].iloc[-2:]) == ["ABANK.DE", "BANK.DE"]
+
+    def test_equal_composite_is_ordered_by_symbol(self):
+        out = score(_frame(self.UNIVERSE), ScoringConfig())  # ZZ.DE kommt vor AA.DE
+        ranks = out.set_index("symbol")["rank_overall"]
+        composite = out.set_index("symbol")["composite_score"]
+        assert composite["AA.DE"] == composite["ZZ.DE"]
+        assert ranks["AA.DE"] < ranks["ZZ.DE"]
+
+
 class TestMinFactorCount:
     def test_default_is_two(self):
         assert ScoringConfig().min_factor_count == 2

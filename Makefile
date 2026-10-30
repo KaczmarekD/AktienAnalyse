@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -130,6 +130,14 @@ db-backup: ## Dump nach backups/ (fuer Hyper Backup; alte Dumps bleiben liegen)
 
 db-shell: ## psql als Owner in der Datenbank
 	docker compose exec db psql -U va_owner value_analyzer
+
+# Replay-Regression (P2b.0): bewertet gespeicherte Wochen mit dem Code dieses Images neu und
+# vergleicht mit dem Ergebnis von damals. Schreibt nichts in die DB. Nach make pull, vor make up.
+regression: ## Gespeicherte Wochen mit diesem Image nachspielen und vergleichen (schreibt nichts)
+	docker compose run --rm value-analyzer python -m src.regression
+
+regression-export: ## Wie regression, dazu je Lauf eine Fixture nach data/replay/ (fuer die CI)
+	docker compose run --rm value-analyzer python -m src.regression --export /app/data/replay
 
 # ---------- Sauberkeit -------------------------------------------------------
 clean: ## Cache und Builds entfernen

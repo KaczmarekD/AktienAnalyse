@@ -111,8 +111,14 @@ cd /volume1/docker/value-analyzer
 git pull               # Compose-Datei, Fallback-CSV, Doku (die CSV im Image wird von ./data verdeckt)
 docker compose pull
 docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
+make regression        # gespeicherte Wochen mit dem neuen Image nachspielen, schreibt nichts
 docker compose up -d
 ```
+
+`make regression` bewertet jede gespeicherte Woche mit dem neuen Code und vergleicht mit dem
+Ergebnis von damals. Exit 0 heißt: alles gleich. Abweichungen sind nur dort in Ordnung, wo die
+Roadmap eine Methodik-Änderung nennt (z. B. M1). Bei leerer Datenbank meldet es „nichts zu
+vergleichen“. Wie jeder Container-Start migriert es vorher das Schema (nur additiv).
 
 **Altdaten übernehmen** (vorhandene `fundamentals_*.parquet` / `value_ranking_*.csv` in `data/`, auch aus Mails gespeicherte CSVs – mehrfach ausführbar, Dateien bleiben liegen):
 ```bash
@@ -220,8 +226,10 @@ value-analyzer/
 │   ├── run_tracker.py      # Abschluss von batch.run aus den Events
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
 │   ├── logging_setup.py    # RotatingFileHandler (5 MB × 10)
-│   └── db/                 # PostgreSQL: Schema batch, Recorder, Migration,
-│                           #   Altdaten-Import (Modelle der Module: adapters/postgres/)
+│   ├── db/                 # PostgreSQL: Schema batch, Recorder, Migration,
+│   │                       #   Altdaten-Import (Modelle der Module: adapters/postgres/)
+│   └── regression/         # Replay-Regression: gespeicherte Wochen nachspielen
+│                           #   und vergleichen (make regression)
 ├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Event-Bus,
 │                           #   DB-Basis, Löschschutz in va_platform/db/ddl.py)
 ├── services/               # uv-Workspace, je domain/application/adapters/entrypoints:
@@ -230,7 +238,8 @@ value-analyzer/
 ├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR
 ├── migrations/             # Alembic-Migrationen (nur additiv)
 ├── db/init/01_roles.sh     # Rollen va_app/va_read beim ersten DB-Start
-├── tests/                  # pytest-Suite; tests/db/ gegen echtes PostgreSQL
+├── tests/                  # pytest-Suite; tests/db/ gegen echtes PostgreSQL,
+│                           #   tests/fixtures/replay/ echte Wochen für die Replay-Regression
 ├── data/
 │   └── dax_mdax_fallback.csv   # Editierbar ohne Rebuild bei DAX/MDAX-Mutationen
 ├── pyproject.toml          # Abhängigkeiten + ruff/pytest/pyright-Konfiguration

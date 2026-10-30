@@ -156,9 +156,11 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
     )
 
     out = pd.concat([out, value_ranks, quality_ranks], axis=1)
-    out = out.sort_values("composite_score", ascending=False, na_position="last").reset_index(
-        drop=True
-    )
+    # Feste Reihenfolge: bei gleichem oder fehlendem Composite nach Symbol. Sonst hinge der
+    # Rang von der Reihenfolge der Eingabe ab (Abruf: Universum, Wiederverwendung: DB).
+    out = out.sort_values(
+        ["composite_score", "symbol"], ascending=[False, True], na_position="last", kind="stable"
+    ).reset_index(drop=True)
     out["rank_overall"] = np.arange(1, len(out) + 1)
 
     log.info(

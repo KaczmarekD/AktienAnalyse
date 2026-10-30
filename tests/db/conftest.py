@@ -103,3 +103,17 @@ def read_engine(db_url: str) -> Iterator[Engine]:
     eng = _role_engine(db_url, "va_read")
     yield eng
     eng.dispose()
+
+
+@pytest.fixture
+def db_settings(tmp_path, monkeypatch, db_url):
+    """Gueltige Settings gegen die Test-Datenbank; Daten und Logs unter ``tmp_path``."""
+    monkeypatch.setenv("SMTP_USER", "test@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "dummy-app-pw")
+    monkeypatch.setenv("MAIL_TO", "recipient@example.com")
+    monkeypatch.setenv("DATABASE_URL", db_url)
+    monkeypatch.chdir(tmp_path)
+    from src.config import Settings
+
+    s = Settings()  # type: ignore[call-arg]
+    return s.model_copy(update={"data_dir": tmp_path / "data", "logs_dir": tmp_path / "logs"})

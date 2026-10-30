@@ -662,6 +662,82 @@ Entschieden am 30.10.2026 (Variante 1 aus P1.10).
 
 ### Phase 2b – Scoring-Profile
 
+#### P2b.0 Replay-Regression über gespeicherte Wochen
+
+Vorschlag B aus [regressionstest.md](regressionstest.md), entschieden am 30.10.2026. Es kommt vor
+P2b.1, weil das Standardprofil (P2b.2) das heutige Ranking exakt reproduzieren soll. Genau das
+prüft dieses Paket, für jede gespeicherte Woche.
+
+- **Werkzeug** `python -m src.regression` (`make regression` im Container):
+  - Es bewertet gespeicherte Abrufe mit dem aktuellen Code neu und vergleicht mit dem
+    gespeicherten Bewertungslauf: Scores und Rang je Titel (`scoring.score_result`), Faktor-Ränge
+    (`scoring.factor_score`) und die CSV des Reports (`reporting.report`), soweit vorhanden.
+    Importierte Wochen haben nur Scores.
+  - Es nimmt denselben Weg wie ein Lauf, der einen Abruf vom selben Tag wiederverwendet:
+    Snapshots → `FundamentalsV1` → `marketdata.snapshot.completed` → Handler von scoring und
+    notification auf einem eigenen Bus im Prozess. Speicher, Versand und Healthcheck sind dort
+    Attrappen, die das Ergebnis nur festhalten.
+  - Es schreibt nichts: Die Verbindung läuft mit `default_transaction_read_only`, egal mit
+    welcher Rolle.
+  - Auswahl: `--scoring-run N` oder `--fetch-run N` (beide mehrfach), ohne Angabe alle
+    Bewertungsläufe außer Rescores. Die Konfiguration kommt wie im Batch aus `Settings`.
+  - Ausgabe je Lauf: „gleich“ oder die abweichenden Titel mit altem und neuem Wert. Exit 0: alles
+    gleich, 1: Abweichungen, 2: nichts zu vergleichen oder Fehler.
+  - `--export DIR` schreibt je Lauf eine Fixture-Datei: Snapshot-Spalten und erwartete
+    Ergebnisse.
+- **CI:** `tests/test_replay_fixtures.py` spielt jede Datei unter `tests/fixtures/replay/` durch.
+  Eine gewollte Änderung (Phase 2b, ADR-0011) schreibt die erwarteten Werte mit `--update-golden`
+  neu, die Snapshots bleiben. Die erste Fixture ist eine echte Woche aus einem lokalen Dry-Run
+  (90 Titel, öffentliche Marktdaten).
+- **Test (rot):**
+  - Vergleich ohne DB: Gleiche Ergebnisse ergeben keine Abweichung. Gemeldet werden ein
+    geänderter Score, Rang oder Flag und ein fehlender oder zusätzlicher Titel. Unterschiede in
+    der letzten Stelle und „leer“ gegen NaN zählen nicht.
+  - CSV-Vergleich: inhaltlich gleich mit Toleranz; eine abweichende Zelle wird mit Titel und
+    Spalte gemeldet.
+  - Replay ohne DB: Ein Fall aus dem Golden-Datensatz läuft durch die Handler und ergibt
+    dieselben Scores wie `score()`. JSON hin und zurück ändert nichts.
+  - DB-Tests:
+    - Ein kompletter Lauf (Yahoo gepatcht wie in `test_pipeline_db`) wird nachgespielt: gleich,
+      Exit 0.
+    - Mit einem anderen Gewicht gibt es Abweichungen, Exit 1.
+    - Ein importierter Lauf ohne Faktor-Ränge und Report wird nur über die Scores verglichen.
+    - Das Werkzeug kann nicht schreiben.
+    - Nach dem Export ergibt das Replay aus der Datei dasselbe.
+- **Implementierung:**
+  - Paket `src/regression/` (Fall laden, Replay, Vergleich, Kommandozeile).
+  - Der Speicher von scoring bildet seine Zeilen mit `score_rows`/`factor_rows`. Die Funktionen
+    werden öffentlich, damit Replay und Speicher dieselben Zeilen bilden.
+  - `scoring_config(settings)` in der Composition Root: Batch und Replay nutzen dieselbe
+    Konfiguration.
+  - Neue Lesezugriffe `get_scoring_runs` und `get_report_for_scoring_run`, dazu
+    `create_db_engine(read_only=True)`.
+- **NAS:** nach `make pull`, vor `make up`: `make regression`. Abweichungen sind nur dort in
+  Ordnung, wo ein Paket eine Methodik-Änderung ankündigt (z. B. M1 für Wochen vor dem
+  30.10.2026).
+- **Umgesetzt (30.10.2026):**
+  - Tests rot in `e4c4785`, Werkzeug in `6c23bed`. Kompaktes Fixture-Format und Ausgabe in
+    `ec39c77`, erste echte Woche in `14dc29b`.
+  - **Erster echter Einsatz:** Ein Dry-Run vom 30.10.2026 (90 Titel, echte Yahoo-Daten) wurde
+    gespeichert und nachgespielt. 88 Titel mit allen Scores und Faktor-Rängen und ihre
+    CSV-Zeilen waren exakt gleich.
+  - **Befund:** Deutsche Bank und Commerzbank (beide ohne Composite, M1) tauschten Rang 89
+    und 90. `score()` ließ Titel mit gleichem oder fehlendem Composite in der Reihenfolge der
+    Eingabe stehen. Das ist beim Abruf die Reihenfolge des Universums, beim Wiederverwenden
+    eines Abrufs vom selben Tag die alphabetische aus der DB. Derselbe Tag ergab so zwei
+    verschiedene CSVs.
+  - **Fix:** Bei Gleichstand entscheidet das Symbol (Test rot in `81864fc`, Fix in `99434b1`).
+    Die Golden-Files sind unverändert, im Golden-Datensatz gibt es keinen Gleichstand. Die
+    erwarteten Werte der Fixture sind darauf mit `--update-golden` erneuert. Der Diff besteht
+    aus vier Zeilen: Rang 89/90 in den Scores und in der CSV.
+  - **Für die NAS:** Wochen, die vor dem Fix gespeichert wurden, können bei Titeln ohne Composite
+    genau diesen Tausch zeigen. Das ist gewollt.
+  - **Größe:** Eine Woche als Fixture hat rund 170 KB. Die meisten Daten sind die
+    Faktor-Ränge (790 Zeilen). Weitere Wochen kommen nach dem Deployment von der NAS
+    (`make regression-export`). Am besten eignen sich Live-Wochen, denn nur sie haben
+    Faktor-Ränge und CSV. Importierte Altwochen vergleicht `make regression` auf der NAS mit dem
+    alten Code.
+
 #### P2b.1 Profil-Tabellen
 
 - **Test:** DB-Tests:

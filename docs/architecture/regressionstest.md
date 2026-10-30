@@ -1,6 +1,8 @@
 # Regressionstest
 
-> **Status:** Vorschlag (19.10.2026), nach Abschluss von Phase 1. Entscheidung offen.
+> **Status:** Vorschlag vom 19.10.2026. B ist am 30.10.2026 entschieden und wird als
+> [P2b.0](implementierungsplan.md#p2b0-replay-regression-über-gespeicherte-wochen) umgesetzt.
+> A bleibt ein einmaliger Schritt auf der NAS.
 
 ## Was es heute schon gibt
 
@@ -10,6 +12,7 @@
 | Kennzahlen | Kennzahlen-Golden (`tests/test_metrics_snapshot.py`) | Rohdaten von 7 echten Titeln → Kennzahlen unverändert | Rohdaten von einem Stichtag, kein Scoring |
 | Ablauf | Golden-Mail über den Bus (`tests/test_pipeline_bus.py`) | alle Handler und Events ergeben die Golden-Mail | Fakes für Abruf und Speicher |
 | Datenbank | `tests/db/test_pipeline_db.py` | kompletter Lauf gegen echtes PostgreSQL | Yahoo-HTTP gepatcht, 4 Titel |
+| Echte Wochen (seit P2b.0) | Replay-Regression (`tests/test_replay_fixtures.py`, `make regression`) | gespeicherte Snapshots → Scores, Faktor-Ränge, CSV unverändert | in der CI nur die exportierten Wochen |
 
 Alles läuft offline und in der CI. Was fehlt: ein Vergleich mit **echten Daten der laufenden
 Woche** und mit dem **Ergebnis des alten Codes**. Genau dort steckt das Risiko eines Umbaus wie
@@ -46,14 +49,18 @@ Kosten: zwei bis drei Dry-Runs, je etwa 5–10 Minuten. Die Läufe stehen danach
 Die Datenbank löscht nie und hält jeden Abruf als Snapshot. Damit wird **jede vergangene Woche
 zu einem Testfall**:
 
-- Werkzeug `python -m src.regression --fetch-run N`: liest die Snapshots nur (Rolle `va_read`),
-  bewertet sie im Speicher neu, baut den Report mit festem Zeitpunkt und vergleicht mit
+- Werkzeug `python -m src.regression` (Auswahl mit `--scoring-run N` oder `--fetch-run N`,
+  sonst alle Läufe außer Rescores): liest die Snapshots über eine schreibgeschützte Verbindung,
+  schickt sie durch die Handler von scoring und notification und vergleicht mit
   `scoring.score_result`, `scoring.factor_score` und der CSV aus `reporting.report` dieses Laufs.
-  Es schreibt nichts.
+  Es schreibt nichts. Exit 0: gleich, 1: Abweichungen, 2: nichts zu vergleichen oder Fehler.
 - `make regression` auf der NAS mit dem neuen Image, bevor `make up` umstellt.
-- Für die CI: einige Wochen als Fixtures exportieren (`tests/fixtures/replay/<datum>.json`, nur
-  Snapshot-Spalten, das sind öffentliche Marktdaten). Dann läuft die Regression über echte
-  Wochen bei jedem Push.
+- Für die CI: Wochen als Fixtures exportieren (`make regression-export` bzw. `--export DIR`,
+  Datei `<datum>_scoring-run-<id>.json` nach `tests/fixtures/replay/`). Sie enthalten die
+  Snapshot-Spalten (öffentliche Marktdaten) und das Ergebnis von damals. Dann läuft die
+  Regression über echte Wochen bei jedem Push.
+- Importierte Altwochen haben nur Scores (keine Faktor-Ränge, kein Report). Verglichen wird dann
+  nur, was gespeichert ist.
 
 Abweichungen sind dort gewollt, wo sich die Methodik ändert (Phase 2b Scoring-Profile, ADR-0011).
 Dann zeigt das Werkzeug genau den Unterschied, und die Fixtures werden bewusst neu geschrieben,

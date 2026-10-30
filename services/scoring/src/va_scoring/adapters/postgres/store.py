@@ -28,26 +28,41 @@ class PostgresScoringStore:
         self, fetch_run_id: int, df_all: pd.DataFrame, scored: pd.DataFrame, cfg: ScoringConfig
     ) -> int:
         """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``."""
-        symbols = [str(s) for s in df_all.get("symbol", pd.Series(dtype=str)).dropna()]
-        scored_symbols = [str(s) for s in scored.get("symbol", pd.Series(dtype=str)).dropna()]
         with session_scope(self._engine) as s:
             repo = ScoringRepository(s)
-            ids = repo.get_instrument_ids([*symbols, *scored_symbols])
+            ids = repo.get_instrument_ids(scoring_symbols(df_all, scored))
             scoring_run_id = repo.write_scoring_run(
                 fetch_run_id=fetch_run_id,
                 config=asdict(cfg),
                 app_version=self._app_version,
             )
-            results = [_score_row(ids[str(r["symbol"])], r) for r in scored.to_dict("records")]
-            passed = set(scored_symbols)
-            results += [
-                ScoreRow(ids[sym], False, None, None, None, None, None)
-                for sym in dict.fromkeys(symbols)
-                if sym not in passed
-            ]
-            repo.write_score_results(scoring_run_id, results)
-            repo.write_factor_scores(scoring_run_id, _factor_rows(scored, ids, cfg))
+            repo.write_score_results(scoring_run_id, score_rows(df_all, scored, ids))
+            repo.write_factor_scores(scoring_run_id, factor_rows(scored, ids, cfg))
             return scoring_run_id
+
+
+def scoring_symbols(df_all: pd.DataFrame, scored: pd.DataFrame) -> list[str]:
+    """Alle Titel eines Bewertungslaufs, ohne Doppelte, in der Reihenfolge des Snapshots."""
+    return list(dict.fromkeys([*_symbols(df_all), *_symbols(scored)]))
+
+
+def score_rows(
+    df_all: pd.DataFrame, scored: pd.DataFrame, ids: Mapping[str, int]
+) -> list[ScoreRow]:
+    """Eine Zeile je Titel: bewertete mit ihren Scores, am Groessenfilter gescheiterte mit
+    ``passed_filter=False``. Die Replay-Regression bildet ihre Zeilen genauso."""
+    results = [_score_row(ids[str(r["symbol"])], r) for r in scored.to_dict("records")]
+    passed = set(_symbols(scored))
+    results += [
+        ScoreRow(ids[sym], False, None, None, None, None, None)
+        for sym in dict.fromkeys(_symbols(df_all))
+        if sym not in passed
+    ]
+    return results
+
+
+def _symbols(df: pd.DataFrame) -> list[str]:
+    return [str(s) for s in df.get("symbol", pd.Series(dtype=str)).dropna()]
 
 
 def _score_row(instrument_id: int, row: Mapping[Any, Any]) -> ScoreRow:
@@ -64,9 +79,10 @@ def _score_row(instrument_id: int, row: Mapping[Any, Any]) -> ScoreRow:
     )
 
 
-def _factor_rows(
-    scored: pd.DataFrame, ids: dict[str, int], cfg: ScoringConfig
+def factor_rows(
+    scored: pd.DataFrame, ids: Mapping[str, int], cfg: ScoringConfig
 ) -> list[FactorScoreRow]:
+    """Rohwert und Perzentilrang je Titel und Faktor; Faktoren ohne beides fehlen."""
     factors = [("value", k, v) for k, v in cfg.value_factors.items()]
     factors += [("quality", k, v) for k, v in cfg.quality_factors.items()]
     rows: list[FactorScoreRow] = []

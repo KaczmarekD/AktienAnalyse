@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from sqlalchemy import BigInteger, Text, column, insert, select, table
+from sqlalchemy import BigInteger, Text, column, insert, or_, select, table
 
 from va_platform.serialization import json_safe, to_python
 
@@ -127,6 +127,29 @@ class ScoringRepository:
 
     def get_scoring_run(self, scoring_run_id: int) -> ScoringRun | None:
         return self.session.get(ScoringRun, scoring_run_id)
+
+    def get_scoring_runs(
+        self,
+        *,
+        scoring_run_ids: Collection[int] = (),
+        fetch_run_ids: Collection[int] = (),
+        origins: Collection[str] | None = None,
+    ) -> list[ScoringRun]:
+        """Bewertungslaeufe nach ID oder bewertetem Abruf (beides: Vereinigung), sonst alle.
+
+        ``origins`` beschraenkt auf bestimmte Herkuenfte, z. B. ohne Rescores.
+        """
+        stmt = select(ScoringRun).order_by(ScoringRun.id)
+        if scoring_run_ids or fetch_run_ids:
+            stmt = stmt.where(
+                or_(
+                    ScoringRun.id.in_(list(scoring_run_ids)),
+                    ScoringRun.fetch_run_id.in_(list(fetch_run_ids)),
+                )
+            )
+        if origins is not None:
+            stmt = stmt.where(ScoringRun.origin.in_(list(origins)))
+        return list(self.session.scalars(stmt))
 
     def get_scores_df(self, scoring_run_id: int) -> pd.DataFrame:
         columns = [

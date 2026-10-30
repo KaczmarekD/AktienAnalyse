@@ -103,6 +103,8 @@ Umgesetzt in `261dc8f`. Details in [datenhaltung.md](datenhaltung.md).
 
 Details: [Implementierungsplan, Phase 2b](implementierungsplan.md#phase-2b--scoring-profile)
 
+- [ ] P2b.0 Replay-Regression über gespeicherte Wochen ([Konzept](regressionstest.md),
+      Vorschlag B)
 - [ ] P2b.1 Profil-Tabellen
 - [ ] P2b.2 ScoringProfileParams
 - [ ] P2b.3 Profil-Version im Lauf und in der Mail

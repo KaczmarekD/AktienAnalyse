@@ -43,6 +43,8 @@ Deshalb gibt es einen Composite **nur mit beiden Teilscores** (M1, 30.10.2026). 
 bleibt der Titel ohne Composite am Ende der CSV und fehlt in Top- und Flop-Liste. Sonst stünde
 ein Titel ohne Quality-Daten besser da als einer mit mittelmäßiger Quality. Heute betrifft das
 Banken wie Deutsche Bank und Commerzbank, denen ROIC, operative Marge und Net Debt/EBITDA fehlen.
+Bei gleichem oder fehlendem Composite entscheidet das Symbol über die Reihenfolge, damit der Rang
+nicht von der Reihenfolge der Eingabe abhängt.
 
 **Value-Faktoren** (alle als Perzentilrang, niedriger Multiple = besser):
 EV/EBIT (kapitalstruktur-neutral, Greenblatt-Logik), P/B, P/FCF (FCF ist
@@ -231,7 +233,8 @@ ADR-0001 und ADR-0002 aufgehoben.
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab
 7. Test in `services/scoring/tests/test_scoring.py`, Golden-Files der Kennzahlen
-   (`tests/golden/metrics/`) bewusst mit `--update-golden` erneuern
+   (`tests/golden/metrics/`) bewusst mit `--update-golden` erneuern. Ein Faktor im Composite
+   verschiebt das Ranking, dann auch die Replay-Fixtures (`tests/test_replay_fixtures.py`)
 
 **Neues Universum (z.B. Stoxx 600)**:
 1. Quelle als Adapter in `va_market_data.adapters` (Klasse mit `name` und
@@ -314,6 +317,15 @@ eigentliche Prüfgegenstand. Jede Testfunktion bekommt eine frische DB aus
 einer migrierten Vorlage (Löschen ist ja verboten). Ohne `TEST_DATABASE_URL`
 werden sie übersprungen; lokal `make test-db-up && make test-db`, in CI
 per Postgres-Service-Container.
+
+**Replay-Regression** (`src/regression/`, P2b.0): Weil die DB nie löscht, ist jede gespeicherte
+Woche ein Testfall. `python -m src.regression` (`make regression`) schickt die Snapshots eines
+Abrufs durch die echten Handler von scoring und notification und vergleicht Scores, Faktor-Ränge
+und CSV mit dem gespeicherten Bewertungslauf. Das Werkzeug schreibt nichts: Die Verbindung ist
+schreibgeschützt (`create_db_engine(read_only=True)`). Echte Wochen liegen als Fixtures unter
+`tests/fixtures/replay/` (Export mit `--export`) und laufen in der CI. Eine gewollte
+Methodik-Änderung schreibt ihre erwarteten Werte mit `--update-golden` neu, wie beim
+Golden-Master. Auf der NAS läuft `make regression` nach `make pull` und vor `make up`.
 
 **Golden-Master der Mail** (`tests/test_golden_report.py`, Dateien unter
 `tests/golden/`): Ein eingefrorener Datensatz

@@ -75,6 +75,15 @@ class ReportingRepository:
         stmt = select(Report).where(Report.run_id == run_id).order_by(Report.id.desc()).limit(1)
         return self.session.scalars(stmt).first()
 
+    def get_report_for_scoring_run(self, scoring_run_id: int) -> Report | None:
+        stmt = (
+            select(Report)
+            .where(Report.scoring_run_id == scoring_run_id)
+            .order_by(Report.id.desc())
+            .limit(1)
+        )
+        return self.session.scalars(stmt).first()
+
     def get_deliveries(self, run_id: int) -> list[Delivery]:
         stmt = (
             select(Delivery)

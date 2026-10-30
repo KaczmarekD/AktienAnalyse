@@ -164,6 +164,15 @@ def alert_channels(settings: Settings) -> tuple[ReportSender, Heartbeat]:
     return SmtpSender(smtp_config(settings)), HealthchecksHeartbeat(settings.healthcheck_url)
 
 
+def scoring_config(settings: Settings) -> ScoringConfig:
+    """Die Bewertung aus den Settings - fuer den Batch und die Replay-Regression gleich."""
+    return ScoringConfig(
+        min_market_cap=settings.min_market_cap,
+        value_weight=settings.value_weight,
+        quality_weight=settings.quality_weight,
+    )
+
+
 def wire(bus: EventBus, adapters: Adapters, settings: Settings, *, version: str) -> None:
     """Haengt die Handler aller Module an den Bus. Reihenfolge = Reihenfolge der Kette."""
     RunRequestedHandler(
@@ -174,13 +183,7 @@ def wire(bus: EventBus, adapters: Adapters, settings: Settings, *, version: str)
         dax_only=settings.universe == "DAX_ONLY",
     ).subscribe()
     SnapshotCompletedHandler(
-        bus,
-        store=adapters.scoring,
-        config=ScoringConfig(
-            min_market_cap=settings.min_market_cap,
-            value_weight=settings.value_weight,
-            quality_weight=settings.quality_weight,
-        ),
+        bus, store=adapters.scoring, config=scoring_config(settings)
     ).subscribe()
     NotificationHandler(
         bus,

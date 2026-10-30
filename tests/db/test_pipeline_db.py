@@ -10,7 +10,6 @@ from datetime import date
 from unittest.mock import Mock, patch
 
 import pandas as pd
-import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
@@ -116,19 +115,6 @@ def _fake_prices(symbol: str, start: date | None, known_splits: frozenset[date])
         {"close": [10.0, 10.5], "adj_close": [9.8, 10.3], "dividend": [0.0, 0.2], "split": 0.0},
         index=PRICE_DAYS,
     )
-
-
-@pytest.fixture
-def db_settings(tmp_path, monkeypatch, db_url):
-    monkeypatch.setenv("SMTP_USER", "test@gmail.com")
-    monkeypatch.setenv("SMTP_PASSWORD", "dummy-app-pw")
-    monkeypatch.setenv("MAIL_TO", "recipient@example.com")
-    monkeypatch.setenv("DATABASE_URL", db_url)
-    monkeypatch.chdir(tmp_path)
-    from src.config import Settings
-
-    s = Settings()  # type: ignore[call-arg]
-    return s.model_copy(update={"data_dir": tmp_path / "data", "logs_dir": tmp_path / "logs"})
 
 
 def _patched_run(

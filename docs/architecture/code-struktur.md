@@ -19,7 +19,8 @@ Monolith):
   `entrypoints/handlers.py`.
 - `src/` ist der Batch: `main.py` legt den Lauf an und startet die Kette, `composition.py` baut
   die Adapter und hängt die Handler an den Bus, `run_tracker.py` schließt `batch.run` ab. `db/`
-  besitzt das Schema `batch`, die Migration und den Altdaten-Import.
+  besitzt das Schema `batch`, die Migration und den Altdaten-Import. `regression/` spielt
+  gespeicherte Wochen durch dieselben Handler nach (P2b.0).
 - Jedes Modul speichert selbst in seinem Schema (`adapters/postgres/`). Die Alembic-Historie
   ist noch eine (`migrations/` im Root).
 
