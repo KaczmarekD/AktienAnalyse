@@ -23,6 +23,9 @@ class SmtpConfig:
     mail_from: str
     mail_to: str
     subject_prefix: str = ""
+    # Ohne TLS und ohne Login - nur fuer einen lokalen Mail-Catcher (Mailpit, U1). Es wird
+    # dabei kein Passwort gesendet.
+    plain: bool = False
 
 
 class SmtpSender:
@@ -52,9 +55,13 @@ class SmtpSender:
             msg.add_attachment(data, maintype="text", subtype="csv", filename=filename)
             log.info("CSV-Anhang angehaengt: %s (%.1f KB)", filename, len(data) / 1024)
 
-        log.info("Verbinde zu SMTP %s:%d (TLS=%s)", cfg.host, cfg.port, cfg.use_tls)
+        mode = "plain" if cfg.plain else ("starttls" if cfg.use_tls else "ssl")
+        log.info("Verbinde zu SMTP %s:%d (%s)", cfg.host, cfg.port, mode)
         context = ssl.create_default_context()
-        if cfg.use_tls:
+        if cfg.plain:
+            with smtplib.SMTP(cfg.host, cfg.port, timeout=30) as s:
+                s.send_message(msg)
+        elif cfg.use_tls:
             with smtplib.SMTP(cfg.host, cfg.port, timeout=30) as s:
                 s.ehlo()
                 s.starttls(context=context)

@@ -660,6 +660,78 @@ Entschieden am 30.10.2026 (Variante 1 aus P1.10).
     weiter als „fehlgeschlagen“, der Lauf heißt dann `partial`. Sie getrennt von gescheiterten
     Abrufen zu zählen, änderte Template und Golden-Files und wäre ein eigenes Paket.
 
+### Track U – Umgebungen (lokal und NAS)
+
+Beschlossen am 30.10.2026, Zielbild und Entscheidungen in [umgebungen.md](umgebungen.md).
+
+#### U1 Lokaler Stack
+
+- **Test (rot):**
+  - Compose ohne Docker-Daemon (`docker compose config`, in einem temporären Ordner mit einer
+    Dummy-`.env`):
+    - Lokal wird `value-analyzer` aus dem Arbeitsstand gebaut, hat das Profil `run` und läuft
+      ohne Cron.
+    - SMTP zeigt fest auf Mailpit (`SMTP_PLAIN`), `HEALTHCHECK_URL` ist leer, auch wenn die
+      `.env` etwas anderes sagt.
+    - Alle veröffentlichten Ports binden nur an `127.0.0.1`.
+    - pgweb nutzt die Rolle `va_read` und `--readonly`.
+    - Die Datenbank liegt unter `./.local/pgdata`.
+    - Die NAS-Definition allein bleibt, wie sie ist: Image aus GHCR, kein Build, weder
+      Mailpit noch pgweb.
+  - `SmtpSender` mit `plain`: kein STARTTLS, kein SSL, kein Login.
+  - Settings: `SMTP_PLAIN` ist standardmäßig aus und landet in `SmtpConfig`.
+- **Implementierung:**
+  - `docker-compose.local.yml`: Mailpit und pgweb mit fester Version.
+  - `SMTP_PLAIN` in Settings, `SmtpConfig` und `SmtpSender`.
+  - `.env.local.example`.
+  - `make local-up`, `local-run`, `local-dry`, `local-regression`, `local-logs`, `local-down`.
+  - Doku: README, CLAUDE.md.
+- **Fertig, wenn:** `make local-up && make local-run` eine echte Mail in Mailpit erzeugt und die
+  Ergebnisse in pgweb zu sehen sind.
+- **NAS:** nichts. `docker-compose.yml` bleibt die Definition des Live-Betriebs.
+- **Umgesetzt (30.10.2026):**
+  - Tests rot in `d10dc19`, Umsetzung in `1f0fb42`, Review-Korrektur in `64706f3`.
+  - **Abweichung vom Vorschlag:** keine eigene `compose.nas.yaml`. Die bestehende
+    `docker-compose.yml` bleibt die NAS-Definition, damit eine NAS nach `git pull` ohne
+    Änderung an ihrer `.env` weiterläuft.
+  - **Ergänzt:**
+    - Der lokale Stack hat einen eigenen Projektnamen (`value-analyzer-local`) und eigene
+      Containernamen.
+    - Der Port der Datenbank lässt sich über `LOCAL_DB_PORT` verlegen.
+    - Grund: Auf dem Entwicklungsrechner lief noch ein `value-analyzer-db` aus dem alten
+      Worktree `phase-0` (`restart: unless-stopped`). Er belegte Port 5432 und den
+      Containernamen.
+  - **Probelauf (30.10.2026, echte Yahoo-Daten):**
+    - `make local-up` und `make local-run` laufen durch. In Mailpit liegt die Mail
+      `[partial 88/90] … Top: Allianz` mit CSV-Anhang.
+    - pgweb zeigt als `va_read` alle Schemas und lehnt Schreibzugriffe ab.
+    - Der Lauf steht in `batch.run` (`partial`, Exit 0). Ein Healthcheck-Ping ging nicht raus.
+    - `make local-regression` meldet den Lauf als gleich.
+  - **Hinweis zum Rechner:** Docker Desktop legt seine Daten auf C: ab (rund 41 GB). Bei einem
+    vollen Laufwerk bricht der Image-Build mit `input/output error` ab. Der Speicherort lässt
+    sich in Docker Desktop verlegen (Settings → Resources → Advanced → Disk image location).
+
+#### U2 NAS-Daten lokal
+
+- **Test:** Ein Dump aus der Test-Datenbank wird in eine leere lokale Datenbank eingespielt;
+  Rollen und Rechte stimmen danach. In eine Datenbank mit Daten wird nichts eingespielt.
+- **Implementierung:** `make local-restore DUMP=…` (pg_restore in den lokalen Container) und die
+  Beschreibung, wie der Dump von der NAS auf den Rechner kommt.
+
+#### U3 Test auf der NAS (optional)
+
+- **Test:** `image_tags.py` vergibt für `feat/**` ein eigenes Tag (`branch-<name>`), aber nie
+  `latest`.
+- **Implementierung:** CI schiebt Branch-Images. Ein zweites Compose-Projekt auf der NAS
+  (`-p va-test`) bekommt eine eigene Datenbank, gefüllt aus einem Dump der Live-Daten, dazu
+  Mailpit und keinen Cron.
+
+#### U4 Analysen im Browser (Entscheidung offen)
+
+Vorschlag: P3.1, P3.2 und aus P3.5 bis P3.7 die Ansichten Ranking, Runs und Titel-Detail vor
+Phase 2b ziehen. Lokal mit `ng serve` und Proxy auf das web-api, auf der NAS als
+frontend-Container ([frontend.md](frontend.md)).
+
 ### Phase 2b – Scoring-Profile
 
 #### P2b.0 Replay-Regression über gespeicherte Wochen

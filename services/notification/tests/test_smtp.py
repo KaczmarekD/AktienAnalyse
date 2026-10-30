@@ -81,6 +81,20 @@ class TestSmtpSender:
         assert "starttls" not in server.calls
         assert server.calls[-2:] == ["send", "quit"]
 
+    def test_plain_without_tls_and_login(self, fake_smtp):
+        """U1: lokaler Mail-Catcher (Mailpit) - kein TLS, und es wird kein Passwort gesendet."""
+        from dataclasses import replace
+
+        SmtpSender(replace(CONFIG, plain=True, host="mailpit", port=1025)).send("Test", "<p>x</p>")
+        (server,) = fake_smtp
+        assert (server.host, server.port) == ("mailpit", 1025)
+        assert "context" not in server.kwargs  # kein SMTP_SSL
+        assert server.calls == ["send", "quit"]
+        assert server.login_args is None
+
+    def test_plain_is_off_by_default(self):
+        assert CONFIG.plain is False
+
     def test_headers_and_html(self, fake_smtp):
         SmtpSender(CONFIG).send("[ok 90/90] Test", "<h1>Report</h1>")
         msg = fake_smtp[0].messages[0]

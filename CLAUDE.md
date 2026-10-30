@@ -24,6 +24,12 @@ sie, `src/run_tracker.py` leitet aus den Events den Abschluss von `batch.run` ab
 Jedes Modul speichert selbst in PostgreSQL 18 (`adapters/postgres/store.py`).
 Geplant via Cron im Container.
 
+**Umgebungen** ([docs/architecture/umgebungen.md](docs/architecture/umgebungen.md)):
+`docker-compose.yml` beschreibt den Live-Betrieb auf der NAS. Lokal legt
+`docker-compose.local.yml` den Build aus dem Arbeitsstand, Mailpit und pgweb darüber
+(`make local-*`). Dort zeigt SMTP fest auf Mailpit (`SMTP_PLAIN`, ohne TLS und Login) und
+`HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht.
+
 ## Methodik-Entscheidungen
 
 > **Stand der Entscheidungen (30.09.2026):**

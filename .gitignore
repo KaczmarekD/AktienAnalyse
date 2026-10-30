@@ -10,6 +10,8 @@ logs/
 # PostgreSQL-Daten und Dumps (Bind-Mounts auf der Synology)
 pgdata/
 backups/
+# Lokaler Stack (U1): Datenbank und Logs
+.local/
 __pycache__/
 *.pyc
 *.log

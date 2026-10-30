@@ -83,3 +83,13 @@ class TestSettings:
     def test_retention_days_is_gone(self, minimal_env):
         # Daten werden nie mehr geloescht - die alte Einstellung existiert nicht mehr
         assert not hasattr(Settings(), "retention_days")  # type: ignore[call-arg]
+
+    def test_smtp_plain_is_off_by_default(self, minimal_env):
+        # U1: ohne TLS und ohne Login nur fuer den lokalen Mail-Catcher, nie aus Versehen
+        assert Settings().smtp_plain is False  # type: ignore[call-arg]
+
+    def test_smtp_plain_reaches_the_sender(self, minimal_env, monkeypatch):
+        from src.composition import smtp_config
+
+        monkeypatch.setenv("SMTP_PLAIN", "true")
+        assert smtp_config(Settings()).plain is True  # type: ignore[call-arg]

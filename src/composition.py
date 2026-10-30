@@ -153,6 +153,7 @@ def smtp_config(settings: Settings) -> SmtpConfig:
         user=settings.smtp_user,
         password=settings.smtp_password.get_secret_value(),
         use_tls=settings.smtp_use_tls,
+        plain=settings.smtp_plain,
         mail_from=settings.effective_mail_from,
         mail_to=str(settings.mail_to),
         subject_prefix=settings.mail_subject_prefix,

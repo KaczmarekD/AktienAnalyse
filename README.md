@@ -165,9 +165,31 @@ In Python liefern die Repositories (je Modul unter `adapters/postgres/`) fertige
 
 Voraussetzung ist [uv](https://docs.astral.sh/uv/) (Windows: `winget install astral-sh.uv`). uv holt auch die passende Python-Version.
 
+**Lokaler Stack** (Docker): dieselben Container wie auf der NAS, aber das Image entsteht aus dem
+Arbeitsstand, die Mail landet im lokalen Postfach Mailpit, und nichts geht nach außen
+([umgebungen.md](docs/architecture/umgebungen.md)).
+
+```bash
+cp .env.local.example .env
+make local-up          # Datenbank, Mailpit und pgweb starten (Image aus dem Arbeitsstand)
+make local-run         # ein Lauf wie am Samstag; die Mail erscheint in Mailpit
+make local-regression  # alle gespeicherten Wochen mit dem Arbeitsstand nachspielen
+make local-down        # stoppen, die Daten in .local/ bleiben
+```
+
+| Adresse | Was |
+|---|---|
+| <http://localhost:8025> | Mailpit: die Mails mit CSV-Anhang |
+| <http://localhost:8081> | pgweb: alle Tabellen, nur lesend (Rolle `va_read`) |
+| `localhost:5432` | Postgres (`LOCAL_DB_PORT`), z. B. für DBeaver |
+
+Lokal zeigt SMTP immer auf Mailpit und `HEALTHCHECK_URL` ist leer, auch wenn die `.env` echte
+Zugangsdaten enthält. Der Batch läuft lokal nur auf Knopfdruck, ohne Cron.
+
+**Schneller Weg** ohne Image-Build, aus der `.venv` gegen denselben lokalen Stack:
+
 ```bash
 make install-dev    # alle Abhängigkeiten exakt aus uv.lock (.venv)
-cp .env.example .env && nano .env
 make dry            # Dry-Run lokal
 make check          # ruff + pyright + import-linter + pytest (DB-Tests ohne DB übersprungen)
 make test-db-up     # Wegwerf-Postgres auf Port 55432 (Docker)
@@ -186,6 +208,7 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 |---|---|---|
 | `SMTP_HOST` | `smtp.gmail.com` | SMTP-Server |
 | `SMTP_PORT` | `587` | SMTP-Port (STARTTLS) |
+| `SMTP_PLAIN` | `false` | Nur lokal: ohne TLS und ohne Login an einen Mail-Catcher (Mailpit) |
 | `SMTP_USER` | – **Pflicht** | Gmail-Adresse |
 | `SMTP_PASSWORD` | – **Pflicht** | Gmail App-Passwort (16 Zeichen) |
 | `MAIL_TO` | – **Pflicht** | Empfänger-Adresse |
@@ -201,6 +224,7 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 | `VA_APP_PASSWORD` | – **Pflicht** | Passwort der App-Rolle `va_app` (kein DELETE); wirkt beim ersten DB-Start |
 | `VA_READ_PASSWORD` | – **Pflicht** | Passwort der Lese-Rolle `va_read` für Auswertungen; wirkt beim ersten DB-Start |
 | `DB_LAN_BIND` | `127.0.0.1` | IP, an die der Postgres-Port gebunden wird (NAS-IP = im LAN erreichbar) |
+| `LOCAL_DB_PORT` | `5432` | Nur lokaler Stack: Port der lokalen Datenbank, falls 5432 belegt ist |
 | `DATABASE_URL` | von Compose gesetzt | Nur lokal nötig: `postgresql+psycopg://va_app:<pw>@host:5432/value_analyzer` |
 | `HEALTHCHECK_URL` | – | Optional: `https://hc-ping.com/<uuid>` |
 | `TZ` | `Europe/Berlin` | Container-Zeitzone |

@@ -17,6 +17,7 @@
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
+| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 in Arbeit |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
 
 **Reihenfolge:**
@@ -82,6 +83,20 @@ Bewusste Änderungen am Ranking außerhalb von ADR-0011. Details:
 [Implementierungsplan, Methodik-Korrekturen](implementierungsplan.md#methodik-korrekturen)
 
 - [x] M1 Kein Composite ohne beide Teilscores (`25c260b`)
+
+## Track U – Umgebungen (lokal und NAS)
+
+Details: [umgebungen.md](umgebungen.md),
+[Implementierungsplan, Track U](implementierungsplan.md#track-u--umgebungen-lokal-und-nas)
+
+- [ ] U1 Lokaler Stack: Mailpit, pgweb, Läufe auf Knopfdruck (`make local-*`), `SMTP_PLAIN`
+- [ ] U2 NAS-Daten lokal einspielen (`make local-restore`), Regression gegen alle Wochen
+- [ ] U3 (optional) Test auf der NAS: Branch-Images, zweites Compose-Projekt mit eigener DB
+- [ ] Entscheidung (du): U4 Analysen im Browser, also P3.1, P3.2 und die Ansichten Ranking,
+      Runs und Titel-Detail vor Phase 2b ziehen
+
+**Fertig, wenn:** jede neue Implementierung lokal mit echten Daten im Browser und in Mailpit
+geprüft werden kann, bevor sie auf die NAS geht.
 
 ## Phase 2 – Postgres (Code fertig, Deployment offen)
 

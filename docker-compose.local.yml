@@ -1,0 +1,66 @@
+# Lokaler Stack (U1, docs/architecture/umgebungen.md). Liegt ueber docker-compose.yml und
+# wird nur ueber die make-Targets local-* genutzt, die beide Dateien angeben. Die NAS kennt
+# diese Datei nicht.
+#
+#   make local-up    Datenbank, Mailpit (http://localhost:8025), pgweb (http://localhost:8081)
+#   make local-run   ein Lauf mit dem Arbeitsstand, die Mail landet in Mailpit
+#
+# Alle Ports nur auf 127.0.0.1. Lokal geht keine Mail nach aussen und kein Healthcheck-Ping
+# raus, auch wenn die .env echte Zugangsdaten enthaelt.
+
+# Eigener Projekt- und Containername: kollidiert nicht mit einem Stack aus docker-compose.yml
+# auf demselben Rechner, egal aus welchem Ordner (Worktree) gestartet
+name: value-analyzer-local
+
+services:
+  db:
+    container_name: value-analyzer-local-db
+    # Eigene Daten, getrennt von ./pgdata der NAS-Definition
+    volumes:
+      - ./.local/pgdata:/var/lib/postgresql
+    # !override: DB_LAN_BIND aus der .env gilt lokal nicht. LOCAL_DB_PORT, falls 5432 belegt ist.
+    ports: !override
+      - "127.0.0.1:${LOCAL_DB_PORT:-5432}:5432"
+
+  value-analyzer:
+    container_name: value-analyzer-local
+    # Aus dem Arbeitsstand gebaut statt aus GHCR
+    image: value-analyzer:local
+    build:
+      context: .
+      target: runtime
+    # make local-up startet ihn nicht (kein Cron), make local-run startet einen Lauf
+    profiles: ["run"]
+    restart: "no"
+    environment:
+      # Fest, schlaegt die .env: kein Versand nach aussen, kein Ping auf den Healthcheck der NAS
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_PLAIN: "true"
+      HEALTHCHECK_URL: ""
+      # Pfade im Container, auch wenn die .env sie fuer make run/dry aus der .venv setzt
+      DATA_DIR: /app/data
+      LOGS_DIR: /app/logs
+    volumes:
+      - ./.local/logs:/app/logs
+
+  mailpit:
+    # Postfach im Browser; nimmt jede Mail an und verschickt nichts
+    image: axllent/mailpit:v1.31.6
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"  # Weboberflaeche
+      - "127.0.0.1:1025:1025"  # SMTP, auch fuer make run/dry aus der .venv
+
+  pgweb:
+    # Datenbank im Browser, nur lesend: Rolle va_read und --readonly
+    image: sosedoff/pgweb:0.17.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGWEB_DATABASE_URL: postgres://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer?sslmode=disable
+    command: ["/usr/bin/pgweb", "--bind=0.0.0.0", "--listen=8081", "--readonly"]
+    ports:
+      - "127.0.0.1:8081:8081"

@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -138,6 +138,30 @@ regression: ## Gespeicherte Wochen mit diesem Image nachspielen und vergleichen 
 
 regression-export: ## Wie regression, dazu je Lauf eine Fixture nach data/replay/ (fuer die CI)
 	docker compose run --rm value-analyzer python -m src.regression --export /app/data/replay
+
+# ---------- Lokaler Stack (U1, docs/architecture/umgebungen.md) -------------
+# Auf dem Entwicklungsrechner: .env aus .env.local.example. Das Image entsteht aus dem
+# Arbeitsstand, Mails landen in Mailpit, kein Healthcheck-Ping. Die NAS nutzt diese Targets nicht.
+LOCAL = docker compose -f docker-compose.yml -f docker-compose.local.yml
+
+local-up: ## Lokal: DB, Mailpit (localhost:8025) und pgweb (localhost:8081) starten
+	$(LOCAL) build value-analyzer
+	$(LOCAL) up -d
+
+local-run: ## Lokal: ein Lauf mit dem Arbeitsstand, die Mail landet in Mailpit
+	$(LOCAL) run --rm --build value-analyzer python -m src.main
+
+local-dry: ## Lokal: Dry-Run mit dem Arbeitsstand (Vorschau nach data/, keine Mail)
+	$(LOCAL) run --rm --build value-analyzer python -m src.main --dry-run
+
+local-regression: ## Lokal: gespeicherte Wochen mit dem Arbeitsstand nachspielen
+	$(LOCAL) run --rm --build value-analyzer python -m src.regression
+
+local-logs: ## Lokal: Logs von DB, Mailpit und pgweb verfolgen
+	$(LOCAL) logs -f
+
+local-down: ## Lokal: alles stoppen (die Daten in .local/ bleiben)
+	$(LOCAL) --profile run down
 
 # ---------- Sauberkeit -------------------------------------------------------
 clean: ## Cache und Builds entfernen

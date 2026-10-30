@@ -49,6 +49,8 @@ class Settings(_OwnerUrl):
     smtp_user: str = Field(min_length=1)
     smtp_password: SecretStr = Field(min_length=1)
     smtp_use_tls: bool = True
+    # Ohne TLS und ohne Login, nur fuer den lokalen Mail-Catcher (U1, umgebungen.md)
+    smtp_plain: bool = False
 
     # --- Mail ---
     mail_from: EmailStr | None = None  # default: smtp_user
