@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
@@ -66,13 +67,91 @@ class TestCompositeMean:
             },
         )
         # Zeile 1 hat nur 2/4 = 50 %, mit min_share 0.6 -> NaN
-        score_s = _composite_mean(df, min_share=0.6)
+        score_s = _composite_mean(df, min_share=0.6, min_count=2)
         assert pd.isna(score_s.iloc[1])
         assert not pd.isna(score_s.iloc[0])
 
+    def test_min_count_applies_beside_the_share(self):
+        df = pd.DataFrame({"f1": [1.0, 1.0], "f2": [1.0, 1.0], "f3": [1.0, np.nan]})
+        # 2 von 3 erfuellen den Anteil 0.5, aber nicht die Mindestzahl 3
+        score_s = _composite_mean(df, min_share=0.5, min_count=3)
+        assert not pd.isna(score_s.iloc[0])
+        assert pd.isna(score_s.iloc[1])
+
     def test_empty_df(self):
-        result = _composite_mean(pd.DataFrame(), min_share=0.5)
+        result = _composite_mean(pd.DataFrame(), min_share=0.5, min_count=2)
         assert result.empty
+
+
+def _frame(rows: dict[str, dict[str, float]]) -> pd.DataFrame:
+    """Kleines Universum: Symbol -> Kennzahlen, alle ueber der Mindest-Marktkapitalisierung."""
+    return pd.DataFrame(
+        [{"symbol": s, "market_cap": 1e9, **metrics} for s, metrics in rows.items()]
+    )
+
+
+# Vier Titel mit allen Faktoren, ein fuenfter mit 2 von 5 Quality-Faktoren
+_FULL_QUALITY = {
+    "roic": 0.10,
+    "fcf_margin": 0.10,
+    "operating_margin": 0.10,
+    "net_debt_ebitda": 2.0,
+    "earnings_stability": 0.5,
+}
+_UNIVERSE = {
+    f"T{i}.DE": {
+        "ev_ebit": 10.0 + i,
+        "pb_ratio": 2.0 + i,
+        "p_fcf": 15.0 + i,
+        "shareholder_yield": 0.03 - 0.005 * i,
+        **{k: v * (1 + 0.2 * i) for k, v in _FULL_QUALITY.items()},
+    }
+    for i in range(4)
+} | {
+    # Billigster Titel, aber kaum Quality-Daten (wie die Deutsche Bank: 2 von 5)
+    "BANK.DE": {
+        "ev_ebit": 5.0,
+        "pb_ratio": 0.5,
+        "p_fcf": 4.0,
+        "shareholder_yield": 0.08,
+        "fcf_margin": -0.5,
+        "earnings_stability": 0.1,
+    }
+}
+
+
+class TestMissingQualityScore:
+    """Sicherungstest P1.10: so verhaelt sich ``score()`` heute bei fehlendem Quality-Score.
+
+    Der Composite ist dann der Value-Score allein, und das Value-Trap-Flag greift nie.
+    Ob das so bleibt, ist eine offene Entscheidung (Implementierungsplan, P1.10). Aendert
+    sie das Verhalten, wird dieser Test bewusst angepasst.
+    """
+
+    def test_composite_is_the_value_score_alone(self):
+        out = score(_frame(_UNIVERSE), ScoringConfig()).set_index("symbol")
+        bank = out.loc["BANK.DE"].to_dict()
+        assert pd.isna(bank["quality_score"])
+        assert float(bank["value_score"]) >= 0.70
+        assert float(bank["composite_score"]) == float(bank["value_score"])
+        assert bool(bank["value_trap_flag"]) is False
+        assert int(bank["rank_overall"]) == 1
+
+
+class TestMinFactorCount:
+    def test_default_is_two(self):
+        assert ScoringConfig().min_factor_count == 2
+
+    def test_is_used_for_both_groups(self):
+        """P1.10: Die Untergrenze steht in ScoringConfig statt im Code."""
+        strict = score(_frame(_UNIVERSE), ScoringConfig(min_factor_count=5)).set_index("symbol")
+        # Vier Value-Faktoren reichen nicht mehr fuer 5, also fehlt jeder Value-Score
+        assert strict["value_score"].isna().all()
+        assert strict.loc["T0.DE", "quality_score"] == pytest.approx(
+            score(_frame(_UNIVERSE), ScoringConfig())
+            .set_index("symbol")
+            .loc["T0.DE", "quality_score"]
+        )
 
 
 class TestScoreEndToEnd:

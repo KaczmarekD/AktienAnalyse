@@ -252,8 +252,10 @@ sich in ganz Phase 1 nicht ändern.**
     `tests/golden/contracts/v1/`. `va_contracts` darf `src` nicht kennen, deshalb prüfen die
     Tests die Passung zu `src.fundamentals` und `score()` von außen, mit dem Golden-Datensatz.
 - **Review:** Feldnamen stabil, optionale Felder bewusst gewählt.
-  - Pflicht sind nur Symbol, Name und Index sowie die IDs der Events (ab 1). `run_id` ist
-    genau bei einem Rescore leer, ein Validator prüft das. `profile` bleibt bis Phase 2b leer.
+  - In `FundamentalsV1` sind nur Symbol, Name und Index Pflicht. Die Event-Payloads haben mehr
+    Pflichtfelder: die IDs (ab 1) und je nach Event etwa `trigger`, `options`, `stage`,
+    `reason`, `as_of` oder `universe`. `run_id` ist genau bei einem Rescore leer, ein Validator
+    prüft das. `profile` bleibt bis Phase 2b leer.
   - Nachgeschärft nach dem Gesamt-Review (19.10.2026), solange noch kein Event gespeichert
     wird: Trigger und Run-Optionen reisen mit, `scoring.run.completed` enthält Universum,
     Gewichte, `fetch_run_id` und `as_of`, das Ranking ist nie leer, `composite_score` hat keine
@@ -401,7 +403,9 @@ sich in ganz Phase 1 nicht ändern.**
     weitergereichtes Event beim Serialisieren seine Payload.
   - Bewusste Unterschiede zum alten Ablauf: Scheitert der Mailversand, bleibt
     `batch.run.report_id` leer (der Report verweist über `run_id` auf den Lauf); scheitert
-    der Abruf, bleibt `universe_size` leer. Der Abschluss von `batch.run` ist immer
+    der Abruf, bleibt `universe_size` leer. Scheitert market-data nach `start_fetch`, bleibt
+    auch `batch.run.fetch_run_id` leer, obwohl der Abruf in `market_data.fetch_run` steht:
+    `RunFailedV1` trägt keine `fetch_run_id`. Der Abschluss von `batch.run` ist immer
     „sicher“ (ein DB-Fehler dort ändert den Exit-Code nicht mehr, auch nicht im Dry-Run).
   - Tests: Bus-Verträge (`packages/va-platform/tests`), Handler je Modul, RunTracker,
     Golden-Mail über den Bus (`tests/test_pipeline_bus.py`, HTML byte-gleich).
@@ -430,6 +434,183 @@ sich in ganz Phase 1 nicht ändern.**
   - `mock_universe_df` hat eine Quelle (`services/scoring/tests/fixtures/mock_universe.json`).
   - Veraltete Verweise in Docstrings und CLAUDE.md sind korrigiert.
 
+#### P1.10 Fix-Paket Spec-Abgleich
+
+Aus dem Abgleich von Code und Specs am 30.10.2026 entstanden (Stand `8580e7d`, CI grün). Keiner
+der Befunde stammt aus dem Umbau in Phase 1, alle sind älter. Ranking und Mail ändern sich nicht,
+die Golden-Files der Mail, der Kennzahlen und der Contracts bleiben unverändert. Das Paket kommt
+vor P2b.1, weil P2b.1 neue Tabellen anlegt und sich auf den Löschschutz-Test verlässt.
+
+- **Test:**
+  - **Jahresabschlüsse:** Ein Netzfehler oder Rate-Limit beim Abruf von `income_stmt`,
+    `balance_sheet` oder `cashflow` löst den Retry von `_ticker_data` aus. Nach dem letzten Versuch
+    gilt der Titel als nicht abrufbar (`fetch failed`), rot.
+    - Heute schluckt yfinance den Fehler (`hide_exceptions`) und liefert eine leere Tabelle. Der
+      Retry greift nie, der Titel zählt als Erfolg mit leeren Kennzahlen, und in `errors` steht
+      nichts. F1.5 hat das nur für die Zusatzabrufe behoben.
+    - Getestet wie in F1.5 mit gepatchter HTTP-Schicht (`YfData.get`) oder einem Fake nach dem
+      Muster von `_SwallowingTicker`.
+    - Ein leerer Abschluss ohne Fehler bleibt leer und wird kein Fehler.
+  - **Löschschutz:** `tests/db/test_protection.py` prüft je Tabelle auch den Schutz gegen UPDATE.
+    - Auf jeder Tabelle außer `UPDATABLE_TABLES` muss `va_no_update` stehen, auf diesen dreien
+      genau `va_guard_update`. Heute prüft der Test nur DELETE und TRUNCATE.
+    - Die Liste der Schemas kommt aus `va_platform.db`, nicht aus einer Kopie im Test. Sonst würde
+      ein neues Schema, das in der Kopie fehlt, still nicht geprüft.
+    - Gegenprobe: Eine Tabelle ohne UPDATE-Trigger lässt den Test scheitern.
+  - **Abschluss eines Laufs:** Ein UPDATE auf `batch.run` oder `market_data.fetch_run`, das
+    `finished_at` nicht setzt, wird abgelehnt (rot). Heute lässt `va_guard_finished` beliebig
+    viele UPDATEs zu, solange der Lauf offen ist.
+  - **Contract:** `FundamentalsV1.from_flat` macht aus `NaT` und `pd.NA` ein `None`, statt den
+    Abruf-Schritt scheitern zu lassen (rot). Heute behandelt `missing_to_none` nur NaN und inf.
+  - **Dead Letter:** Die Fehlermail nach einem Dead Letter enthält den Traceback, nicht nur
+    `repr()` (rot, `src/main.py`).
+  - **Steuersatz:** `FetcherConfig` und `YahooFundamentals` verlangen `default_tax_rate`. Heute
+    fallen beide still auf eine eingebettete 0,27 zurück (rot).
+  - **Sicherungstest Scoring:** Ein Titel ohne Quality-Score bekommt heute den Value-Score als
+    Composite und kein Value-Trap-Flag. Der Test macht dieses Verhalten sichtbar, bis über die
+    Entscheidung unten befunden ist.
+- **Implementierung:**
+  - **Jahresabschlüsse:** `_ticker_data` ruft die Abschlüsse in `_yahoo_errors_raised()` ab.
+    - Nach dem letzten Versuch kostet der Fehler den ganzen Titel, wie heute jeder Fehler, der aus
+      `_ticker_data` herauskommt.
+    - Begründung: Ohne Abschlüsse blieben nur P/B und Shareholder Yield, und der Titel bekäme über
+      den Value-Score allein trotzdem einen Rang (siehe Entscheidung unten).
+  - **Trigger:** `va_guard_finished` verlangt `NEW.finished_at IS NOT NULL`.
+    - Dazu eine neue Migration `0005`. Sie schreibt die Funktion selbst aus, statt sie aus
+      `va_platform.db.ddl` zu importieren, und `ddl.py` bekommt dieselbe Änderung. So sind frische
+      und migrierte Datenbanken gleich.
+    - Heute ändern nur `write_run_finish` und `write_fetch_run_finish` diese Tabellen. Beide
+      setzen `finished_at`.
+  - **Contract:** `missing_to_none` erkennt fehlende Werte ohne pandas-Import. Die Import-Grenze
+    von `va_contracts` bleibt.
+  - **Dead Letter:** `src/main.py` gibt `traceback.format_exception(dead.error)` weiter.
+  - **Steuersatz:** `FetcherConfig.default_tax_rate` hat keinen Default mehr. Der Wert kommt nur
+    aus den Settings.
+  - **Untergrenze:** Die Untergrenze von 2 Faktoren in `_composite_mean` wird ein Feld in
+    `ScoringConfig` (Standard 2). P2b.2 übernimmt es in `ScoringProfileParams`.
+  - **yfinance-Namen:** Die `info`-Schlüssel (`marketCap`, `currentPrice`, `priceToBook`,
+    `sector` usw.) und der Aufbau des FX-Symbols (`…=X`, `lastPrice`) kommen in eine Tabelle
+    `INFO_FIELDS` am Kopf von `yahoo.py`. Heute stehen sie außerhalb der Tabellen, das verletzt
+    die CLAUDE.md-Regel „yfinance-Feldnamen“.
+  - **Abhängigkeit:** va-platform deklariert `psycopg`, weil die Engine `postgresql+psycopg`
+    erzwingt. Heute steht es nur im Root-Projekt.
+  - **Defaults im Report:** `build_report` verliert die veralteten Defaults (`version="0.2.0"`,
+    Gewichte, `top_n`/`bottom_n`). Aufrufer übergeben sie ohnehin.
+- **Doku:**
+  - **CLAUDE.md:**
+    - Rezept „Neues Workspace-Mitglied“:
+      - Laufzeitabhängigkeit statt Dev-Gruppe.
+      - Ergänzen: `testpaths`, Coverage (`[tool.coverage.run] source`, `--cov` in Makefile und
+        CI) und die eigenen `[tool.uv.sources]` des Mitglieds. Heute würden die Tests eines neuen
+        Mitglieds still nicht gesammelt.
+    - Earnings Stability rechnet mit σ geteilt durch den Mittelwert der Beträge. So rechnet der
+      Code seit dem ersten Commit, die Golden-Files halten das fest. Dasselbe im README.
+    - „ADR-0001 bis ADR-0009“ wird „bis ADR-0011“.
+    - Rezept „Neue Mail-Empfänger“: dazu `NotificationConfig.recipient` in `src/composition.py`.
+    - `INFO_FIELDS` in die Liste der yfinance-Tabellen.
+    - „CSV-Vollranking“ heißt: alle bewerteten Titel. Gefilterte und gescheiterte Titel fehlen in
+      der CSV, stehen aber in der DB.
+    - Rezept „Neues Universum“: `MIN_MARKET_CAP` wird in der Handelswährung verglichen. Das ist
+      korrekt, solange das Universum nur `.DE`-Titel hat.
+  - **code-struktur.md:**
+    - Status und Ist-Analyse auf den Stand nach Phase 1 bringen.
+    - Ports wie umgesetzt beschreiben: `load(fallback, cfg, today) -> LiveUniverse`,
+      `fetch(ticker, history) -> Fundamentals` und `SnapshotStore` statt `RawFinancials`.
+    - Validierung liegt in `domain/universe.py`.
+    - Sieben import-linter-Verträge, `src` heißt „Batch“.
+  - **architecture/README.md:**
+    - Den Statusblock um Phase 0, Phase 1 und F1 ergänzen.
+    - pyarrow bleibt für den Altdaten-Import.
+    - pandas steht auch in va-platform und notification.
+  - **README:**
+    - Die Pipeline läuft über den Event-Bus statt über `send_report()`.
+    - Das Schema `market_data` enthält auch die F1-Tabellen.
+  - **Dieser Plan:**
+    - F1.1 bis F1.6: je ein Hinweis, wohin die Module gezogen sind
+      (`va_market_data.domain.consensus`/`history`, `adapters/yahoo.py`, `PostgresSnapshotStore`).
+    - P2b.1: Die nächste freie Migration ist nach diesem Paket `0006`.
+    - P1.2: „Pflicht sind nur Symbol, Name und Index“ gilt für `FundamentalsV1`, nicht für die
+      Event-Payloads.
+    - F1.3: Ab 2000 angefragt, Yahoo liefert ab etwa 2015.
+    - P1.8, bewusster Unterschied: Scheitert der Abruf nach `start_fetch`, bleibt
+      `batch.run.fetch_run_id` leer.
+  - **Docstrings:**
+    - `tests/test_contracts_v1.py`: „Altbestand“ und `main._ticker_label`.
+    - `va_platform/__init__.py`: nennt Settings-Basis und Logging, aber nicht den Bus.
+    - `services/scoring/tests/conftest.py`: „Kopie“.
+    - Kommentar an `RunFailedV1.scoring_run_id`: Das Feld gilt nicht nur beim Rescore. Es ist ein
+      `#`-Kommentar und ändert das Schema nicht.
+    - Migration `0002`: `src.consensus`.
+- **Grün:** Standard. Alle Golden-Files bleiben unverändert.
+- **Review:** `/code-review high`. Gegenprobe zum Löschschutz-Test wie bei P1.1: Eine Tabelle ohne
+  UPDATE-Trigger einbauen und den Test rot sehen.
+- **Bewusst offen:**
+  - **Alte Migrationen:** `0001` bis `0004` importieren ihre DDL aus `va_platform.db.ddl`. Ändert
+    sich dort später etwas, weichen frische von migrierten Datenbanken ab. Sie bleiben, bis die
+    Migrationen in Phase 5 je Service getrennt werden. Ändert eine Migration bestehende DDL (wie
+    `0005` die Trigger-Funktion), schreibt sie sie aus, und ein Test vergleicht sie mit `ddl.py`.
+    Neue Tabellen bekommen weiter `protect_table()`, den Schutz prüft `test_protection.py`.
+  - **`notification.report.sent`** kommt auch bei `notify=False`, ohne dass eine Mail rausging.
+    Wird erst mit Phase 3/4 relevant und dann im Contract geklärt.
+  - **Randfälle des `InProcessBus`:** ein Fehler in `on_dead_letter` und die Reihenfolge der
+    Abonnenten von `screening.run.failed`. Der Batch nutzt je Lauf einen frischen Bus, NATS
+    ersetzt ihn in P4.3.
+  - **Versandprotokoll:** Alarme aus dem Fallback in `src/main.py` (`notify_failure_without_run`)
+    stehen nicht darin.
+  - **`frequency` beim Lesen:** Die Lese-Methoden für `statement_value` prüfen `frequency` nicht.
+    Ein Tippfehler ergibt ein leeres Ergebnis.
+  - **Methodiktext im Template:** Er nennt feste Quartile statt der Schwellen 0,70/0,30. Das kommt
+    mit P2b.3 (Profil im Footer).
+- **Umgesetzt (30.10.2026):**
+  - **Abweichungen vom Plan:**
+    - Neben `INFO_FIELDS` gibt es `STATEMENT_FIELDS` (Attribute der Jahresabschlüsse) und
+      `FX_FIELDS`. Der Ersatz `financials` für `income_stmt` entfällt, yfinance ab 1.7 hat immer
+      `income_stmt`. `INFO_FIELDS` hält den Vorrang wie bisher mit `or`: Beim Kurs gilt
+      `regularMarketPrice`, wenn `currentPrice` leer oder 0 ist.
+    - Nur die drei Abschlüsse laufen in `_yahoo_errors_raised()`, `info` nicht. Dort verschluckt
+      yfinance nur HTTP-Fehlerantworten, Netzfehler und Rate-Limit kommen schon an. Eine
+      Fehlerantwort allein des Zusatzabrufs für `info` kostete sonst den ganzen Titel.
+    - `build_report` behält die Defaults für `top_n`, `bottom_n` und die Gewichte. Sie
+      entsprechen den Konfigurationswerten, und Tests sowie die J4125-Prüfung im Image nutzen
+      sie. Nur die veraltete Versionsnummer `0.2.0` wird der Platzhalter `dev`.
+    - Die Untergrenze heißt `ScoringConfig.min_factor_count`. Sie landet über `asdict` in der
+      Konfiguration jedes neuen `scoring_run`.
+  - **Tests:** Rot gesehen haben 13 neue Tests, aus dem erwarteten Grund (`9509864`). Dazu
+    kommen:
+    - ein Vergleich der Trigger-Funktion zwischen Migration `0005` und `ddl.py`
+      (`tests/test_migrate.py`);
+    - eine eingebaute Gegenprobe zum Löschschutz: eine Tabelle nur mit DELETE- und
+      TRUNCATE-Trigger wird gemeldet.
+  - **Live-Probe** am 30.10.2026: Basisabruf mit dem neuen Code für alle 90 Titel der
+    Fallback-CSV. Kein Titel gescheitert, keiner mit leeren Abschlüssen oder ohne
+    Marktkapitalisierung, im Median 1,0 s je Titel.
+  - **Review** (`/code-review high`), behoben in `e1068fe`:
+    - Nach einem Rate-Limit wiederholt der Basisabruf nicht mehr, wie die Zusatzabrufe.
+    - `errors` nennt die Ursache statt `RetryError[...]`.
+    - Ein Test prüft, dass jeder `INFO_FIELDS`-Eintrag mindestens einen Kandidaten hat.
+  - **Review, bewusst offen:**
+    - Ein Retry lädt auch `info` erneut. Das kostet nur im Fehlerfall zwei Anfragen.
+    - `batch.run.error` bekommt nach einem Dead Letter weiter nur die Fehlermeldung. Den
+      Traceback hat die Fehlermail.
+
+**Entscheidung (du), nicht Teil des Pakets: Titel ohne Quality-Score**
+
+- **Heute:** Liegen weniger als 3 von 5 Quality-Faktoren vor, ist der Composite der Value-Score
+  allein (`va_scoring.domain.scoring.score`). Das Value-Trap-Flag kann dann nicht greifen.
+- **Betroffen:** echte Titel, etwa die Deutsche Bank (2 von 5 Quality-Faktoren). Ein Titel ohne
+  Quality-Daten steht damit besser da als einer mit mittelmäßiger Quality. Das widerspricht
+  CLAUDE.md: Quality soll Value-Traps unterdrücken.
+- **Herkunft:** Das Verhalten stammt aus dem ersten Commit und ist nirgends dokumentiert.
+- **Möglichkeiten:**
+  1. Kein Composite ohne beide Teilscores: Der Titel bekommt keinen Rang und steht am Ende. Das
+     entspricht der Regel aus ADR-0011: Wer unter den Mindestanteil fällt, bekommt keinen
+     Composite-Score.
+  2. Ein fehlender Teilscore zählt neutral (0,5).
+  3. So lassen und in CLAUDE.md dokumentieren, bis F2.4 die Finanzwerte gesondert behandelt.
+- **Folgen:** Varianten 1 und 2 ändern Ranking und Golden-Files. Sie gehören deshalb in die
+  Entscheidung über ADR-0011 oder in ein eigenes Paket mit `--update-golden`. Der Replay-Vergleich
+  aus [regressionstest.md](regressionstest.md) zeigt vorher, welche Titel sich verschieben.
+
 ### Phase 2b – Scoring-Profile
 
 #### P2b.1 Profil-Tabellen
@@ -438,8 +619,8 @@ sich in ganz Phase 1 nicht ändern.**
   - eine Version anlegen und aktivieren, die jüngste Aktivierung gewinnt
   - `UPDATE`/`DELETE` verboten (der Löschschutz-Test greift automatisch)
   - das Profil „Standard“ wird aus ENV angelegt, auch bei wiederholtem Start nur einmal
-- **Implementierung:** eine neue Migration (die nächste freie Nummer, `0002` ist durch F1.1
-  belegt) mit `protect_table()` sowie ein Repository
+- **Implementierung:** eine neue Migration (die nächste freie Nummer ist `0006`, `0002` bis
+  `0004` belegt Track F1, `0005` P1.10) mit `protect_table()` sowie ein Repository
   ([scoring-profile.md](scoring-profile.md)).
 
 #### P2b.2 ScoringProfileParams
@@ -632,6 +813,17 @@ unverändert.
     `domain/metrics` (P1.3).
   - Ändert ein Phase-0-Paket dieselbe Datei, etwa `data_fetcher.py` in P0.5, wird zuerst das
     Phase-0-Paket gemergt.
+  - F1.1 bis F1.6 sind vor Phase 1 entstanden und nennen die alten Orte. Seit Phase 1 liegen sie
+    hier:
+    - `src/consensus.py` → `va_market_data.domain.consensus`, `src/history.py` →
+      `va_market_data.domain.history`
+    - `data_fetcher` (`fetch_one`, `fetch_consensus`, `fetch_quarterly`, `fetch_prices`,
+      `_additional`, `CONSENSUS_FIELDS`, `QUARTERLY_FIELDS`, `PRICE_FIELDS`) →
+      `va_market_data.adapters.yahoo`; `fetch_all` → `va_market_data.application.fetch`
+    - der Recorder (`BatchRecorder.history_state`, die Savepoints, `_OptionalWrites`) →
+      `PostgresSnapshotStore` und `_OptionalWrites` in `va_market_data.adapters.postgres.store`
+    - das Repository (`write_consensus`, `write_statements`, `get_statements_as_of` usw.) →
+      `MarketDataRepository` in `va_market_data.adapters.postgres.repository`
 - **F2 und F3 (Auswertung)** setzen voraus, dass
   [ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md) akzeptiert ist. Es ist derzeit
   nur vorgeschlagen. Bis zur Annahme wird kein F2- oder F3-Paket begonnen, entschieden wird nach
@@ -714,8 +906,8 @@ unverändert.
     der Zeitzone der Börse (dieselbe Datumsregel wie für Abschlüsse). Fehlende und nicht positive
     Werte zählen nicht.
   - Ein Fehler kostet nur die Aktienanzahl dieser Woche, der nächste Lauf holt die Lücke nach.
-- **NAS (du):** Nur deployen, die Migration läuft beim Start. Der erste Lauf holt die Historie ab
-  2015, das kostet je Titel unter einer Sekunde.
+- **NAS (du):** Nur deployen, die Migration läuft beim Start. Der erste Lauf fragt die Historie ab
+  2000-01-01 an, Yahoo liefert sie ab etwa 2015/2016. Das kostet je Titel unter einer Sekunde.
 - **Review:** Gemessen am 19.10.2026 mit yfinance 1.7:
   - Der Abruf kostet 0,1 bis 0,5 s je Titel, beim ersten Titel eines Laufs bis 2,4 s.
   - Yahoo liefert die Aktienanzahl ab 2015/2016, rund 700 Tage je Titel. Danach kommen wenige

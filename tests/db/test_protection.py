@@ -12,10 +12,10 @@ from src.db.repositories.runs import RunRepository
 from va_market_data.adapters.postgres import MarketDataRepository
 from va_market_data.domain.consensus import ConsensusEntry
 from va_market_data.domain.history import PriceBar
-from va_platform.db import session_scope
+from va_platform.db import APP_SCHEMAS, session_scope
+from va_platform.db.ddl import UPDATABLE_TABLES
 from va_scoring.adapters.postgres import ScoreRow, ScoringRepository
 
-APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting")
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 
 
@@ -46,29 +46,64 @@ def _exec(engine: Engine, sql: str, **params: object) -> None:
         conn.execute(text(sql), params)
 
 
-class TestTriggers:
-    def test_every_table_has_delete_and_truncate_guard(self, engine):
-        with engine.connect() as conn:
-            tables = conn.execute(
-                text(
-                    "SELECT table_schema || '.' || table_name FROM information_schema.tables "
-                    "WHERE table_schema = ANY(:s) AND table_type = 'BASE TABLE'"
-                ),
-                {"s": list(APP_SCHEMAS)},
-            ).scalars()
-            tables = sorted(tables)
-            assert len(tables) >= 12
-            for table in tables:
-                guards = conn.execute(
+def _unguarded(engine: Engine) -> list[str]:
+    """Alle Luecken im Schutz der App-Tabellen, leer bei vollstaendigem Schutz.
+
+    Jede Tabelle braucht Trigger gegen DELETE und TRUNCATE. Gegen UPDATE schuetzt
+    ``va_no_update``, nur ``UPDATABLE_TABLES`` haben stattdessen ``va_guard_update``.
+    """
+    gaps: list[str] = []
+    with engine.connect() as conn:
+        tables = conn.execute(
+            text(
+                "SELECT table_schema || '.' || table_name FROM information_schema.tables "
+                "WHERE table_schema = ANY(:s) AND table_type = 'BASE TABLE'"
+            ),
+            {"s": list(APP_SCHEMAS)},
+        ).scalars()
+        for table in sorted(tables):
+            names = set(
+                conn.execute(
                     text(
                         "SELECT t.tgname FROM pg_trigger t "
                         "WHERE t.tgrelid = CAST(:t AS regclass) AND NOT t.tgisinternal"
                     ),
                     {"t": table},
                 ).scalars()
-                names = set(guards)
-                assert "va_no_delete" in names, f"{table} ohne DELETE-Schutz"
-                assert "va_no_truncate" in names, f"{table} ohne TRUNCATE-Schutz"
+            )
+            update_guard = "va_guard_update" if table in UPDATABLE_TABLES else "va_no_update"
+            for guard in ("va_no_delete", "va_no_truncate", update_guard):
+                if guard not in names:
+                    gaps.append(f"{table} ohne {guard}")
+            if table in UPDATABLE_TABLES and "va_no_update" in names:
+                gaps.append(f"{table} darf abgeschlossen werden, hat aber va_no_update")
+    return gaps
+
+
+class TestTriggers:
+    def test_every_table_is_protected(self, engine):
+        """Loeschen, Leeren und Ueberschreiben - fuer jede Tabelle jedes App-Schemas."""
+        with engine.connect() as conn:
+            count = conn.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.tables "
+                    "WHERE table_schema = ANY(:s) AND table_type = 'BASE TABLE'"
+                ),
+                {"s": list(APP_SCHEMAS)},
+            ).scalar()
+        assert count is not None and count >= 12
+        assert _unguarded(engine) == []
+
+    def test_a_table_without_update_guard_is_noticed(self, engine):
+        """Gegenprobe: eine neue Tabelle, die nur gegen DELETE und TRUNCATE geschuetzt ist."""
+        _exec(engine, "CREATE TABLE scoring.probe (id integer)")
+        for op_name, guard in (("DELETE", "va_no_delete"), ("TRUNCATE", "va_no_truncate")):
+            _exec(
+                engine,
+                f"CREATE TRIGGER {guard} BEFORE {op_name} ON scoring.probe "
+                "FOR EACH STATEMENT EXECUTE FUNCTION public.va_forbid_change()",
+            )
+        assert _unguarded(engine) == ["scoring.probe ohne va_no_update"]
 
     def test_delete_is_rejected(self, engine):
         run_id = _start_run(engine)
@@ -176,6 +211,25 @@ class TestTriggers:
             RunRepository(s).write_run_finish(run_id, status="success", exit_code=0)
         with pytest.raises(DBAPIError, match="abgeschlossen"):
             _exec(engine, "UPDATE batch.run SET status = 'failed' WHERE id = :id", id=run_id)
+
+    def test_open_run_is_only_updated_to_finish_it(self, engine):
+        """P1.10: Das einzige UPDATE eines Laufs ist sein Abschluss - mit ``finished_at``."""
+        run_id = _start_run(engine)
+        with pytest.raises(DBAPIError, match="finished_at"):
+            _exec(engine, "UPDATE batch.run SET status = 'failed' WHERE id = :id", id=run_id)
+        with session_scope(engine) as s:
+            fetch_run_id = _fetch_run(MarketDataRepository(s))
+        with pytest.raises(DBAPIError, match="finished_at"):
+            _exec(
+                engine,
+                "UPDATE market_data.fetch_run SET ok_count = 1 WHERE id = :id",
+                id=fetch_run_id,
+            )
+        with session_scope(engine) as s:  # der Abschluss selbst geht weiter
+            RunRepository(s).write_run_finish(run_id, status="success", exit_code=0)
+            MarketDataRepository(s).write_fetch_run_finish(
+                fetch_run_id, ok_count=1, success_share=1.0
+            )
 
     def test_instrument_symbol_is_immutable_isin_only_backfilled(self, engine):
         with session_scope(engine) as s:

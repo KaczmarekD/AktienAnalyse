@@ -61,6 +61,8 @@ class ScoringConfig:
     # Mindestens X von N Faktoren muessen vorliegen, sonst kein Score:
     min_value_factor_share: float = 0.5
     min_quality_factor_share: float = 0.5
+    # ... und je Gruppe mindestens so viele, egal wie klein der Anteil ist
+    min_factor_count: int = 2
 
     # Value-Trap: oberes Value-Quartil + unteres Quality-Quartil
     value_trap_value_threshold: float = 0.70
@@ -91,12 +93,16 @@ def _percentile_rank(series: pd.Series, direction: str, drop_non_positive: bool)
     return out
 
 
-def _composite_mean(rank_df: pd.DataFrame, min_share: float) -> pd.Series:
-    """Mittelwert ueber alle vorhandenen Faktor-Ranks (NaN-tolerant)."""
+def _composite_mean(rank_df: pd.DataFrame, min_share: float, min_count: int) -> pd.Series:
+    """Mittelwert ueber alle vorhandenen Faktor-Ranks (NaN-tolerant).
+
+    Ein Score entsteht nur mit genug Faktoren: Anteil ``min_share`` und mindestens
+    ``min_count`` Stueck.
+    """
     if rank_df.empty:
         return pd.Series(dtype=float)
     available = rank_df.notna().sum(axis=1)
-    min_required = max(2, math.ceil(rank_df.shape[1] * min_share))
+    min_required = max(min_count, math.ceil(rank_df.shape[1] * min_share))
     score = rank_df.mean(axis=1, skipna=True)
     score[available < min_required] = np.nan
     return score
@@ -132,8 +138,12 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
                 drop_non_positive=False,
             )
 
-    out["value_score"] = _composite_mean(value_ranks, cfg.min_value_factor_share)
-    out["quality_score"] = _composite_mean(quality_ranks, cfg.min_quality_factor_share)
+    out["value_score"] = _composite_mean(
+        value_ranks, cfg.min_value_factor_share, cfg.min_factor_count
+    )
+    out["quality_score"] = _composite_mean(
+        quality_ranks, cfg.min_quality_factor_share, cfg.min_factor_count
+    )
 
     v = out["value_score"]
     q = out["quality_score"]

@@ -1,6 +1,6 @@
 # Roadmap
 
-> Stand: 19.10.2026. Hier steht, *was* in welcher Phase passiert und was erledigt ist. *Wie*
+> Stand: 30.10.2026. Hier steht, *was* in welcher Phase passiert und was erledigt ist. *Wie*
 > jedes Arbeitspaket umgesetzt wird (Test → Implementierung → Grün → Review), steht im
 > [Implementierungsplan](implementierungsplan.md). Abgehakt wird nur hier, jeweils mit Commit.
 > Die Samstags-Mail muss nach jedem Paket unverändert funktionieren.
@@ -11,7 +11,7 @@
 |---|---|---|
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
 | 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
-| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.9), NAS: neues Image laden |
+| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.9), Fix-Paket P1.10 aus dem Spec-Abgleich offen, NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | offen |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
@@ -23,6 +23,8 @@
 - Phase 2 wurde vorgezogen, weil jede Woche ohne Stichtagsdaten verloren ist.
 - Phase 0 beginnt mit P0.1: Der Golden-Master ist das Sicherungsnetz für alle späteren Umbauten.
 - Ab Phase 1 ist die Reihenfolge verbindlich.
+- P1.10 kommt vor P2b.1: P2b.1 legt neue Tabellen an und verlässt sich auf den Löschschutz-Test,
+  der heute den Schutz gegen UPDATE nicht prüft.
 - Track F1 ist aus demselben Grund vorgezogen wie Phase 2 und kann parallel zu Phase 0 laufen.
   F2 und F3 beginnen erst, wenn ADR-0011 angenommen ist, frühestens nach P1.5 und P2b.2.
 
@@ -65,6 +67,11 @@ Details: [Implementierungsplan, Phase 1](implementierungsplan.md#phase-1--modula
 - [x] P1.7 Datenbankzugriff je Modul (`5cad2aa`)
 - [x] P1.8 Event-Bus im Prozess, Composition Root (`6d6286c`)
 - [x] P1.9 Aufräumen (`4f183d6`), Gesamt-Review Phase 1 (`cef8ebb`)
+- [ ] P1.10 Fix-Paket Spec-Abgleich (Abgleich vom 30.10.2026): Jahresabschlüsse ohne verschluckte
+      Abruffehler, Löschschutz-Test mit UPDATE, Trigger für den Abschluss eines Laufs, Doku auf
+      den Stand nach Phase 1
+- [ ] Entscheidung (du): Titel ohne Quality-Score bekommen heute den Value-Score als Composite
+      (Varianten im [Implementierungsplan, P1.10](implementierungsplan.md#p110-fix-paket-spec-abgleich))
 
 **Fertig, wenn:** es weiterhin ein Container ist, die Golden-Files unverändert sind und die CI die
 Grenzen erzwingt.

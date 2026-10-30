@@ -9,7 +9,7 @@ import logging
 from collections.abc import Callable
 from datetime import date
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import pandas as pd
 import pytest
@@ -19,11 +19,14 @@ from yfinance._http import HTTPError
 from yfinance.data import YfData
 from yfinance.exceptions import YFRateLimitError
 
+from va_market_data.adapters import yahoo
 from va_market_data.adapters.yahoo import (
     CONSENSUS_FIELDS,
     FIELD_MAP,
     PRICE_FIELDS,
     QUARTERLY_FIELDS,
+    FetcherConfig,
+    YahooFundamentals,
     YahooResponseError,
     _consensus_value,
     _dividend_yield,
@@ -47,6 +50,9 @@ from va_market_data.domain.universe import Ticker
 
 # Vor dem Patchen der Fixture gemerkt: einige Tests brauchen den echten Ablauf
 REAL_FETCH_CONSENSUS = fetch_consensus
+
+# Im Betrieb kommt der Steuersatz aus den Settings
+CFG = FetcherConfig(default_tax_rate=0.27)
 
 
 @pytest.fixture(autouse=True)
@@ -389,6 +395,158 @@ class TestYahooErrorsReachTheAdapters:
         assert yf.config.debug.hide_exceptions is True
 
 
+BASE_INFO = {"currency": "EUR", "financialCurrency": "EUR", "marketCap": 1_000.0}
+
+
+class _SwallowingStatementsTicker:
+    """Basisabruf wie yfinance 1.7: ``info`` kommt, die Jahresabschluesse scheitern.
+
+    Mit ``hide_exceptions`` (Standard) verschluckt yfinance den Fehler und liefert eine
+    leere Tabelle. ``failures`` sagt, wie viele Zugriffe scheitern (``None``: alle).
+    """
+
+    info = BASE_INFO
+
+    def __init__(self, error: Exception | None, failures: int | None = None) -> None:
+        self.calls = 0
+        self._error = error
+        self._failures = failures
+
+    def _statement(self) -> pd.DataFrame:
+        self.calls += 1
+        failing = self._failures is None or self.calls <= self._failures
+        if self._error is None or not failing or yf.config.debug.hide_exceptions:
+            return pd.DataFrame()
+        raise self._error
+
+    @property
+    def income_stmt(self) -> pd.DataFrame:
+        return self._statement()
+
+    balance_sheet = income_stmt
+    cashflow = income_stmt
+
+
+class TestBaseFetchErrors:
+    """P1.10: Fehler beim Abruf der Jahresabschluesse kommen an, statt verschluckt zu werden.
+
+    Sonst griff der Retry nie, und ein gedrosselter Titel zaehlte als Erfolg mit leeren
+    Kennzahlen - ohne Eintrag in ``errors``.
+    """
+
+    def _fetch(self, fake: Any) -> Any:
+        with (
+            patch("va_market_data.adapters.yahoo.yf.Ticker", return_value=fake),
+            patch("time.sleep"),
+        ):
+            return fetch_one(Ticker("X.DE", "X", "DAX"), CFG)
+
+    def test_statement_failure_is_retried_then_costs_the_ticker(self):
+        fake = _SwallowingStatementsTicker(ConnectionError("reset"))
+        f = self._fetch(fake)
+        assert fake.calls == 3  # drei Versuche, jeweils am ersten Abschluss gescheitert
+        assert f.raw is None
+        assert any(e.startswith("fetch failed") for e in f.errors)
+        assert yf.config.debug.hide_exceptions is True  # danach wieder Standard
+
+    def test_error_names_the_cause_not_the_retry(self):
+        f = self._fetch(_SwallowingStatementsTicker(ConnectionError("reset")))
+        assert f.errors == ["fetch failed: reset"]
+
+    def test_rate_limit_is_not_retried(self):
+        """Wie bei den Zusatzabrufen: Wiederholen verlaengert nur die Drosselung."""
+        fake = _SwallowingStatementsTicker(YFRateLimitError())
+        f = self._fetch(fake)
+        assert fake.calls == 1
+        assert f.raw is None
+        assert f.errors and f.errors[0].startswith("fetch failed")
+
+    def test_transient_statement_failure_recovers(self):
+        fake = _SwallowingStatementsTicker(ConnectionError("reset"), failures=1)
+        f = self._fetch(fake)
+        assert f.raw is not None
+        assert f.errors == []
+
+    def test_empty_statements_without_error_stay_empty(self):
+        """Keine Daten (z. B. kein Cashflow bei einer Bank) ist kein Fehler."""
+        f = self._fetch(_SwallowingStatementsTicker(None))
+        assert f.raw is not None
+        assert f.market.market_cap == 1_000.0
+        assert f.errors == []
+
+    def test_rate_limit_reaches_the_adapter_on_the_http_level(self):
+        """Mit echtem yfinance: nur die HTTP-Schicht ist gepatcht."""
+        requests: list[str] = []
+
+        def throttled(self, url, params=None, timeout=30, **kwargs):
+            requests.append(url)
+            raise YFRateLimitError
+
+        with (
+            patch.object(yf.Ticker, "info", new_callable=PropertyMock, return_value=BASE_INFO),
+            patch.object(YfData, "get", throttled),
+            patch("time.sleep"),
+        ):
+            f = fetch_one(Ticker("SAP.DE", "SAP", "DAX"), CFG)
+        assert requests  # die Abschluesse wurden wirklich angefragt
+        assert f.raw is None
+        assert any(e.startswith("fetch failed") for e in f.errors)
+
+
+class TestYahooFieldTables:
+    """CLAUDE.md: yfinance-Namen stehen nur in den Tabellen am Kopf von ``yahoo.py``."""
+
+    def _fetch(self, info: dict[str, Any]) -> Any:
+        with patch(
+            "va_market_data.adapters.yahoo._ticker_data", return_value=(info, None, None, None)
+        ):
+            return fetch_one(Ticker("X.DE", "X", "DAX"), CFG)
+
+    def test_every_info_field_has_a_candidate(self):
+        for field, keys in yahoo.INFO_FIELDS.items():
+            assert keys, field
+
+    def test_info_keys_come_from_the_table(self, monkeypatch):
+        monkeypatch.setitem(yahoo.INFO_FIELDS, "market_cap", ("mktCap",))
+        f = self._fetch({"currency": "EUR", "financialCurrency": "EUR", "mktCap": 5.0})
+        assert f.market.market_cap == 5.0
+
+    def test_statement_attributes_come_from_the_table(self, monkeypatch):
+        income = _statement({"Total Revenue": 1_000.0})
+
+        class Renamed:
+            info = BASE_INFO
+            annual_income = income
+            balance_sheet = cashflow = pd.DataFrame()
+
+        monkeypatch.setitem(yahoo.STATEMENT_FIELDS, "income", "annual_income")
+        with patch("va_market_data.adapters.yahoo.yf.Ticker", return_value=Renamed()):
+            _, fetched, _, _ = yahoo._ticker_data("X.DE")
+        assert fetched is income
+
+    @pytest.mark.parametrize(
+        ("info", "price"),
+        [
+            ({"currentPrice": 10.0, "regularMarketPrice": 12.0}, 10.0),
+            ({"regularMarketPrice": 12.0}, 12.0),
+            ({"currentPrice": 0, "regularMarketPrice": 12.0}, 12.0),  # wie bisher mit ``or``
+            ({}, None),
+        ],
+    )
+    def test_price_falls_back_to_the_market_price(self, info, price):
+        f = self._fetch({"currency": "EUR", "financialCurrency": "EUR", **info})
+        assert f.market.price == price
+
+
+class TestFetcherConfig:
+    def test_tax_rate_comes_only_from_the_settings(self):
+        """P1.10: kein eingebetteter Steuersatz, der still statt der Settings greift."""
+        with pytest.raises(TypeError):
+            FetcherConfig()  # pyright: ignore[reportCallIssue]
+        with pytest.raises(TypeError):
+            YahooFundamentals()  # pyright: ignore[reportCallIssue]
+
+
 class TestConsensusSharedSource:
     """yfinance holt eps_trend, eps_revisions, earnings_estimate, revenue_estimate und
     growth_estimates aus einem gemeinsamen Abruf (earningsTrend). Scheitert er, loggt
@@ -649,7 +807,7 @@ class TestFetchOneCurrencyMismatch:
             patch("va_market_data.adapters.yahoo._ticker_data", return_value=data),
             patch("va_market_data.adapters.yahoo._fx_rate", **fx_rate),
         ):
-            return fetch_one(Ticker("QIA.DE", "Qiagen", "MDAX"))
+            return fetch_one(Ticker("QIA.DE", "Qiagen", "MDAX"), CFG)
 
     def test_value_multiples_use_converted_statements(self):
         f = self._fetch({"return_value": 0.8})
@@ -687,7 +845,7 @@ class TestFetchOneShareholderYield:
             cashflow,
         )
         with patch("va_market_data.adapters.yahoo._ticker_data", return_value=data):
-            return fetch_one(Ticker("X.DE", "X", "MDAX"))
+            return fetch_one(Ticker("X.DE", "X", "MDAX"), CFG)
 
     def test_zero_yield_is_kept(self):
         f = self._fetch(
@@ -721,7 +879,7 @@ class TestFetchOneProvenanceAndRaw:
             {"side_effect": side_effect} if side_effect else {"return_value": data}
         )
         with patch("va_market_data.adapters.yahoo._ticker_data", **kwargs):
-            return fetch_one(Ticker("X.DE", "X", "DAX"), history=history)
+            return fetch_one(Ticker("X.DE", "X", "DAX"), CFG, history=history)
 
     def test_raw_data_is_kept(self):
         f = self._fetch()
@@ -837,7 +995,7 @@ class TestRateLimitPerTicker:
         with patch(
             "va_market_data.adapters.yahoo._ticker_data", return_value=(info, None, None, None)
         ):
-            return fetch_one(Ticker(symbol, "X", "DAX"))
+            return fetch_one(Ticker(symbol, "X", "DAX"), CFG)
 
     def test_rate_limit_in_the_consensus_skips_the_rest(
         self, no_consensus_network, no_quarterly_network, no_shares_network, no_prices_network
@@ -946,7 +1104,7 @@ class TestFetchOneInvalidPeriods:
         with patch(
             "va_market_data.adapters.yahoo._ticker_data", return_value=(info, income, None, None)
         ):
-            return fetch_one(Ticker("X.DE", "X", "DAX"))
+            return fetch_one(Ticker("X.DE", "X", "DAX"), CFG)
 
     def test_metrics_ignore_undated_columns(self):
         f = self._fetch(self.INCOME)

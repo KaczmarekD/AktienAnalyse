@@ -8,7 +8,10 @@ den README (der zeigt, **wie** das Projekt betrieben wird).
 
 Wöchentlicher Batch-Job auf einer Synology, der DAX/MDAX (90 Werte) nach
 einer Value-+-Quality-Methodik durchscoresd und das Ergebnis als E-Mail
-versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking).
+versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking). Die CSV enthält alle
+Titel, die den Größenfilter passieren, auch die ohne Score. Titel unter
+`MIN_MARKET_CAP` und gescheiterte Abrufe fehlen dort, stehen aber in der DB
+(`market_data.fundamental_snapshot`, `scoring.score_result` mit `passed_filter = false`).
 
 ## Architektur in einem Satz
 
@@ -44,7 +47,9 @@ schwerer zu manipulieren als E), Shareholder Yield = Div + Buybacks (hoch
 Einmaleffekte verzerrt.
 
 **Quality-Faktoren**: ROIC, FCF-Marge, Operating Margin, Net Debt/EBITDA
-(invertiert), Earnings Stability (1 − min(σ/μ, 1) über 5 Jahre Net Income).
+(invertiert), Earnings Stability (1 − min(σ/μ, 1) des Net Income über die letzten
+5 Geschäftsjahre, davon mindestens 4 gültige; σ ist die Standardabweichung der
+Grundgesamtheit, μ der Mittelwert der *Beträge*).
 ROIC nutzt die *effektive* Steuerquote pro Unternehmen, wenn Pretax und
 Tax Expense vorhanden sind – Fallback ist `DEFAULT_TAX_RATE=0.27`
 (deutsche Durchschnittssteuerlast). Begrenzt auf [0, 0.6], um Ausreißer
@@ -80,10 +85,15 @@ Konstruktor erzeugen: `model_validate` ignoriert unbekannte Felder, also auch
 Tippfehler.
 
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
-`services/market-data/src/va_market_data/adapters/yahoo.py`: `FIELD_MAP` (Statement-Zeilen), `CONSENSUS_FIELDS`,
-`QUARTERLY_FIELDS` und `PRICE_FIELDS`. yfinance benennt unangekündigt um
-("Total Revenue" → "TotalRevenue") – wenn das passiert, ist dort die einzige
-zu ändernde Stelle.
+`services/market-data/src/va_market_data/adapters/yahoo.py`:
+- `FIELD_MAP`: Zeilen der Abschlüsse
+- `STATEMENT_FIELDS`: Attribute der Jahresabschlüsse (`income_stmt`, `balance_sheet`, `cashflow`)
+- `INFO_FIELDS`: Schlüssel in `info` (`marketCap`, `currentPrice` …), Reihenfolge = Vorrang
+- `FX_FIELDS`: Aufbau des FX-Symbols (`…=X`) und das Feld `lastPrice` in `fast_info`
+- `CONSENSUS_FIELDS`, `QUARTERLY_FIELDS` und `PRICE_FIELDS`: Zusatzdaten (ADR-0010)
+
+yfinance benennt unangekündigt um ("Total Revenue" → "TotalRevenue") – wenn
+das passiert, ist dort die einzige zu ändernde Stelle.
 
 **Konfiguration kommt aus Pydantic Settings**, niemals aus eingebetteten
 Konstanten. Wenn du eine Konstante brauchst und sie könnte sich je nach
@@ -125,8 +135,8 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Die DB erzwingt „niemals löschen“ selbst (`va_platform.db.ddl`): Trigger gegen
   DELETE/TRUNCATE auf jeder Tabelle, Faktentabellen zusätzlich gegen UPDATE.
   Einzige UPDATEs: einmaliger Abschluss von `batch.run`/`market_data.fetch_run`
-  und das Nachtragen einer ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur
-  SELECT (LAN-Auswertungen).
+  (das UPDATE muss `finished_at` setzen, Migration `0005`) und das Nachtragen einer
+  ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
@@ -155,7 +165,7 @@ umgebaut: `market-data`, `scoring`, `notification` und `web-api` (FastAPI:
 REST, WebSocket, Eventmanager), dazu ein Angular-Frontend im eigenen
 nginx-Container, NATS JetStream und PostgreSQL. Plan und Roadmap:
 `docs/architecture/README.md`, Entscheidungen: `docs/adr/` (ADR-0001 bis
-ADR-0009), Recherche: `docs/research/`.
+ADR-0011; ADR-0011 ist nur vorgeschlagen), Recherche: `docs/research/`.
 
 Bis eine Phase umgesetzt ist, beschreibt dieses Dokument den **Ist-Stand**.
 Neue Arbeit folgt der Zielrichtung, bei Widersprüchen gelten die ADRs.
@@ -210,7 +220,8 @@ ADR-0001 und ADR-0002 aufgehoben.
 3. Feld im Contract `FundamentalsV1` (`va_contracts`) und dessen
    Schema-Golden-Files unter `tests/golden/contracts/v1/` (additiv)
 4. Auslesen der Rohwerte in `va_market_data.adapters.yahoo.fetch_one()` (`StatementFigures`
-   bzw. `MarketFigures`; `FIELD_MAP` erweitern, falls yfinance-Roh-Feld nötig)
+   bzw. `MarketFigures`; `FIELD_MAP` bzw. `INFO_FIELDS` erweitern, falls yfinance-Roh-Feld
+   nötig)
 5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS` (`va_scoring.domain.scoring`)
 6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
@@ -226,22 +237,34 @@ ADR-0001 und ADR-0002 aufgehoben.
 3. ENV `UNIVERSE` in `config.py` um neuen Literal-Wert erweitern
 4. Filter im Handler von market-data (`RunRequestedHandler`, heute `dax_only`) und
    seine Verdrahtung in `src/composition.py:wire`
+5. Währung prüfen: `MIN_MARKET_CAP` wird mit der Marktkapitalisierung in Handelswährung
+   verglichen (Yahoo `marketCap`). Das stimmt, solange das Universum nur `.DE`-Titel (EUR)
+   hat. Ein Universum mit anderen Währungen braucht vorher eine Umrechnung.
 
 **Neues Workspace-Mitglied** (Paket oder Service, ADR-0004):
 1. Verzeichnis unter `packages/` oder `services/` mit `pyproject.toml`
-   (Name `va-<name>`, Build-Backend `uv_build`), Code unter `src/va_<name>/`
-2. Root-`pyproject.toml`: in die Dev-Gruppe und unter `[tool.uv.sources]`
-   (`workspace = true`), Import-Name in `known-first-party`
-3. import-linter: Import-Name in `root_packages` und in die passenden Verträge
-4. Dockerfile: seine `pyproject.toml` beim ersten `uv sync` einbinden, sonst scheitert
+   (Name `va-<name>`, Build-Backend `uv_build`), Code unter `src/va_<name>/`, Tests
+   unter `tests/`. Nutzt es `va-contracts` oder `va-platform`, stehen diese in seinen
+   `dependencies` und in seinem eigenen `[tool.uv.sources]` (`workspace = true`)
+2. Root-`pyproject.toml`: als Laufzeitabhängigkeit in `[project] dependencies` (der Batch
+   importiert es) und unter `[tool.uv.sources]` (`workspace = true`), Import-Name in
+   `known-first-party`
+3. Tests: Pfad in `[tool.pytest.ini_options] testpaths`, sonst sammelt pytest sie still
+   nicht
+4. Coverage: Import-Name in `[tool.coverage.run] source` und als `--cov=va_<name>` in
+   `make test-cov` (`Makefile`) und im Pytest-Schritt von `.github/workflows/ci.yml`
+5. import-linter: Import-Name in `root_packages` und in die passenden Verträge
+6. Dockerfile: seine `pyproject.toml` beim ersten `uv sync` einbinden, sonst scheitert
    `--locked`, und `--refresh-package va-<name>` beim zweiten, sonst baut uv aus dem
    Cache einen alten Stand ins Image
-5. `make lock`
+7. `make lock`
 
 **Neue Mail-Empfänger**: `MAIL_TO` ist heute Single-Recipient. Wenn mehrere,
 auf Liste umstellen (`pydantic.EmailStr` → `list[EmailStr]`, `;`-getrennt
 parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `smtp_config` in
-`src/composition.py` anpassen.
+`src/composition.py` anpassen. Dazu `NotificationConfig.recipient`
+(`va_notification.entrypoints.handlers`, gesetzt in `src/composition.py:wire`): Es
+landet im Versandprotokoll.
 
 ## Externe Quellen, von denen wir abhängen
 
@@ -250,9 +273,12 @@ parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `smtp_config` in
   oder EODHD über einen neuen Adapter hinter dem Port `FundamentalsProvider`. Achtung:
   yfinance verschluckt Fehler standardmäßig (`config.debug.hide_exceptions`)
   und liefert dann leer, auch bei einem Rate-Limit. Abrufe, die Retry oder
-  Abbruch brauchen, laufen deshalb in `_yahoo_errors_raised()`. Tests dafür
-  modellieren dieses Verhalten (siehe `_SwallowingTicker`), statt direkt
-  aus dem Attribut zu werfen.
+  Abbruch brauchen, laufen deshalb in `_yahoo_errors_raised()`: Jahresabschlüsse,
+  Quartale, Aktienanzahl und Kurse. Der Konsens erkennt geloggte HTTP-Fehler über
+  `_YfErrorCapture`. `info` bleibt bewusst außen vor, dort verschluckt yfinance nur
+  HTTP-Fehlerantworten (Begründung an `_ticker_data`). Tests dafür modellieren
+  dieses Verhalten (siehe `_SwallowingTicker`), statt direkt aus dem Attribut zu
+  werfen.
 - **iShares-Holdings (EXS1/EXS3)**: undokumentierte Frontend-API von
   BlackRock, liefert Ticker + ISIN. Kann jederzeit umziehen – dann URL/Params
   am Kopf von `va_market_data/adapters/ishares.py` anpassen.

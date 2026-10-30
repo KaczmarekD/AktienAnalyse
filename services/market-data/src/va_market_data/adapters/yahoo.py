@@ -93,6 +93,36 @@ FIELD_MAP: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Jahresabschluesse: Statement -> Attribut von yf.Ticker
+STATEMENT_FIELDS: dict[str, str] = {
+    "income": "income_stmt",
+    "balance": "balance_sheet",
+    "cashflow": "cashflow",
+}
+
+# Basisdaten aus yf.Ticker.info: logisches Feld -> Schluessel, Reihenfolge = Vorrang
+INFO_FIELDS: dict[str, tuple[str, ...]] = {
+    "currency": ("currency",),
+    "financial_currency": ("financialCurrency",),
+    "sector": ("sector",),
+    "industry": ("industry",),
+    "price": ("currentPrice", "regularMarketPrice"),
+    "market_cap": ("marketCap",),
+    "enterprise_value": ("enterpriseValue",),
+    "shares_outstanding": ("sharesOutstanding",),
+    "trailing_pe": ("trailingPE",),
+    "price_to_book": ("priceToBook",),
+    # Dividendenrendite: dezimal, sonst die Prozentangabe (siehe _dividend_yield)
+    "dividend_yield": ("trailingAnnualDividendYield",),
+    "dividend_yield_pct": ("dividendYield",),
+}
+
+# Wechselkurse: Ticker-Muster und Feld in yf.Ticker.fast_info
+FX_FIELDS: dict[str, str] = {
+    "ticker": "{source}{target}=X",
+    "price": "lastPrice",
+}
+
 # Konsens-Snapshots (ADR-0010): stabiler Name der Art in der DB -> Attribut von yf.Ticker.
 # Benennt yfinance ein Attribut um, wird nur hier nachgezogen - die DB-Namen bleiben.
 CONSENSUS_FIELDS: dict[str, str] = {
@@ -133,8 +163,9 @@ PRICE_FIELDS: dict[str, str] = {
 
 @dataclass
 class FetcherConfig:
+    # Pflicht: kommt aus den Settings (DEFAULT_TAX_RATE), kein eingebetteter Ersatz
+    default_tax_rate: float
     sleep_between: float = 0.4
-    default_tax_rate: float = 0.27
     # Erster Abruf der Aktienanzahl (F1.3); Yahoo liefert meist erst ab 2015
     shares_history_start: date = date(2000, 1, 1)
     # Kurse (F1.4): ab dem letzten gespeicherten Tag minus 8 Wochen (~40 Handelstage).
@@ -183,6 +214,16 @@ def _latest(series: pd.Series | None) -> float | None:
     return _to_float(cleaned.iloc[0])
 
 
+def _info(info: dict[str, Any], field: str) -> Any:
+    """Wert eines logischen Felds aus ``info`` (``INFO_FIELDS``).
+
+    Wie ``a or b``: Ist ein Kandidat leer (None, 0, ""), gilt der naechste, der letzte in
+    jedem Fall. Mit nur einem Kandidaten ist das genau ``info.get``.
+    """
+    values = [info.get(key) for key in INFO_FIELDS[field]]
+    return next((value for value in values if value), values[-1])
+
+
 def _to_float(value: Any) -> float | None:
     """Endliche Zahl als ``float``, sonst ``None`` (auch fuer NaN, inf und Text)."""
     if value is None:
@@ -211,10 +252,10 @@ def _dividend_yield(info: dict[str, Any]) -> float | None:
     Mit yfinance 1.7 unveraendert: Live-Vergleich gegen 0.2.66 am 30.09.2026 ergab
     fuer alle 90 Titel identische Werte.
     """
-    trailing = _to_float(info.get("trailingAnnualDividendYield"))
+    trailing = _to_float(_info(info, "dividend_yield"))
     if trailing is not None:
         return trailing
-    pct = _to_float(info.get("dividendYield"))
+    pct = _to_float(_info(info, "dividend_yield_pct"))
     return pct / 100.0 if pct is not None else None
 
 
@@ -259,14 +300,28 @@ def _fiscal_period_end(income: pd.DataFrame | None) -> date | None:
 # ---------------------------------------------------------------------------
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
+@retry(
+    # Nach einem Rate-Limit verlaengerte ein Retry nur die Drosselung (wie bei den Zusatzabrufen)
+    retry=retry_if_not_exception_type(YFRateLimitError),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1.5, min=2, max=15),
+    reraise=True,  # in errors steht die Ursache, nicht "RetryError[...]"
+)
 def _ticker_data(symbol: str) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Basisdaten eines Titels: ``info`` und die drei Jahresabschluesse.
+
+    Fehler der Abschluesse kommen an (``_yahoo_errors_raised``): fuer den Retry und nach
+    dem letzten Versuch als "fetch failed". Sonst zaehlte ein gedrosselter Titel als
+    Erfolg mit leeren Kennzahlen (P1.10). ``info`` bleibt bewusst aussen vor: Dort
+    verschluckt yfinance nur HTTP-Fehlerantworten, Netzfehler und Rate-Limit kommen schon
+    an. Eine Fehlerantwort allein des Zusatzabrufs fuer ``info`` kostete sonst den ganzen
+    Titel, obwohl die Basisdaten da sind.
+    """
     yt = yf.Ticker(symbol)
     info = yt.info or {}
-    income = yt.income_stmt if hasattr(yt, "income_stmt") else yt.financials
-    balance = yt.balance_sheet
-    cashflow = yt.cashflow
-    return info, income, balance, cashflow
+    with _yahoo_errors_raised():
+        frames = {name: getattr(yt, attr) for name, attr in STATEMENT_FIELDS.items()}
+    return info, frames["income"], frames["balance"], frames["cashflow"]
 
 
 class _RateLimitGuard:
@@ -523,9 +578,10 @@ def fetch_prices(
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1.5, min=2, max=15))
 def _fx_rate(from_ccy: str, to_ccy: str) -> float:
     """Wechselkurs 1 from_ccy -> to_ccy (z.B. USD -> EUR). Pro Run gecached."""
-    rate = _to_float(yf.Ticker(f"{from_ccy}{to_ccy}=X").fast_info.get("lastPrice"))
+    symbol = FX_FIELDS["ticker"].format(source=from_ccy, target=to_ccy)
+    rate = _to_float(yf.Ticker(symbol).fast_info.get(FX_FIELDS["price"]))
     if rate is None or rate <= 0:
-        msg = f"kein Kurs fuer {from_ccy}{to_ccy}=X"
+        msg = f"kein Kurs fuer {symbol}"
         raise ValueError(msg)
     return rate
 
@@ -537,8 +593,8 @@ def _statement_fx(info: dict[str, Any], errors: list[str]) -> float | None:
     bekommen ist - dann duerfen Abschlusswerte nicht gegen Marktdaten
     gerechnet werden.
     """
-    trading = info.get("currency")
-    reporting = info.get("financialCurrency")
+    trading = _info(info, "currency")
+    reporting = _info(info, "financial_currency")
     if not trading or not reporting or trading == reporting:
         return 1.0
     try:
@@ -562,10 +618,9 @@ def _additional[T](label: str, symbol: str, fetch: Callable[[], T], fallback: T)
 
 
 def fetch_one(
-    ticker: Ticker, cfg: FetcherConfig | None = None, history: HistoryState | None = None
+    ticker: Ticker, cfg: FetcherConfig, history: HistoryState | None = None
 ) -> Fundamentals:
     """Ein Titel. ``history`` sagt, bis wann seine Zeitreihen schon gespeichert sind."""
-    cfg = cfg or FetcherConfig()
     _RATE_LIMIT.hit = False
     fund = Fundamentals(
         identity=Identity(symbol=ticker.symbol, name=ticker.name, index=ticker.index),
@@ -618,16 +673,16 @@ def fetch_one(
     cashflow = _dated_columns(cashflow, "cashflow", fund.errors)
     fund.provenance.fiscal_period_end = _fiscal_period_end(income)
 
-    fund.identity.currency = info.get("currency")
-    fund.identity.financial_currency = info.get("financialCurrency")
-    fund.identity.sector = info.get("sector")
-    fund.identity.industry = info.get("industry")
+    fund.identity.currency = _info(info, "currency")
+    fund.identity.financial_currency = _info(info, "financial_currency")
+    fund.identity.sector = _info(info, "sector")
+    fund.identity.industry = _info(info, "industry")
 
     fund.market = MarketData(
-        price=_to_float(info.get("currentPrice") or info.get("regularMarketPrice")),
-        market_cap=_to_float(info.get("marketCap")),
-        enterprise_value=_to_float(info.get("enterpriseValue")),
-        shares_outstanding=_to_float(info.get("sharesOutstanding")),
+        price=_to_float(_info(info, "price")),
+        market_cap=_to_float(_info(info, "market_cap")),
+        enterprise_value=_to_float(_info(info, "enterprise_value")),
+        shares_outstanding=_to_float(_info(info, "shares_outstanding")),
     )
 
     statements = StatementFigures(
@@ -654,8 +709,8 @@ def fetch_one(
     market = MarketFigures(
         market_cap=fund.market.market_cap,
         enterprise_value=fund.market.enterprise_value,
-        trailing_pe=_to_float(info.get("trailingPE")),
-        price_to_book=_to_float(info.get("priceToBook")),
+        trailing_pe=_to_float(_info(info, "trailing_pe")),
+        price_to_book=_to_float(_info(info, "price_to_book")),
         dividend_yield=_dividend_yield(info),
     )
     fx = _statement_fx(info, fund.errors)
@@ -672,8 +727,8 @@ def fetch_one(
 class YahooFundamentals:
     """``FundamentalsProvider`` ueber yfinance."""
 
-    def __init__(self, cfg: FetcherConfig | None = None) -> None:
-        self.cfg = cfg or FetcherConfig()
+    def __init__(self, cfg: FetcherConfig) -> None:
+        self.cfg = cfg
 
     def fetch(self, ticker: Ticker, history: HistoryState | None = None) -> Fundamentals:
         return fetch_one(ticker, self.cfg, history=history)

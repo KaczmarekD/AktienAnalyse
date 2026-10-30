@@ -23,19 +23,29 @@
 
 ## Pipeline
 
+`src/main.py` legt den Lauf an und startet die Kette auf dem Event-Bus im Prozess. Die Module
+reagieren auf Events, verdrahtet in `src/composition.py`:
+
 ```
-load_universe()          iShares → Deka → CSV, validiert → Ticker + Quelle
+screening.run.requested
       │
-fetch_all()              yfinance → je Titel sofort in PostgreSQL (Rohdaten + Kennzahlen)
+market-data              Universum iShares → Deka → CSV, validiert; yfinance → je Titel
+      │                  sofort in PostgreSQL (Rohdaten, Abschlüsse, Zusatzdaten, Kennzahlen)
+marketdata.snapshot.completed
       │
-score()                  Marktkapitalisierungsfilter → Perzentilränge → Composite Score
+scoring                  Marktkapitalisierungsfilter → Perzentilränge → Composite Score
       │
-build_report()           HTML-Mail-Body + CSV-Vollranking
+scoring.run.completed
       │
-send_report()            SMTP (Gmail App-Passwort); Report + Versand in PostgreSQL
-      │
-ping()                   Healthchecks.io (optional)
+notification             HTML-Mail-Body + CSV-Vollranking; Versand über den Port ReportSender
+      │                  (SMTP, Gmail App-Passwort), Report + Versand in PostgreSQL;
+      │                  Healthchecks.io (optional)
+notification.report.sent → Abschluss von batch.run
 ```
+
+Scheitert eine Stufe, meldet sie `screening.run.failed`. notification pingt dann
+Healthchecks.io mit `/fail` (bei geplanten Läufen immer) und schickt eine Fehlermail, außer im
+Dry-Run und wenn es nur keine bewertbaren Daten gab.
 
 ---
 
@@ -43,7 +53,7 @@ ping()                   Healthchecks.io (optional)
 
 ### Composite Score = 0.6 × Value + 0.4 × Quality
 
-Alle Faktoren werden als **Perzentilrang** (0–1) über das gefilterte Universum berechnet. Fehlende Werte werden übersprungen, nicht mit 0 bestraft. Der Composite wird nur vergeben, wenn mindestens 50 % der Faktoren je Kategorie vorliegen.
+Alle Faktoren werden als **Perzentilrang** (0–1) über das gefilterte Universum berechnet. Fehlende Werte werden übersprungen, nicht mit 0 bestraft. Ein Value- oder Quality-Score wird nur vergeben, wenn mindestens 50 % der Faktoren der Kategorie vorliegen (aufgerundet, mindestens 2).
 
 **Value-Faktoren** (niedriger Multiple = besser, außer Yield):
 
@@ -64,7 +74,7 @@ Alle Faktoren werden als **Perzentilrang** (0–1) über das gefilterte Universu
 | FCF-Marge | Free Cashflow / Umsatz |
 | Operating Margin | Betriebliche Rentabilität |
 | Net Debt/EBITDA | Verschuldungsgrad (invertiert; niedrig = besser) |
-| Earnings Stability | `1 − min(σ/μ, 1)` über 5 Jahre Net Income; 1 = konstante Gewinne |
+| Earnings Stability | `1 − min(σ/μ, 1)` des Net Income über die letzten 5 Geschäftsjahre (mindestens 4 gültige); σ = Standardabweichung der Grundgesamtheit, μ = Mittelwert der Beträge; 1 = konstante Gewinne |
 
 **Value-Trap-Flag**: Value-Score ≥ 0.70 **und** Quality-Score ≤ 0.30 → der Titel ist billig, aber fundamental schwach.
 
@@ -126,7 +136,7 @@ PostgreSQL 18 läuft als Container `db`; Daten liegen im Bind-Mount `./pgdata` (
 | Schema | Inhalt |
 |---|---|
 | `batch` | Läufe (Status, Einstellungen ohne Passwörter, Fehler), Log-Zeilen je Lauf, importierte Altdateien |
-| `market_data` | Instrumente (Symbol, ISIN), Abrufe, Index-Zugehörigkeit je Abruf, yfinance-Rohdaten (JSONB), versionierte Abschlusswerte, Wechselkurse, Kennzahlen je Abruf |
+| `market_data` | Instrumente (Symbol, ISIN), Abrufe, Index-Zugehörigkeit je Abruf, yfinance-Rohdaten (JSONB), versionierte Abschlusswerte (Jahre und Quartale, `statement_value`), Wechselkurse, Kennzahlen je Abruf; seit ADR-0010 Analystenkonsens je Abruf (`consensus_snapshot`), Aktienanzahl (`share_count`) und Tageskurse (`price_bar`), beide versioniert |
 | `scoring` | Bewertungsläufe mit Konfiguration, Scores aller Titel, Perzentilrang je Faktor |
 | `reporting` | Reports (HTML + CSV), Mail-/Healthcheck-Versand |
 

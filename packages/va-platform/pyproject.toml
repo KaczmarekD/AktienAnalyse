@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "va-contracts",
     "sqlalchemy>=2.1,<3",  # wie im Root-Projekt (DB-Basis, P1.7)
+    "psycopg[binary]>=3.3,<4",  # die Engine erzwingt postgresql+psycopg (P1.10)
     "numpy>=2.3.2,<3",  # serialization
     "pandas>=3.0,<4",  # serialization
 ]

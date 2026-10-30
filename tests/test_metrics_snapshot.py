@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from va_market_data.adapters.yahoo import fetch_one
+from va_market_data.adapters.yahoo import FetcherConfig, fetch_one
 from va_market_data.domain.fundamentals import Fundamentals, Growth, QualityMetrics, ValueMetrics
 from va_market_data.domain.metrics import Metrics
 from va_market_data.domain.universe import Ticker
@@ -57,7 +57,7 @@ def _fetch(symbol: str, *, fx_available: bool = True) -> Fundamentals:
         patch("va_market_data.adapters.yahoo.fetch_share_counts", return_value=None),
         patch("va_market_data.adapters.yahoo.fetch_prices", return_value=None),
     ):
-        return fetch_one(Ticker(symbol, symbol, "DAX"))
+        return fetch_one(Ticker(symbol, symbol, "DAX"), FetcherConfig(default_tax_rate=0.27))
 
 
 def _snapshot(f: Fundamentals) -> bytes:

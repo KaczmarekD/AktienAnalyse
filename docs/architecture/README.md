@@ -1,10 +1,17 @@
 # Zielarchitektur Value-Analyzer
 
 > **Status:** Plan, beschlossen am 30.09.2026. Umsetzung in Phasen, siehe [Roadmap](roadmap.md).
-> Erledigt sind das Universum aus iShares/Deka und im Code die Postgres-Persistenz (Phase 2,
-> `261dc8f`). Deployment und Altdaten-Import auf der NAS stehen noch aus. Der Code in `src/`
-> ist weiterhin der Wochen-Batch, [CLAUDE.md](../../CLAUDE.md) beschreibt diesen Ist-Stand. Für
-> neue Arbeit gilt die hier beschriebene Richtung. Bei Widersprüchen haben die
+> Im Code erledigt sind:
+> - das Universum aus iShares/Deka (`ca85d93`, `c14fa32`)
+> - Phase 0, das Fundament: Golden-Master, CI, uv, Python 3.14, Images aus der CI (P0.1–P0.8)
+> - Phase 1, der modulare Monolith mit den späteren Service-Grenzen (P1.1–P1.9)
+> - Phase 2, die Postgres-Persistenz (`261dc8f`)
+> - Track F1, die Stichtagsdaten aus ADR-0010 (F1.1–F1.6)
+>
+> Deployment und Altdaten-Import auf der NAS stehen noch aus. Es bleibt ein Container mit
+> einem Wochen-Batch: `src/` startet die Kette, die Module unter `packages/` und `services/`
+> arbeiten über einen Event-Bus im Prozess. [CLAUDE.md](../../CLAUDE.md) beschreibt diesen
+> Ist-Stand. Für neue Arbeit gilt die hier beschriebene Richtung. Bei Widersprüchen haben die
 > [ADRs](../adr/README.md) Vorrang.
 
 ## Kurzfassung
@@ -94,7 +101,7 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 | Messaging | NATS JetStream 2.12+ mit FastStream 0.7 | Persistenz, Replay, Request/Reply, Deduplizierung, geringer Ressourcenbedarf ([ADR-0002](../adr/0002-nats-jetstream-und-faststream.md)) |
 | Datenbank | PostgreSQL 18 (19 erscheint voraussichtlich Ende Oktober 2026) | `uuidv7()` eingebaut, ein Schema und eine Rolle je Service ([ADR-0003](../adr/0003-postgresql-schema-pro-service.md)) |
 | ORM und Migrationen | SQLAlchemy 2.1 mit psycopg 3 + Alembic | Heute synchron (Batch, Phase 2). Einzelne Services stellen erst bei Bedarf auf die async-Engine um, dafür braucht es das Extra `sqlalchemy[asyncio]` ([datenhaltung.md](datenhaltung.md)). Kein SQLModel, damit Datenbank-Modelle und API-DTOs getrennt bleiben. |
-| Datenanalyse | pandas 3, NumPy 2 | nur in `market-data` und `scoring`. pyarrow entfällt mit dem Parquet-Cache. |
+| Datenanalyse | pandas 3, NumPy 2 | pandas steht in `market-data`, `scoring`, `notification` und `va-platform` (`serialization`), NumPy ebenso außer in `notification`. `va-contracts` bleibt ohne (import-linter). pyarrow bleibt nur für den Altdaten-Import (`src/db/import_legacy.py` liest Parquet). |
 | Frontend | Angular 22 | zoneless und OnPush als Standard, Signal Forms und Resource-API stabil, Tests mit Vitest ([ADR-0005](../adr/0005-angular-frontend-eigener-container.md)) |
 | State | NgRx SignalStore + Events-Plugin (NgRx ≥ 21) | Server-Events werden direkt zu Store-Events |
 | API-Client | @hey-api/openapi-ts mit Angular- und Zod-v4-Plugin | typisierter Client und Validierungsschemas aus der OpenAPI-Beschreibung |
@@ -113,7 +120,7 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 
 | Dokument | Inhalt |
 |---|---|
-| [code-struktur.md](code-struktur.md) | Ist-Analyse, Monorepo-Layout, Ports & Adapters, wohin die heutigen Module wandern |
+| [code-struktur.md](code-struktur.md) | Ist-Analyse nach Phase 1, Monorepo-Layout, Ports & Adapters, wohin die Module des alten Batches gewandert sind |
 | [events.md](events.md) | Ablauf eines Runs, Event-Katalog, Envelope, Outbox/Inbox, Streams und Consumer |
 | [web-api-realtime.md](web-api-realtime.md) | web-api-Module, REST-API, Eventmanager, WebSocket-Hub und -Protokoll, Sicherheitsregeln |
 | [datenhaltung.md](datenhaltung.md) | Postgres-Schemas und Tabellen, Snapshots als Historie, Backup |

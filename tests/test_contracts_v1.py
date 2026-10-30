@@ -1,7 +1,7 @@
 """Contracts v1 (P1.2): Datenformate zwischen den Services, siehe docs/architecture/events.md.
 
-Die Modelle liegen in ``va_contracts`` und duerfen den Altbestand ``src`` nicht kennen
-(import-linter). Die Tests pruefen deshalb hier, dass sie zu ``va_market_data.domain.fundamentals``, zur
+Die Modelle liegen in ``va_contracts`` und duerfen weder den Batch ``src`` noch die Services
+kennen (import-linter). Die Tests pruefen deshalb hier, dass sie zu ``va_market_data.domain.fundamentals``, zur
 Ausgabe von ``va_scoring.domain.scoring.score`` und zu ``va_notification.domain.report.build_report`` passen - mit dem
 eingefrorenen Golden-Datensatz.
 """
@@ -163,6 +163,20 @@ class TestFundamentalsV1:
         frame.loc[0, ["ev_ebit", "roic"]] = [float("inf"), float("-inf")]
         v1 = FundamentalsV1.from_flat(frame.to_dict("records")[0])
         assert (v1.value.ev_ebit, v1.quality.roic) == (None, None)
+
+    def test_back_from_a_row_with_nat_and_pd_na(self):
+        """P1.10: Fehlende Zeitpunkte (NaT) und Werte nullbarer Spalten (pd.NA) kosten nur das
+        Feld - sonst scheiterte der ganze Abruf-Schritt am Contract."""
+        records = [f.to_flat_dict() for f in _golden_fundamentals()]
+        records[0]["fetched_at"] = None
+        frame = pd.DataFrame(records)
+        frame["sector"] = frame["sector"].astype("string")
+        frame.loc[0, "sector"] = pd.NA
+        row = frame.to_dict("records")[0]
+        assert row["fetched_at"] is pd.NaT  # die Spalte ist datetime64, None wird NaT
+        v1 = FundamentalsV1.from_flat(row)
+        assert (v1.provenance.fetched_at, v1.identity.sector) == (None, None)
+        assert FundamentalsV1.from_flat(frame.to_dict("records")[1]).provenance.fetched_at
 
     @pytest.mark.parametrize("bad", [float("nan"), float("inf")])
     def test_non_finite_numbers_are_rejected(self, bad):
@@ -372,7 +386,10 @@ class TestRunContext:
 
 
 def _label(member: UniverseMemberV1) -> str:
-    """Wie main._ticker_label - Darstellung ist Sache von notification, nicht des Contracts."""
+    """Wie ``_label`` in ``va_notification.entrypoints.handlers``.
+
+    Die Darstellung ist Sache von notification, nicht des Contracts.
+    """
     return f"{member.name} ({member.symbol}, {member.index})"
 
 

@@ -36,6 +36,11 @@ BEGIN
             TG_TABLE_SCHEMA, TG_TABLE_NAME, OLD.id
             USING ERRCODE = 'restrict_violation';
     END IF;
+    IF NEW.finished_at IS NULL THEN
+        RAISE EXCEPTION '%.% #%: ein UPDATE muss den Lauf abschliessen (finished_at)',
+            TG_TABLE_SCHEMA, TG_TABLE_NAME, OLD.id
+            USING ERRCODE = 'restrict_violation';
+    END IF;
     IF NEW.id <> OLD.id OR NEW.started_at IS DISTINCT FROM OLD.started_at THEN
         RAISE EXCEPTION 'Aendern von id/started_at auf %.% ist verboten',
             TG_TABLE_SCHEMA, TG_TABLE_NAME

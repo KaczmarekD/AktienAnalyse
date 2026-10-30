@@ -163,7 +163,7 @@ def _execute(
                 options=options,
                 stage=_stage(dead.consumer),
                 reason=f"{dead.consumer}: {dead.error}",
-                detail=repr(dead.error),
+                detail="".join(traceback.format_exception(dead.error)),
             )
             bus.publish(follow_up(dead.envelope, RUN_FAILED, failed, source=SOURCE))
 

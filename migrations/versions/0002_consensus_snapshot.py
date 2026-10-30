@@ -5,7 +5,8 @@ Revises: 0001
 Erstellt: 2026-09-30
 
 Nur additiv. Die erlaubten Werte stehen hier bewusst fest und werden nicht aus
-``src.consensus`` importiert: Eine Migration beschreibt den Stand ihres Datums.
+``va_market_data.domain.consensus`` (damals ``src.consensus``) importiert: Eine Migration
+beschreibt den Stand ihres Datums.
 """
 
 from collections.abc import Sequence

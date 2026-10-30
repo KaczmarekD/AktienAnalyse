@@ -1,4 +1,8 @@
-"""Fixtures fuer die Scoring-Tests (Kopie aus tests/conftest.py, die Root-Tests nutzen sie weiter)."""
+"""Fixtures fuer die Scoring-Tests.
+
+``mock_universe_df`` gibt es auch in ``tests/conftest.py`` fuer die Root-Tests. Beide lesen
+dieselbe Datei ``fixtures/mock_universe.json``.
+"""
 
 from __future__ import annotations
 

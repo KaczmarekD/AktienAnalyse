@@ -157,6 +157,7 @@ class RunFailedV1(_RunScoped):
 
     stage: Stage
     reason: str  # z. B. "timeout" (Watchdog), "no_data" oder die Fehlermeldung der Stufe
-    scoring_run_id: PositiveId | None = None  # bei einem gescheiterten Rescore
+    # von scoring gesetzt, sobald der Bewertungslauf gespeichert ist (auch bei no_data)
+    scoring_run_id: PositiveId | None = None
     # Details fuer die Fehlermail, etwa der Traceback (additiv seit P1.8)
     detail: str | None = None

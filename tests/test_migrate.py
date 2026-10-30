@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from src.db import migrate
+from va_platform.db import ddl
 
 
 @pytest.fixture
@@ -45,3 +48,28 @@ class TestMigrateMain:
         cfg = migrate.alembic_config("postgresql://u:p%25w@db/va")
         assert cfg.attributes["url"] == "postgresql+psycopg://u:p%25w@db/va"
         assert cfg.get_main_option("script_location") == str(migrate.MIGRATIONS_DIR)
+
+
+def _function(sql: str, name: str) -> str:
+    """Eine ``CREATE FUNCTION`` aus einem SQL-Text, Leerraum vereinheitlicht."""
+    start = sql.index(f"CREATE OR REPLACE FUNCTION public.{name}()")
+    end = sql.index("$$;", start) + len("$$;")
+    return " ".join(sql[start:end].split())
+
+
+class TestGuardFinished:
+    """P1.10: Migration 0005 und ``va_platform.db.ddl`` haben dieselbe Fassung des Triggers.
+
+    Eine frische Datenbank bekommt ihn ueber 0001 aus ``ddl.py``, eine bestehende ueber
+    0005. Laufen beide auseinander, unterscheiden sich NAS und Testvorlage.
+    """
+
+    def test_migration_and_ddl_agree(self):
+        path = Path(__file__).parents[1] / "migrations" / "versions" / "0005_guard_finished.py"
+        spec = importlib.util.spec_from_file_location("migration_0005", path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert _function(module.GUARD_FINISHED, "va_guard_finished") == _function(
+            ddl.CREATE_FUNCTIONS, "va_guard_finished"
+        )

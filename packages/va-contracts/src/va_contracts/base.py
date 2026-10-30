@@ -27,11 +27,19 @@ class Contract(BaseModel):
 
 
 def missing_to_none(value: Any) -> Any:
-    """NaN (wie es pandas fuer fehlende Werte liefert) und +-inf -> ``None``, alles andere bleibt.
+    """Fehlende Werte aus pandas und +-inf -> ``None``, alles andere bleibt.
 
-    inf kommt z. B. aus einer Division durch 0 in Altdaten. Es ist kein gueltiges JSON und
-    soll nur dieses eine Feld kosten, nicht den ganzen Titel oder Lauf.
+    Fehlend heisst NaN, NaT (Zeitspalten) und ``pd.NA`` (nullbare Spalten). inf kommt
+    z. B. aus einer Division durch 0 in Altdaten. Beides ist kein gueltiges JSON und soll
+    nur dieses eine Feld kosten, nicht den ganzen Titel oder Lauf.
+
+    Erkannt ohne pandas-Import (``va_contracts`` kennt keine Datenverarbeitung): NaN und
+    NaT sind sich selbst ungleich, ``pd.NA`` laesst sich nicht als Wahrheitswert lesen.
     """
     if isinstance(value, float) and not math.isfinite(value):
         return None
-    return value
+    try:
+        missing = bool(value != value)  # noqa: PLR0124 - gewollt: NaN und NaT
+    except TypeError:
+        return None
+    return None if missing else value

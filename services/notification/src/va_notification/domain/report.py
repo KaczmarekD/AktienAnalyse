@@ -106,7 +106,7 @@ def build_report(
     bottom_n: int = 10,
     value_weight: float = 0.6,
     quality_weight: float = 0.4,
-    version: str = "0.2.0",
+    version: str = "dev",  # im Betrieb die App-Version aus NotificationConfig
     universe_size: int | None = None,
     universe_source: str | None = None,
     universe_as_of: date | None = None,

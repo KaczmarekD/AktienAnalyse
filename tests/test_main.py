@@ -486,6 +486,21 @@ class TestRunErrorHandling:
         assert _pings(adapters)[-1].args[0] is False
         assert len(_mails(adapters, ERROR_SUBJECT)) == 1
 
+    def test_dead_letter_mail_carries_the_traceback(
+        self, settings, recorder, mock_tickers, mock_universe_df
+    ):
+        """P1.10: Die Fehlermail zeigt, wo der Handler gescheitert ist - nicht nur repr()."""
+        with patch(
+            "va_scoring.entrypoints.handlers.SnapshotCompletedHandler.__call__",
+            side_effect=RuntimeError("Bug im Handler"),
+        ):
+            _, adapters, _ = _run_with(
+                settings, recorder, mock_tickers, {"return_value": mock_universe_df}
+            )
+        html = _mails(adapters, ERROR_SUBJECT)[0].args[1]
+        assert "Traceback (most recent call last)" in html
+        assert "RuntimeError: Bug im Handler" in html
+
     def test_error_escaping_the_bus_fails_the_run_with_alarm(
         self, settings, recorder, mock_tickers, mock_universe_df
     ):
