@@ -593,9 +593,12 @@ vor P2b.1, weil P2b.1 neue Tabellen anlegt und sich auf den Löschschutz-Test ve
     - `batch.run.error` bekommt nach einem Dead Letter weiter nur die Fehlermeldung. Den
       Traceback hat die Fehlermail.
 
-**Entscheidung (du), nicht Teil des Pakets: Titel ohne Quality-Score**
+**Entscheidung, nicht Teil des Pakets: Titel ohne Quality-Score**
 
-- **Heute:** Liegen weniger als 3 von 5 Quality-Faktoren vor, ist der Composite der Value-Score
+> **Entschieden am 30.10.2026: Variante 1**, umgesetzt als eigenes Paket
+> [M1](#m1-kein-composite-ohne-beide-teilscores).
+
+- **Bis dahin:** Liegen weniger als 3 von 5 Quality-Faktoren vor, ist der Composite der Value-Score
   allein (`va_scoring.domain.scoring.score`). Das Value-Trap-Flag kann dann nicht greifen.
 - **Betroffen:** echte Titel, etwa die Deutsche Bank (2 von 5 Quality-Faktoren). Ein Titel ohne
   Quality-Daten steht damit besser da als einer mit mittelmäßiger Quality. Das widerspricht
@@ -610,6 +613,52 @@ vor P2b.1, weil P2b.1 neue Tabellen anlegt und sich auf den Löschschutz-Test ve
 - **Folgen:** Varianten 1 und 2 ändern Ranking und Golden-Files. Sie gehören deshalb in die
   Entscheidung über ADR-0011 oder in ein eigenes Paket mit `--update-golden`. Der Replay-Vergleich
   aus [regressionstest.md](regressionstest.md) zeigt vorher, welche Titel sich verschieben.
+
+### Methodik-Korrekturen
+
+Bewusste Änderungen am Ranking außerhalb von ADR-0011. Sie liegen nicht in Phase 1, weil dort die
+Golden-Files gleich bleiben müssen.
+
+#### M1 Kein Composite ohne beide Teilscores
+
+Entschieden am 30.10.2026 (Variante 1 aus P1.10).
+
+- **Voraussetzung:** P1.10 (Sicherungstest `TestMissingQualityScore`).
+- **Test:**
+  - Der Sicherungstest aus P1.10 wird bewusst umgedreht: Ein Titel ohne Quality-Score bekommt
+    keinen Composite und keinen Rang vor den bewerteten Titeln (rot).
+  - Dasselbe für einen Titel ohne Value-Score (rot).
+  - Titel ohne Composite stehen nicht in Top- und Flop-Liste der Mail, aber in der CSV, hinter
+    allen bewerteten Titeln.
+  - Die Golden-Files bleiben gleich: Im Golden-Datensatz haben alle Titel beide Teilscores.
+- **Implementierung:** In `score()` entsteht der Composite nur, wenn Value- und Quality-Score
+  vorliegen. Das Value-Trap-Flag bleibt wie es ist: Ohne Quality-Score kann es nicht greifen,
+  der Titel hat dann aber auch keinen Rang mehr.
+- **Review:**
+  - Vergleich alt gegen neu mit echten Daten aller 90 Titel: Welche Titel verlieren ihren Rang,
+    wie verschieben sich Top 20 und Flop 10?
+  - Die Doku zur Methodik (CLAUDE.md, README) nennt die Regel.
+- **Folge:** Betroffene Titel zählen in Betreffzeile und Kopf der Mail als „fehlgeschlagen“, und
+  der Lauf heißt dann `partial`. So zählt die Mail heute schon Titel unter der Größenschwelle.
+  Bis F2.4 einen Abschnitt „Finanzwerte“ bringt, erscheinen betroffene Banken nur in der CSV.
+- **Umgesetzt (30.10.2026):**
+  - Tests rot in `1ba0454`, Umsetzung in `aa236f4`. Der Composite ist
+    `value_weight × Value + quality_weight × Quality`, fehlt ein Teilscore, bleibt er leer. Die
+    Golden-Files sind unverändert.
+  - **Vergleich alt gegen neu** mit echten Daten aller 90 Titel vom 30.10.2026 (Abruf mit dem
+    Code aus P1.10, Zusatzdaten abgeschaltet):
+    - Deutsche Bank und Commerzbank standen auf Platz 1 und 2, allein über den Value-Score
+      (0,82 bzw. 0,81) ohne Quality-Score. Sie verlieren den Composite.
+    - Sonst hat kein Titel nur einen Teilscore. Alle anderen rücken um zwei Plätze auf, ihr
+      Composite ist exakt gleich.
+    - Neu in der Top 20 sind Ströer und Fuchs. Die Flop 10 und das eine Value-Trap-Flag bleiben
+      gleich.
+    - Die Mail heißt `[partial 88/90] … Top: Allianz` statt `[ok 90/90] … Top: Deutsche Bank`. Im
+      Kopf steht „2 fehlgeschlagen“, `batch.run` steht auf `partial`. Exit-Code und
+      Healthcheck-Ping bleiben Erfolg.
+  - **Bewusst so belassen** (Entscheidung 30.10.2026): Die Mail zählt Titel ohne Composite
+    weiter als „fehlgeschlagen“, der Lauf heißt dann `partial`. Sie getrennt von gescheiterten
+    Abrufen zu zählen, änderte Template und Golden-Files und wäre ein eigenes Paket.
 
 ### Phase 2b – Scoring-Profile
 

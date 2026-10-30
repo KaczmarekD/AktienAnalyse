@@ -145,16 +145,11 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
         quality_ranks, cfg.min_quality_factor_share, cfg.min_factor_count
     )
 
+    # Nur aus beiden Teilscores (M1): Fehlt einer, gibt es kein Urteil. Sonst stuende ein
+    # Titel ohne Quality-Daten besser da als einer mit mittelmaessiger Quality.
     v = out["value_score"]
     q = out["quality_score"]
-    composite = pd.Series(np.nan, index=out.index, dtype=float)
-    both = v.notna() & q.notna()
-    composite[both] = cfg.value_weight * v[both] + cfg.quality_weight * q[both]
-    only_v = v.notna() & q.isna()
-    composite[only_v] = v[only_v]
-    only_q = v.isna() & q.notna()
-    composite[only_q] = q[only_q]
-    out["composite_score"] = composite
+    out["composite_score"] = cfg.value_weight * v + cfg.quality_weight * q
 
     out["value_trap_flag"] = (out["value_score"].fillna(0) >= cfg.value_trap_value_threshold) & (
         out["quality_score"].fillna(1) <= cfg.value_trap_quality_threshold

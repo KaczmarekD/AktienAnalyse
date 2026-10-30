@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+import pandas as pd
 import pytest
 
 from va_market_data.domain.universe import FALLBACK_SOURCE
@@ -100,6 +101,27 @@ class TestBuildReportIntegration:
         report = build_report(score(df, ScoringConfig()), top_n=8, bottom_n=8, universe_size=8)
         assert ">nan<" not in report.html
         assert '<td class="text">-</td>' in report.html
+
+
+class TestUnscoredTitles:
+    """M1: Ein Titel ohne Composite steht nur in der CSV, hinter den bewerteten Titeln."""
+
+    def test_only_in_the_csv(self, mock_universe_df):
+        row = mock_universe_df[mock_universe_df["symbol"] == "VAL.DE"].iloc[0].to_dict()
+        # Billig wie VAL.DE, aber nur 2 von 5 Quality-Faktoren (wie eine Bank)
+        row |= {
+            "symbol": "BANK.DE",
+            "name": "Bank ohne Quality",
+            "roic": None,
+            "operating_margin": None,
+            "net_debt_ebitda": None,
+        }
+        df = pd.concat([mock_universe_df, pd.DataFrame([row])], ignore_index=True)
+        report = build_report(score(df, ScoringConfig()), top_n=8, bottom_n=8, universe_size=9)
+        assert "Bank ohne Quality" not in report.html
+        lines = report.csv_bytes.decode("utf-8-sig").strip().splitlines()
+        assert "BANK.DE" in lines[-1]
+        assert report.scored == 7
 
 
 class TestUniverseSourceNote:

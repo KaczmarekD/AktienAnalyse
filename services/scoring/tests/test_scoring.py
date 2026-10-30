@@ -120,22 +120,37 @@ _UNIVERSE = {
 }
 
 
-class TestMissingQualityScore:
-    """Sicherungstest P1.10: so verhaelt sich ``score()`` heute bei fehlendem Quality-Score.
+class TestMissingSubscore:
+    """M1 (Entscheidung 30.10.2026): Ein Composite entsteht nur aus beiden Teilscores.
 
-    Der Composite ist dann der Value-Score allein, und das Value-Trap-Flag greift nie.
-    Ob das so bleibt, ist eine offene Entscheidung (Implementierungsplan, P1.10). Aendert
-    sie das Verhalten, wird dieser Test bewusst angepasst.
+    Bis dahin war er bei fehlendem Quality-Score der Value-Score allein (Sicherungstest aus
+    P1.10). Ein Titel ohne Quality-Daten stand so besser da als einer mit mittelmaessiger
+    Quality, und das Value-Trap-Flag konnte nie greifen.
     """
 
-    def test_composite_is_the_value_score_alone(self):
-        out = score(_frame(_UNIVERSE), ScoringConfig()).set_index("symbol")
-        bank = out.loc["BANK.DE"].to_dict()
+    def test_no_composite_without_quality_score(self):
+        out = score(_frame(_UNIVERSE), ScoringConfig())
+        bank = out.set_index("symbol").loc["BANK.DE"].to_dict()
         assert pd.isna(bank["quality_score"])
-        assert float(bank["value_score"]) >= 0.70
-        assert float(bank["composite_score"]) == float(bank["value_score"])
+        assert float(bank["value_score"]) >= 0.70  # billig, aber ohne Urteil zur Quality
+        assert pd.isna(bank["composite_score"])
         assert bool(bank["value_trap_flag"]) is False
-        assert int(bank["rank_overall"]) == 1
+        assert out["symbol"].iloc[-1] == "BANK.DE"  # hinter allen bewerteten Titeln
+
+    def test_no_composite_without_value_score(self):
+        # Nur negative Multiples: kein Value-Faktor zaehlt, Quality ist vollstaendig
+        universe = _UNIVERSE | {"QONLY.DE": {"ev_ebit": -5.0, "pb_ratio": -1.0, **_FULL_QUALITY}}
+        row = score(_frame(universe), ScoringConfig()).set_index("symbol").loc["QONLY.DE"]
+        values = row.to_dict()
+        assert pd.isna(values["value_score"])
+        assert pd.notna(values["quality_score"])
+        assert pd.isna(values["composite_score"])
+
+    def test_both_subscores_keep_the_weighting(self):
+        out = score(_frame(_UNIVERSE), ScoringConfig()).set_index("symbol")
+        t0 = out.loc["T0.DE"].to_dict()
+        expected = 0.6 * float(t0["value_score"]) + 0.4 * float(t0["quality_score"])
+        assert float(t0["composite_score"]) == pytest.approx(expected)
 
 
 class TestMinFactorCount:

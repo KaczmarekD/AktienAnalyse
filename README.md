@@ -53,7 +53,7 @@ Dry-Run und wenn es nur keine bewertbaren Daten gab.
 
 ### Composite Score = 0.6 × Value + 0.4 × Quality
 
-Alle Faktoren werden als **Perzentilrang** (0–1) über das gefilterte Universum berechnet. Fehlende Werte werden übersprungen, nicht mit 0 bestraft. Ein Value- oder Quality-Score wird nur vergeben, wenn mindestens 50 % der Faktoren der Kategorie vorliegen (aufgerundet, mindestens 2).
+Alle Faktoren werden als **Perzentilrang** (0–1) über das gefilterte Universum berechnet. Fehlende Werte werden übersprungen, nicht mit 0 bestraft. Ein Value- oder Quality-Score wird nur vergeben, wenn mindestens 50 % der Faktoren der Kategorie vorliegen (aufgerundet, mindestens 2). Einen Composite gibt es nur mit beiden Teilscores. Titel ohne Composite (heute vor allem Banken, denen Quality-Kennzahlen fehlen) stehen am Ende der CSV, nicht in der Mail, und zählen dort als „fehlgeschlagen“.
 
 **Value-Faktoren** (niedriger Multiple = besser, außer Yield):
 

@@ -70,11 +70,18 @@ Details: [Implementierungsplan, Phase 1](implementierungsplan.md#phase-1--modula
 - [ ] P1.10 Fix-Paket Spec-Abgleich (Abgleich vom 30.10.2026): Jahresabschlüsse ohne verschluckte
       Abruffehler, Löschschutz-Test mit UPDATE, Trigger für den Abschluss eines Laufs, Doku auf
       den Stand nach Phase 1
-- [ ] Entscheidung (du): Titel ohne Quality-Score bekommen heute den Value-Score als Composite
-      (Varianten im [Implementierungsplan, P1.10](implementierungsplan.md#p110-fix-paket-spec-abgleich))
+- [x] Entscheidung (du): Titel ohne Quality-Score bekommen heute den Value-Score als Composite.
+      Entschieden am 30.10.2026 für Variante 1, umgesetzt in M1 (siehe unten)
 
 **Fertig, wenn:** es weiterhin ein Container ist, die Golden-Files unverändert sind und die CI die
 Grenzen erzwingt.
+
+## Methodik-Korrekturen
+
+Bewusste Änderungen am Ranking außerhalb von ADR-0011. Details:
+[Implementierungsplan, Methodik-Korrekturen](implementierungsplan.md#methodik-korrekturen)
+
+- [ ] M1 Kein Composite ohne beide Teilscores (nach P1.10)
 
 ## Phase 2 – Postgres (Code fertig, Deployment offen)
 

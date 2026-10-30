@@ -39,6 +39,10 @@ Geplant via Cron im Container.
 existiert primär, um klassische *Value Traps* zu unterdrücken (vgl.
 Asness/Frazzini/Pedersen, "Quality Minus Junk"). Reines Value-Investing
 kauft die billigsten Aktien – die sind meistens berechtigt billig.
+Deshalb gibt es einen Composite **nur mit beiden Teilscores** (M1, 30.10.2026). Fehlt einer,
+bleibt der Titel ohne Composite am Ende der CSV und fehlt in Top- und Flop-Liste. Sonst stünde
+ein Titel ohne Quality-Daten besser da als einer mit mittelmäßiger Quality. Heute betrifft das
+Banken wie Deutsche Bank und Commerzbank, denen ROIC, operative Marge und Net Debt/EBITDA fehlen.
 
 **Value-Faktoren** (alle als Perzentilrang, niedriger Multiple = besser):
 EV/EBIT (kapitalstruktur-neutral, Greenblatt-Logik), P/B, P/FCF (FCF ist
