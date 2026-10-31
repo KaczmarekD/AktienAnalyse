@@ -174,8 +174,35 @@ jobs:
       - name: Frontend-Image bauen
         run: docker build -t va-frontend:ci frontend
 
-      - name: Frontend-Smoke (nginx vor dem web-api)
-        run: docker/frontend-smoke.sh va-frontend:ci value-analyzer:ci
+      # U5.2: die ganze Kette mit Replay-Daten statt Yahoo, mit genau diesen Images: Batch,
+      # Mail in Mailpit, web-api hinter nginx, UI. Die Pruefungen (tests/e2e) laufen mit uv.
+      - name: uv installieren (E2E-Pruefungen)
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.21"
+          enable-cache: true
+
+      # U5.3: der Browser-Test (Playwright) laeuft mit Node auf dem Runner, nie auf der NAS
+      - name: Node 24 LTS (Browser-Test)
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Playwright mit Chromium
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ../.local/playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: E2E (ganze Kette mit Replay-Daten)
+        env:
+          E2E_APP_IMAGE: value-analyzer:ci
+          E2E_FRONTEND_IMAGE: va-frontend:ci
+        run: docker/e2e.sh
 
       # P0.6b: Die NAS baut nicht selbst, Compose zieht das Image aus GHCR
       - name: Compose nutzt das Image aus GHCR

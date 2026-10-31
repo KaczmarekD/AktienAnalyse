@@ -1,0 +1,66 @@
+# E2E-Stack (U5.2, docs/architecture/umgebungen.md). Liegt ueber docker-compose.yml und
+# docker-compose.local.yml und wird nur ueber docker/e2e.sh genutzt (make local-e2e, CI):
+#
+#   docker compose --env-file docker/e2e.env \
+#     -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml ...
+#
+# Ein Wegwerf-Stack: Die Datenbank liegt auf tmpfs, der Batch liest eine Replay-Fixture statt
+# Yahoo, die Mail landet in Mailpit. Von der .env des Rechners kommt nichts hinein. Eigene
+# Namen und Ports, damit er neben dem lokalen Stack laeuft.
+
+name: value-analyzer-e2e
+
+services:
+  db:
+    container_name: value-analyzer-e2e-db
+    # Nur die Init-Skripte (Rollen wie sonst), die Daten auf tmpfs statt in .local/pgdata
+    volumes: !override
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/lib/postgresql
+    ports: !reset []
+
+  value-analyzer:
+    container_name: value-analyzer-e2e
+    # CI: das frisch gebaute Image (E2E_APP_IMAGE=value-analyzer:ci)
+    image: ${E2E_APP_IMAGE:-value-analyzer:local}
+    env_file: !reset []
+    environment:
+      # Pflichtfelder der Settings; SMTP_PLAIN sendet kein Passwort
+      SMTP_USER: e2e@example.com
+      SMTP_PASSWORD: e2e
+      MAIL_TO: e2e@example.com
+      REPLAY_SOURCE: /app/e2e/${E2E_FIXTURE:?E2E_FIXTURE in docker/e2e.env setzen}
+    # Nur die Fixtures. Logs und Vorschau bleiben im Container und gehen mit ihm.
+    volumes: !override
+      - ./tests/fixtures/replay:/app/e2e:ro
+
+  web-api:
+    container_name: value-analyzer-e2e-web-api
+    image: ${E2E_APP_IMAGE:-value-analyzer:local}
+    # Wie auf der NAS nur hinter nginx erreichbar
+    ports: !reset []
+
+  frontend:
+    container_name: value-analyzer-e2e-frontend
+    # CI: das echte Image (E2E_FRONTEND_IMAGE=va-frontend:ci). Lokal dasselbe nginx mit dem
+    # Angular-Build aus frontend/dist (npm run build), ohne Node im Docker: Platz auf C:
+    image: ${E2E_FRONTEND_IMAGE:-va-frontend:e2e}
+    build:
+      context: ./frontend
+      target: prebuilt
+      additional_contexts:
+        dist: ./frontend/dist/va-frontend/browser
+    profiles: !reset []
+    ports: !override
+      - "127.0.0.1:18080:8080"
+
+  mailpit:
+    container_name: value-analyzer-e2e-mailpit
+    # Nur die Weboberflaeche; SMTP erreicht der Batch im Docker-Netz
+    ports: !override
+      - "127.0.0.1:18025:8025"
+
+  pgweb:
+    # Braucht der Test nicht
+    profiles: ["pgweb"]

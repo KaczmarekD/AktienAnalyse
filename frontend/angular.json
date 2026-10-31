@@ -46,6 +46,11 @@
                   "maximumError": "8kB"
                 }
               ],
+              "optimization": {
+                "scripts": true,
+                "styles": { "minify": true, "inlineCritical": false },
+                "fonts": true
+              },
               "outputHashing": "all"
             },
             "development": {
@@ -77,7 +82,12 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html",
+              "e2e/**/*.ts",
+              "playwright.config.ts"
+            ]
           }
         }
       }

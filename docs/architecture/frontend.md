@@ -53,6 +53,10 @@ unten zeigen die Idee, die Dateien den Stand.
 - **Sicherheits-Header:** CSP mit `script-src 'self'`, `X-Frame-Options DENY`, `nosniff`,
   `Referrer-Policy same-origin`. Kein Abschnitt setzt ein eigenes `add_header`, sonst gingen
   diese Header dort verloren.
+- **Kein Inline-Skript im Build (seit U5.3):** Angular legt das Stylesheet beim Inlining der
+  kritischen CSS mit `media="print"` an und schaltet es per Inline-Skript um. Die CSP blockiert
+  das Skript, die globalen Styles griffen dann nie. Der Browser-Test hat das gefunden. Deshalb
+  steht in `angular.json` `inlineCritical: false`, und `tests/test_nginx_conf.py` prüft das.
 - **Cache:** `index.html` wird nie gecacht, Dateien mit Hash im Namen ein Jahr.
 - **Swagger:** `/api/docs` geht hinter nginx nicht, weil Swagger sein Skript von einem CDN
   lädt. Lokal bleibt es am web-api auf Port 8000.

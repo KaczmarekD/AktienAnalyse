@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui api ui-install ui ui-api ui-check
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api ui-install ui ui-api ui-check ui-e2e-install
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -169,6 +169,20 @@ local-ui: ## Lokal: frontend (nginx) aus dem Arbeitsstand unter http://localhost
 local-down: ## Lokal: alles stoppen (die Daten in .local/ bleiben)
 	$(LOCAL) --profile run --profile ui down
 
+# ---------- E2E-Test (U5, docs/architecture/umgebungen.md) ------------------
+# Wegwerf-Stack mit Replay-Daten statt Yahoo: Datenbank auf tmpfs, UI unter :18080, Mailpit
+# unter :18025. Laeuft neben dem lokalen Stack. Die CI ruft docker/e2e.sh mit ihren Images auf.
+E2E = docker compose --env-file docker/e2e.env -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+
+local-e2e: ## Lokal: ganze Kette mit Replay-Daten pruefen (Batch, Mail, API, UI), danach aufraeumen
+	cd frontend && npm run build
+	$(E2E) build value-analyzer frontend
+	bash docker/e2e.sh
+
+local-check: ## Lokal: Mail, API und UI des lokalen Stacks zum letzten Lauf pruefen (braucht make local-ui)
+	E2E_BASE_URL=http://127.0.0.1:8080 E2E_MAILPIT_URL=http://127.0.0.1:8025 $(RUN) pytest tests/e2e -p no:cacheprovider
+	cd frontend && E2E_BASE_URL=http://127.0.0.1:8080 PLAYWRIGHT_BROWSERS_PATH=../.local/playwright npx playwright test
+
 # ---------- Frontend (P3.5, docs/architecture/frontend.md) ------------------
 # Node laeuft nur lokal und in der CI, nie auf der NAS. Das UI holt seine Daten ueber /api vom
 # web-api (make api oder make local-up); ng serve leitet /api an 127.0.0.1:8000 weiter.
@@ -180,6 +194,9 @@ ui: ## Frontend mit Reload unter http://localhost:4200 (braucht das web-api auf 
 
 ui-api: ## Frontend: API-Client aus tests/golden/openapi/v1.json neu erzeugen
 	cd frontend && npm run generate:api
+
+ui-e2e-install: ## Frontend: Chromium fuer die Browser-Tests (U5.3) nach .local/playwright, nicht auf C:
+	cd frontend && PLAYWRIGHT_BROWSERS_PATH=../.local/playwright npx playwright install chromium
 
 ui-check: ## Frontend: Format, Lint, Tests und Build wie in der CI
 	cd frontend && npm run format:check && npm run lint && npm test -- --watch=false && npm run build

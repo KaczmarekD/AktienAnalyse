@@ -34,6 +34,9 @@ Geplant via Cron im Container.
 schreibgeschützte Verbindung, nie die Zugangsdaten des Batches. Seit P3.6 laufen auf der NAS
 web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
 nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
+`make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
+tmpfs, in dem der Batch eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, nur mit
+`SMTP_PLAIN` und ohne Healthcheck erlaubt).
 
 ## Methodik-Entscheidungen
 
@@ -343,6 +346,14 @@ schreibgeschützt (`create_db_engine(read_only=True)`). Echte Wochen liegen als 
 `tests/fixtures/replay/` (Export mit `--export`) und laufen in der CI. Eine gewollte
 Methodik-Änderung schreibt ihre erwarteten Werte mit `--update-golden` neu, wie beim
 Golden-Master. Auf der NAS läuft `make regression` nach `make pull` und vor `make up`.
+
+**End-to-End-Test** (U5, `docker/e2e.sh`, `make local-e2e`, in der CI im Docker-Job): Ein Batch
+mit der Replay-Fixture aus `docker/e2e.env` läuft durch den ganzen Stack. Dann prüfen
+`tests/e2e/` (pytest, von außen über nginx und die Mailpit-API) und `frontend/e2e/` (Playwright,
+Chromium unter `.local/playwright`), dass Mail, API und UI denselben Lauf mit den Werten der
+Fixture zeigen. Die Browser-Tests verlangen eine leere Konsole: Ein CSP-Verstoß ist ein Fehler.
+Ohne `E2E_BASE_URL` überspringen sich die Tests. Eine gewollte Methodik-Änderung erneuert
+zuerst die Replay-Fixture (`--update-golden`), dann stimmt auch der E2E-Test wieder.
 
 **Golden-Master der Mail** (`tests/test_golden_report.py`, Dateien unter
 `tests/golden/`): Ein eingefrorener Datensatz

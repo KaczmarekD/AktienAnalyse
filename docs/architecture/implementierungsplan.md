@@ -745,6 +745,128 @@ an ihnen ändert:
   Schemas, aus denen ab Phase 4 Projektionen werden.
 - **UI-Bibliothek:** Angular Material, entschieden am 31.10.2026.
 
+#### U5 Lokaler End-to-End-Test
+
+Geplant am 31.10.2026 als nächstes Paket, vor P2b.1. Ziel: Ein Befehl auf dem
+Entwicklungsrechner prüft die ganze Kette, so wie sie auf der NAS läuft. Die Kette: Universum,
+market-data, Datenbank, scoring, notification mit der Mail in Mailpit, web-api hinter nginx und
+das UI im Browser.
+
+**Stand vor U5:**
+- Der lokale Stack aus U1 und U4 läuft: `make local-up`, `make local-run`, `make local-ui`
+  bzw. `make ui`.
+- Geprüft wird von Hand: Mail in Mailpit, Daten in pgweb, Ansichten im Browser.
+- Jeder Lauf fragt iShares bzw. Deka, OpenFIGI und Yahoo ab. Das dauert und hängt an Yahoo,
+  und das Ergebnis ist jedes Mal anders. Feste Erwartungswerte gibt es so nicht.
+- Die Angular-Tests (Vitest) laufen gegen nachgebaute HTTP-Antworten, nie gegen das echte
+  web-api.
+- Die CI prüft nginx vor dem web-api (`docker/frontend-smoke.sh`), aber mit leerer Datenbank.
+
+**U5.1 Replay-Quelle statt Yahoo**
+- **Neues Setting `REPLAY_SOURCE`:** der Pfad zu einer Fixture aus `tests/fixtures/replay/`.
+  - Ist es gesetzt, liefert der Adapter `va_market_data.adapters.replay` das Universum und die
+    Fundamentaldaten aus dieser Datei, über die Ports `UniverseSource` und
+    `FundamentalsProvider`.
+  - Abgefragt wird dann weder iShares noch Deka, OpenFIGI oder Yahoo. Konsens, Quartale,
+    Aktienanzahl und Kurse bleiben leer.
+  - Die ISIN kommt aus der Fallback-CSV.
+- **Kennzeichnung:** Der Abruf wird mit `provider = "replay"` gespeichert. Der Lauf trägt den
+  Pfad in seinen Settings und ist so in der DB nie mit einem echten Abruf zu verwechseln.
+- **Schutz:** Die Settings lehnen `REPLAY_SOURCE` ab, wenn `SMTP_PLAIN` aus ist oder
+  `HEALTHCHECK_URL` gesetzt ist. Eine Mail mit Replay-Daten kann so nie über Gmail
+  hinausgehen.
+- **Verdrahtung:** `build_adapters` in `src/composition.py` wählt Universum und Abruf nach
+  `REPLAY_SOURCE`.
+- **Test (rot):**
+  - Fixture → `Fundamentals` → `to_flat_dict()` ergibt wieder die Snapshot-Zeilen.
+  - Das Universum hat 90 Titel mit Index und ISIN.
+  - Settings: `REPLAY_SOURCE` ohne `SMTP_PLAIN` oder mit `HEALTHCHECK_URL` wird abgelehnt.
+  - Mit gesperrtem Socket geht kein Aufruf nach außen.
+  - DB-Test: Ein Lauf mit `REPLAY_SOURCE` ergibt dieselben Scores, Ränge und Flags wie die
+    Fixture, der Abruf hat `provider = "replay"`.
+
+**U5.2 E2E-Stack und Prüfungen (`make local-e2e`)**
+- **Eigener Stack:** Compose-Projekt `value-analyzer-e2e` (`docker-compose.e2e.yml` über den
+  beiden anderen).
+  - Die Datenbank liegt auf tmpfs, ohne Volume. Wie bei `make test-db` ist sie eine
+    Wegwerf-Datenbank: Replay-Daten landen nie in `.local/pgdata`.
+  - Eigene Ports, nur auf `127.0.0.1`: UI auf 18080, Mailpit auf 18025. So läuft der Stack
+    neben dem lokalen.
+  - Das web-api hat keinen eigenen Port und ist wie auf der NAS nur über nginx erreichbar.
+- **Ablauf von `make local-e2e`:**
+  1. Images aus dem Arbeitsstand bauen.
+  2. db, Mailpit, web-api und frontend starten.
+  3. Einen Batch-Lauf mit `REPLAY_SOURCE` ausführen.
+  4. Die Prüfungen laufen lassen.
+  5. Den Stack abbauen, auch bei einem Fehler. Bei Fehlern vorher die Logs ausgeben.
+- **Prüfungen:** pytest unter `tests/e2e/` mit Marker `e2e`. Ohne `E2E_BASE_URL` werden sie
+  übersprungen, wie die DB-Tests ohne `TEST_DATABASE_URL`.
+  - Der Batch endet mit Exit 0, `/api/v1/runs` zeigt den Lauf als abgeschlossen.
+  - Mailpit-API: In Mailpit liegt genau eine Mail. Ihr Betreff nennt den Top-Titel der
+    Fixture. Die angehängte CSV gleicht der CSV der Fixture inhaltlich, bis auf die
+    Datumsfelder. Verglichen wird mit dem Vergleich aus `src/regression/compare.py`.
+  - `/api/v1/ranking/latest` über nginx: Scores und Ränge wie in der Fixture.
+  - `/api/v1/reports/{id}` liefert dasselbe HTML wie die Mail.
+  - Frontend: `/` liefert die App mit den Sicherheits-Headern. Ein unbekannter Host bekommt
+    keine Antwort.
+- **Frontend ohne Node-Build in Docker:** Auf C: waren am 31.10.2026 nur 3,1 GB frei, und
+  Docker Desktop liegt dort. `make local-e2e` baut Angular deshalb mit npm auf E:
+  (`frontend/dist`). Build und nginx-Template hängt es in dasselbe Basis-Image
+  (`nginx-unprivileged:1.30.6`). Das echte Frontend-Image prüft weiter die CI.
+- **CI:** Der Job „Docker Build + J4125-Pruefung“ führt dieselben Prüfungen mit den frisch
+  gebauten Images aus und ersetzt damit `docker/frontend-smoke.sh`.
+- **Live-Variante `make local-check`:** dieselben Prüfungen ohne Vergleichswerte, gegen den
+  laufenden lokalen Stack mit echten Yahoo-Daten nach `make local-run`. Geprüft wird: Lauf
+  abgeschlossen, Mail da, Ranking nicht leer, UI erreichbar.
+
+**U5.3 Browser-Test des UI (Playwright)**
+- **Setup:** `@playwright/test` im Frontend, nur Chromium. Die Tests laufen gegen den Stack aus
+  U5.2, `make local-e2e` ruft sie mit auf.
+- **Prüfungen:**
+  - Das Ranking zeigt die Top-Titel der Fixture in der richtigen Reihenfolge.
+  - Ein Klick auf einen Titel öffnet das Titel-Detail.
+  - Die Runs zeigen den Lauf. Im Detail steht die Mail im iframe mit `sandbox`.
+  - In der Konsole stehen keine Fehler, auch keine Verstöße gegen die CSP.
+- **Speicherort:** Die Browser liegen auf E: (`PLAYWRIGHT_BROWSERS_PATH=.local/playwright`),
+  nicht unter `%LOCALAPPDATA%` auf C:.
+- **CI:** installiert Chromium (`npx playwright install --with-deps chromium`) und führt die
+  Browser-Tests gegen den Stack aus.
+
+**Fertig, wenn:**
+- `make local-e2e` läuft ohne Zugriff auf Yahoo, iShares, Deka und OpenFIGI in wenigen
+  Minuten grün durch.
+- Ein absichtlich anderes Gewicht (`VALUE_WEIGHT=0.5`) färbt es rot.
+- Die CI macht dieselbe Prüfung bei jedem Push.
+
+**NAS:** nichts. `REPLAY_SOURCE` bleibt dort leer, die Settings verhindern es ohnehin
+zusammen mit Gmail.
+
+**Umgesetzt (31.10.2026):**
+- **U5.1:** `va_market_data.adapters.replay` und `REPLAY_SOURCE` (`FilePath`, nur mit
+  `SMTP_PLAIN` und ohne `HEALTHCHECK_URL`). Die Composition Root liest die Fixture erst im Lauf.
+  Ein Fehler darin lässt dann den Lauf scheitern, statt wie eine ausgefallene Datenbank
+  auszusehen. Der DB-Test zeigt: Ein ganzer Lauf ergibt dieselben Scores, Faktor-Ränge und
+  dieselbe CSV wie die Fixture.
+- **U5.2:** `docker-compose.e2e.yml`, `docker/e2e.env`, `docker/e2e.sh`, `make local-e2e` und
+  `make local-check`. Die CI ruft `docker/e2e.sh` mit ihren Images auf, `docker/frontend-smoke.sh`
+  ist entfernt. 16 Prüfungen unter `tests/e2e/`.
+- **U5.3:** Playwright 1.64.1 mit drei Browser-Tests unter `frontend/e2e/`, Chromium mit
+  `make ui-e2e-install`.
+- **Abweichungen vom Plan:**
+  - Kein pytest-Marker: Die Tests unter `tests/e2e/` überspringen sich ohne `E2E_BASE_URL`
+    selbst.
+  - Das Frontend wird lokal nicht eingehängt. Die neue Stufe `prebuilt` im Frontend-Dockerfile
+    nimmt den Build aus `frontend/dist` als zusätzlichen Build-Kontext. So stammen nginx,
+    Template und Header aus demselben Dockerfile wie das Image der NAS.
+  - `E2E_FIXTURE` ist überall der Dateiname unter `tests/fixtures/replay/`.
+  - Playwright zeichnet keinen Trace auf. Die Aufzeichnung führt Skripte im abgeschotteten
+    Mail-iframe aus, Chrome meldet das als Fehler in der Konsole.
+- **Gefunden:** Hinter nginx griffen die globalen Styles des UI nie (seit P3.6). Angulars
+  Inlining der kritischen CSS braucht ein Inline-Skript, die CSP (`script-src 'self'`) blockiert
+  es. Behoben mit `inlineCritical: false` ([frontend.md](frontend.md)).
+- **Gegenprobe:** Mit `VALUE_WEIGHT=0.5` scheitern genau die Vergleiche von Scores und CSV mit
+  der Fixture.
+
 ### Phase 2b – Scoring-Profile
 
 #### P2b.0 Replay-Regression über gespeicherte Wochen

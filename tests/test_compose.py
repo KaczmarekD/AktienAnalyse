@@ -1,4 +1,6 @@
-"""Compose: der lokale Stack ueber der NAS-Definition (U1, docs/architecture/umgebungen.md).
+"""Compose: der lokale Stack und der E2E-Stack ueber der NAS-Definition (U1, U5).
+
+Hintergrund: docs/architecture/umgebungen.md.
 
 ``docker compose config`` fuehrt die Dateien zusammen, wie ``up`` es taete, und braucht dafuer
 nur die CLI, keinen Docker-Daemon. Es laeuft in einem temporaeren Ordner mit einer Dummy-.env,
@@ -20,6 +22,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 NAS = "docker-compose.yml"
 LOCAL = "docker-compose.local.yml"
+E2E = "docker-compose.e2e.yml"
+E2E_ENV = "docker/e2e.env"
 REAL_LOOKING_ENV = """
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -42,24 +46,44 @@ _COMPOSE_INPUTS = (
     "LOCAL_DB_PORT",
     "UI_LAN_BIND",
     "UI_SERVER_NAMES",
+    "E2E_APP_IMAGE",
+    "E2E_FRONTEND_IMAGE",
+    "E2E_FIXTURE",
 )
 
 
-def _config(directory: Path, *files: str, env: str | None = None) -> dict[str, Any]:
-    """``env``: Inhalt der .env; ohne Angabe .env.example mit echt wirkenden Werten."""
+def _config(
+    directory: Path,
+    *files: str,
+    env: str | None = None,
+    env_file: str | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """``env``: Inhalt der .env; ohne Angabe .env.example mit echt wirkenden Werten.
+
+    ``env_file``: statt einer .env diese Datei aus dem Repo mit ``--env-file`` (E2E-Stack, der
+    ohne .env auskommen muss, etwa in der CI).
+    """
     if shutil.which("docker") is None:
         if os.environ.get("CI"):
             pytest.fail("docker CLI fehlt in der CI")
         pytest.skip("docker CLI nicht installiert")
     for name in files:
         shutil.copy(ROOT / name, directory / name)
-    if env is None:
-        env = (ROOT / ".env.example").read_text(encoding="utf-8") + REAL_LOOKING_ENV
-    (directory / ".env").write_text(env, encoding="utf-8")
     args = ["docker", "compose", "--project-directory", str(directory)]
+    if env_file is None:
+        if env is None:
+            env = (ROOT / ".env.example").read_text(encoding="utf-8") + REAL_LOOKING_ENV
+        (directory / ".env").write_text(env, encoding="utf-8")
+    else:
+        target = directory / env_file
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / env_file, target)
+        args += ["--env-file", str(target)]
     for name in files:
         args += ["-f", str(directory / name)]
     environ = {k: v for k, v in os.environ.items() if k not in _COMPOSE_INPUTS}
+    environ |= extra_env or {}
     result = subprocess.run(  # feste Argumente, keine Shell
         [*args, "--profile", "run", "--profile", "ui", "config", "--format", "json"],
         capture_output=True,
@@ -81,6 +105,12 @@ def local_dev_env(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     """Mit der .env aus .env.local.example, wie auf dem Entwicklungsrechner."""
     env = (ROOT / ".env.local.example").read_text(encoding="utf-8")
     return _config(tmp_path_factory.mktemp("local-dev"), NAS, LOCAL, env=env)
+
+
+@pytest.fixture(scope="module")
+def e2e(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """Der E2E-Stack (U5.2): ohne .env, nur mit docker/e2e.env, wie in der CI."""
+    return _config(tmp_path_factory.mktemp("e2e"), NAS, LOCAL, E2E, env_file=E2E_ENV)
 
 
 @pytest.fixture(scope="module")
@@ -256,3 +286,85 @@ class TestNasDefinition:
 
     def test_data_stays_in_pgdata(self, nas):
         assert _mounts(nas["services"]["db"])["/var/lib/postgresql"].endswith("/pgdata")
+
+
+class TestE2eStack:
+    """U5.2: Wegwerf-Stack fuer make local-e2e und die CI, mit Replay-Daten statt Yahoo."""
+
+    def test_own_project_and_names(self, e2e, local, nas):
+        # Laeuft neben dem lokalen Stack und kollidiert mit keinem anderen
+        assert e2e["name"] == "value-analyzer-e2e"
+        names = {s.get("container_name") for s in e2e["services"].values()}
+        assert None not in names
+        assert all(n.startswith("value-analyzer-e2e") for n in names)
+        others = {
+            s.get("container_name")
+            for s in [*local["services"].values(), *nas["services"].values()]
+        }
+        assert not names & others
+
+    def test_services(self, e2e):
+        # pgweb braucht der Test nicht
+        assert set(e2e["services"]) == {"db", "value-analyzer", "web-api", "frontend", "mailpit"}
+
+    def test_database_is_thrown_away(self, e2e):
+        db = e2e["services"]["db"]
+        assert "/var/lib/postgresql" not in _mounts(db)  # nie .local/pgdata oder pgdata
+        assert any(str(t).startswith("/var/lib/postgresql") for t in db["tmpfs"])
+        assert _mounts(db)["/docker-entrypoint-initdb.d"].endswith("/db/init")  # Rollen wie sonst
+        assert "ports" not in db
+
+    def test_batch_replays_the_fixture(self, e2e):
+        batch = e2e["services"]["value-analyzer"]
+        fixture = batch["environment"]["REPLAY_SOURCE"]
+        assert fixture.startswith("/app/e2e/")
+        assert (ROOT / "tests/fixtures/replay" / fixture.removeprefix("/app/e2e/")).is_file()
+        [mount] = batch["volumes"]
+        assert (mount["target"], mount.get("read_only")) == ("/app/e2e", True)
+        assert str(mount["source"]).replace("\\", "/").endswith("/tests/fixtures/replay")
+
+    def test_mail_and_healthcheck_stay_local(self, e2e):
+        env = e2e["services"]["value-analyzer"]["environment"]
+        assert (env["SMTP_HOST"], env["SMTP_PORT"], env["SMTP_PLAIN"]) == (
+            "mailpit",
+            "1025",
+            "true",
+        )
+        assert env["HEALTHCHECK_URL"] == ""
+
+    def test_needs_no_env_file(self, e2e):
+        # Kein .env des Rechners im Container: Der Stack laeuft gleich, lokal und in der CI
+        batch = e2e["services"]["value-analyzer"]
+        assert "env_file" not in batch
+        assert {"SMTP_USER", "SMTP_PASSWORD", "MAIL_TO"} <= set(batch["environment"])
+
+    def test_ports_bind_to_localhost_only(self, e2e):
+        published = {
+            (name, port["published"], port.get("host_ip"))
+            for name, service in e2e["services"].items()
+            for port in service.get("ports", [])
+        }
+        # Das web-api nur hinter nginx, wie auf der NAS
+        assert published == {("mailpit", "18025", "127.0.0.1"), ("frontend", "18080", "127.0.0.1")}
+
+    def test_frontend_serves_the_angular_build_of_the_working_tree(self, e2e):
+        frontend = e2e["services"]["frontend"]
+        assert frontend["image"] == "va-frontend:e2e"
+        assert frontend["build"]["target"] == "prebuilt"  # ohne Node im Docker (Platz auf C:)
+        dist = str(frontend["build"]["additional_contexts"]["dist"]).replace("\\", "/")
+        assert dist.endswith("/frontend/dist/va-frontend/browser")
+        assert "profiles" not in frontend
+        assert frontend["environment"]["VA_SERVER_NAMES"] == "localhost 127.0.0.1"
+
+    def test_batch_and_web_api_share_the_local_image(self, e2e):
+        services = e2e["services"]
+        assert services["value-analyzer"]["image"] == services["web-api"]["image"]
+        assert services["web-api"]["image"] == "value-analyzer:local"
+
+    def test_ci_uses_the_images_under_test(self, tmp_path):
+        images = {"E2E_APP_IMAGE": "value-analyzer:ci", "E2E_FRONTEND_IMAGE": "va-frontend:ci"}
+        ci = _config(tmp_path, NAS, LOCAL, E2E, env_file=E2E_ENV, extra_env=images)
+        services = ci["services"]
+        assert services["value-analyzer"]["image"] == "value-analyzer:ci"
+        assert services["web-api"]["image"] == "value-analyzer:ci"
+        assert services["frontend"]["image"] == "va-frontend:ci"

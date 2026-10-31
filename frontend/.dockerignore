@@ -2,4 +2,7 @@ node_modules
 dist
 .angular
 coverage
+test-results
+playwright-report
+e2e
 .vscode

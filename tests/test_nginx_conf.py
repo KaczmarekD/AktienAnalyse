@@ -1,15 +1,18 @@
 """Regeln der nginx-Konfiguration des frontend-Containers (P3.6, ADR-0007).
 
-Statisch geprueft, ohne Docker. Den laufenden Container prueft die CI
-(``docker/frontend-smoke.sh``): nginx -t, Routen, /api ueber nginx, return 444.
+Statisch geprueft, ohne Docker. Den laufenden Container pruefen die E2E-Tests (U5.2,
+``docker/e2e.sh`` in der CI und mit ``make local-e2e``): nginx -t, Routen, /api ueber nginx,
+Sicherheits-Header, return 444.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
-CONF = Path(__file__).resolve().parents[1] / "frontend" / "nginx" / "default.conf.template"
+FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
+CONF = FRONTEND / "nginx" / "default.conf.template"
 
 
 def _conf() -> str:
@@ -64,6 +67,16 @@ def test_security_headers():
     assert "default-src 'self'" in csp.group(1)
     assert "script-src 'self'" in csp.group(1)
     assert "connect-src 'self'" in csp.group(1)
+
+
+def test_production_build_needs_no_inline_script():
+    # Die CSP erlaubt nur Skripte von 'self'. Angulars Critical-CSS-Inlining laedt das
+    # Stylesheet mit media="print" und schaltet es per Inline-Skript um. Blockiert die CSP das,
+    # greifen die globalen Styles nie (gefunden vom Browser-Test, U5.3).
+    angular = json.loads((FRONTEND / "angular.json").read_text(encoding="utf-8"))
+    build = angular["projects"]["va-frontend"]["architect"]["build"]
+    production = build["configurations"]["production"]
+    assert production["optimization"]["styles"]["inlineCritical"] is False
 
 
 def test_index_html_is_never_cached():

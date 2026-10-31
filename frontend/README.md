@@ -8,7 +8,14 @@ make ui-install   # Abhaengigkeiten exakt aus package-lock.json
 make api          # web-api auf 127.0.0.1:8000 (oder make local-up)
 make ui           # UI mit Reload unter http://localhost:4200
 make ui-check     # Format, Lint, Tests und Build wie in der CI
+make ui-e2e-install  # einmalig: Chromium fuer die Browser-Tests nach .local/playwright (E:)
+make local-e2e    # Browser-Tests (e2e/, Playwright) mit der ganzen Kette, siehe umgebungen.md
 ```
+
+- **Browser-Tests** unter `e2e/` (Playwright, nur Chromium): Ranking, Titel-Detail und das
+  Lauf-Detail mit der Mail, gegen das echte web-api hinter nginx. Die Konsole muss leer
+  bleiben, auch ohne CSP-Verstöße. Sie laufen in `make local-e2e`, `make local-check` und in
+  der CI, nie in `make ui-check`.
 
 - **API-Client** unter `src/app/api/`: von hey-api aus dem OpenAPI-Snapshot
   `tests/golden/openapi/v1.json` erzeugt (`make ui-api`). Nie von Hand ändern. Die CI prüft,

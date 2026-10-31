@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from functools import cached_property, partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -17,6 +18,8 @@ from va_market_data.adapters.deka import DekaSource
 from va_market_data.adapters.ishares import IsharesSource
 from va_market_data.adapters.openfigi import resolve_isins_openfigi
 from va_market_data.adapters.postgres.store import PostgresSnapshotStore
+from va_market_data.adapters.replay import PROVIDER as REPLAY_PROVIDER
+from va_market_data.adapters.replay import ReplayFundamentals, replay_universe
 from va_market_data.adapters.yahoo import (
     PROVIDER,
     FetcherConfig,
@@ -38,13 +41,14 @@ from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
 
 from . import __version__
 from .db.recorder import BatchRecorder
+from .regression.case import ReplayCase
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     import pandas as pd
 
-    from va_market_data.application.ports import Fetch, SnapshotStore
+    from va_market_data.application.ports import Fetch, FundamentalsProvider, SnapshotStore
     from va_market_data.domain.fundamentals import Fundamentals
     from va_market_data.domain.history import HistoryState
     from va_market_data.domain.universe import Ticker, Universe
@@ -95,12 +99,24 @@ class Adapters:
 def build_adapters(settings: Settings) -> Adapters:
     """Die echten Adapter: PostgreSQL, Yahoo, iShares/Deka/CSV, SMTP, Healthchecks.io.
 
-    Die Engine verbindet sich erst beim ersten Zugriff - ein DB-Ausfall zeigt sich also
-    beim Start des Laufs, nicht hier.
+    Mit ``REPLAY_SOURCE`` (U5) kommen Universum und Fundamentaldaten aus einer Replay-Fixture
+    statt aus dem Netz. Die Engine verbindet sich erst beim ersten Zugriff - ein DB-Ausfall
+    zeigt sich also beim Start des Laufs, nicht hier.
     """
     engine = create_db_engine(settings.database_url.get_secret_value())
     fetcher = FetcherConfig(default_tax_rate=settings.default_tax_rate)
     sender, heartbeat = alert_channels(settings)
+
+    universe: Callable[[], Universe]
+    if settings.replay_source is None:
+        provider_name, version = PROVIDER, provider_version()
+        universe, sleep_between = load_universe, fetcher.sleep_between
+        provider: Callable[[], FundamentalsProvider] = partial(YahooFundamentals, fetcher)
+    else:
+        replay = _ReplayFile(settings.replay_source)
+        provider_name, version = REPLAY_PROVIDER, settings.replay_source.name
+        universe, sleep_between = replay.universe, 0.0
+        provider = replay.fundamentals
 
     def fetch(
         tickers: list[Ticker],
@@ -110,24 +126,41 @@ def build_adapters(settings: Settings) -> Adapters:
     ) -> pd.DataFrame:
         return fetch_all(
             tickers,
-            YahooFundamentals(fetcher),
-            sleep_between=fetcher.sleep_between,
+            provider(),
+            sleep_between=sleep_between,
             on_result=on_result,
             history=history,
         )
 
     return Adapters(
         batch=BatchRecorder(engine),
-        market_data=PostgresSnapshotStore(
-            engine, provider=PROVIDER, provider_version=provider_version()
-        ),
+        market_data=PostgresSnapshotStore(engine, provider=provider_name, provider_version=version),
         scoring=PostgresScoringStore(engine, app_version=__version__),
         reporting=PostgresReportStore(engine),
-        load_universe=load_universe,
+        load_universe=universe,
         fetch=fetch,
         sender=sender,
         heartbeat=heartbeat,
     )
+
+
+class _ReplayFile:
+    """Eine Replay-Fixture als Quelle (U5). Gelesen erst im Lauf: Ein Fehler in der Datei
+    laesst dann den Lauf scheitern, statt wie eine ausgefallene Datenbank auszusehen."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    @cached_property
+    def _rows(self) -> list[dict[str, Any]]:
+        case = ReplayCase.from_json(self._path.read_text(encoding="utf-8"))
+        return [{str(k): v for k, v in row.items()} for row in case.snapshots.to_dict("records")]
+
+    def universe(self) -> Universe:
+        return replay_universe(self._rows, load_fallback(DEFAULT_FALLBACK_CSV))
+
+    def fundamentals(self) -> FundamentalsProvider:
+        return ReplayFundamentals(self._rows)
 
 
 def load_universe(

@@ -181,8 +181,17 @@ cp .env.local.example .env
 make local-up          # Datenbank, Mailpit, pgweb und web-api starten (Image aus dem Arbeitsstand)
 make local-run         # ein Lauf wie am Samstag; die Mail erscheint in Mailpit
 make local-regression  # alle gespeicherten Wochen mit dem Arbeitsstand nachspielen
+make local-ui          # das UI hinter nginx unter http://localhost:8080
+make local-check       # Mail, API und UI zum letzten Lauf prüfen (braucht make local-ui)
 make local-down        # stoppen, die Daten in .local/ bleiben
 ```
+
+**End-to-End-Test** (U5): `make local-e2e` prüft die ganze Kette mit einem Befehl, ohne Yahoo.
+Der Batch läuft mit einer gespeicherten echten Woche (`tests/fixtures/replay/`). Geprüft werden
+die Mail in Mailpit, das web-api hinter nginx und das UI, jeweils gegen die Erwartungswerte der
+Woche. Der Stack ist ein Wegwerf-Stack mit eigener Datenbank auf tmpfs, der neben dem lokalen
+läuft (UI auf `:18080`, Mailpit auf `:18025`) und danach verschwindet. `E2E_KEEP=1 make
+local-e2e` lässt ihn zum Ansehen stehen. Die CI macht dasselbe bei jedem Push.
 
 | Adresse | Was |
 |---|---|

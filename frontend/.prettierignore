@@ -2,4 +2,6 @@ dist
 node_modules
 .angular
 coverage
+test-results
+playwright-report
 package-lock.json

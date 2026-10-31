@@ -93,3 +93,41 @@ class TestSettings:
 
         monkeypatch.setenv("SMTP_PLAIN", "true")
         assert smtp_config(Settings()).plain is True  # type: ignore[call-arg]
+
+
+class TestReplaySource:
+    """U5.1: Replay-Daten nur mit einem lokalen Mail-Catcher und ohne Healthcheck."""
+
+    @pytest.fixture
+    def fixture_file(self, tmp_path):
+        path = tmp_path / "woche.json"
+        path.write_text("{}", encoding="utf-8")
+        return path
+
+    @pytest.fixture
+    def local_env(self, minimal_env, monkeypatch):
+        monkeypatch.setenv("SMTP_PLAIN", "true")
+        monkeypatch.delenv("HEALTHCHECK_URL", raising=False)
+
+    def test_is_off_by_default(self, minimal_env):
+        assert Settings().replay_source is None  # type: ignore[call-arg]
+
+    def test_local_setup_accepts_an_existing_file(self, local_env, monkeypatch, fixture_file):
+        monkeypatch.setenv("REPLAY_SOURCE", str(fixture_file))
+        assert Settings().replay_source == fixture_file  # type: ignore[call-arg]
+
+    def test_missing_file_is_rejected(self, local_env, monkeypatch, tmp_path):
+        monkeypatch.setenv("REPLAY_SOURCE", str(tmp_path / "fehlt.json"))
+        with pytest.raises(ValidationError):
+            Settings()  # type: ignore[call-arg]
+
+    def test_rejected_with_a_real_mail_server(self, minimal_env, monkeypatch, fixture_file):
+        monkeypatch.setenv("REPLAY_SOURCE", str(fixture_file))
+        with pytest.raises(ValidationError, match="SMTP_PLAIN"):
+            Settings()  # type: ignore[call-arg]
+
+    def test_rejected_with_a_healthcheck(self, local_env, monkeypatch, fixture_file):
+        monkeypatch.setenv("REPLAY_SOURCE", str(fixture_file))
+        monkeypatch.setenv("HEALTHCHECK_URL", "https://hc-ping.com/abc")
+        with pytest.raises(ValidationError, match="HEALTHCHECK_URL"):
+            Settings()  # type: ignore[call-arg]

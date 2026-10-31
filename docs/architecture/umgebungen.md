@@ -25,6 +25,7 @@ Zeitplan:
 | Daten ansehen | pgweb (nur lesen) unter <http://localhost:8081>, web-api mit Swagger unter <http://localhost:8000/api/docs>, das UI mit `make ui` unter <http://localhost:4200> (oder hinter nginx mit `make local-ui` unter <http://localhost:8080>) | Web-UI unter `http://<nas-ip>:8080` (seit P3.6, `UI_LAN_BIND`) |
 | Ports | nur `127.0.0.1` | Postgres optional im LAN (`DB_LAN_BIND`) |
 | Tests | `make check`, `make test-db` (Wegwerf-DB auf 55432), `make local-regression` | `make regression` nach `make pull`, vor `make up` |
+| End-to-End (ab U5) | `make local-e2e`: ganze Kette mit festen Daten (Replay), Wegwerf-DB; `make local-check` gegen den lokalen Stack | – (die CI prüft dieselbe Kette bei jedem Push) |
 
 ## Entscheidungen
 
@@ -65,6 +66,23 @@ Zeitplan:
   (P3.1, P3.2) und die Ansichten Ranking, Runs und Titel-Detail. Lokal mit `ng serve`, auf der
   NAS als frontend-Container. Der Profil-Editor wartet auf Phase 2b. **Entschieden am
   31.10.2026:** U4 kommt vor Phase 2b.
+- **U5 Lokaler End-to-End-Test:** `make local-e2e` prüft die ganze Kette mit einem Befehl:
+  Batch, Mail in Mailpit, web-api hinter nginx und das UI im Browser (Playwright). Die Daten
+  kommen aus einer Replay-Fixture statt von Yahoo, damit das Ergebnis feststeht. Umgesetzt am
+  31.10.2026, vor P2b.1 ([Implementierungsplan](implementierungsplan.md#u5-lokaler-end-to-end-test)).
+
+## Neue Implementierung lokal prüfen (ab U5)
+
+Einmalig: `make ui-install` und `make ui-e2e-install` (Chromium nach `.local/playwright`, rund
+720 MB auf E:, nicht auf C:).
+
+1. Code: `make check`, `make test-db`, bei Änderungen am UI `make ui-check`.
+2. Ganze Kette mit festen Daten: `make local-e2e`. Das dauert rund zwei Minuten, die meiste Zeit
+   für den Image-Build. `E2E_KEEP=1 make local-e2e` lässt den Stack zum Ansehen stehen (UI unter
+   <http://localhost:18080>, Mailpit unter <http://localhost:18025>).
+3. Alle gespeicherten Wochen: `make local-regression`, nach U2 mit den Daten der NAS.
+4. Bei Bedarf mit echten Daten ansehen: `make local-up`, `make local-run`, `make local-ui`,
+   dann `make local-check`, Mailpit und das UI im Browser.
 
 ## Was gleich bleibt
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import EmailStr, Field, SecretStr
+from pydantic import EmailStr, Field, FilePath, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _MODEL_CONFIG = SettingsConfigDict(
@@ -74,6 +74,24 @@ class Settings(_OwnerUrl):
     healthcheck_url: str | None = None  # https://hc-ping.com/<uuid>
     cron_schedule: str = "30 7 * * 6"  # Sa 07:30 Europe/Berlin
     tz: str = "Europe/Berlin"
+
+    # --- Lokaler End-to-End-Test (U5, docs/architecture/umgebungen.md) ---
+    # Pfad zu einer Replay-Fixture (tests/fixtures/replay/): Universum und Fundamentaldaten
+    # kommen dann aus der Datei statt von iShares, Deka, OpenFIGI und Yahoo. Nur lokal.
+    replay_source: FilePath | None = None
+
+    @model_validator(mode="after")
+    def _replay_only_locally(self) -> Settings:
+        """Eine Mail mit Replay-Daten darf nie ueber einen echten Mailserver hinausgehen."""
+        if self.replay_source is None:
+            return self
+        if not self.smtp_plain:
+            msg = "REPLAY_SOURCE nur mit SMTP_PLAIN (lokaler Mail-Catcher wie Mailpit)"
+            raise ValueError(msg)
+        if self.healthcheck_url:
+            msg = "REPLAY_SOURCE nur ohne HEALTHCHECK_URL (sonst verdeckt der Ping die NAS)"
+            raise ValueError(msg)
+        return self
 
     @property
     def effective_mail_from(self) -> str:

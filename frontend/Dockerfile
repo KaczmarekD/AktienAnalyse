@@ -8,12 +8,20 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine
+FROM nginxinc/nginx-unprivileged:1.30.6-alpine AS nginx
 LABEL org.opencontainers.image.source="https://github.com/KaczmarekD/AktienAnalyse"
 LABEL org.opencontainers.image.description="Value-Analyzer: Web-UI (Angular) hinter nginx"
 # Hostnamen, unter denen das UI aufgerufen wird; alle anderen bekommen keine Antwort.
 # Auf der NAS setzt docker-compose.yml den Wert aus UI_SERVER_NAMES.
 ENV VA_SERVER_NAMES="localhost 127.0.0.1"
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
-COPY --from=build /app/dist/va-frontend/browser /usr/share/nginx/html
 EXPOSE 8080
+
+# E2E-Stack (U5.2, make local-e2e): dasselbe nginx mit dem Angular-Build aus frontend/dist.
+# Der Build-Kontext "dist" kommt aus docker-compose.e2e.yml; Node laeuft dafuer nicht im Docker.
+FROM nginx AS prebuilt
+COPY --from=dist . /usr/share/nginx/html
+
+# Das Image fuer die NAS (Standard, letzte Stufe)
+FROM nginx
+COPY --from=build /app/dist/va-frontend/browser /usr/share/nginx/html
