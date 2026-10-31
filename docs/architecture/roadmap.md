@@ -17,7 +17,7 @@
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
-| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 erledigt; U4 in Arbeit (P3.1, P3.2, P3.4, P3.5, P3.7 erledigt), U2 nach dem NAS-Deployment |
+| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 und U4 erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
 
 **Reihenfolge:**
@@ -98,7 +98,7 @@ Details: [umgebungen.md](umgebungen.md),
 - [ ] U3 (optional) Test auf der NAS: Branch-Images, zweites Compose-Projekt mit eigener DB
 - [x] Entscheidung (du): U4 Analysen im Browser, also P3.1, P3.2 und die Ansichten Ranking,
       Runs und Titel-Detail vor Phase 2b ziehen. Entschieden am 31.10.2026: ja
-- [ ] U4 Analysen im Browser (Pakete unter Phase 3)
+- [x] U4 Analysen im Browser (Pakete unter Phase 3: P3.1, P3.2, P3.4, P3.5, P3.7, P3.6)
 
 **Fertig, wenn:** jede neue Implementierung lokal mit echten Daten im Browser und in Mailpit
 geprüft werden kann, bevor sie auf die NAS geht.
@@ -144,7 +144,7 @@ Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 f
 - [ ] P3.3 Profil-Endpunkte und Vorschau (nach Phase 2b)
 - [x] P3.4 Sicherheitsgrundlagen 🔒 (U4) (`7736091`)
 - [x] P3.5 Angular-Gerüst und generierter Client (U4) (`a342653`)
-- [ ] P3.6 frontend-Container 🔒 (U4)
+- [x] P3.6 frontend-Container 🔒 (U4) (`07d234f`)
 - [x] P3.7 Ansichten: Ranking, Runs, Titel-Detail (U4) (`c8cf31e`); Profil-Editor nach Phase 2b
 - [ ] P3.8 Schutz der Schnittstelle
 - [ ] NAS (du): frontend-Container deployen, Firewall-Regel für Port 8080
