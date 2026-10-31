@@ -2,7 +2,8 @@
 # wird nur ueber die make-Targets local-* genutzt, die beide Dateien angeben. Die NAS kennt
 # diese Datei nicht.
 #
-#   make local-up    Datenbank, Mailpit (http://localhost:8025), pgweb (http://localhost:8081)
+#   make local-up    Datenbank, Mailpit (http://localhost:8025), pgweb (http://localhost:8081),
+#                    web-api (http://localhost:8000/api/docs)
 #   make local-run   ein Lauf mit dem Arbeitsstand, die Mail landet in Mailpit
 #
 # Alle Ports nur auf 127.0.0.1. Lokal geht keine Mail nach aussen und kein Healthcheck-Ping
@@ -51,6 +52,27 @@ services:
     ports:
       - "127.0.0.1:8025:8025"  # Weboberflaeche
       - "127.0.0.1:1025:1025"  # SMTP, auch fuer make run/dry aus der .venv
+
+  web-api:
+    # REST fuer das Frontend (P3.1, U4). Lokal mit eigenem Port, auf der NAS spaeter nur hinter
+    # nginx (P3.6). Dasselbe Image wie der Batch, gebaut von make local-up.
+    container_name: value-analyzer-local-web-api
+    image: value-analyzer:local
+    pull_policy: never
+    # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle
+    entrypoint:
+      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
+       "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Bewusst ohne env_file: nur die Leserolle, keine Zugangsdaten des Batches
+    environment:
+      TZ: Europe/Berlin
+      WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
+    ports:
+      - "127.0.0.1:8000:8000"
 
   pgweb:
     # Datenbank im Browser, nur lesend: Rolle va_read und --readonly

@@ -28,6 +28,7 @@ dependencies = [
     "va-market-data",
     "va-scoring",
     "va-notification",
+    "va-web-api",  # laeuft aus demselben Image wie der Batch (U4, P3.1)
 ]
 
 [dependency-groups]
@@ -39,6 +40,7 @@ dev = [
     "pandas-stubs>=3.0",
     "types-requests>=2.32",
     "import-linter>=2.15,<3",  # Grenzen zwischen den Workspace-Paketen (P1.1)
+    "httpx>=0.28,<1",  # TestClient von FastAPI (P3.1)
 ]
 
 # ----------------------------------------------------------------------------
@@ -62,6 +64,7 @@ va-platform = { workspace = true }
 va-market-data = { workspace = true }
 va-scoring = { workspace = true }
 va-notification = { workspace = true }
+va-web-api = { workspace = true }
 
 # ----------------------------------------------------------------------------
 # import-linter: Grenzen zwischen den Workspace-Paketen (ADR-0004, P1.1).
@@ -74,6 +77,7 @@ root_packages = [
     "va_market_data",
     "va_scoring",
     "va_notification",
+    "va_web_api",
     "src",  # Batch: Einstieg, Konfiguration, Composition Root, Schema batch
 ]
 # Auch Drittpakete im Graphen, damit Vertraege sie verbieten koennen
@@ -82,7 +86,7 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Services importieren einander nicht"
 type = "independence"
-modules = ["va_market_data", "va_scoring", "va_notification"]
+modules = ["va_market_data", "va_scoring", "va_notification", "va_web_api"]
 
 [[tool.importlinter.contracts]]
 name = "Schichten innerhalb jedes Service"
@@ -94,7 +98,7 @@ containers = ["va_market_data", "va_scoring", "va_notification"]
 name = "Geteilte Pakete kennen keine Services"
 type = "forbidden"
 source_modules = ["va_contracts", "va_platform"]
-forbidden_modules = ["va_market_data", "va_scoring", "va_notification"]
+forbidden_modules = ["va_market_data", "va_scoring", "va_notification", "va_web_api"]
 
 [[tool.importlinter.contracts]]
 name = "Contracts sind reine Datenformate"
@@ -117,7 +121,7 @@ forbidden_modules = ["yfinance", "requests", "sqlalchemy", "psycopg", "alembic"]
 [[tool.importlinter.contracts]]
 name = "Pakete und Services haengen nicht am Batch src"
 type = "forbidden"
-source_modules = ["va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification"]
+source_modules = ["va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification", "va_web_api"]
 forbidden_modules = ["src"]
 
 # ----------------------------------------------------------------------------
@@ -165,6 +169,7 @@ known-first-party = [
     "va_market_data",
     "va_scoring",
     "va_notification",
+    "va_web_api",
 ]
 
 [tool.ruff.lint.flake8-type-checking]
@@ -201,7 +206,7 @@ indent-style = "space"
 [tool.pytest.ini_options]
 minversion = "7.0"
 # Service-Tests liegen beim Service (code-struktur.md), Rest unter tests/
-testpaths = ["tests", "packages/va-platform/tests", "services/market-data/tests", "services/scoring/tests", "services/notification/tests"]
+testpaths = ["tests", "packages/va-platform/tests", "services/market-data/tests", "services/scoring/tests", "services/notification/tests", "services/web-api/tests"]
 addopts = [
     "-ra",
     "--strict-markers",
@@ -211,6 +216,9 @@ addopts = [
 filterwarnings = [
     "ignore::DeprecationWarning:yfinance",
     "ignore::FutureWarning:yfinance",
+    # Starlette 1.10 empfiehlt httpx2 fuer den TestClient; wir bleiben beim bewaehrten httpx,
+    # bis httpx2 sich gesetzt hat (P3.1)
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
 
 # ----------------------------------------------------------------------------
@@ -235,7 +243,7 @@ reportOptionalMemberAccess = "warning"
 # Coverage (optional, fuer 'make coverage')
 # ----------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["src", "va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification"]
+source = ["src", "va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification", "va_web_api"]
 omit = ["src/__init__.py", "tests/*"]
 
 [tool.coverage.report]

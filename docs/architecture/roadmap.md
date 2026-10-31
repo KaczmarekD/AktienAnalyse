@@ -28,6 +28,9 @@
   der vor P1.10 den Schutz gegen UPDATE nicht prüfte.
 - Track F1 ist aus demselben Grund vorgezogen wie Phase 2 und kann parallel zu Phase 0 laufen.
   F2 und F3 beginnen erst, wenn ADR-0011 angenommen ist, frühestens nach P1.5 und P2b.2.
+- U4 (Entscheidung 31.10.2026): Die Lese-Teile von Phase 3 kommen vor Phase 2b, damit die
+  Analysen im Browser zu sehen sind. Reihenfolge: P3.1, P3.2, P3.4, P3.5, P3.6, P3.7 ohne den
+  Profil-Editor. P3.3 und der Profil-Editor folgen nach Phase 2b.
 
 ## Sofort (du, auf der NAS)
 
@@ -93,8 +96,9 @@ Details: [umgebungen.md](umgebungen.md),
       (`9ba5ffe`)
 - [ ] U2 NAS-Daten lokal einspielen (`make local-restore`), Regression gegen alle Wochen
 - [ ] U3 (optional) Test auf der NAS: Branch-Images, zweites Compose-Projekt mit eigener DB
-- [ ] Entscheidung (du): U4 Analysen im Browser, also P3.1, P3.2 und die Ansichten Ranking,
-      Runs und Titel-Detail vor Phase 2b ziehen
+- [x] Entscheidung (du): U4 Analysen im Browser, also P3.1, P3.2 und die Ansichten Ranking,
+      Runs und Titel-Detail vor Phase 2b ziehen. Entschieden am 31.10.2026: ja
+- [ ] U4 Analysen im Browser (Pakete unter Phase 3)
 
 **Fertig, wenn:** jede neue Implementierung lokal mit echten Daten im Browser und in Mailpit
 geprüft werden kann, bevor sie auf die NAS geht.
@@ -131,14 +135,16 @@ Details: [Implementierungsplan, Phase 2b](implementierungsplan.md#phase-2b--scor
 
 Details: [Implementierungsplan, Phase 3](implementierungsplan.md#phase-3--web-api-und-angular)
 
+Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 folgen danach.
+
 - [ ] UI-Bibliothek festlegen (Angular Material oder PrimeNG), vor P3.5
-- [ ] P3.1 Gerüst des web-api
-- [ ] P3.2 Lese-Endpunkte
-- [ ] P3.3 Profil-Endpunkte und Vorschau
-- [ ] P3.4 Sicherheitsgrundlagen 🔒
-- [ ] P3.5 Angular-Gerüst und generierter Client
-- [ ] P3.6 frontend-Container 🔒
-- [ ] P3.7 Ansichten
+- [ ] P3.1 Gerüst des web-api (U4)
+- [ ] P3.2 Lese-Endpunkte (U4)
+- [ ] P3.3 Profil-Endpunkte und Vorschau (nach Phase 2b)
+- [ ] P3.4 Sicherheitsgrundlagen 🔒 (U4)
+- [ ] P3.5 Angular-Gerüst und generierter Client (U4)
+- [ ] P3.6 frontend-Container 🔒 (U4)
+- [ ] P3.7 Ansichten: Ranking, Runs, Titel-Detail (U4); Profil-Editor nach Phase 2b
 - [ ] P3.8 Schutz der Schnittstelle
 - [ ] NAS (du): frontend-Container deployen, Firewall-Regel für Port 8080
 

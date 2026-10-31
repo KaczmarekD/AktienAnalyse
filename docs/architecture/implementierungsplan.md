@@ -726,11 +726,24 @@ Beschlossen am 30.10.2026, Zielbild und Entscheidungen in [umgebungen.md](umgebu
   (`-p va-test`) bekommt eine eigene Datenbank, gefüllt aus einem Dump der Live-Daten, dazu
   Mailpit und keinen Cron.
 
-#### U4 Analysen im Browser (Entscheidung offen)
+#### U4 Analysen im Browser
 
-Vorschlag: P3.1, P3.2 und aus P3.5 bis P3.7 die Ansichten Ranking, Runs und Titel-Detail vor
-Phase 2b ziehen. Lokal mit `ng serve` und Proxy auf das web-api, auf der NAS als
-frontend-Container ([frontend.md](frontend.md)).
+Entschieden am 31.10.2026: P3.1, P3.2, P3.4, P3.5, P3.6 und aus P3.7 die Ansichten Ranking, Runs
+und Titel-Detail kommen vor Phase 2b. Die Pakete stehen unter Phase 3, hier nur das, was U4
+an ihnen ändert:
+
+- **Lokal zuerst:** Das web-api läuft bis P3.6 nur im lokalen Stack (`docker-compose.local.yml`)
+  unter `127.0.0.1:8000`, mit Swagger unter `/docs`. Auf die NAS kommt es mit dem
+  frontend-Container (P3.6). Dort hat es keinen eigenen Port.
+- **Ein Image:** Das web-api läuft aus demselben Image wie der Batch, nur mit anderem Befehl
+  (`uvicorn`). Eigene Images je Service bleiben bei P5.1.
+- **Eigener Lesezugang:** `WEB_API_DATABASE_URL` mit der Rolle `va_read`, dazu eine
+  schreibgeschützte Verbindung. Die Zugangsdaten des Batches (`DATABASE_URL`, SMTP) bekommt es
+  nicht.
+- **Keine Imports aus den Fach-Services:** Das web-api ist ein Service für sich (Vertrag
+  „Services importieren einander nicht“). Es liest in P3.2 mit eigenen Abfragen aus den
+  Schemas, aus denen ab Phase 4 Projektionen werden.
+- **Offen:** die UI-Bibliothek, vor P3.5.
 
 ### Phase 2b – Scoring-Profile
 
@@ -843,6 +856,20 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Health-Endpoint (TestClient) und OpenAPI-Snapshot.
 - **Implementierung:** `services/web-api` mit FastAPI-App, Lifespan und Settings.
+- **Umgesetzt (31.10.2026, U4):**
+  - Tests rot in `597e9fa`, Umsetzung in `82901a0`.
+  - **Pakete:** `va-web-api` mit FastAPI 0.162 (bringt `opentelemetry-api` mit) und uvicorn
+    ohne `[standard]`, beides reines Python. Die J4125-Prüfung lädt das web-api mit.
+  - **App:** `create_app()` als Fabrik (`uvicorn --factory`). Swagger liegt unter `/api/docs`,
+    die OpenAPI unter `/api/v1/openapi.json`. Beides reicht nginx später mit `/api/*` weiter.
+  - **Lesezugang:** Der Lifespan öffnet `WEB_API_DATABASE_URL` (Rolle `va_read`)
+    schreibgeschützt. Health braucht keine Datenbank.
+  - **Snapshot:** `tests/golden/openapi/v1.json`.
+  - **Lokal:** Der Container `web-api` im lokalen Stack bekommt nur die Leserolle, startet ohne
+    Migrationslauf und lauscht auf `127.0.0.1:8000`. Für die `.venv` gibt es `make api`.
+  - **httpx statt httpx2:** Starlette 1.10 empfiehlt für den TestClient `httpx2`. Es ist erst
+    wenige Wochen alt, deshalb bleibt es vorerst bei `httpx` 0.28. Die Warnung ist in der
+    pytest-Konfiguration ausgeblendet.
 
 #### P3.2 Lese-Endpunkte
 

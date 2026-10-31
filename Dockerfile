@@ -40,6 +40,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --no-install-project --no-install-workspace
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
@@ -52,7 +53,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     uv sync --locked --inexact --no-dev --no-install-project --no-editable \
         --refresh-package va-contracts --refresh-package va-platform \
         --refresh-package va-market-data --refresh-package va-scoring \
-        --refresh-package va-notification
+        --refresh-package va-notification --refresh-package va-web-api
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/

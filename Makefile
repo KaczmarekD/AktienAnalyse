@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down api
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -37,12 +37,15 @@ dry: ## Dry-Run: erzeugt HTML+CSV ohne Mail
 force: ## Wie run, aber ignoriert den Abruf von heute in der DB
 	$(PYTHON) -m src.main --force-refresh
 
+api: ## web-api aus der .venv mit Reload, Swagger unter http://localhost:8000/api/docs
+	$(RUN) uvicorn --factory va_web_api.main:create_app --reload --host 127.0.0.1 --port 8000
+
 # ---------- Qualitaetssicherung ----------------------------------------------
 test: ## Tests laufen lassen
 	$(RUN) pytest
 
 test-cov: ## Tests mit Coverage-Report
-	$(RUN) pytest --cov=src --cov=va_contracts --cov=va_platform --cov=va_market_data --cov=va_scoring --cov=va_notification --cov-report=term-missing --cov-report=html
+	$(RUN) pytest --cov=src --cov=va_contracts --cov=va_platform --cov=va_market_data --cov=va_scoring --cov=va_notification --cov=va_web_api --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
 	$(RUN) ruff check $(PY_PATHS)
@@ -144,7 +147,7 @@ regression-export: ## Wie regression, dazu je Lauf eine Fixture nach data/replay
 # Arbeitsstand, Mails landen in Mailpit, kein Healthcheck-Ping. Die NAS nutzt diese Targets nicht.
 LOCAL = docker compose -f docker-compose.yml -f docker-compose.local.yml
 
-local-up: ## Lokal: DB, Mailpit (localhost:8025) und pgweb (localhost:8081) starten
+local-up: ## Lokal: DB, Mailpit (:8025), pgweb (:8081) und web-api (:8000) starten
 	$(LOCAL) build value-analyzer
 	$(LOCAL) up -d
 

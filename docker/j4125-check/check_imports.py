@@ -86,6 +86,10 @@ print(
 sys.path.insert(0, "/app")
 importlib.import_module("src.main")  # kompletter Importgraph der App
 print("App-Importgraph (src.main) geladen")
+# Das web-api laeuft aus demselben Image (U4, P3.1): FastAPI, Starlette, uvicorn
+web_api = importlib.import_module("va_web_api.main")
+importlib.import_module("uvicorn")
+print(f"web-api geladen ({web_api.__name__})")
 
 # 3. Rechnen wie im Wochenlauf
 import numpy as np  # noqa: E402

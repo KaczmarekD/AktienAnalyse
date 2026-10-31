@@ -28,7 +28,10 @@ Geplant via Cron im Container.
 `docker-compose.yml` beschreibt den Live-Betrieb auf der NAS. Lokal legt
 `docker-compose.local.yml` den Build aus dem Arbeitsstand, Mailpit und pgweb darüber
 (`make local-*`). Dort zeigt SMTP fest auf Mailpit (`SMTP_PLAIN`, ohne TLS und Login) und
-`HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht.
+`HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht. Das web-api
+(`services/web-api`, FastAPI, ab P3.1) läuft aus demselben Image, lokal unter
+`localhost:8000`. Es bekommt nur `WEB_API_DATABASE_URL` mit der Rolle `va_read` und eine
+schreibgeschützte Verbindung, nie die Zugangsdaten des Batches.
 
 ## Methodik-Entscheidungen
 

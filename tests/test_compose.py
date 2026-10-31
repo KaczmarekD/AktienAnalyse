@@ -120,6 +120,7 @@ class TestLocalStack:
             ("mailpit", "8025", "127.0.0.1"),
             ("mailpit", "1025", "127.0.0.1"),
             ("pgweb", "8081", "127.0.0.1"),
+            ("web-api", "8000", "127.0.0.1"),
         }
 
     def test_names_do_not_collide_with_the_nas_definition(self, local, nas):
@@ -147,6 +148,23 @@ class TestLocalStack:
         batch = _mounts(local["services"]["value-analyzer"])
         assert batch["/app/logs"].endswith("/.local/logs")
         assert batch["/app/data"].endswith("/data")
+
+
+class TestLocalWebApi:
+    """P3.1/U4: das web-api lokal unter localhost:8000, bis P3.6 es hinter nginx stellt."""
+
+    def test_runs_from_the_local_image_with_uvicorn(self, local):
+        api = local["services"]["web-api"]
+        assert api["image"] == "value-analyzer:local"
+        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle
+        assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
+        assert "va_web_api.main:create_app" in api["entrypoint"]
+
+    def test_gets_only_the_read_role(self, local):
+        env = local["services"]["web-api"]["environment"]
+        assert set(env) == {"TZ", "WEB_API_DATABASE_URL"}  # keine Zugangsdaten des Batches
+        assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
+        assert "@db:5432/value_analyzer" in env["WEB_API_DATABASE_URL"]
 
 
 class TestLocalDevEnv:

@@ -22,7 +22,7 @@ Zeitplan:
 | Mail | Mailpit, Postfach unter <http://localhost:8025> | Gmail |
 | Healthcheck | aus | Healthchecks.io, falls eingerichtet |
 | Datenbank | eigene, Daten in `./.local/pgdata` | `./pgdata`, nie gelöscht |
-| Daten ansehen | pgweb (nur lesen) unter <http://localhost:8081>, später die Web-UI | später die Web-UI unter `http://<nas>:8080` |
+| Daten ansehen | pgweb (nur lesen) unter <http://localhost:8081>, web-api mit Swagger unter <http://localhost:8000/api/docs>, später die Web-UI | später die Web-UI unter `http://<nas>:8080` |
 | Ports | nur `127.0.0.1` | Postgres optional im LAN (`DB_LAN_BIND`) |
 | Tests | `make check`, `make test-db` (Wegwerf-DB auf 55432), `make local-regression` | `make regression` nach `make pull`, vor `make up` |
 
@@ -61,8 +61,8 @@ Zeitplan:
   Live-Datenbank schreibt. Das Live-Image fände danach eine ihm unbekannte Revision vor.
 - **U4 Analysen im Browser:** Teile von Phase 3 vorziehen: web-api mit Lese-Endpunkten
   (P3.1, P3.2) und die Ansichten Ranking, Runs und Titel-Detail. Lokal mit `ng serve`, auf der
-  NAS als frontend-Container. Der Profil-Editor wartet auf Phase 2b. **Entscheidung offen:** Die
-  Reihenfolge in der Roadmap ändert sich dadurch (heute steht 2b vor 3).
+  NAS als frontend-Container. Der Profil-Editor wartet auf Phase 2b. **Entschieden am
+  31.10.2026:** U4 kommt vor Phase 2b.
 
 ## Was gleich bleibt
 

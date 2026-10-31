@@ -171,7 +171,7 @@ Arbeitsstand, die Mail landet im lokalen Postfach Mailpit, und nichts geht nach 
 
 ```bash
 cp .env.local.example .env
-make local-up          # Datenbank, Mailpit und pgweb starten (Image aus dem Arbeitsstand)
+make local-up          # Datenbank, Mailpit, pgweb und web-api starten (Image aus dem Arbeitsstand)
 make local-run         # ein Lauf wie am Samstag; die Mail erscheint in Mailpit
 make local-regression  # alle gespeicherten Wochen mit dem Arbeitsstand nachspielen
 make local-down        # stoppen, die Daten in .local/ bleiben
@@ -181,6 +181,7 @@ make local-down        # stoppen, die Daten in .local/ bleiben
 |---|---|
 | <http://localhost:8025> | Mailpit: die Mails mit CSV-Anhang |
 | <http://localhost:8081> | pgweb: alle Tabellen, nur lesend (Rolle `va_read`) |
+| <http://localhost:8000/api/docs> | web-api: REST-Schnittstelle mit Swagger (ab P3.1, nur lesend) |
 | `localhost:5432` | Postgres (`LOCAL_DB_PORT`), z. B. für DBeaver |
 
 Lokal zeigt SMTP immer auf Mailpit und `HEALTHCHECK_URL` ist leer, auch wenn die `.env` echte
@@ -191,6 +192,7 @@ Zugangsdaten enthält. Der Batch läuft lokal nur auf Knopfdruck, ohne Cron.
 ```bash
 make install-dev    # alle Abhängigkeiten exakt aus uv.lock (.venv)
 make dry            # Dry-Run lokal
+make api            # web-api mit Reload unter localhost:8000 (statt des Containers)
 make check          # ruff + pyright + import-linter + pytest (DB-Tests ohne DB übersprungen)
 make test-db-up     # Wegwerf-Postgres auf Port 55432 (Docker)
 make test-db        # alle Tests inkl. DB-Tests
