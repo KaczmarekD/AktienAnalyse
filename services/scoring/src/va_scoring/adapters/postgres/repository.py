@@ -4,17 +4,26 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from sqlalchemy import BigInteger, Text, column, insert, or_, select, table
+from sqlalchemy import BigInteger, Text, column, func, insert, or_, select, table
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from va_platform.serialization import json_safe, to_python
 
-from .models import FactorScore, ScoreResult, ScoringRun
+from ...domain.profile import ProfileVersionRef
+from .models import (
+    FactorScore,
+    Profile,
+    ProfileActivation,
+    ProfileVersion,
+    ScoreResult,
+    ScoringRun,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -123,6 +132,105 @@ class ScoringRepository:
                 [{"scoring_run_id": scoring_run_id, **_clean(asdict(r))} for r in rows],
             )
 
+    # --- Profile (P2b.1, ADR-0009): nur anfuegen ----------------------------
+
+    def write_profile(self, name: str) -> int:
+        stmt = insert(Profile).values(name=name).returning(Profile.id)
+        return self.session.execute(stmt).scalar_one()
+
+    def write_profile_version(
+        self,
+        profile_id: int,
+        params: Mapping[str, Any],
+        *,
+        parent_version: int | None = None,
+        comment: str | None = None,
+    ) -> int:
+        """Legt die naechste Version des Profils an (1, 2, ...) und liefert ihre Nummer.
+
+        Speichern zwei gleichzeitig, scheitert der zweite am Schluessel, statt zu ueberschreiben.
+        """
+        version = self._newest_version(profile_id) + 1
+        self.session.execute(
+            insert(ProfileVersion).values(
+                profile_id=profile_id,
+                version=version,
+                params=json_safe(dict(params)),
+                parent_version=parent_version,
+                comment=comment,
+            )
+        )
+        return version
+
+    def write_profile_activation(self, profile_id: int, version: int) -> None:
+        """Macht die Version aktiv, auch eine aeltere (Zurueckrollen)."""
+        self.session.execute(
+            insert(ProfileActivation).values(profile_id=profile_id, version=version)
+        )
+
+    def ensure_profile(
+        self, name: str, params: Mapping[str, Any], *, comment: str
+    ) -> tuple[ProfileVersionRef, bool]:
+        """Legt das Profil mit Version 1 an, falls es den Namen noch nicht gibt.
+
+        Aktiviert wird nur, wenn noch keine Version aktiv ist: Ein anderes aktives Profil
+        bleibt aktiv. Liefert die aktive Version und ob das Profil neu ist. Gleichzeitige
+        Aufrufe legen es nur einmal an (``ON CONFLICT DO NOTHING`` auf den Namen).
+        """
+        stmt = (
+            pg_insert(Profile)
+            .values(name=name)
+            .on_conflict_do_nothing(index_elements=[Profile.name])
+            .returning(Profile.id)
+        )
+        new_id = self.session.execute(stmt).scalar()
+        if new_id is not None:
+            self.write_profile_version(new_id, params, comment=comment)
+        if self.get_active_profile_version() is None:
+            profile_id = new_id if new_id is not None else self.get_profile_id(name)
+            newest = 0 if profile_id is None else self._newest_version(profile_id)
+            if profile_id is not None and newest > 0:
+                self.write_profile_activation(profile_id, newest)
+        active = self.get_active_profile_version()
+        if active is None:
+            msg = f"Profil {name} hat keine Version, nichts ist aktiv"
+            raise LookupError(msg)
+        return active, new_id is not None
+
+    def get_profile_id(self, name: str) -> int | None:
+        return self.session.execute(select(Profile.id).where(Profile.name == name)).scalar()
+
+    def get_profile_version(self, profile_id: int, version: int) -> ProfileVersionRef | None:
+        row = self.session.execute(
+            _profile_versions().where(
+                ProfileVersion.profile_id == profile_id, ProfileVersion.version == version
+            )
+        ).one_or_none()
+        return None if row is None else _version_ref(row)
+
+    def get_active_profile_version(self) -> ProfileVersionRef | None:
+        """Die Version der juengsten Aktivierung, ueber alle Profile."""
+        newest = (
+            select(ProfileActivation.profile_id, ProfileActivation.version)
+            .order_by(ProfileActivation.activated_at.desc(), ProfileActivation.id.desc())
+            .limit(1)
+            .subquery()
+        )
+        row = self.session.execute(
+            _profile_versions().join(
+                newest,
+                (newest.c.profile_id == ProfileVersion.profile_id)
+                & (newest.c.version == ProfileVersion.version),
+            )
+        ).one_or_none()
+        return None if row is None else _version_ref(row)
+
+    def _newest_version(self, profile_id: int) -> int:
+        newest = self.session.execute(
+            select(func.max(ProfileVersion.version)).where(ProfileVersion.profile_id == profile_id)
+        ).scalar()
+        return int(newest or 0)
+
     # --- get ---------------------------------------------------------------
 
     def get_scoring_run(self, scoring_run_id: int) -> ScoringRun | None:
@@ -207,6 +315,21 @@ class ScoringRepository:
             .order_by(ScoringRun.created_at, ScoringRun.id)
         )
         return _frame(self.session, stmt, ["scoring_run_id", "created_at", "origin", *columns])
+
+
+def _profile_versions() -> Any:
+    return select(
+        ProfileVersion.profile_id, Profile.name, ProfileVersion.version, ProfileVersion.params
+    ).join(Profile, Profile.id == ProfileVersion.profile_id)
+
+
+def _version_ref(row: Any) -> ProfileVersionRef:
+    return ProfileVersionRef(
+        profile_id=int(row.profile_id),
+        name=str(row.name),
+        version=int(row.version),
+        params=dict(row.params),
+    )
 
 
 def _clean(row: dict[str, Any]) -> dict[str, Any]:

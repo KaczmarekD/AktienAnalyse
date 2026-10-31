@@ -31,6 +31,7 @@ from va_contracts.events.v1 import (
 )
 from va_market_data.domain.universe import Ticker, Universe
 from va_platform.bus import InProcessBus
+from va_scoring.domain.profile import ProfileVersionRef
 
 FIXED_NOW = datetime(2026, 10, 3, 7, 30)
 RECORDS = json.loads((GOLDEN_DIR / "input_fundamentals.json").read_text(encoding="utf-8"))
@@ -56,6 +57,9 @@ class Store:
 
     def load_snapshots(self, fetch_run_id, symbols):
         raise AssertionError("kein wiederverwendeter Abruf erwartet")
+
+    def ensure_default_profile(self, params):
+        return ProfileVersionRef(1, "Standard", 1, dict(params))
 
     def record_scoring(self, fetch_run_id, df_all, scored, cfg):
         return 20

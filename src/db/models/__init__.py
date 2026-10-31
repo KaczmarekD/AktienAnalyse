@@ -17,7 +17,14 @@ from va_market_data.adapters.postgres.models import (
 )
 from va_notification.adapters.postgres.models import Delivery, Report
 from va_platform.db import APP_SCHEMAS, Base
-from va_scoring.adapters.postgres.models import FactorScore, ScoreResult, ScoringRun
+from va_scoring.adapters.postgres.models import (
+    FactorScore,
+    Profile,
+    ProfileActivation,
+    ProfileVersion,
+    ScoreResult,
+    ScoringRun,
+)
 
 from .batch import ImportFile, Run, RunLog
 
@@ -33,6 +40,9 @@ __all__ = [
     "ImportFile",
     "Instrument",
     "PriceBar",
+    "Profile",
+    "ProfileActivation",
+    "ProfileVersion",
     "RawInfo",
     "Report",
     "Run",

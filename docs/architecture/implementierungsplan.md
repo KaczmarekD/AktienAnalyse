@@ -954,6 +954,45 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Implementierung:** eine neue Migration (die nächste freie Nummer ist `0006`, `0002` bis
   `0004` belegt Track F1, `0005` P1.10) mit `protect_table()` sowie ein Repository
   ([scoring-profile.md](scoring-profile.md)).
+- **Entwurf (31.10.2026):**
+  - **Tabellen** im Schema `scoring`. Die Modelle liegen in
+    `va_scoring.adapters.postgres.models`, Migration `0006`:
+    - `profile`: id, name (eindeutig), created_at.
+    - `profile_version`: Schlüssel (profile_id, version). Die Version zählt je Profil ab 1.
+      Dazu params (JSONB), parent_version, comment und created_at. parent_version verweist auf
+      eine ältere Version desselben Profils.
+    - `profile_activation`: id, profile_id, version (Fremdschlüssel auf die Version),
+      activated_at. Aktiv ist die jüngste Zeile über alle Profile (activated_at, dann id).
+    - Alle drei sind nur zum Anfügen da: `protect_table()` mit Schutz gegen `UPDATE`, Rechte wie
+      die übrigen Tabellen von `scoring`.
+  - **params:**
+    - Die Werte aus [scoring-profile.md](scoring-profile.md), die Faktoren als sortierte Liste
+      ihrer Schlüssel. `quality_weight` steht nicht drin, es ist `1 − value_weight`.
+    - Dazu `min_factor_count`: heute fest 2, im UI nicht änderbar. So beschreibt ein Profil das
+      Scoring vollständig, und ein altes Ranking bleibt nachrechenbar.
+    - Gebildet von `profile_params(ScoringConfig)` in `va_scoring.domain.profile`. Das
+      Pydantic-Modell mit Validierung folgt in P2b.2.
+  - **Repository** (`ScoringRepository`): `write_profile`, `write_profile_version` (nächste
+    Nummer), `write_profile_activation`, `get_profile_id`, `get_profile_version`,
+    `get_active_profile_version` und `ensure_profile`.
+  - **Profil „Standard“:**
+    - Der Batch legt es beim Start an (`ScoringStore.ensure_default_profile`), mit den Werten
+      aus ENV über `scoring_config(settings)`.
+    - Gibt es „Standard“ schon, passiert nichts, auch wenn sich ENV geändert hat.
+    - Aktiviert wird v1 nur, wenn noch keine Version aktiv ist. Ein später im UI angelegtes und
+      aktiviertes Profil bleibt so aktiv.
+    - Gleichzeitige Starts schützt `ON CONFLICT DO NOTHING` auf den Namen.
+    - Ein Fehler dabei kippt den Lauf nicht, er landet als Warnung im Log. Bis P2b.3 rechnet das
+      Scoring weiter mit den Werten aus ENV.
+  - **Noch nicht in P2b.1:** die Validierung (P2b.2), das Profil im Lauf und in der Mail (P2b.3)
+    und die API (P3.3).
+- **Umgesetzt (31.10.2026):** wie im Entwurf. Die Migration `0006` stammt aus
+  `alembic revision --autogenerate`, ergänzt um `protect_table()` und die Rechte. `alembic check`
+  findet danach keinen Unterschied zwischen Modellen und Migrationen.
+  - **Ergänzt:** Die Version der Vorlage (`parent_version`) ist ein Fremdschlüssel auf eine
+    ältere Version desselben Profils. Ein `CHECK` sorgt dafür, dass sie kleiner ist.
+  - **NAS:** Beim ersten Lauf nach dem Deployment entsteht „Standard“ v1 aus der `.env` der
+    NAS. Am Ranking ändert sich nichts.
 
 #### P2b.2 ScoringProfileParams
 

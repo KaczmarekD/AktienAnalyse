@@ -216,6 +216,26 @@ class TestFullRun:
             logs = RunRepository(s).get_logs(run.id)
             assert any("START" in entry.message for entry in logs)
 
+    def test_standard_profile_comes_from_env_only_once(self, db_settings, engine):
+        # P2b.1: Die ENV-Werte dienen nur einmal als Startwerte (ADR-0009)
+        first = db_settings.model_copy(update={"value_weight": 0.5, "quality_weight": 0.5})
+        _patched_run(first)
+        later = first.model_copy(update={"value_weight": 0.7, "quality_weight": 0.3})
+        _patched_run(later, force_refresh=True)
+        with engine.connect() as conn:
+            names = conn.execute(text("SELECT name FROM scoring.profile")).scalars().all()
+            versions = conn.execute(
+                text(
+                    "SELECT version, (params->>'value_weight')::float FROM scoring.profile_version"
+                )
+            ).all()
+            activations = conn.execute(
+                text("SELECT count(*) FROM scoring.profile_activation")
+            ).scalar_one()
+        assert names == ["Standard"]
+        assert [tuple(v) for v in versions] == [(1, 0.5)]
+        assert activations == 1
+
     def test_second_run_same_day_reuses_fetch(self, db_settings, engine):
         _patched_run(db_settings)
         rc, ticker_data, _ = _patched_run(db_settings)

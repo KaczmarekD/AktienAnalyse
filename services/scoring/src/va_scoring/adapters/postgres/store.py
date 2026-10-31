@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
@@ -11,12 +12,18 @@ import pandas as pd
 from va_platform.db import session_scope
 from va_platform.serialization import to_python
 
+from ...domain.profile import DEFAULT_PROFILE_NAME
 from .repository import FactorScoreRow, ScoreRow, ScoringRepository
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
 
+    from ...domain.profile import ProfileVersionRef
     from ...domain.scoring import ScoringConfig
+
+log = logging.getLogger(__name__)
+
+DEFAULT_PROFILE_COMMENT = "Startwerte aus ENV (VALUE_WEIGHT, QUALITY_WEIGHT, MIN_MARKET_CAP)"
 
 
 class PostgresScoringStore:
@@ -39,6 +46,23 @@ class PostgresScoringStore:
             repo.write_score_results(scoring_run_id, score_rows(df_all, scored, ids))
             repo.write_factor_scores(scoring_run_id, factor_rows(scored, ids, cfg))
             return scoring_run_id
+
+    def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
+        """Legt "Standard" einmalig an (ENV nur als Startwerte), liefert die aktive Version."""
+        with session_scope(self._engine) as s:
+            active, created = ScoringRepository(s).ensure_profile(
+                DEFAULT_PROFILE_NAME, params, comment=DEFAULT_PROFILE_COMMENT
+            )
+        # Bis P2b.3 rechnet das Scoring noch mit den ENV-Werten: nur das Anlegen ist eine Meldung
+        if created:
+            log.info(
+                "Profil %s aus den ENV-Werten angelegt (aktiv: %s)",
+                DEFAULT_PROFILE_NAME,
+                active.label,
+            )
+        else:
+            log.debug("Aktives Scoring-Profil: %s", active.label)
+        return active
 
 
 def scoring_symbols(df_all: pd.DataFrame, scored: pd.DataFrame) -> list[str]:

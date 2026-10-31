@@ -167,6 +167,10 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
   Abfrage „Stand zu Datum X“ über `get_statements_as_of`).
+- Scoring-Profile (ADR-0009, seit P2b.1) liegen in `scoring.profile`, `profile_version` und
+  `profile_activation`, alle nur zum Anfügen. Aktiv ist die jüngste Aktivierung. Der Batch
+  legt beim Start einmalig das Profil „Standard“ aus den ENV-Werten an. Bis P2b.3 rechnet
+  das Scoring noch mit `ScoringConfig` aus ENV, das Profil wirkt also noch nicht.
 - Zugriffe nur über die Repositories der Module (`get_*`/`write_*`,
   bewusst ohne delete). Jeder Titel wird sofort nach dem Abruf gespeichert.
 - Migrationen (Alembic, `migrations/`) sind nur additiv; jede neue Tabelle

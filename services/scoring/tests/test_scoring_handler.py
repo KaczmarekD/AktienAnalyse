@@ -19,6 +19,7 @@ from va_contracts.events.v1 import (
     UniverseMemberV1,
 )
 from va_platform.bus import InProcessBus
+from va_scoring.domain.profile import ProfileVersionRef
 from va_scoring.domain.scoring import ScoringConfig, score
 from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
 
@@ -37,6 +38,9 @@ class FakeStore:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
         self.calls: list[dict[str, Any]] = []
+
+    def ensure_default_profile(self, params):
+        return ProfileVersionRef(1, "Standard", 1, dict(params))
 
     def record_scoring(self, fetch_run_id, df_all, scored, cfg):
         if self.error:

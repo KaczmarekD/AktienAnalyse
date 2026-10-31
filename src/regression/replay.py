@@ -41,10 +41,13 @@ from .compare import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from va_contracts import Envelope
     from va_contracts.events.v1 import RunFailedV1
     from va_notification.domain.report import ReportArtifacts
     from va_platform.bus import DeadLetter
+    from va_scoring.domain.profile import ProfileVersionRef
     from va_scoring.domain.scoring import ScoringConfig
 
     from .case import ReplayCase
@@ -208,6 +211,10 @@ class _ScoringCapture:
         factors = _frame(factor_rows(scored, ids, cfg), FACTOR_COLUMNS, symbols)
         self.factor_scores = factors.sort_values(["symbol", "factor_key"], ignore_index=True)
         return self.scoring_run_id
+
+    def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
+        msg = "Das Replay legt keine Profile an"
+        raise NotImplementedError(msg)
 
 
 @dataclass

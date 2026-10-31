@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     import pandas as pd
 
+    from ..domain.profile import ProfileVersionRef
     from ..domain.scoring import ScoringConfig
 
 
@@ -20,3 +23,10 @@ class ScoringStore(Protocol):
     def record_scoring(
         self, fetch_run_id: int, df_all: pd.DataFrame, scored: pd.DataFrame, cfg: ScoringConfig
     ) -> int: ...
+
+    def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
+        """Legt das Profil "Standard" einmalig mit ``params`` an und liefert die aktive Version.
+
+        Die Werte aus ENV dienen nur beim ersten Mal als Startwerte (ADR-0009, P2b.1).
+        """
+        ...

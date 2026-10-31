@@ -20,12 +20,13 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import pytest
 
-from src.composition import Adapters
+from src.composition import Adapters, scoring_config
 from src.main import _run, run
 from va_market_data.domain.fundamentals import Fundamentals, Identity
 from va_market_data.domain.history import HistoryState
 from va_market_data.domain.universe import Ticker, Universe
 from va_notification.domain.errors import ERROR_SUBJECT
+from va_scoring.domain.profile import ProfileVersionRef, profile_params
 
 
 def _universe(tickers, **kwargs):
@@ -44,6 +45,7 @@ class FakeRecorder:
         failing_symbols: frozenset[str] = frozenset(),
         history: dict[str, HistoryState] | None = None,
         fail_history: bool = False,
+        fail_profile: bool = False,
     ) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.reusable = reusable
@@ -53,6 +55,7 @@ class FakeRecorder:
         self.failing_symbols = failing_symbols
         self.history = history or {}
         self.fail_history = fail_history
+        self.fail_profile = fail_profile
 
     def get(self, name: str) -> list[Any]:
         return [args for n, args in self.calls if n == name]
@@ -88,6 +91,12 @@ class FakeRecorder:
 
     def finish_fetch(self, fetch_run_id, df):
         self.calls.append(("finish_fetch", fetch_run_id))
+
+    def ensure_default_profile(self, params):
+        self.calls.append(("ensure_default_profile", params))
+        if self.fail_profile:
+            raise ConnectionError("db hiccup")
+        return ProfileVersionRef(1, "Standard", 1, dict(params))
 
     def record_scoring(self, fetch_run_id, df_all, scored, cfg):
         self.calls.append(("record_scoring", fetch_run_id))
@@ -231,6 +240,40 @@ class TestRunDryRun:
             20,
             30,
         )
+
+
+class TestDefaultProfile:
+    """P2b.1: Beim Start entsteht das Profil "Standard" aus den ENV-Werten (ADR-0009)."""
+
+    def test_start_ensures_the_standard_profile_from_env(
+        self, settings, recorder, mock_tickers, mock_universe_df
+    ):
+        settings = settings.model_copy(update={"min_market_cap": 1e9})
+        _run_with(
+            settings, recorder, mock_tickers, {"return_value": mock_universe_df}, dry_run=True
+        )
+        [params] = recorder.get("ensure_default_profile")
+        assert params == profile_params(scoring_config(settings))
+        assert params["min_market_cap"] == 1e9
+
+    def test_after_the_run_is_started_and_before_the_fetch(
+        self, settings, recorder, mock_tickers, mock_universe_df
+    ):
+        _run_with(
+            settings, recorder, mock_tickers, {"return_value": mock_universe_df}, dry_run=True
+        )
+        names = [name for name, _ in recorder.calls]
+        assert names.index("start_run") < names.index("ensure_default_profile")
+        assert names.index("ensure_default_profile") < names.index("start_fetch")
+
+    def test_failure_does_not_stop_the_run(self, settings, mock_tickers, mock_universe_df, caplog):
+        # Bis P2b.3 rechnet das Scoring mit den ENV-Werten, das Profil ist noch Beiwerk
+        recorder = FakeRecorder(fail_profile=True)
+        rc, _, _ = _run_with(
+            settings, recorder, mock_tickers, {"return_value": mock_universe_df}, dry_run=True
+        )
+        assert rc == 0
+        assert "Profil Standard" in caplog.text
 
 
 # ---------------------------------------------------------------------------

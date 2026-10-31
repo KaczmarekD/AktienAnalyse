@@ -1,7 +1,9 @@
 """Schema ``scoring``: jede Bewertung eines Abrufs ist ein eigener, unveraenderlicher Lauf.
 
 Ein Neu-Scoring alter Daten (andere Gewichte, neuer Faktor) erzeugt einen neuen
-``scoring_run`` - bestehende Ergebnisse werden nie ueberschrieben.
+``scoring_run`` - bestehende Ergebnisse werden nie ueberschrieben. Die Scoring-Profile
+(P2b.1, ADR-0009) sind ebenso nur zum Anfuegen da: neue Version statt Aenderung, neue
+Aktivierung statt Umschalten.
 """
 
 from __future__ import annotations
@@ -9,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Identity, func
+from sqlalchemy import CheckConstraint, ForeignKey, ForeignKeyConstraint, Identity, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_platform.db import Base, in_values
@@ -72,3 +74,55 @@ class FactorScore(Base):
     direction: Mapped[str]
     raw_value: Mapped[float | None]
     percentile_rank: Mapped[float | None]
+
+
+class Profile(Base):
+    """Ein Scoring-Profil. Sein Inhalt steht in den Versionen."""
+
+    __tablename__ = "profile"
+    __table_args__ = {"schema": "scoring"}  # noqa: RUF012
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ProfileVersion(Base):
+    """Eine unveraenderliche Version: Speichern legt immer die naechste Nummer an."""
+
+    __tablename__ = "profile_version"
+    __table_args__ = (
+        CheckConstraint("version >= 1", name="version"),
+        CheckConstraint("parent_version < version", name="parent_version"),
+        # Die Vorlage ist eine aeltere Version desselben Profils
+        ForeignKeyConstraint(
+            ["profile_id", "parent_version"],
+            ["scoring.profile_version.profile_id", "scoring.profile_version.version"],
+        ),
+        {"schema": "scoring"},
+    )
+
+    profile_id: Mapped[int] = mapped_column(ForeignKey("scoring.profile.id"), primary_key=True)
+    version: Mapped[int] = mapped_column(primary_key=True)
+    params: Mapped[dict[str, Any]]
+    parent_version: Mapped[int | None]
+    comment: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ProfileActivation(Base):
+    """Aktiv ist die juengste Zeile ueber alle Profile. Zurueckrollen: aeltere Version aktivieren."""
+
+    __tablename__ = "profile_activation"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["profile_id", "version"],
+            ["scoring.profile_version.profile_id", "scoring.profile_version.version"],
+        ),
+        {"schema": "scoring"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    profile_id: Mapped[int]
+    version: Mapped[int]
+    activated_at: Mapped[datetime] = mapped_column(server_default=func.now())
