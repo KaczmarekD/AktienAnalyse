@@ -32,46 +32,29 @@ Die Standardwerte entsprechen dem heutigen `ScoringConfig`:
 | `min_quality_factor_share` | 0.5 | 0–1: Mindestanteil vorhandener Quality-Faktoren |
 | `value_trap_value_threshold` | 0.70 | 0–1 |
 | `value_trap_quality_threshold` | 0.30 | 0–1 |
+| `min_factor_count` | 2 | ≥ 1: so viele Faktoren muss ein Titel je Gruppe mindestens haben. Im UI nicht änderbar, steht aber im Profil, damit es das Scoring vollständig beschreibt (seit P2b.1). |
 | `drop_negative_value_metrics` | an | negative Multiples aus dem Value-Ranking ausschließen |
-| `value_factors` | EV/EBIT, P/B, P/FCF, Shareholder Yield | Teilmenge des Katalogs, mindestens 2 aktiv |
-| `quality_factors` | ROIC, FCF-Marge, Operating Margin, Net Debt/EBITDA, Earnings Stability | Teilmenge des Katalogs, mindestens 2 aktiv |
+| `value_factors` | EV/EBIT, P/B, P/FCF, Shareholder Yield | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv |
+| `quality_factors` | ROIC, FCF-Marge, Operating Margin, Net Debt/EBITDA, Earnings Stability | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv |
 
 **Bewusst nicht änderbar** sind der Faktor-Katalog selbst und die Richtung jedes Faktors (ob ein
 hoher oder niedriger Wert besser ist). Neue Faktoren bleiben Code-Änderungen nach dem Ablauf in
 [CLAUDE.md](../../CLAUDE.md). Das UI zeigt zu jedem Faktor Methodik-Hinweise an, etwa warum das
 KGV fehlt oder warum negative Multiples ausgeschlossen werden.
 
-```python
-ValueFactor = Literal["ev_ebit", "pb", "p_fcf", "shareholder_yield"]
-QualityFactor = Literal[
-    "roic", "fcf_margin", "operating_margin", "net_debt_ebitda", "earnings_stability"
-]
+Seit P2b.2 steht das Modell im Code:
+[`va_scoring.domain.profile`](../../services/scoring/src/va_scoring/domain/profile.py).
 
-
-class ScoringProfileParams(BaseModel):
-    value_weight: float = Field(0.6, ge=0, le=1)
-    min_market_cap: float = Field(300_000_000, ge=0)
-    min_value_factor_share: float = Field(0.5, ge=0, le=1)
-    min_quality_factor_share: float = Field(0.5, ge=0, le=1)
-    value_trap_value_threshold: float = Field(0.70, ge=0, le=1)
-    value_trap_quality_threshold: float = Field(0.30, ge=0, le=1)
-    drop_negative_value_metrics: bool = True
-    value_factors: set[ValueFactor] = Field(default_factory=lambda: set(get_args(ValueFactor)))
-    quality_factors: set[QualityFactor] = Field(
-        default_factory=lambda: set(get_args(QualityFactor))
-    )
-
-    @property
-    def quality_weight(self) -> float:
-        return 1.0 - self.value_weight
-
-    @model_validator(mode="after")
-    def _min_two_factors(self) -> Self:
-        # _composite_mean braucht mindestens 2 vorhandene Faktoren je Gruppe
-        if len(self.value_factors) < 2 or len(self.quality_factors) < 2:
-            raise ValueError("je Gruppe mindestens 2 aktive Faktoren")
-        return self
-```
+- **`ScoringProfileParams`** (Pydantic):
+  - unveränderlich, unbekannte Felder sind ein Fehler,
+  - die Grenzen stehen am Feld,
+  - die Regel zur Zahl der Faktoren steht im `model_validator`.
+- **Faktoren:** als `frozenset` der Literal-Schlüssel `ValueFactorKey` und `QualityFactorKey`.
+  Im JSON erscheinen sie als sortierte Liste: gleiche Parameter ergeben denselben Hash.
+- **`to_config()`** liefert die `ScoringConfig` für `score()`. Die Faktoren stehen in der
+  Reihenfolge des Katalogs, `quality_weight` ist `1 − value_weight`. Für die Standardwerte ist
+  sie gleich `ScoringConfig()`.
+- **`from_config()`** bildet das Profil „Standard“ aus den ENV-Werten.
 
 ## Ablauf im UI
 

@@ -1002,6 +1002,34 @@ prüft dieses Paket, für jede gespeicherte Woche.
     gleich.
   - Ein abgeschalteter Faktor verändert das Ranking wie erwartet.
 - **Implementierung:** Pydantic-Modell und seine Abbildung auf `score()`.
+- **Entwurf (31.10.2026):**
+  - **Modell:** `ScoringProfileParams` in `va_scoring.domain.profile`, unveränderlich, ohne
+    unbekannte Felder (ein Tippfehler in gespeicherten params fällt auf). Die Felder stehen in
+    [scoring-profile.md](scoring-profile.md), dazu `min_factor_count` (Standard 2, mindestens 1)
+    wie in P2b.1.
+  - **Faktoren:** als Literal-Schlüssel `ValueFactorKey` und `QualityFactorKey`. Ein Test hält
+    sie gleich mit `DEFAULT_VALUE_FACTORS` und `DEFAULT_QUALITY_FACTORS`, dem Katalog im Code.
+  - **Regeln:**
+    - Die Grenzen stehen am Feld (`ge`, `le`), damit sie später in OpenAPI landen.
+    - Je Gruppe sind mindestens zwei Faktoren aktiv und mindestens so viele wie
+      `min_factor_count`, sonst entstünde nie ein Score.
+  - **JSON:** Die Faktoren erscheinen als sortierte Liste, also in derselben Form wie in P2b.1
+    und mit stabilem Hash. `profile_params(cfg)` geht jetzt über das Modell. Die in P2b.1
+    gespeicherte Version „Standard“ v1 bleibt gültig.
+  - **Abbildung auf `score()`:** `to_config()` liefert eine `ScoringConfig` mit
+    `quality_weight = 1 − value_weight` und den Faktoren in der Reihenfolge des Katalogs. Für
+    die Standardwerte ist sie gleich `ScoringConfig()`, Golden-Files und Replay-Fixtures
+    bleiben also unverändert.
+  - **Abhängigkeit:** `pydantic` direkt in `va-scoring`, bisher kam es nur über `va-contracts`.
+  - **Noch nicht in P2b.2:** Das Scoring rechnet erst ab P2b.3 mit dem Profil. OpenAPI und der
+    Editor kommen in P3.3.
+- **Umgesetzt (31.10.2026):** wie im Entwurf.
+  - Die Felder haben ihren Standardwert als `Field(default=...)`. Pyright erkennt ihn nur so.
+  - `from_config()` geht über `model_validate`: Ein Faktor außerhalb des Katalogs fällt auch
+    dort auf.
+  - Neuer Test in `tests/test_replay_fixtures.py`: Jede gespeicherte Woche ergibt mit dem
+    Profil „Standard“ (Werte des Deployments) dasselbe Ergebnis. P2b.3 kann das Scoring damit
+    umstellen, ohne dass sich eine Woche ändert.
 
 #### P2b.3 Profil-Version im Lauf und in der Mail
 
