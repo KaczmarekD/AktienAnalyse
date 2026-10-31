@@ -13,11 +13,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError
 
 from va_platform.db import create_db_engine
 
-from .api import health
+from .api import health, instruments, ranking, reports, runs
 from .settings import WebApiSettings
 
 API_PREFIX = "/api/v1"
@@ -44,5 +46,12 @@ def create_app(settings: WebApiSettings | None = None) -> FastAPI:
         redoc_url=None,
         openapi_url=f"{API_PREFIX}/openapi.json",
     )
-    app.include_router(health.router, prefix=API_PREFIX)
+    for module in (health, runs, ranking, instruments, reports):
+        app.include_router(module.router, prefix=API_PREFIX)
+
+    @app.exception_handler(OperationalError)
+    async def database_down(request: Request, exc: OperationalError) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI
+        # Keine Details nach aussen: Die Meldung enthielte Host und Rolle
+        return JSONResponse(status_code=503, content={"detail": "Datenbank nicht erreichbar"})
+
     return app

@@ -182,7 +182,7 @@ make local-down        # stoppen, die Daten in .local/ bleiben
 | <http://localhost:8025> | Mailpit: die Mails mit CSV-Anhang |
 | <http://localhost:8081> | pgweb: alle Tabellen, nur lesend (Rolle `va_read`) |
 | <http://localhost:8000/api/docs> | web-api: REST-Schnittstelle mit Swagger (ab P3.1, nur lesend) |
-| `localhost:5432` | Postgres (`LOCAL_DB_PORT`), z. B. für DBeaver |
+| `127.0.0.1:5432` | Postgres (`LOCAL_DB_PORT`), z. B. für DBeaver |
 
 Lokal zeigt SMTP immer auf Mailpit und `HEALTHCHECK_URL` ist leer, auch wenn die `.env` echte
 Zugangsdaten enthält. Der Batch läuft lokal nur auf Knopfdruck, ohne Cron.

@@ -32,6 +32,16 @@ class TestHealth:
         assert client.get("/api/v1/gibt-es-nicht").status_code == 404
 
 
+class TestDatabaseDown:
+    def test_read_endpoint_answers_503(self):
+        # connect_timeout: unter Windows wartet libpq sonst lange auf den abgelehnten Port
+        url = SecretStr("postgresql+psycopg://va_read:x@127.0.0.1:1/none?connect_timeout=2")
+        with TestClient(create_app(WebApiSettings(database_url=url))) as c:
+            response = c.get("/api/v1/runs")
+        assert response.status_code == 503
+        assert response.json() == {"detail": "Datenbank nicht erreichbar"}
+
+
 class TestDocs:
     """Unter /api, damit nginx (P3.6) sie mit /api/* weiterreicht."""
 

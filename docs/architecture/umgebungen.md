@@ -45,8 +45,10 @@ Zeitplan:
   kollidiert so nicht mit einem Stack aus `docker-compose.yml` auf demselben Rechner. Ist Port
   5432 belegt, verlegt `LOCAL_DB_PORT` die lokale Datenbank.
 - **Der schnelle Weg bleibt:** `make dry` und `make run` laufen weiter aus der `.venv` gegen
-  dieselbe lokale Datenbank (`localhost:5432`), Mails gehen dann an `localhost:1025`
-  ([.env.local.example](../../.env.local.example)).
+  dieselbe lokale Datenbank (`127.0.0.1:5432`), Mails gehen dann an `127.0.0.1:1025`
+  ([.env.local.example](../../.env.local.example)). Bewusst `127.0.0.1` statt `localhost`:
+  Windows versucht bei `localhost` zuerst IPv6, die Ports lauschen aber nur auf IPv4. Jede
+  Verbindung wartete dann, bis der Versuch abbricht (gemessen 16 s, ohne Timeout bis zu 2 min).
 
 ## Pakete
 

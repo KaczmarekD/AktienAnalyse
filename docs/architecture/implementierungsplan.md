@@ -877,6 +877,37 @@ prüft dieses Paket, für jede gespeicherte Woche.
   gerenderte Mail), Zugriff über die Rolle `va_read`.
 - **Implementierung:** Router `runs`, `ranking`, `instruments`, `reports`
   ([web-api-realtime.md](web-api-realtime.md)).
+- **Entwurf (31.10.2026, U4):**
+
+  | Endpunkt | Inhalt | Quelle |
+  |---|---|---|
+  | `GET /runs?limit&offset` | Läufe, neueste zuerst: Art, Status, Zeiten, Dry-Run, Zähler, Exit-Code | `batch.run` |
+  | `GET /runs/{id}` | dazu Fehler und die IDs von Abruf, Bewertung und Report | `batch.run` |
+  | `GET /ranking/latest` | jüngster Bewertungslauf außer Rescores | `scoring.*`, Snapshot des Abrufs |
+  | `GET /ranking/{scoring_run_id}` | alle Titel mit Rang, Scores, Flag, Größenfilter und den Faktor-Kennzahlen, dazu Gewichte und Abruftag | wie oben |
+  | `GET /instruments/{symbol}` | Stammdaten, neuester gültiger Snapshot, Score-Verlauf über alle Bewertungsläufe | `market_data.*`, `scoring.*` |
+  | `GET /reports/{id}` | Betreff, Zeitpunkt, HTML der Mail | `reporting.report` |
+  | `GET /reports/{id}/csv` | die CSV als Download (`text/csv`) | `reporting.report` |
+
+  - **Eigene Abfragen:** Das web-api liest mit eigenem SQL (`va_web_api.read`), ohne die
+    Repositories der Fach-Services. Ab Phase 4 lösen Projektionen das ab, die REST-Antworten
+    bleiben gleich.
+  - **Fehlende Daten:** Unbekannte IDs und Symbole ergeben 404. Ist die Datenbank nicht
+    erreichbar, kommt 503 statt 500.
+  - **Snapshot:** Der OpenAPI-Snapshot ändert sich bewusst.
+- **Umgesetzt (31.10.2026):**
+  - Tests rot in `9806327`.
+  - **Code:** Antwortmodelle in `va_web_api.models`. Sie verbieten unbekannte Felder, damit
+    Tippfehler in einer Abfrage auffallen. Die Abfragen stehen in `va_web_api.read`, die Router
+    unter `va_web_api.api` (`runs`, `ranking`, `instruments`, `reports`).
+  - **503:** Fällt die Datenbank aus, antworten die Endpunkte ohne Details mit 503.
+  - **Probe mit echten Daten** (Lauf vom 30.10.2026 im lokalen Stack, 90 Titel):
+    - Das Ranking beginnt mit Allianz, Porsche SE und freenet.
+    - Commerzbank und Deutsche Bank stehen ohne Composite auf 89 und 90.
+    - Titel, Report und CSV-Download liefern die erwarteten Daten.
+  - **Befund aus U1, hier behoben:** `.env.local.example` nutzte `localhost`. Unter Windows
+    hing damit jede Verbindung aus der `.venv`, erst über IPv6, dann bis zum Abbruch. Die
+    Vorlage nutzt jetzt `127.0.0.1`.
 
 #### P3.3 Profil-Endpunkte und Vorschau
 
