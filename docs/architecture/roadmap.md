@@ -14,7 +14,7 @@
 | 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1), NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | 🚧 P2b.0 Replay-Regression erledigt, ab P2b.1 offen |
-| 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
+| 3 | web-api + Angular (UI im LAN, Profil-Editor) | 🚧 Lese-Teile über U4 erledigt (P3.1, P3.2, P3.4–P3.7), offen: P3.3 und Profil-Editor (nach 2b), P3.8; NAS: Deployment |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 und U4 erledigt, U2 nach dem NAS-Deployment |
