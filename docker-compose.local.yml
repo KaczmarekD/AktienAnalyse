@@ -54,25 +54,26 @@ services:
       - "127.0.0.1:1025:1025"  # SMTP, auch fuer make run/dry aus der .venv
 
   web-api:
-    # REST fuer das Frontend (P3.1, U4). Lokal mit eigenem Port, auf der NAS spaeter nur hinter
-    # nginx (P3.6). Dasselbe Image wie der Batch, gebaut von make local-up.
+    # Wie auf der NAS (docker-compose.yml), aber aus dem Arbeitsstand (gebaut von make local-up)
+    # und lokal direkt erreichbar, mit Swagger unter /api/docs
     container_name: value-analyzer-local-web-api
     image: value-analyzer:local
     pull_policy: never
-    # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle
-    entrypoint:
-      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
-       "--host", "0.0.0.0", "--port", "8000"]
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    # Bewusst ohne env_file: nur die Leserolle, keine Zugangsdaten des Batches
-    environment:
-      TZ: Europe/Berlin
-      WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
     ports:
       - "127.0.0.1:8000:8000"
+
+  frontend:
+    # nginx mit dem Build aus dem Arbeitsstand (make local-ui). Nur auf Wunsch: Der Node-Build
+    # braucht viel Platz, zum Entwickeln gibt es make ui (ng serve mit Reload).
+    container_name: value-analyzer-local-frontend
+    image: va-frontend:local
+    build:
+      context: ./frontend
+    profiles: ["ui"]
+    environment:
+      VA_SERVER_NAMES: localhost 127.0.0.1
+    ports: !override
+      - "127.0.0.1:8080:8080"
 
   pgweb:
     # Datenbank im Browser, nur lesend: Rolle va_read und --readonly

@@ -974,6 +974,27 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Implementierung:** Dockerfile, `nginx/default.conf` und der Compose-Eintrag
   ([frontend.md](frontend.md)).
 - **NAS (du):** Container deployen, Firewall-Regel für Port 8080 auf das eigene Subnetz.
+- **Umgesetzt (31.10.2026, U4, nach P3.7):**
+  - Tests rot in `7846cbd`:
+    - Compose: Die NAS hat `web-api` ohne Port und nur mit der Leserolle, dazu `frontend` aus
+      GHCR auf `UI_LAN_BIND:8080`. Lokal liegt das frontend auf `127.0.0.1`.
+    - Regeln der nginx-Konfiguration, statisch geprüft.
+    - Container-Smoke für die CI (`docker/frontend-smoke.sh`).
+  - **Image:** `frontend/Dockerfile` baut mit `node:24.22.2-alpine`, `nginxinc/nginx-unprivileged:1.30.6-alpine`
+    liefert aus (ohne root, Port 8080).
+  - **nginx-Vorlage:** `return 444` für unbekannte Hostnamen, `UI_SERVER_NAMES` per `envsubst`,
+    `/api/` mit `^~` und Auflösung zur Laufzeit, Sicherheits-Header ohne `add_header` in den
+    Abschnitten, `index.html` ohne Cache, SPA-Fallback.
+  - **CI:**
+    - Baut das Image und prüft es zusammen mit dem web-api aus dem App-Image: `nginx -t`,
+      `/` und `/runs/1` liefern `index.html`, `/api/v1/health` geht über nginx, Header stimmen,
+      ein fremder Host bekommt keine Antwort.
+    - Schiebt es mit denselben Tags wie das App-Image nach GHCR (`va-frontend`).
+  - **Lokal:** `make local-ui` baut und startet nginx unter `127.0.0.1:8080`, nur auf Wunsch (Profil
+    `ui`), weil der Node-Build viel Platz braucht. `nginx -t` mit der echten Vorlage lief lokal
+    durch.
+  - **Hinweis:** Swagger (`/api/docs`) lädt sein Skript von einem CDN und geht hinter nginx wegen
+    der CSP nicht. Lokal bleibt es am web-api erreichbar.
 
 #### P3.7 Ansichten
 

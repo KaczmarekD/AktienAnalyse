@@ -25,6 +25,8 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 HEALTHCHECK_URL=https://hc-ping.com/00000000-0000-0000-0000-000000000000
 DB_LAN_BIND=192.168.1.10
+UI_LAN_BIND=192.168.1.10
+UI_SERVER_NAMES=nas nas.fritz.box 192.168.1.10
 """
 # Variablen, die Compose sonst aus der Umgebung des Testlaufs uebernaehme
 _COMPOSE_INPUTS = (
@@ -38,6 +40,8 @@ _COMPOSE_INPUTS = (
     "REG",
     "VERSION",
     "LOCAL_DB_PORT",
+    "UI_LAN_BIND",
+    "UI_SERVER_NAMES",
 )
 
 
@@ -57,7 +61,7 @@ def _config(directory: Path, *files: str, env: str | None = None) -> dict[str, A
         args += ["-f", str(directory / name)]
     environ = {k: v for k, v in os.environ.items() if k not in _COMPOSE_INPUTS}
     result = subprocess.run(  # feste Argumente, keine Shell
-        [*args, "--profile", "run", "config", "--format", "json"],
+        [*args, "--profile", "run", "--profile", "ui", "config", "--format", "json"],
         capture_output=True,
         text=True,
         check=False,
@@ -121,6 +125,7 @@ class TestLocalStack:
             ("mailpit", "1025", "127.0.0.1"),
             ("pgweb", "8081", "127.0.0.1"),
             ("web-api", "8000", "127.0.0.1"),
+            ("frontend", "8080", "127.0.0.1"),
         }
 
     def test_names_do_not_collide_with_the_nas_definition(self, local, nas):
@@ -167,6 +172,24 @@ class TestLocalWebApi:
         assert "@db:5432/value_analyzer" in env["WEB_API_DATABASE_URL"]
 
 
+class TestLocalFrontend:
+    """P3.6: nginx mit dem Build aus dem Arbeitsstand unter localhost:8080."""
+
+    def test_is_built_from_the_working_tree(self, local):
+        frontend = local["services"]["frontend"]
+        assert frontend["image"] == "va-frontend:local"
+        assert str(frontend["build"]["context"]).replace("\\", "/").endswith("/frontend")
+
+    def test_starts_only_on_demand(self, local):
+        # Der Node-Build braucht viel Platz; zum Entwickeln gibt es make ui (ng serve)
+        assert local["services"]["frontend"]["profiles"] == ["ui"]
+
+    def test_answers_only_for_local_names(self, local):
+        # Die Namen der NAS aus der .env gelten lokal nicht
+        env = local["services"]["frontend"]["environment"]
+        assert env["VA_SERVER_NAMES"] == "localhost 127.0.0.1"
+
+
 class TestLocalDevEnv:
     """Die .env fuer make run/dry aus der .venv darf den Container nicht verbiegen."""
 
@@ -191,8 +214,9 @@ class TestNasDefinition:
         assert "build" not in batch
         assert "profiles" not in batch
 
-    def test_no_local_helpers(self, nas):
-        assert set(nas["services"]) == {"db", "value-analyzer"}
+    def test_services_on_the_nas(self, nas):
+        # Batch, Datenbank und seit P3.6 das UI: frontend (nginx) vor dem web-api
+        assert set(nas["services"]) == {"db", "value-analyzer", "web-api", "frontend"}
 
     def test_mail_healthcheck_and_lan_come_from_the_env(self, nas):
         env = nas["services"]["value-analyzer"]["environment"]
@@ -201,6 +225,34 @@ class TestNasDefinition:
         assert "SMTP_PLAIN" not in env
         [port] = nas["services"]["db"]["ports"]
         assert port["host_ip"] == "192.168.1.10"
+
+    def test_web_api_has_no_port_and_only_the_read_role(self, nas):
+        api = nas["services"]["web-api"]
+        assert "ports" not in api  # nur hinter nginx erreichbar
+        assert api["image"] == nas["services"]["value-analyzer"]["image"]
+        assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
+        env = api["environment"]
+        assert set(env) == {"TZ", "WEB_API_DATABASE_URL"}
+        assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
+
+    def test_frontend_from_ghcr_on_8080_in_the_lan(self, nas):
+        frontend = nas["services"]["frontend"]
+        assert frontend["image"] == "ghcr.io/kaczmarekd/va-frontend:latest"
+        assert "build" not in frontend
+        [port] = frontend["ports"]
+        assert (port["published"], port["target"], port["host_ip"]) == (
+            "8080",
+            8080,
+            "192.168.1.10",
+        )
+        assert frontend["environment"]["VA_SERVER_NAMES"] == "nas nas.fritz.box 192.168.1.10"
+        assert "web-api" in frontend["depends_on"]
+
+    def test_ui_stays_local_without_lan_bind(self, tmp_path):
+        env = (ROOT / ".env.example").read_text(encoding="utf-8")
+        nas = _config(tmp_path, NAS, env=env)
+        [port] = nas["services"]["frontend"]["ports"]
+        assert port["host_ip"] == "127.0.0.1"
 
     def test_data_stays_in_pgdata(self, nas):
         assert _mounts(nas["services"]["db"])["/var/lib/postgresql"].endswith("/pgdata")

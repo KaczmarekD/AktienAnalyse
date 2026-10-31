@@ -170,6 +170,13 @@ jobs:
       - name: Smoke-Test im Image
         run: docker run --rm --entrypoint python value-analyzer:ci -c "import src.main"
 
+      # P3.6: das UI hinter nginx, zusammen mit dem web-api aus dem Image oben
+      - name: Frontend-Image bauen
+        run: docker build -t va-frontend:ci frontend
+
+      - name: Frontend-Smoke (nginx vor dem web-api)
+        run: docker/frontend-smoke.sh va-frontend:ci value-analyzer:ci
+
       # P0.6b: Die NAS baut nicht selbst, Compose zieht das Image aus GHCR
       - name: Compose nutzt das Image aus GHCR
         run: |
@@ -177,6 +184,7 @@ jobs:
           images=$(docker compose config --images)
           echo "$images"
           grep -qx "ghcr.io/kaczmarekd/value-analyzer:latest" <<< "$images"
+          grep -qx "ghcr.io/kaczmarekd/va-frontend:latest" <<< "$images"
 
       # ADR-0008: dieselben Pakete wie im Laufzeit-Image, unter QEMU mit einem
       # CPU-Modell ohne AVX (J4125 der NAS). Wie make check-j4125.
@@ -213,9 +221,12 @@ jobs:
       - name: Image nach GHCR schieben
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/value-analyzer"
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           tags=$(python3 docker/image_tags.py)
           for tag in $tags; do
-            docker tag value-analyzer:ci "$image:$tag"
-            docker push "$image:$tag"
+            # Batch und web-api (ein Image), dazu das frontend (P3.6) mit denselben Tags
+            for image in value-analyzer va-frontend; do
+              docker tag "$image:ci" "$registry/$image:$tag"
+              docker push "$registry/$image:$tag"
+            done
           done

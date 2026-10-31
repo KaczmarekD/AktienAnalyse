@@ -42,6 +42,21 @@ Fortschritt und „Run starten“ kommen mit Phase 4, der Profil-Editor nach Pha
 
 ## Container
 
+Seit P3.6 gibt es ihn wirklich: [frontend/Dockerfile](../../frontend/Dockerfile) und
+[frontend/nginx/default.conf.template](../../frontend/nginx/default.conf.template). Die Skizzen
+unten zeigen die Idee, die Dateien den Stand.
+
+- **Hostnamen:** Erlaubt sind die Namen aus `UI_SERVER_NAMES`. nginx setzt sie beim Start ein,
+  alle anderen Hostnamen bekommen `return 444`.
+- **web-api:** `/api/` geht mit `^~` an das web-api. Es wird erst bei der Anfrage aufgelöst
+  (Docker-DNS), nginx startet also auch, wenn das web-api noch fehlt.
+- **Sicherheits-Header:** CSP mit `script-src 'self'`, `X-Frame-Options DENY`, `nosniff`,
+  `Referrer-Policy same-origin`. Kein Abschnitt setzt ein eigenes `add_header`, sonst gingen
+  diese Header dort verloren.
+- **Cache:** `index.html` wird nie gecacht, Dateien mit Hash im Namen ein Jahr.
+- **Swagger:** `/api/docs` geht hinter nginx nicht, weil Swagger sein Skript von einem CDN
+  lädt. Lokal bleibt es am web-api auf Port 8000.
+
 Der `frontend`-Container ist der **einzige Einstiegspunkt** im LAN. Er liefert den Angular-Build
 aus und leitet `/api/*` und `/ws` intern an das web-api weiter. Für den Browser ist alles eine
 einzige Adresse. Deshalb braucht es kein CORS und keine API-URL im Build (nur relative Pfade), und

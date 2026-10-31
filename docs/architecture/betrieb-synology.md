@@ -50,6 +50,9 @@
 - Nur der `frontend`-Container veröffentlicht einen Port (8080). web-api, Postgres und NATS hängen
   ausschließlich im internen Docker-Netz.
 - Zugriff über `http://<nas>:8080`. Die DSM-Firewall gibt den Port nur für das eigene Subnetz frei.
+- Seit P3.6 in `docker-compose.yml`: Port 8080 bindet an `UI_LAN_BIND` (Default `127.0.0.1`, also
+  nur auf der NAS selbst). Für das LAN die NAS-IP eintragen und in `UI_SERVER_NAMES` die Namen,
+  unter denen das UI aufgerufen wird. Alle anderen Hostnamen bekommen keine Antwort.
 - HTTPS ist optional über den DSM-Reverse-Proxy möglich. Dann dort die WebSocket-Header
   aktivieren: Reverse Proxy → Benutzerdefinierter Header → Erstellen → WebSocket.
 - Weitere Sicherheitsregeln (Origin-Prüfung, nur JSON, Hostnamen-Filter):

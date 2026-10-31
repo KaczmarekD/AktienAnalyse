@@ -115,6 +115,13 @@ make regression        # gespeicherte Wochen mit dem neuen Image nachspielen, sc
 docker compose up -d
 ```
 
+**Web-UI** (seit P3.6): `docker compose up -d` startet neben dem Batch das web-api und den
+`frontend`-Container (nginx). Damit das UI im LAN unter `http://<nas-ip>:8080` erreichbar ist,
+in der `.env` `UI_LAN_BIND` auf die NAS-IP setzen und in `UI_SERVER_NAMES` die Namen eintragen,
+unter denen du es aufrufst (z. B. `nas nas.fritz.box 192.168.1.10`). In der DSM-Firewall Port 8080
+nur für das eigene Subnetz freigeben. Ist das Paket `va-frontend` in GHCR privat, gilt dasselbe
+wie für das Image des Batches (`docker login ghcr.io`).
+
 `make regression` bewertet jede gespeicherte Woche mit dem neuen Code und vergleicht mit dem
 Ergebnis von damals. Exit 0 heißt: alles gleich. Abweichungen sind nur dort in Ordnung, wo die
 Roadmap eine Methodik-Änderung nennt (z. B. M1). Bei leerer Datenbank meldet es „nichts zu

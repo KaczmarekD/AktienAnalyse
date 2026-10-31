@@ -31,7 +31,9 @@ Geplant via Cron im Container.
 `HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht. Das web-api
 (`services/web-api`, FastAPI, ab P3.1) läuft aus demselben Image, lokal unter
 `localhost:8000`. Es bekommt nur `WEB_API_DATABASE_URL` mit der Rolle `va_read` und eine
-schreibgeschützte Verbindung, nie die Zugangsdaten des Batches.
+schreibgeschützte Verbindung, nie die Zugangsdaten des Batches. Seit P3.6 laufen auf der NAS
+web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
+nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
 
 ## Methodik-Entscheidungen
 

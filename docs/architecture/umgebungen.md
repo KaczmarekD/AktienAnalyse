@@ -22,7 +22,7 @@ Zeitplan:
 | Mail | Mailpit, Postfach unter <http://localhost:8025> | Gmail |
 | Healthcheck | aus | Healthchecks.io, falls eingerichtet |
 | Datenbank | eigene, Daten in `./.local/pgdata` | `./pgdata`, nie gelöscht |
-| Daten ansehen | pgweb (nur lesen) unter <http://localhost:8081>, web-api mit Swagger unter <http://localhost:8000/api/docs>, das UI mit `make ui` unter <http://localhost:4200> | später die Web-UI unter `http://<nas>:8080` |
+| Daten ansehen | pgweb (nur lesen) unter <http://localhost:8081>, web-api mit Swagger unter <http://localhost:8000/api/docs>, das UI mit `make ui` unter <http://localhost:4200> (oder hinter nginx mit `make local-ui` unter <http://localhost:8080>) | Web-UI unter `http://<nas-ip>:8080` (seit P3.6, `UI_LAN_BIND`) |
 | Ports | nur `127.0.0.1` | Postgres optional im LAN (`DB_LAN_BIND`) |
 | Tests | `make check`, `make test-db` (Wegwerf-DB auf 55432), `make local-regression` | `make regression` nach `make pull`, vor `make up` |
 

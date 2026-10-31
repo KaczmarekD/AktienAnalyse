@@ -53,3 +53,38 @@ services:
     #   docker compose run --rm value-analyzer python -m src.main --dry-run
     # Altdaten importieren (einmalig, mehrfach ausfuehrbar):
     #   docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
+
+  web-api:
+    # REST fuer das UI (P3.1-P3.6). Dasselbe Image wie der Batch, aber ohne Port: Nur das
+    # frontend (nginx) erreicht es im internen Docker-Netz.
+    image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
+    container_name: value-analyzer-web-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle
+    entrypoint:
+      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
+       "--host", "0.0.0.0", "--port", "8000"]
+    # Bewusst ohne env_file: nur die Leserolle, keine Zugangsdaten des Batches
+    environment:
+      TZ: Europe/Berlin
+      WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
+
+  frontend:
+    # Einziger Einstieg im LAN (P3.6, ADR-0005/0007): Angular-Build und /api/ an das web-api.
+    # Das Image entsteht in der CI (Node laeuft nie auf der NAS).
+    image: ${REG:-ghcr.io/kaczmarekd}/va-frontend:${VERSION:-latest}
+    container_name: value-analyzer-frontend
+    restart: unless-stopped
+    depends_on:
+      - web-api
+    environment:
+      # Hostnamen, unter denen das UI im Browser aufgerufen wird; alle anderen bekommen keine
+      # Antwort (Schutz vor DNS-Rebinding)
+      VA_SERVER_NAMES: ${UI_SERVER_NAMES:-localhost 127.0.0.1}
+    ports:
+      # Nur im LAN: UI_LAN_BIND auf die NAS-IP setzen (Default: nur auf der NAS selbst).
+      # Die DSM-Firewall sollte Port 8080 auf das Heimnetz beschraenken.
+      - "${UI_LAN_BIND:-127.0.0.1}:8080:8080"

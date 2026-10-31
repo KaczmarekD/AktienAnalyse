@@ -1,0 +1,79 @@
+"""Regeln der nginx-Konfiguration des frontend-Containers (P3.6, ADR-0007).
+
+Statisch geprueft, ohne Docker. Den laufenden Container prueft die CI
+(``docker/frontend-smoke.sh``): nginx -t, Routen, /api ueber nginx, return 444.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+CONF = Path(__file__).resolve().parents[1] / "frontend" / "nginx" / "default.conf.template"
+
+
+def _conf() -> str:
+    # Kommentare raus, damit nur wirksame Direktiven zaehlen
+    return "\n".join(
+        line.split("#", 1)[0] for line in CONF.read_text(encoding="utf-8").splitlines()
+    )
+
+
+def _server_blocks() -> list[str]:
+    return [
+        block for block in re.split(r"\n(?=server\s*\{)", _conf()) if block.startswith("server")
+    ]
+
+
+def test_unknown_hosts_get_no_answer():
+    # DNS-Rebinding: nur bekannte Hostnamen bekommen eine Antwort
+    [default] = [b for b in _server_blocks() if "default_server" in b]
+    assert "return 444;" in default
+    assert "listen 8080 default_server;" in default
+
+
+def test_known_hosts_come_from_the_environment():
+    [app] = [b for b in _server_blocks() if "default_server" not in b]
+    assert "server_name ${VA_SERVER_NAMES};" in app
+
+
+def test_api_goes_to_the_web_api_resolved_per_request():
+    conf = _conf()
+    # Variable + resolver: nginx startet auch, wenn das web-api noch nicht laeuft
+    assert "resolver 127.0.0.11" in conf
+    # ^~: Vorrang vor den Regex-Abschnitten fuer statische Dateien
+    assert re.search(r"location \^~ /api/ \{[^}]*proxy_pass http://\$web_api", conf)
+    assert 'set $web_api "web-api:8000";' in conf
+
+
+def test_angular_routes_fall_back_to_index_html():
+    assert "try_files $uri $uri/ /index.html;" in _conf()
+
+
+def test_security_headers():
+    conf = _conf()
+    for header in (
+        'X-Content-Type-Options "nosniff"',
+        'X-Frame-Options "DENY"',
+        'Referrer-Policy "same-origin"',
+        "Content-Security-Policy",
+    ):
+        assert f"add_header {header}" in conf, header
+    csp = re.search(r'Content-Security-Policy "([^"]+)"', conf)
+    assert csp
+    assert "default-src 'self'" in csp.group(1)
+    assert "script-src 'self'" in csp.group(1)
+    assert "connect-src 'self'" in csp.group(1)
+
+
+def test_index_html_is_never_cached():
+    # expires statt add_header: Ein add_header in der location verwuerfe die Sicherheits-Header
+    block = re.search(r"location = /index.html \{([^}]*)\}", _conf())
+    assert block
+    assert "expires -1;" in block.group(1)
+
+
+def test_no_add_header_inside_locations():
+    # nginx erbt add_header nur, wenn die location selbst keins setzt
+    for location in re.findall(r"location [^{]+\{([^}]*)\}", _conf()):
+        assert "add_header" not in location

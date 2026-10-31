@@ -1,0 +1,64 @@
+# frontend des Value-Analyzer (P3.6, docs/architecture/frontend.md): einziger Einstieg im LAN.
+# Liefert den Angular-Build aus und reicht /api/ an das web-api im internen Docker-Netz weiter.
+# Vorlage: Beim Start setzt das nginx-Image ${VA_SERVER_NAMES} ein (envsubst nur fuer gesetzte
+# Umgebungsvariablen, nginx-Variablen wie $uri bleiben stehen).
+
+# Unbekannte Hostnamen bekommen keine Antwort: Schutz vor DNS-Rebinding (ADR-0007, Regel 3)
+server {
+    listen 8080 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 8080;
+    server_name ${VA_SERVER_NAMES};
+
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+
+    # Gelten fuer jede Antwort. Keine location darf ein eigenes add_header setzen, sonst
+    # verlöre sie diese Header (nginx erbt add_header nur ohne eigenes).
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "same-origin" always;
+    # Angular und die Mail im iframe bringen Styles inline mit; Skripte nur vom eigenen Server.
+    # Swagger unter /api/docs laedt sein Skript von einem CDN und geht hier deshalb nicht; es
+    # bleibt lokal direkt am web-api (Port 8000) erreichbar.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml text/csv;
+
+    # Docker-DNS zur Laufzeit: nginx startet auch, wenn das web-api (noch) nicht laeuft, und
+    # antwortet dann mit 502 statt gar nicht zu starten
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $web_api "web-api:8000";
+
+    # ^~: hat Vorrang vor den Regex-Abschnitten unten (eine API-Adresse auf .png o. ae.)
+    location ^~ /api/ {
+        proxy_pass http://$web_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Nie cachen, damit ein neues Image sofort greift (expires statt add_header, siehe oben)
+    location = /index.html {
+        expires -1;
+    }
+
+    # Gebaute Dateien tragen einen Hash im Namen und aendern sich nie
+    location ~* \.(?:js|css|woff2?|svg|ico|png)$ {
+        expires 1y;
+        try_files $uri =404;
+    }
+
+    # Angular-Routen (/ranking, /runs/1 ...) liefern index.html, den Rest macht der Router
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

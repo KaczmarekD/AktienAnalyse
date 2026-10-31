@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down api ui-install ui ui-api ui-check
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui api ui-install ui ui-api ui-check
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -91,8 +91,8 @@ REG ?= ghcr.io/kaczmarekd
 VERSION ?= latest
 IMAGE ?= $(REG)/value-analyzer:$(VERSION)
 
-pull: ## Image aus GHCR laden (NAS: danach make up)
-	docker compose pull value-analyzer
+pull: ## Images aus GHCR laden: Batch/web-api und frontend (NAS: danach make up)
+	docker compose pull value-analyzer frontend
 
 build: ## Image lokal bauen, unter dem Namen aus docker-compose.yml (nicht auf der NAS)
 	docker build --target runtime -t $(IMAGE) .
@@ -163,8 +163,11 @@ local-regression: ## Lokal: gespeicherte Wochen mit dem Arbeitsstand nachspielen
 local-logs: ## Lokal: Logs von DB, Mailpit und pgweb verfolgen
 	$(LOCAL) logs -f
 
+local-ui: ## Lokal: frontend (nginx) aus dem Arbeitsstand unter http://localhost:8080 (braucht Platz)
+	$(LOCAL) --profile ui up -d --build frontend
+
 local-down: ## Lokal: alles stoppen (die Daten in .local/ bleiben)
-	$(LOCAL) --profile run down
+	$(LOCAL) --profile run --profile ui down
 
 # ---------- Frontend (P3.5, docs/architecture/frontend.md) ------------------
 # Node laeuft nur lokal und in der CI, nie auf der NAS. Das UI holt seine Daten ueber /api vom
