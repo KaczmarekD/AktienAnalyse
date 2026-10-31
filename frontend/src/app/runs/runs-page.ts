@@ -1,10 +1,30 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
+import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 
-/** Platzhalter, bis P3.7 die Laeufe zeigt. */
+import { listRunsResource } from '../api/@angular/common.gen';
+import { errorMessage } from '../shared/api-error';
+import { RunStatusPipe } from '../shared/format';
+
+/** Die letzten Laeufe des Batches, neueste zuerst. */
 @Component({
   selector: 'app-runs-page',
-  template: `<h1>Runs</h1>
-    <p>Die Ansicht kommt mit P3.7.</p>`,
+  imports: [DatePipe, MatTableModule, RouterLink, RunStatusPipe],
+  templateUrl: './runs-page.html',
+  styleUrl: './runs-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class RunsPage {}
+export class RunsPage {
+  private readonly resource = listRunsResource(() => ({ query: { limit: 50 } }));
+
+  protected readonly runs = computed(() =>
+    this.resource.hasValue() ? this.resource.value() : undefined,
+  );
+  protected readonly error = computed(() => {
+    const error = this.resource.error();
+    return error ? errorMessage(error, 'Keine Läufe gefunden.') : undefined;
+  });
+
+  protected readonly columns = ['id', 'started_at', 'kind', 'status', 'scored', 'exit_code'];
+}

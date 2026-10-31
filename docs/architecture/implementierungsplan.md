@@ -981,6 +981,37 @@ prüft dieses Paket, für jede gespeicherte Woche.
   Filter, Validierungsmeldungen, Aufruf der Vorschau, Umgang mit 409.
 - **Implementierung:** Ranking, Runs, Titel-Detail und der Profil-Editor (Signal Forms mit
   `validateStandardSchema`).
+- **Umgesetzt für U4 (31.10.2026), ohne den Profil-Editor:**
+  - Komponententests rot in `5a80ca3`, 24 Tests für drei Ansichten. Sie laufen gegen
+    `HttpTestingController`, mit Beispieldaten im Format des generierten Clients.
+  - **Ranking** (`/ranking`, `/ranking/:scoringRunId`):
+    - Kopf mit Lauf, Abruftag, Quelle und Gewichten.
+    - Tabelle mit Rang, Titel (Link zum Detail), Index, Sektor, den drei Scores,
+      Value-Trap-Markierung, Marktkapitalisierung, EV/EBIT, KBV und ROIC.
+    - Filter für den Index, Suche nach Name oder Symbol, Titel unter der Größenschwelle auf
+      Wunsch am Ende.
+    - Sortierung je Spalte, fehlende Werte stehen immer hinten.
+  - **Runs** (`/runs`, `/runs/:runId`):
+    - Liste mit Status auf Deutsch, Zählern und Dry-Run-Kennzeichen.
+    - Detail mit Zeiten, Fehlertext, Link zum Ranking des Laufs und CSV-Download.
+    - Die Mail läuft im iframe mit leerem `sandbox`-Attribut: keine Skripte, kein Zugriff auf
+      die Seite. Deshalb darf ihr eigenes CSS bleiben (`bypassSecurityTrustHtml` nur dafür).
+  - **Titel-Detail** (`/instruments/:symbol`): Stammdaten, 15 Kennzahlen des neuesten Abrufs mit
+    Hinweisen vom Abruf, Score-Verlauf mit der neuesten Bewertung zuerst und Links zum
+    jeweiligen Ranking.
+  - **Gemeinsam:**
+    - Deutsche Formate über `LOCALE_ID` `de-DE` (0,78; 12,3 %; 140,0 Mrd; 30.10.2026).
+    - Verständliche Meldungen bei 404 („Noch kein Bewertungslauf“) und bei Ausfall des web-api.
+    - Die Resources bekommen ihre Parameter aus den Routen (`withComponentInputBinding`).
+  - **Probe mit echten Daten** (lokaler Lauf vom 30.10.2026, `ng serve` gegen das web-api):
+    - Ranking mit 90 Titeln, BMW als Value-Trap markiert.
+    - Lauf 1 mit Mail und CSV, Titel-Seiten mit allen Kennzahlen.
+    - Keine Fehler in der Browser-Konsole.
+  - **Testhelfer:** Eine offene Anfrage hält die App „instabil“. Der Helfer stößt Anfragen
+    deshalb mit `TestBed.tick()` an, statt auf `whenStable()` zu warten. Sonst warteten Test
+    und Anfrage aufeinander, etwa bei Lauf → Report.
+  - **Größe:** Der erste Seitenaufruf lädt komprimiert 104 kB, die Ranking-Seite mit
+    Tabelle, Sortierung und Formularfeldern 30 kB dazu.
 
 #### P3.8 Schutz der Schnittstelle
 

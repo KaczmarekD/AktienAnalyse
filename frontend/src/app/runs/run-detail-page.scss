@@ -1,0 +1,55 @@
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1.5rem;
+}
+
+dt {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+dd {
+  margin: 0;
+}
+
+dd[data-status='failed'],
+dd[data-status='no_data'] {
+  color: var(--mat-sys-error);
+  font-weight: 500;
+}
+
+.badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.75rem;
+  background-color: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font-size: 0.6em;
+  vertical-align: middle;
+}
+
+.error {
+  padding: 1rem;
+  overflow-x: auto;
+  background-color: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+.links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.subject {
+  font-weight: 500;
+}
+
+iframe {
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--mat-sys-outline-variant);
+  background-color: white;
+}
+
+.message {
+  color: var(--mat-sys-on-surface-variant);
+}

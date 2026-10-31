@@ -1,0 +1,54 @@
+<p><a routerLink="/runs">← Alle Läufe</a></p>
+
+@if (error(); as message) {
+  <p class="message">{{ message }}</p>
+} @else if (run(); as run) {
+  <h1>
+    Lauf {{ run.id }}
+    @if (run.dry_run) {
+      <span class="badge">Dry-Run</span>
+    }
+  </h1>
+
+  <dl>
+    <dt>Status</dt>
+    <dd [attr.data-status]="run.status">{{ run.status | runStatus }}</dd>
+    <dt>Art</dt>
+    <dd>{{ run.kind }}{{ run.force_refresh ? ', neu abgerufen' : '' }}</dd>
+    <dt>Start</dt>
+    <dd>{{ run.started_at | date: 'dd.MM.yyyy HH:mm' }}</dd>
+    <dt>Ende</dt>
+    <dd>{{ run.finished_at ? (run.finished_at | date: 'dd.MM.yyyy HH:mm') : '–' }}</dd>
+    <dt>Bewertet</dt>
+    <dd>
+      {{ run.scored_count ?? '–' }} von {{ run.universe_size ?? '–' }}, fehlgeschlagen
+      {{ run.failed_count ?? '–' }}
+    </dd>
+    <dt>Exit-Code</dt>
+    <dd>{{ run.exit_code ?? '–' }}</dd>
+    <dt>Version</dt>
+    <dd>{{ run.app_version }}</dd>
+  </dl>
+
+  @if (run.error) {
+    <h2>Fehler</h2>
+    <pre class="error">{{ run.error }}</pre>
+  }
+
+  <p class="links">
+    @if (run.scoring_run_id !== null) {
+      <a [routerLink]="['/ranking', run.scoring_run_id]">Ranking dieses Laufs</a>
+    }
+    @if (run.report_id !== null) {
+      <a [href]="'/api/v1/reports/' + run.report_id + '/csv'" download>CSV herunterladen</a>
+    }
+  </p>
+
+  @if (report(); as report) {
+    <h2>Mail</h2>
+    <p class="subject">{{ report.subject }}</p>
+    <iframe sandbox="" title="Mail des Laufs" [attr.srcdoc]="mail()"></iframe>
+  }
+} @else {
+  <p class="message">Lade den Lauf …</p>
+}

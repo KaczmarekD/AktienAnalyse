@@ -16,6 +16,9 @@
 
 ## Ansichten
 
+Seit P3.7 (U4) gibt es Ranking, Runs und Titel-Detail ohne Echtzeit: Sie laden beim Öffnen. Live-Updates,
+Fortschritt und „Run starten“ kommen mit Phase 4, der Profil-Editor nach Phase 2b.
+
 | Ansicht | Inhalt |
 |---|---|
 | Ranking | Top/Flop, Filter nach Index und Sektor, Value-Trap-Markierungen, Live-Update bei neuem Ranking |

@@ -1,0 +1,28 @@
+.identity,
+.as-of {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.5rem 2rem;
+}
+
+.figures dt {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+
+.figures dd {
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+
+table {
+  width: 100%;
+}
+
+.message {
+  color: var(--mat-sys-on-surface-variant);
+}

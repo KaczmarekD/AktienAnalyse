@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-// Die Ansichten selbst kommen mit P3.7, bis dahin stehen dort Platzhalter
+// Routenparameter kommen als Inputs in die Seiten (withComponentInputBinding, app.config.ts)
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'ranking' },
   {
@@ -9,9 +9,24 @@ export const routes: Routes = [
     loadComponent: () => import('./ranking/ranking-page').then((m) => m.RankingPage),
   },
   {
+    path: 'ranking/:scoringRunId',
+    title: 'Ranking · Value-Analyzer',
+    loadComponent: () => import('./ranking/ranking-page').then((m) => m.RankingPage),
+  },
+  {
     path: 'runs',
     title: 'Runs · Value-Analyzer',
     loadComponent: () => import('./runs/runs-page').then((m) => m.RunsPage),
+  },
+  {
+    path: 'runs/:runId',
+    title: 'Lauf · Value-Analyzer',
+    loadComponent: () => import('./runs/run-detail-page').then((m) => m.RunDetailPage),
+  },
+  {
+    path: 'instruments/:symbol',
+    title: 'Titel · Value-Analyzer',
+    loadComponent: () => import('./instruments/instrument-page').then((m) => m.InstrumentPage),
   },
   { path: '**', redirectTo: 'ranking' },
 ];

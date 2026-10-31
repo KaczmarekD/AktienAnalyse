@@ -1,0 +1,46 @@
+.run {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+table {
+  width: 100%;
+}
+
+td,
+th {
+  white-space: nowrap;
+}
+
+.symbol {
+  margin-left: 0.5rem;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+}
+
+.value-trap {
+  background-color: var(--mat-sys-error-container);
+}
+
+.filtered {
+  opacity: 0.6;
+}
+
+.badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.75rem;
+  background-color: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+  font-size: 0.8em;
+}
+
+.message {
+  color: var(--mat-sys-on-surface-variant);
+}

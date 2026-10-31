@@ -1,0 +1,50 @@
+<h1>Runs</h1>
+
+@if (error(); as message) {
+  <p class="message">{{ message }}</p>
+} @else if (runs(); as runs) {
+  @if (runs.length === 0) {
+    <p class="message">Noch keine Läufe. Der erste entsteht mit <code>make local-run</code>.</p>
+  } @else {
+    <table mat-table [dataSource]="runs">
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef>Lauf</th>
+        <td mat-cell *matCellDef="let run">
+          <a [routerLink]="['/runs', run.id]">#{{ run.id }}</a>
+          @if (run.dry_run) {
+            <span class="badge">Dry-Run</span>
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="started_at">
+        <th mat-header-cell *matHeaderCellDef>Start</th>
+        <td mat-cell *matCellDef="let run">{{ run.started_at | date: 'dd.MM.yyyy HH:mm' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="kind">
+        <th mat-header-cell *matHeaderCellDef>Art</th>
+        <td mat-cell *matCellDef="let run">{{ run.kind }}</td>
+      </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let run">
+          <span class="status" [attr.data-status]="run.status">{{ run.status | runStatus }}</span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="scored">
+        <th mat-header-cell *matHeaderCellDef>Bewertet</th>
+        <td mat-cell *matCellDef="let run">
+          {{ run.scored_count ?? '–' }}/{{ run.universe_size ?? '–' }}
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="exit_code">
+        <th mat-header-cell *matHeaderCellDef>Exit</th>
+        <td mat-cell *matCellDef="let run">{{ run.exit_code ?? '–' }}</td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let run; columns: columns" [attr.data-run]="run.id"></tr>
+    </table>
+  }
+} @else {
+  <p class="message">Lade die Läufe …</p>
+}

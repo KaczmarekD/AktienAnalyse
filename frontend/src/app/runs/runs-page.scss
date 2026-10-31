@@ -1,0 +1,22 @@
+table {
+  width: 100%;
+}
+
+.badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.75rem;
+  background-color: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font-size: 0.8em;
+}
+
+.status[data-status='failed'],
+.status[data-status='no_data'] {
+  color: var(--mat-sys-error);
+  font-weight: 500;
+}
+
+.message {
+  color: var(--mat-sys-on-surface-variant);
+}
