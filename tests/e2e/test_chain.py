@@ -111,6 +111,11 @@ class TestReplayResult:
         assert expected.csv is not None
         assert compare_csv(expected.csv, _csv_attachment(mailpit, mail)) == []
 
+    @pytest.mark.usefixtures("expected")
+    def test_mail_names_the_profile(self, mail):
+        # P2b.3: Der erste Lauf legt "Standard" v1 an und rechnet damit
+        assert "Profil Standard v1" in mail["HTML"]
+
     def test_subject_names_the_top_title(self, mail, expected: ReplayCase):
         top = expected.scores.sort_values("rank_overall").iloc[0]["symbol"]
         names = expected.snapshots.set_index("symbol")["name"]

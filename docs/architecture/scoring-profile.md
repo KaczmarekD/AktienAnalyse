@@ -1,7 +1,9 @@
 # Scoring-Profile im UI
 
-> **Status:** Plan (30.09.2026). Tabellen in Phase 2b, Editor mit Vorschau ab Phase 3, siehe
-> [Roadmap](roadmap.md). Entscheidung: [ADR-0009](../adr/0009-scoring-profile-in-der-db.md).
+> **Status:** Phase 2b umgesetzt (31.10.2026): Tabellen (P2b.1), `ScoringProfileParams`
+> (P2b.2), und jeder Bewertungslauf rechnet mit dem aktiven Profil und speichert dessen
+> Version (P2b.3). Editor mit Vorschau ab Phase 3 (P3.3), siehe [Roadmap](roadmap.md).
+> Entscheidung: [ADR-0009](../adr/0009-scoring-profile-in-der-db.md).
 
 ## Ziel
 

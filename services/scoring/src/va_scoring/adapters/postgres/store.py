@@ -32,7 +32,12 @@ class PostgresScoringStore:
         self._app_version = app_version
 
     def record_scoring(
-        self, fetch_run_id: int, df_all: pd.DataFrame, scored: pd.DataFrame, cfg: ScoringConfig
+        self,
+        fetch_run_id: int,
+        df_all: pd.DataFrame,
+        scored: pd.DataFrame,
+        cfg: ScoringConfig,
+        profile: ProfileVersionRef | None = None,
     ) -> int:
         """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``."""
         with session_scope(self._engine) as s:
@@ -42,6 +47,8 @@ class PostgresScoringStore:
                 fetch_run_id=fetch_run_id,
                 config=asdict(cfg),
                 app_version=self._app_version,
+                profile_id=None if profile is None else profile.profile_id,
+                profile_version=None if profile is None else profile.version,
             )
             repo.write_score_results(scoring_run_id, score_rows(df_all, scored, ids))
             repo.write_factor_scores(scoring_run_id, factor_rows(scored, ids, cfg))
@@ -53,7 +60,7 @@ class PostgresScoringStore:
             active, created = ScoringRepository(s).ensure_profile(
                 DEFAULT_PROFILE_NAME, params, comment=DEFAULT_PROFILE_COMMENT
             )
-        # Bis P2b.3 rechnet das Scoring noch mit den ENV-Werten: nur das Anlegen ist eine Meldung
+        # Nur das Anlegen ist eine Meldung; mit welchem Profil gerechnet wird, meldet der Handler
         if created:
             log.info(
                 "Profil %s aus den ENV-Werten angelegt (aktiv: %s)",

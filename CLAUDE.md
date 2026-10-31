@@ -49,6 +49,11 @@ tmpfs, in dem der Batch eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, 
 > Bis ADR-0011 angenommen und F2.5 umgesetzt ist, gilt die Methodik unten unverändert. Grundlage ist
 > die Recherche unter `docs/research/fundamentalanalyse-sota/`.
 
+**Scoring-Profile (ADR-0009, seit P2b.3):** Gewichte und Schwellen kommen aus dem aktiven Profil
+in der Datenbank (`ScoringProfileParams` in `va_scoring.domain.profile`). Die Werte unten sind
+dessen Standardwerte und die des Profils „Standard“ v1, das der erste Lauf aus den ENV-Werten
+anlegt. Jeder Bewertungslauf speichert seine Profil-Version, die Mail nennt sie im Footer.
+
 **Composite = 0.6 × Value + 0.4 × Quality** – die Quality-Komponente
 existiert primär, um klassische *Value Traps* zu unterdrücken (vgl.
 Asness/Frazzini/Pedersen, "Quality Minus Junk"). Reines Value-Investing
@@ -123,11 +128,13 @@ das passiert, ist dort die einzige zu ändernde Stelle.
 
 **Konfiguration kommt aus Pydantic Settings**, niemals aus eingebetteten
 Konstanten. Wenn du eine Konstante brauchst und sie könnte sich je nach
-Deployment unterscheiden, geh durch `Settings`.
+Deployment unterscheiden, geh durch `Settings`. Ausnahme seit P2b.3 (ADR-0009): Die fachlichen
+Scoring-Parameter stehen in den Profilen. `VALUE_WEIGHT`, `QUALITY_WEIGHT` und `MIN_MARKET_CAP`
+sind nur die Startwerte für das Profil „Standard“.
 
-**Magic Numbers im Scoring (`va_scoring.domain.scoring`) gehören in `ScoringConfig`**. Wenn du einen
-Schwellwert hardcoden willst, frag dich erst, ob `ScoringConfig` die richtige
-Heimat ist – meistens ja.
+**Magic Numbers im Scoring gehören in `ScoringProfileParams`** (`va_scoring.domain.profile`, mit
+Grenzen am Feld und Standardwert), von dort über `to_config()` in `ScoringConfig`. Ein neuer
+Schwellwert bekommt einen Standardwert, gespeicherte Profile ohne ihn erhalten ihn beim Lesen.
 
 **Universum-Quellen: iShares → Deka → Fallback-CSV** (Kette in
 `va_market_data.application.universe`, Quellen in `va_market_data.adapters`,
@@ -168,9 +175,10 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
   Abfrage „Stand zu Datum X“ über `get_statements_as_of`).
 - Scoring-Profile (ADR-0009, seit P2b.1) liegen in `scoring.profile`, `profile_version` und
-  `profile_activation`, alle nur zum Anfügen. Aktiv ist die jüngste Aktivierung. Der Batch
-  legt beim Start einmalig das Profil „Standard“ aus den ENV-Werten an. Bis P2b.3 rechnet
-  das Scoring noch mit `ScoringConfig` aus ENV, das Profil wirkt also noch nicht.
+  `profile_activation`, alle nur zum Anfügen. Aktiv ist die jüngste Aktivierung. Der Handler
+  von scoring legt beim ersten Bewertungslauf „Standard“ aus den ENV-Werten an
+  (`StoredProfile`) und rechnet seit P2b.3 immer mit der aktiven Version.
+  `scoring_run.profile_id`/`profile_version` halten fest, welche das war.
 - Zugriffe nur über die Repositories der Module (`get_*`/`write_*`,
   bewusst ohne delete). Jeder Titel wird sofort nach dem Abruf gespeichert.
 - Migrationen (Alembic, `migrations/`) sind nur additiv; jede neue Tabelle
@@ -253,6 +261,9 @@ ADR-0001 und ADR-0002 aufgehoben.
    bzw. `MarketFigures`; `FIELD_MAP` bzw. `INFO_FIELDS` erweitern, falls yfinance-Roh-Feld
    nötig)
 5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS` (`va_scoring.domain.scoring`)
+   und derselbe Schlüssel im Literal `ValueFactorKey` bzw. `QualityFactorKey`
+   (`va_scoring.domain.profile`), ein Test hält beide gleich. Bestehende Profile schalten ihn
+   nicht von selbst ein: Dafür braucht es eine neue Profil-Version
 6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab

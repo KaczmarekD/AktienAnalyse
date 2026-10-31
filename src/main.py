@@ -33,10 +33,9 @@ from va_contracts.events.v1 import (
 )
 from va_notification.entrypoints.handlers import notify_failure_without_run
 from va_platform.bus import InProcessBus, follow_up
-from va_scoring.domain.profile import profile_params
 
 from . import __version__
-from .composition import alert_channels, build_adapters, scoring_config, wire
+from .composition import alert_channels, build_adapters, wire
 from .config import Settings, load_settings
 from .db.log_handler import BufferingLogHandler
 from .logging_setup import setup_logging
@@ -123,14 +122,6 @@ def _run(
                 dry_run=dry_run,
             )
             return EXIT_DB_UNAVAILABLE
-
-        # P2b.1: ENV-Werte nur einmal als Startwerte. Bis P2b.3 rechnet das Scoring noch mit
-        # ENV, ein Fehler hier kippt den Lauf deshalb nicht.
-        _safely(
-            "Profil Standard",
-            adapters.scoring.ensure_default_profile,
-            profile_params(scoring_config(settings)),
-        )
 
         try:
             options = RunOptionsV1(force_refresh=force_refresh, dry_run=dry_run)

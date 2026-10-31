@@ -236,8 +236,8 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 | `MAIL_SUBJECT_PREFIX` | `[Value-Screening DAX/MDAX]` | Mail-Betreff-Präfix |
 | `UNIVERSE` | `DAX_MDAX` | `DAX_MDAX` oder `DAX_ONLY` |
 | `TOP_N` / `BOTTOM_N` | `20` / `10` | Anzahl Top/Bottom-Kandidaten in der Mail |
-| `MIN_MARKET_CAP` | `300000000` | Mindest-Marktkapitalisierung in EUR |
-| `VALUE_WEIGHT` / `QUALITY_WEIGHT` | `0.6` / `0.4` | Composite-Gewichtung (wird auf Summe 1 normiert) |
+| `MIN_MARKET_CAP` | `300000000` | Mindest-Marktkapitalisierung in EUR, nur Startwert (siehe unten) |
+| `VALUE_WEIGHT` / `QUALITY_WEIGHT` | `0.6` / `0.4` | Composite-Gewichtung (wird auf Summe 1 normiert), nur Startwert (siehe unten) |
 | `DEFAULT_TAX_RATE` | `0.27` | Fallback-Steuersatz für ROIC-Berechnung |
 | `CRON_SCHEDULE` | `30 7 * * 6` | Cron-Ausdruck (Sa 07:30); Format: `m h dom mon dow` |
 | `POSTGRES_PASSWORD` | – **Pflicht** | Passwort der Owner-Rolle `va_owner` (Migrationen) |
@@ -250,6 +250,11 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 | `TZ` | `Europe/Berlin` | Container-Zeitzone |
 | `REG` | `ghcr.io/kaczmarekd` | Registry des Images (Compose) |
 | `VERSION` | `latest` | Image-Tag: `latest` folgt `main`, `sha-<commit>` oder `X.Y.Z` pinnt |
+
+**Scoring-Profile** (ADR-0009, seit P2b.3): `MIN_MARKET_CAP`, `VALUE_WEIGHT` und `QUALITY_WEIGHT`
+legen beim ersten Lauf das Profil „Standard“ v1 in der Datenbank an. Danach rechnet jeder Lauf mit
+dem aktiven Profil, und der Footer der Mail nennt es („Profil Standard v1“). Eine Änderung in der
+`.env` wirkt dann nicht mehr. Gewichte ändert eine neue Profil-Version, ab P3.3 im UI.
 
 ### Gmail App-Passwort einrichten
 

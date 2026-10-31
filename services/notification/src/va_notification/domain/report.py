@@ -107,6 +107,7 @@ def build_report(
     value_weight: float = 0.6,
     quality_weight: float = 0.4,
     version: str = "dev",  # im Betrieb die App-Version aus NotificationConfig
+    profile: str | None = None,  # z. B. "Standard v1" (P2b.3), fehlt ohne Profil
     universe_size: int | None = None,
     universe_source: str | None = None,
     universe_as_of: date | None = None,
@@ -135,6 +136,7 @@ def build_report(
         bottom_rows=bottom_rows,
         weights={"value": value_weight, "quality": quality_weight},
         version=version,
+        profile=profile,
         universe_source=universe_source,
         universe_as_of=universe_as_of.isoformat() if universe_as_of else None,
         is_fallback=universe_source == FALLBACK_SOURCE,

@@ -2,8 +2,8 @@
 
 Jedes Speichern erzeugt eine neue, unveraenderliche Version. Aktiv ist genau eine. Die heutigen
 ENV-Werte legen einmalig das Profil "Standard" an (P2b.1). ``ScoringProfileParams`` prueft die
-Parameter und bildet sie auf ``score()`` ab (P2b.2). Bis P2b.3 rechnet das Scoring noch mit der
-``ScoringConfig`` aus ENV. Details: docs/architecture/scoring-profile.md.
+Parameter und bildet sie auf ``score()`` ab (P2b.2). Seit P2b.3 rechnet jeder Bewertungslauf mit
+dem aktiven Profil und speichert dessen Version. Details: docs/architecture/scoring-profile.md.
 """
 
 from __future__ import annotations
@@ -136,6 +136,18 @@ class ProfileVersionRef:
     @property
     def label(self) -> str:
         return f"{self.name} v{self.version}"
+
+
+@dataclass(frozen=True)
+class ActiveProfile:
+    """Damit rechnet ein Bewertungslauf. ``ref`` fehlt nur ohne gespeichertes Profil (Replay)."""
+
+    config: ScoringConfig
+    ref: ProfileVersionRef | None = None
+
+    @property
+    def label(self) -> str | None:
+        return None if self.ref is None else self.ref.label
 
 
 def profile_params(cfg: ScoringConfig) -> dict[str, Any]:

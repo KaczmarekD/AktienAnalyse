@@ -1038,6 +1038,52 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Die Golden-Mail zeigt im Footer „Profil Standard v1“. Diese Änderung am Golden-File ist
     beabsichtigt.
 - **Implementierung:** Verweis im Lauf, Footer im Template.
+- **Entwurf (31.10.2026):**
+  - **Das Scoring rechnet mit dem aktiven Profil.** Die ENV-Werte (`VALUE_WEIGHT`,
+    `QUALITY_WEIGHT`, `MIN_MARKET_CAP`) wirken nur noch beim allerersten Lauf, als Startwerte für
+    „Standard“ v1 (ADR-0009).
+  - **Ports von scoring:**
+    - `ScoringStore` speichert nur noch Läufe, `record_scoring` bekommt die Profil-Version mit.
+    - Neu ist `ProfileStore` mit `ensure_default_profile`.
+    - Neu ist `ProfileSource` mit `active() -> ActiveProfile`, also `ScoringConfig` und
+      Profil-Version.
+  - **Quellen:**
+    - `StoredProfile` legt bei Bedarf „Standard“ an, liest die aktive Version und prüft sie
+      mit `ScoringProfileParams`.
+    - `FixedProfile` rechnet mit einer festen Konfiguration ohne Profil. Das nutzt das Replay.
+  - **Umbau gegenüber P2b.1:**
+    - Der Handler von scoring holt das Profil selbst, wenn er es braucht. Der Aufruf beim
+      Start des Batches entfällt.
+    - Ein Fehler dabei lässt den Lauf jetzt scheitern (Stufe scoring, Alarm), denn ohne Profil
+      gibt es keine Bewertung.
+    - Ungültige gespeicherte params scheitern laut, statt still mit anderen Werten zu rechnen.
+  - **Migration `0007`:**
+    - `scoring.scoring_run` bekommt `profile_id` und `profile_version`, beide leer bei Läufen
+      vor P2b.3, beim Import und beim Replay.
+    - Ein Fremdschlüssel verweist auf `profile_version` desselben Schemas.
+    - Ein `CHECK` erlaubt nur beides oder keines.
+  - **Event:** `ScoringRunCompletedV1.profile` gibt es schon (optional, P1). Der Handler füllt es
+    jetzt. Der Vertrag ändert sich nicht, die Schema-Golden-Files bleiben.
+  - **Mail:** Der Footer nennt „Profil Standard v1“. Ohne Profil steht dort nichts. Die
+    HTML-Golden-Files ändern sich gewollt, CSV und Metadaten nicht.
+  - **E2E:** Mit Replay-Daten prüft `tests/e2e`, dass die Mail „Profil Standard v1“ nennt.
+  - **Noch nicht in P2b.3:**
+    - Das Replay rechnet weiter mit den Settings statt mit dem gespeicherten Profil des Laufs.
+      Solange es nur „Standard“ v1 aus denselben ENV-Werten gibt, ist das gleich.
+    - Das gespeicherte Profil im Replay folgt mit dem Profil-Editor (P3.3).
+    - Bis P3.3 lassen sich Gewichte nur noch über ein neues Profil in der Datenbank ändern,
+      nicht mehr über die `.env`.
+- **Umgesetzt (31.10.2026):** wie im Entwurf.
+  - Die Migration `0007` stammt aus `alembic revision --autogenerate`. Den `CHECK` ergänzt sie
+    von Hand, weil Alembic CHECK-Constraints nicht erkennt. `alembic check` findet danach keinen
+    Unterschied.
+  - `Adapters.scoring` hat den Typ `ScoringAdapter`, also `ScoringStore` und `ProfileStore`.
+  - Golden-Files: In allen sechs Mails kommt im Footer „Profil Standard v1 &middot;“ dazu.
+    Das ist gewollt, CSV und Metadaten bleiben gleich. `tests/test_pipeline_bus.py` vergleicht
+    die Mail durch den ganzen Bus und rechnet mit „Standard“ v1 wie der Golden-Master.
+  - **NAS:** Der erste Lauf nach dem Deployment legt „Standard“ v1 aus der `.env` der NAS an.
+    Die Replay-Wochen zeigen, dass das Ranking dabei gleich bleibt (P2b.2). Danach wirkt eine
+    Änderung von `VALUE_WEIGHT`, `QUALITY_WEIGHT` oder `MIN_MARKET_CAP` nicht mehr.
 
 ### Phase 3 – web-api und Angular
 

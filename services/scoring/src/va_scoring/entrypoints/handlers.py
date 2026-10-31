@@ -19,6 +19,7 @@ from va_contracts.events.v1 import (
     SNAPSHOT_COMPLETED,
     FundamentalsV1,
     IdentityV1,
+    ProfileRefV1,
     RankingRowV1,
     RunFailedV1,
     ScoringRunCompletedV1,
@@ -32,8 +33,8 @@ if TYPE_CHECKING:
     from va_contracts.events.v1 import SnapshotCompletedV1
     from va_platform.bus import EventBus
 
-    from ..application.ports import ScoringStore
-    from ..domain.scoring import ScoringConfig
+    from ..application.ports import ProfileSource, ScoringStore
+    from ..domain.profile import ProfileVersionRef
 
 log = logging.getLogger(__name__)
 
@@ -45,10 +46,10 @@ _FLAT_COLUMNS = list(FundamentalsV1(identity=IdentityV1(symbol="", name="", inde
 
 
 class SnapshotCompletedHandler:
-    def __init__(self, bus: EventBus, *, store: ScoringStore, config: ScoringConfig) -> None:
+    def __init__(self, bus: EventBus, *, store: ScoringStore, profile: ProfileSource) -> None:
         self._bus = bus
         self._store = store
-        self._config = config
+        self._profile = profile
 
     def subscribe(self) -> None:
         self._bus.subscribe(SNAPSHOT_COMPLETED, CONSUMER, self)
@@ -57,10 +58,15 @@ class SnapshotCompletedHandler:
         snap = env.data
         scoring_run_id: int | None = None
         try:
+            # Das aktive Profil gilt fuer diesen Lauf (P2b.3); ohne Profil keine Bewertung
+            active = self._profile.active()
+            cfg = active.config
+            if active.label is not None:
+                log.info("Scoring mit Profil %s", active.label)
             frame = pd.DataFrame([f.to_flat() for f in snap.fundamentals], columns=_FLAT_COLUMNS)
-            scored = score(frame, self._config) if snap.fundamentals else frame.iloc[0:0]
+            scored = score(frame, cfg) if snap.fundamentals else frame.iloc[0:0]
             scoring_run_id = self._store.record_scoring(
-                snap.fetch_run_id, frame, scored, self._config
+                snap.fetch_run_id, frame, scored, cfg, profile=active.ref
             )
             if scored.empty or int(scored["composite_score"].notna().sum()) == 0:
                 log.error("Keine bewertbaren Datenpunkte - Abbruch.")
@@ -75,8 +81,9 @@ class SnapshotCompletedHandler:
                 fetch_run_id=snap.fetch_run_id,
                 as_of=snap.as_of,
                 universe=snap.universe,
-                value_weight=self._config.value_weight,
-                quality_weight=self._config.quality_weight,
+                value_weight=cfg.value_weight,
+                quality_weight=cfg.quality_weight,
+                profile=_profile_ref(active.ref),
                 ranking=[
                     RankingRowV1.from_flat(row, fundamentals=contracts.get(str(row["symbol"])))
                     for row in scored.to_dict("records")
@@ -112,3 +119,9 @@ class SnapshotCompletedHandler:
             scoring_run_id=scoring_run_id,
         )
         self._bus.publish(follow_up(env, RUN_FAILED, failed, source=SOURCE))
+
+
+def _profile_ref(ref: ProfileVersionRef | None) -> ProfileRefV1 | None:
+    if ref is None:
+        return None
+    return ProfileRefV1(profile_id=ref.profile_id, version=ref.version, name=ref.name)

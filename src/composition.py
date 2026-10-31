@@ -36,6 +36,9 @@ from va_notification.adapters.smtp import SmtpConfig, SmtpSender
 from va_notification.entrypoints.handlers import NotificationConfig, NotificationHandler
 from va_platform.db import create_db_engine
 from va_scoring.adapters.postgres.store import PostgresScoringStore
+from va_scoring.application.ports import ProfileStore, ScoringStore
+from va_scoring.application.profiles import StoredProfile
+from va_scoring.domain.profile import profile_params
 from va_scoring.domain.scoring import ScoringConfig
 from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
 
@@ -54,7 +57,6 @@ if TYPE_CHECKING:
     from va_market_data.domain.universe import Ticker, Universe
     from va_notification.application.ports import Heartbeat, ReportSender, ReportStore
     from va_platform.bus import EventBus
-    from va_scoring.application.ports import ScoringStore
 
     from .config import Settings
     from .db.log_handler import LogEntry
@@ -83,11 +85,15 @@ class BatchStore(Protocol):
     def record_logs(self, run_id: int, entries: Sequence[LogEntry]) -> None: ...
 
 
+class ScoringAdapter(ScoringStore, ProfileStore, Protocol):
+    """Speicher von scoring: Bewertungslaeufe und Profile (P2b.3)."""
+
+
 @dataclass(frozen=True)
 class Adapters:
     batch: BatchStore
     market_data: SnapshotStore
-    scoring: ScoringStore
+    scoring: ScoringAdapter
     reporting: ReportStore
     load_universe: Callable[[], Universe]
     fetch: Fetch
@@ -216,8 +222,10 @@ def wire(bus: EventBus, adapters: Adapters, settings: Settings, *, version: str)
         fetch=adapters.fetch,
         dax_only=settings.universe == "DAX_ONLY",
     ).subscribe()
+    # Die ENV-Werte sind nur Startwerte fuer das Profil "Standard" (ADR-0009, P2b.3)
+    start_params = profile_params(scoring_config(settings))
     SnapshotCompletedHandler(
-        bus, store=adapters.scoring, config=scoring_config(settings)
+        bus, store=adapters.scoring, profile=StoredProfile(adapters.scoring, start_params)
     ).subscribe()
     NotificationHandler(
         bus,

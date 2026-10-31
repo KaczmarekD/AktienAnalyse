@@ -28,6 +28,7 @@ from va_notification.entrypoints.handlers import NotificationConfig, Notificatio
 from va_platform.bus import InProcessBus
 from va_platform.serialization import json_safe
 from va_scoring.adapters.postgres.store import factor_rows, score_rows, scoring_symbols
+from va_scoring.application.profiles import FixedProfile
 from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
 
 from .case import FACTOR_COLUMNS, SCORE_COLUMNS
@@ -41,8 +42,6 @@ from .compare import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from va_contracts import Envelope
     from va_contracts.events.v1 import RunFailedV1
     from va_notification.domain.report import ReportArtifacts
@@ -113,7 +112,8 @@ def replay(case: ReplayCase, config: ScoringConfig) -> ReplayResult:
     dead: list[DeadLetter] = []
 
     bus = InProcessBus(on_dead_letter=dead.append)
-    SnapshotCompletedHandler(bus, store=scoring, config=config).subscribe()
+    # Fest die uebergebene Konfiguration, ohne gespeichertes Profil (P2b.3)
+    SnapshotCompletedHandler(bus, store=scoring, profile=FixedProfile(config)).subscribe()
     NotificationHandler(
         bus,
         sender=_NoSender(),
@@ -200,6 +200,7 @@ class _ScoringCapture:
         df_all: pd.DataFrame,
         scored: pd.DataFrame,
         cfg: ScoringConfig,
+        profile: ProfileVersionRef | None = None,  # noqa: ARG002 - Signatur des Ports
     ) -> int:
         # Kuenstliche IDs je Titel, damit dieselben Funktionen wie im Speicher greifen
         ids = {symbol: i for i, symbol in enumerate(scoring_symbols(df_all, scored), start=1)}
@@ -211,10 +212,6 @@ class _ScoringCapture:
         factors = _frame(factor_rows(scored, ids, cfg), FACTOR_COLUMNS, symbols)
         self.factor_scores = factors.sort_values(["symbol", "factor_key"], ignore_index=True)
         return self.scoring_run_id
-
-    def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
-        msg = "Das Replay legt keine Profile an"
-        raise NotImplementedError(msg)
 
 
 @dataclass

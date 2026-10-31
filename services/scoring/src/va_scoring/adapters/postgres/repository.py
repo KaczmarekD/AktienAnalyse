@@ -103,6 +103,8 @@ class ScoringRepository:
         origin: str = "live",
         note: str | None = None,
         created_at: datetime | None = None,
+        profile_id: int | None = None,
+        profile_version: int | None = None,
     ) -> int:
         safe_config = json_safe(config) if config is not None else None
         values: dict[str, Any] = {
@@ -112,6 +114,8 @@ class ScoringRepository:
             "config_hash": config_hash(safe_config),
             "app_version": app_version,
             "note": note,
+            "profile_id": profile_id,
+            "profile_version": profile_version,
         }
         if created_at is not None:
             values["created_at"] = created_at

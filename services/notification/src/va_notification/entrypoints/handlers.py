@@ -27,6 +27,7 @@ from va_contracts.events.v1 import (
     REPORT_SENT,
     RUN_FAILED,
     SCORING_RUN_COMPLETED,
+    ProfileRefV1,
     ReportSentV1,
     RunFailedV1,
     UniverseMemberV1,
@@ -134,6 +135,7 @@ class NotificationHandler:
             value_weight=event.value_weight,
             quality_weight=event.quality_weight,
             version=cfg.version,
+            profile=_profile_label(event.profile),
             universe_size=event.universe.size,
             universe_source=event.universe.source,
             universe_as_of=event.universe.as_of,
@@ -242,6 +244,13 @@ def _send_error_mail(sender: ReportSender, trace: str) -> str | None:
         log.error("Auch Fehler-Mail fehlgeschlagen: %s", inner)
         return str(inner)
     return None
+
+
+def _profile_label(profile: ProfileRefV1 | None) -> str | None:
+    """Fuer den Footer, z. B. "Standard v1"; ohne Namen die ID ("#7 v2")."""
+    if profile is None:
+        return None
+    return f"{profile.name or f'#{profile.profile_id}'} v{profile.version}"
 
 
 def _label(member: UniverseMemberV1) -> str:

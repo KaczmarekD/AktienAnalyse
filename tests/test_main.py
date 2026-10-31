@@ -22,6 +22,7 @@ import pytest
 
 from src.composition import Adapters, scoring_config
 from src.main import _run, run
+from src.run_tracker import EXIT_FAILED
 from va_market_data.domain.fundamentals import Fundamentals, Identity
 from va_market_data.domain.history import HistoryState
 from va_market_data.domain.universe import Ticker, Universe
@@ -98,8 +99,9 @@ class FakeRecorder:
             raise ConnectionError("db hiccup")
         return ProfileVersionRef(1, "Standard", 1, dict(params))
 
-    def record_scoring(self, fetch_run_id, df_all, scored, cfg):
+    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None):
         self.calls.append(("record_scoring", fetch_run_id))
+        self.scoring_profile = profile
         self.scored_symbols = set(df_all["symbol"])
         return 20
 
@@ -242,10 +244,10 @@ class TestRunDryRun:
         )
 
 
-class TestDefaultProfile:
-    """P2b.1: Beim Start entsteht das Profil "Standard" aus den ENV-Werten (ADR-0009)."""
+class TestProfile:
+    """P2b.3: Das Scoring rechnet mit dem aktiven Profil; ENV liefert nur die Startwerte."""
 
-    def test_start_ensures_the_standard_profile_from_env(
+    def test_scoring_ensures_the_standard_profile_from_env(
         self, settings, recorder, mock_tickers, mock_universe_df
     ):
         settings = settings.model_copy(update={"min_market_cap": 1e9})
@@ -255,25 +257,24 @@ class TestDefaultProfile:
         [params] = recorder.get("ensure_default_profile")
         assert params == profile_params(scoring_config(settings))
         assert params["min_market_cap"] == 1e9
+        assert recorder.scoring_profile == ProfileVersionRef(1, "Standard", 1, params)
 
-    def test_after_the_run_is_started_and_before_the_fetch(
-        self, settings, recorder, mock_tickers, mock_universe_df
-    ):
+    def test_when_scoring_needs_it(self, settings, recorder, mock_tickers, mock_universe_df):
         _run_with(
             settings, recorder, mock_tickers, {"return_value": mock_universe_df}, dry_run=True
         )
         names = [name for name, _ in recorder.calls]
-        assert names.index("start_run") < names.index("ensure_default_profile")
-        assert names.index("ensure_default_profile") < names.index("start_fetch")
+        assert names.index("start_fetch") < names.index("ensure_default_profile")
+        assert names.index("ensure_default_profile") < names.index("record_scoring")
 
-    def test_failure_does_not_stop_the_run(self, settings, mock_tickers, mock_universe_df, caplog):
-        # Bis P2b.3 rechnet das Scoring mit den ENV-Werten, das Profil ist noch Beiwerk
+    def test_unreadable_profile_fails_the_run(self, settings, mock_tickers, mock_universe_df):
+        # Ohne Profil keine Bewertung: lieber kein Report als einer mit unbekannten Parametern
         recorder = FakeRecorder(fail_profile=True)
         rc, _, _ = _run_with(
             settings, recorder, mock_tickers, {"return_value": mock_universe_df}, dry_run=True
         )
-        assert rc == 0
-        assert "Profil Standard" in caplog.text
+        assert rc == EXIT_FAILED
+        assert recorder.get("record_scoring") == []
 
 
 # ---------------------------------------------------------------------------

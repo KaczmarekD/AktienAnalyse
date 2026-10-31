@@ -22,6 +22,7 @@ from va_contracts.events.v1 import (
     FundamentalsV1,
     IdentityV1,
     MarketDataV1,
+    ProfileRefV1,
     RankingRowV1,
     RunFailedV1,
     RunOptionsV1,
@@ -321,3 +322,21 @@ def test_error_mail_escapes_the_traceback():
     body = error_mail_html("ValueError: <b>kaputt</b> & mehr")
     assert "&lt;b&gt;kaputt&lt;/b&gt; &amp; mehr" in body
     assert "<b>kaputt</b>" not in body
+
+
+class TestProfileInTheMail:
+    """P2b.3: Der Footer nennt das Profil, mit dem der Lauf gerechnet wurde."""
+
+    def _html(self, setup, profile: ProfileRefV1 | None) -> str:
+        _publish(setup, _completed().model_copy(update={"profile": profile}))
+        return setup.store.reports[0][2].html
+
+    def test_footer_names_profile_and_version(self, setup):
+        html = self._html(setup, ProfileRefV1(profile_id=1, version=1, name="Standard"))
+        assert "Profil Standard v1" in html
+
+    def test_profile_without_name_is_named_by_its_id(self, setup):
+        assert "Profil #7 v2" in self._html(setup, ProfileRefV1(profile_id=7, version=2))
+
+    def test_without_profile_no_profile_line(self, setup):
+        assert "Profil " not in self._html(setup, None)

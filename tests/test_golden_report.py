@@ -66,6 +66,7 @@ def _report(scored: pd.DataFrame, case: str) -> ReportArtifacts:
         top_n=5,
         bottom_n=3,
         version="0.0.0-golden",
+        profile="Standard v1",  # P2b.3: der Footer nennt das Profil
         universe_size=8,
         now=FIXED_NOW,
         **CASES[case],  # type: ignore[arg-type]

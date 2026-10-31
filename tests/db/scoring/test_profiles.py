@@ -198,3 +198,40 @@ class TestDefaultProfileInTheStore:
             t: _count(engine, t) for t in ("profile", "profile_version", "profile_activation")
         }
         assert counts == {"profile": 1, "profile_version": 1, "profile_activation": 1}
+
+
+class TestScoringRunReference:
+    """P2b.3: Jeder Bewertungslauf speichert, mit welcher Profil-Version er rechnete."""
+
+    def test_scoring_run_stores_the_profile_version(self, session):
+        repo = ScoringRepository(session)
+        pid = repo.write_profile("A")
+        repo.write_profile_version(pid, PARAMS)
+        sid = repo.write_scoring_run(
+            fetch_run_id=1, config=PARAMS, app_version="0", profile_id=pid, profile_version=1
+        )
+        run = repo.get_scoring_run(sid)
+        assert run is not None
+        assert (run.profile_id, run.profile_version) == (pid, 1)
+
+    def test_without_profile_both_stay_empty(self, session):
+        repo = ScoringRepository(session)
+        sid = repo.write_scoring_run(fetch_run_id=1, config=PARAMS, app_version="0")
+        run = repo.get_scoring_run(sid)
+        assert run is not None
+        assert (run.profile_id, run.profile_version) == (None, None)
+
+    def test_only_existing_versions(self, session):
+        repo = ScoringRepository(session)
+        pid = repo.write_profile("A")
+        with pytest.raises(IntegrityError):
+            repo.write_scoring_run(
+                fetch_run_id=1, config=PARAMS, app_version="0", profile_id=pid, profile_version=5
+            )
+
+    def test_profile_and_version_only_together(self, session):
+        repo = ScoringRepository(session)
+        pid = repo.write_profile("A")
+        repo.write_profile_version(pid, PARAMS)
+        with pytest.raises(IntegrityError):
+            repo.write_scoring_run(fetch_run_id=1, config=PARAMS, app_version="0", profile_id=pid)

@@ -23,6 +23,12 @@ class ScoringRun(Base):
     __tablename__ = "scoring_run"
     __table_args__ = (
         CheckConstraint(in_values("origin", SCORING_ORIGINS), name="origin"),
+        # Profil und Version nur zusammen (P2b.3); leer vor P2b.3, beim Import und im Replay
+        CheckConstraint("(profile_id IS NULL) = (profile_version IS NULL)", name="profile"),
+        ForeignKeyConstraint(
+            ["profile_id", "profile_version"],
+            ["scoring.profile_version.profile_id", "scoring.profile_version.version"],
+        ),
         {"schema": "scoring"},
     )
 
@@ -34,6 +40,8 @@ class ScoringRun(Base):
     app_version: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     note: Mapped[str | None]
+    profile_id: Mapped[int | None]
+    profile_version: Mapped[int | None]
 
 
 class ScoreResult(Base):

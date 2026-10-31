@@ -61,7 +61,7 @@ class Store:
     def ensure_default_profile(self, params):
         return ProfileVersionRef(1, "Standard", 1, dict(params))
 
-    def record_scoring(self, fetch_run_id, df_all, scored, cfg):
+    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None):
         return 20
 
     def record_report(self, run_id, scoring_run_id, report):

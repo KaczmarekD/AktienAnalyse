@@ -236,6 +236,43 @@ class TestFullRun:
         assert [tuple(v) for v in versions] == [(1, 0.5)]
         assert activations == 1
 
+    def test_scoring_run_records_the_profile_version(self, db_settings, engine):
+        # P2b.3: Jeder Bewertungslauf kennt seine Profil-Version (ADR-0009)
+        _patched_run(db_settings)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT p.name, r.profile_version FROM scoring.scoring_run r "
+                    "JOIN scoring.profile p ON p.id = r.profile_id"
+                )
+            ).one()
+        assert tuple(row) == ("Standard", 1)
+
+    def test_active_profile_wins_over_env(self, db_settings, engine):
+        _patched_run(db_settings)
+        with session_scope(engine) as s:
+            repo = ScoringRepository(s)
+            pid = repo.get_profile_id("Standard")
+            assert pid is not None
+            first = repo.get_profile_version(pid, 1)
+            assert first is not None
+            repo.write_profile_version(
+                pid, {**first.params, "value_weight": 0.5}, parent_version=1, comment="Test"
+            )
+            repo.write_profile_activation(pid, 2)
+        # Die ENV-Werte waren nur Startwerte: Ein geaenderter Wert wirkt nicht mehr
+        env_changed = db_settings.model_copy(update={"value_weight": 0.9, "quality_weight": 0.1})
+        rc, _, _ = _patched_run(env_changed, force_refresh=True)
+        assert rc == 0
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT profile_version, (config->>'value_weight')::float "
+                    "FROM scoring.scoring_run ORDER BY id"
+                )
+            ).all()
+        assert [tuple(r) for r in rows] == [(1, 0.6), (2, 0.5)]
+
     def test_second_run_same_day_reuses_fetch(self, db_settings, engine):
         _patched_run(db_settings)
         rc, ticker_data, _ = _patched_run(db_settings)

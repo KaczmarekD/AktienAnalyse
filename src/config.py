@@ -61,9 +61,10 @@ class Settings(_OwnerUrl):
     universe: Literal["DAX_MDAX", "DAX_ONLY"] = "DAX_MDAX"
     top_n: int = Field(default=20, ge=1, le=200)
     bottom_n: int = Field(default=10, ge=0, le=100)
+    # Nur Startwert fuer das Profil "Standard" (ADR-0009, P2b.3), danach gilt das aktive Profil
     min_market_cap: float = Field(default=300_000_000.0, ge=0)
 
-    # --- Scoring (optional override) ---
+    # --- Scoring: Gewichte nur als Startwerte fuer "Standard" (wie min_market_cap) ---
     value_weight: float = Field(default=0.6, ge=0, le=1)
     quality_weight: float = Field(default=0.4, ge=0, le=1)
     default_tax_rate: float = Field(default=0.27, ge=0, le=0.6)

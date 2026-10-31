@@ -13,13 +13,15 @@ from va_contracts.events.v1 import (
     SCORING_RUN_COMPLETED,
     SNAPSHOT_COMPLETED,
     FundamentalsV1,
+    ProfileRefV1,
     RunOptionsV1,
     SnapshotCompletedV1,
     UniverseInfoV1,
     UniverseMemberV1,
 )
 from va_platform.bus import InProcessBus
-from va_scoring.domain.profile import ProfileVersionRef
+from va_scoring.application.profiles import FixedProfile
+from va_scoring.domain.profile import ActiveProfile, ProfileVersionRef
 from va_scoring.domain.scoring import ScoringConfig, score
 from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
 
@@ -39,14 +41,17 @@ class FakeStore:
         self.error = error
         self.calls: list[dict[str, Any]] = []
 
-    def ensure_default_profile(self, params):
-        return ProfileVersionRef(1, "Standard", 1, dict(params))
-
-    def record_scoring(self, fetch_run_id, df_all, scored, cfg):
+    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None):
         if self.error:
             raise self.error
         self.calls.append(
-            {"fetch_run_id": fetch_run_id, "df_all": df_all, "scored": scored, "cfg": cfg}
+            {
+                "fetch_run_id": fetch_run_id,
+                "df_all": df_all,
+                "scored": scored,
+                "cfg": cfg,
+                "profile": profile,
+            }
         )
         return 20
 
@@ -86,7 +91,8 @@ def _snapshot(
 
 
 def _subscribe(bus, store, cfg=None) -> None:
-    SnapshotCompletedHandler(bus, store=store, config=cfg or ScoringConfig()).subscribe()
+    profile = FixedProfile(cfg or ScoringConfig())
+    SnapshotCompletedHandler(bus, store=store, profile=profile).subscribe()
 
 
 def test_scores_stores_and_publishes_the_ranking(bus, mock_universe_df):
@@ -159,3 +165,61 @@ def test_error_becomes_run_failed(bus, mock_universe_df):
     assert "db weg" in failed.reason
     assert failed.detail is not None
     assert "ConnectionError" in failed.detail
+
+
+# --- P2b.3: das aktive Profil ----------------------------------------------------------------
+
+OWN = ProfileVersionRef(3, "Eigenes", 2, {"value_weight": 0.5})
+
+
+class FakeProfile:
+    """``ProfileSource``: ein festes aktives Profil, oder ein Fehler beim Lesen."""
+
+    def __init__(self, active: ActiveProfile | None = None, error: Exception | None = None) -> None:
+        self._active = active
+        self._error = error
+
+    def active(self) -> ActiveProfile:
+        if self._error is not None:
+            raise self._error
+        assert self._active is not None
+        return self._active
+
+
+def test_without_profile_the_event_names_none(bus, mock_universe_df):
+    store = FakeStore()
+    _subscribe(bus, store)
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df)
+    assert seen[0].data.profile is None
+    assert store.calls[0]["profile"] is None
+
+
+def test_active_profile_is_used_stored_and_named(bus, mock_universe_df):
+    store = FakeStore()
+    cfg = ScoringConfig(value_weight=0.5, quality_weight=0.5)
+    SnapshotCompletedHandler(
+        bus, store=store, profile=FakeProfile(ActiveProfile(cfg, OWN))
+    ).subscribe()
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df)
+
+    data = seen[0].data
+    assert (data.value_weight, data.quality_weight) == (0.5, 0.5)
+    assert data.profile == ProfileRefV1(profile_id=3, version=2, name="Eigenes")
+    assert (store.calls[0]["cfg"], store.calls[0]["profile"]) == (cfg, OWN)
+    expected = score(mock_universe_df, cfg)
+    assert [r.fundamentals.symbol for r in data.ranking] == list(expected["symbol"])
+
+
+def test_unreadable_profile_fails_the_run_before_scoring(bus, mock_universe_df):
+    store = FakeStore()
+    SnapshotCompletedHandler(
+        bus, store=store, profile=FakeProfile(error=ConnectionError("db weg"))
+    ).subscribe()
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df)
+    failed = seen[0].data
+    assert (failed.stage, failed.scoring_run_id) == ("scoring", None)
+    assert "db weg" in failed.reason
+    assert store.calls == []
