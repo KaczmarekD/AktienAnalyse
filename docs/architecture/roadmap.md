@@ -13,8 +13,8 @@
 | 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
 | 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1), NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
-| 2b | Scoring-Profile in der DB | 🚧 P2b.0 bis P2b.2 erledigt (Replay-Regression, Profil-Tabellen, ScoringProfileParams), P2b.3 offen |
-| 3 | web-api + Angular (UI im LAN, Profil-Editor) | 🚧 Lese-Teile über U4 erledigt (P3.1, P3.2, P3.4–P3.7), offen: P3.3 und Profil-Editor (nach 2b), P3.8; NAS: Deployment |
+| 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; Editor mit P3.3; NAS: Deployment |
+| 3 | web-api + Angular (UI im LAN, Profil-Editor) | 🚧 Lese-Teile über U4 erledigt (P3.1, P3.2, P3.4–P3.7), offen: P3.3 und Profil-Editor (Phase 2b ist fertig), P3.8; NAS: Deployment |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
@@ -133,7 +133,7 @@ Details: [Implementierungsplan, Phase 2b](implementierungsplan.md#phase-2b--scor
       Vorschlag B) (`e222564`)
 - [x] P2b.1 Profil-Tabellen, Profil „Standard“ beim Start aus ENV (`767263a`)
 - [x] P2b.2 ScoringProfileParams (`c230e45`)
-- [ ] P2b.3 Profil-Version im Lauf und in der Mail
+- [x] P2b.3 Profil-Version im Lauf und in der Mail (`6baf004`)
 
 **Fertig, wenn:** jeder Bewertungslauf seine Profil-Version kennt.
 
