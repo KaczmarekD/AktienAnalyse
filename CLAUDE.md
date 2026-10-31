@@ -99,6 +99,12 @@ Schema) färbt sie rot, ohne dass sich der Vertrag ändert. Events per
 Konstruktor erzeugen: `model_validate` ignoriert unbekannte Felder, also auch
 Tippfehler.
 
+**Frontend** (`frontend/`, Angular 22 mit Angular Material, ab P3.5): Der API-Client unter
+`frontend/src/app/api/` entsteht mit hey-api aus dem OpenAPI-Snapshot
+`tests/golden/openapi/v1.json` (`make ui-api`) und wird nie von Hand geändert. Die CI prüft, dass
+er zum Snapshot passt. Ändert sich die API, kommen neuer Snapshot und neuer Client in denselben
+Commit. Das UI ruft nur relative Pfade (`/api/v1/...`) und lädt nichts aus dem Internet.
+
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
 `services/market-data/src/va_market_data/adapters/yahoo.py`:
 - `FIELD_MAP`: Zeilen der Abschlüsse

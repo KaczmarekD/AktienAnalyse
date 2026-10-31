@@ -110,3 +110,17 @@ Frontend und Backend werden unabhängig ausgerollt. Deshalb braucht die Schnitts
 
 `ng serve` mit einer Proxy-Konfiguration, die `/api` und `/ws` an das lokal laufende web-api
 weiterleitet. So ist auch in der Entwicklung alles eine Adresse, genau wie hinter nginx.
+
+Seit P3.5 (Code unter `frontend/`, Befehle in [frontend/README.md](../../frontend/README.md)):
+
+- `make ui-install`, dann `make api` oder `make local-up` für das web-api und `make ui` für das
+  UI unter <http://localhost:4200>. `frontend/proxy.conf.json` leitet `/api` an
+  `127.0.0.1:8000`.
+- Der API-Client unter `frontend/src/app/api/` entsteht mit hey-api aus dem OpenAPI-Snapshot
+  `tests/golden/openapi/v1.json` (`make ui-api`). Es gibt `httpResource`-Funktionen wie
+  `latestRankingResource` und Zod-4-Schemas. Er wird committet und nie von Hand geändert. Die
+  CI erzeugt ihn neu und bricht ab, wenn er nicht zum Snapshot passt.
+- Die Operation-IDs der API sind die Funktionsnamen des web-api, daraus entstehen die Namen im
+  Client.
+- Keine Ressourcen aus dem Internet: Systemschrift statt Roboto von Google Fonts, keine Icon-Fonts
+  von außen. Das UI läuft im LAN, und jeder Aufruf ginge sonst an Google.

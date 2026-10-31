@@ -1,0 +1,20 @@
+mat-toolbar {
+  gap: 1.5rem;
+}
+
+.brand {
+  font-weight: 500;
+}
+
+nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.active {
+  background-color: var(--mat-sys-secondary-container);
+}
+
+main {
+  padding: 1.5rem;
+}

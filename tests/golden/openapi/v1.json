@@ -1170,7 +1170,7 @@
   "paths": {
     "/api/v1/health": {
       "get": {
-        "operationId": "health_api_v1_health_get",
+        "operationId": "health",
         "responses": {
           "200": {
             "content": {
@@ -1191,7 +1191,7 @@
     },
     "/api/v1/instruments/{symbol}": {
       "get": {
-        "operationId": "get_instrument_api_v1_instruments__symbol__get",
+        "operationId": "get_instrument",
         "parameters": [
           {
             "in": "path",
@@ -1237,7 +1237,7 @@
     "/api/v1/ranking/latest": {
       "get": {
         "description": "Juengster Bewertungslauf ausser Rescores.",
-        "operationId": "latest_ranking_api_v1_ranking_latest_get",
+        "operationId": "latest_ranking",
         "responses": {
           "200": {
             "content": {
@@ -1261,7 +1261,7 @@
     },
     "/api/v1/ranking/{scoring_run_id}": {
       "get": {
-        "operationId": "get_ranking_api_v1_ranking__scoring_run_id__get",
+        "operationId": "get_ranking",
         "parameters": [
           {
             "in": "path",
@@ -1306,7 +1306,7 @@
     },
     "/api/v1/reports/{report_id}": {
       "get": {
-        "operationId": "get_report_api_v1_reports__report_id__get",
+        "operationId": "get_report",
         "parameters": [
           {
             "in": "path",
@@ -1351,7 +1351,7 @@
     },
     "/api/v1/reports/{report_id}/csv": {
       "get": {
-        "operationId": "get_report_csv_api_v1_reports__report_id__csv_get",
+        "operationId": "get_report_csv",
         "parameters": [
           {
             "in": "path",
@@ -1393,7 +1393,7 @@
     "/api/v1/runs": {
       "get": {
         "description": "Laeufe, neueste zuerst.",
-        "operationId": "list_runs_api_v1_runs_get",
+        "operationId": "list_runs",
         "parameters": [
           {
             "in": "query",
@@ -1427,7 +1427,7 @@
                   "items": {
                     "$ref": "#/components/schemas/RunSummary"
                   },
-                  "title": "Response List Runs Api V1 Runs Get",
+                  "title": "Response List Runs",
                   "type": "array"
                 }
               }
@@ -1453,7 +1453,7 @@
     },
     "/api/v1/runs/{run_id}": {
       "get": {
-        "operationId": "get_run_api_v1_runs__run_id__get",
+        "operationId": "get_run",
         "parameters": [
           {
             "in": "path",

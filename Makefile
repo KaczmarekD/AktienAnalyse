@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down api
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down api ui-install ui ui-api ui-check
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -165,6 +165,21 @@ local-logs: ## Lokal: Logs von DB, Mailpit und pgweb verfolgen
 
 local-down: ## Lokal: alles stoppen (die Daten in .local/ bleiben)
 	$(LOCAL) --profile run down
+
+# ---------- Frontend (P3.5, docs/architecture/frontend.md) ------------------
+# Node laeuft nur lokal und in der CI, nie auf der NAS. Das UI holt seine Daten ueber /api vom
+# web-api (make api oder make local-up); ng serve leitet /api an 127.0.0.1:8000 weiter.
+ui-install: ## Frontend: Abhaengigkeiten exakt aus package-lock.json
+	cd frontend && npm ci
+
+ui: ## Frontend mit Reload unter http://localhost:4200 (braucht das web-api auf :8000)
+	cd frontend && npm start
+
+ui-api: ## Frontend: API-Client aus tests/golden/openapi/v1.json neu erzeugen
+	cd frontend && npm run generate:api
+
+ui-check: ## Frontend: Format, Lint, Tests und Build wie in der CI
+	cd frontend && npm run format:check && npm run lint && npm test -- --watch=false && npm run build
 
 # ---------- Sauberkeit -------------------------------------------------------
 clean: ## Cache und Builds entfernen

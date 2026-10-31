@@ -939,6 +939,30 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Test:** Vitest-Smoke-Test und ein CI-Job mit `npm ci`, Lint, Test und Build.
 - **Implementierung:** Angular-22-Workspace und hey-api-Konfiguration (Angular- und Zod-Plugin)
   auf Basis des OpenAPI-Snapshots.
+- **Umgesetzt (31.10.2026, U4):**
+  - Smoke-Test rot in `e0aba04`.
+  - **Versionen:** Angular 22.2 (zoneless, Vitest 5, TypeScript 6.0), Angular Material 22.2,
+    angular-eslint 22.6, hey-api 0.99, Zod 4.6.
+  - **Client:** `frontend/src/app/api/` aus `tests/golden/openapi/v1.json`, mit Requests,
+    `httpResource`-Funktionen, Typen und Zod-Schemas. Er wird committet und ist vom Lint
+    ausgenommen.
+  - **Namen:** Das web-api nutzt die Funktionsnamen als Operation-IDs (`1b0f799`). Der Client
+    heißt deshalb `latestRankingResource` statt `latestRankingApiV1RankingLatestGetResource`.
+  - **App-Hülle:** Material-Toolbar mit Navigation zu Ranking und Runs. Bis P3.7 stehen dort
+    Platzhalter. HTTP läuft über `fetch`, nur mit relativen Pfaden. Lokal leitet
+    `proxy.conf.json` an `127.0.0.1:8000`.
+  - **Ohne Google Fonts:** Die Systemschrift ersetzt Roboto aus dem Internet, die Links aus
+    `ng add` sind entfernt.
+  - **CI:** eigener Job „Frontend Lint + Test + Build“ mit Node 24, `npm ci`, Abgleich des
+    Clients mit dem Snapshot, Prettier, ESLint, Vitest und Produktions-Build.
+  - **Lokal:** `make ui-install`, `make ui`, `make ui-api`, `make ui-check`.
+  - **Build:** 324 kB beim ersten Laden, komprimiert 83 kB.
+  - **Hinweis:** `npm audit` meldet 0 Schwachstellen in den Laufzeitpaketen. Die 22 Meldungen
+    betreffen nur Entwicklungswerkzeuge (`js-yaml`, `minimatch`) und landen nicht im Build.
+  - **Befund aus U1, hier behoben:** `.dockerignore` schloss `.local/` nicht aus. Jeder
+    Image-Build im lokalen Stack schickte die lokale Datenbank (`.local/pgdata`) als
+    Build-Kontext an Docker. Jetzt sind `.local/` und `frontend/` ausgeschlossen. Das Frontend
+    bekommt in P3.6 ein eigenes Image.
 
 #### P3.6 frontend-Container 🔒
 

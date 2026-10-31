@@ -7,6 +7,10 @@ data/*
 pgdata/
 backups/
 logs/
+# Lokaler Stack (U1): Datenbank, Logs, npm-Cache - nie in den Build-Kontext
+.local/
+# Frontend (P3.5) hat ein eigenes Image mit eigenem Kontext (P3.6)
+frontend/
 **/__pycache__/
 **/*.pyc
 .git/

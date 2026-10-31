@@ -50,6 +50,12 @@ class TestDocs:
         assert response.status_code == 200
         assert "swagger" in response.text.lower()
 
+    def test_operation_ids_are_the_function_names(self, client):
+        # Daraus entstehen die Namen im generierten Client des Frontends (P3.5)
+        schema = client.get("/api/v1/openapi.json").json()
+        ids = {op["operationId"] for path in schema["paths"].values() for op in path.values()}
+        assert {"health", "list_runs", "latest_ranking", "get_report_csv"} <= ids
+
     def test_openapi_lists_only_versioned_paths(self, client):
         schema = client.get("/api/v1/openapi.json").json()
         assert schema["info"]["version"] == version("va-web-api")

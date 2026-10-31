@@ -193,6 +193,8 @@ Zugangsdaten enthält. Der Batch läuft lokal nur auf Knopfdruck, ohne Cron.
 make install-dev    # alle Abhängigkeiten exakt aus uv.lock (.venv)
 make dry            # Dry-Run lokal
 make api            # web-api mit Reload unter localhost:8000 (statt des Containers)
+make ui-install     # Frontend: Abhängigkeiten (Node ≥ 22.22, nur lokal und in der CI)
+make ui             # Frontend mit Reload unter http://localhost:4200, Daten vom web-api
 make check          # ruff + pyright + import-linter + pytest (DB-Tests ohne DB übersprungen)
 make test-db-up     # Wegwerf-Postgres auf Port 55432 (Docker)
 make test-db        # alle Tests inkl. DB-Tests
