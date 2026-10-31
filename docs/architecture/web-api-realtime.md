@@ -193,7 +193,9 @@ Adressen im Heimnetz schicken. Diese Regeln verhindern Missbrauch
 ([ADR-0007](../adr/0007-lan-only-ohne-login.md)):
 
 1. Schreibende Endpunkte akzeptieren nur JSON, CORS bleibt ausgeschaltet. Fremde Seiten scheitern
-   dann an der Vorabprüfung (Preflight) des Browsers.
+   dann an der Vorabprüfung (Preflight) des Browsers. Das gilt auch für Anfragen ohne Body: Ein
+   `fetch` ohne Body käme sonst ohne Vorabprüfung durch. Das Frontend schickt Befehle ohne
+   Inhalt deshalb als `{}` (`va_web_api.security`, P3.4).
 2. Der WebSocket-Hub prüft beim Verbindungsaufbau den `Origin`-Header, denn für WebSockets gibt
    es keinen Preflight.
 3. nginx beantwortet nur bekannte Hostnamen: `server_name` plus ein Default-Server mit

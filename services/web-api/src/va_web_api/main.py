@@ -20,6 +20,7 @@ from sqlalchemy.exc import OperationalError
 from va_platform.db import create_db_engine
 
 from .api import health, instruments, ranking, reports, runs
+from .security import JsonOnlyMiddleware
 from .settings import WebApiSettings
 
 API_PREFIX = "/api/v1"
@@ -46,6 +47,8 @@ def create_app(settings: WebApiSettings | None = None) -> FastAPI:
         redoc_url=None,
         openapi_url=f"{API_PREFIX}/openapi.json",
     )
+    # Kein CORSMiddleware: CORS bleibt bewusst aus (ADR-0007)
+    app.add_middleware(JsonOnlyMiddleware)
     for module in (health, runs, ranking, instruments, reports):
         app.include_router(module.router, prefix=API_PREFIX)
 

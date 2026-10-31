@@ -12,7 +12,7 @@
 | State | NgRx SignalStore + Events-Plugin (NgRx ≥ 21) | Server-Events werden zu Store-Events |
 | API-Client | @hey-api/openapi-ts: Angular-Plugin (`httpResource`) + Zod-v4-Plugin | aus der OpenAPI-Beschreibung des web-api generiert |
 | WebSocket-Typen | aus den Pydantic-Modellen in `va-contracts` (JSON-Schema → TypeScript) | eine Quelle für Python und TypeScript |
-| UI-Bibliothek | **offen**: Angular Material oder PrimeNG, für die Ranking-Tabelle ggf. AG Grid Community | Entscheidung zu Beginn von Phase 3 |
+| UI-Bibliothek | Angular Material (entschieden am 31.10.2026) | vom Angular-Team, zieht mit jeder Angular-Version mit; die Tabelle mit Sortierung und Filtern reicht für 90 Titel, ein Grid wie AG Grid ist nicht nötig |
 
 ## Ansichten
 

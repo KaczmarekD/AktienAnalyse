@@ -32,8 +32,8 @@ Details: [frontend.md](../architecture/frontend.md).
 - ⚠️ Getrennte Deployments brauchen Regeln für die Schnittstelle: `/api/v1`, `oasdiff breaking` in
   der CI, versioniertes WebSocket-Subprotokoll, erst Backend, dann Frontend ausrollen.
 - ⚠️ Die nginx-Konfiguration muss gepflegt werden (WebSocket-Header, Hostnamen-Filter, Caching).
-- Offen: welche UI-Bibliothek (Angular Material oder PrimeNG). Die Entscheidung fällt zu Beginn
-  von Phase 3.
+- UI-Bibliothek: Angular Material, entschieden am 31.10.2026 (PrimeNG verworfen: mehr fertige
+  Bausteine, aber mehr Bruch zwischen Versionen; [frontend.md](../architecture/frontend.md)).
 
 ## Verworfene Alternativen
 

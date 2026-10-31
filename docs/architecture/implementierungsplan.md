@@ -743,7 +743,7 @@ an ihnen ändert:
 - **Keine Imports aus den Fach-Services:** Das web-api ist ein Service für sich (Vertrag
   „Services importieren einander nicht“). Es liest in P3.2 mit eigenen Abfragen aus den
   Schemas, aus denen ab Phase 4 Projektionen werden.
-- **Offen:** die UI-Bibliothek, vor P3.5.
+- **UI-Bibliothek:** Angular Material, entschieden am 31.10.2026.
 
 ### Phase 2b – Scoring-Profile
 
@@ -924,6 +924,14 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Bei fremdem `Origin` kommen keine CORS-Header.
 - **Implementierung:** Mutationen nur mit JSON, CORS bleibt aus
   ([ADR-0007](../adr/0007-lan-only-ohne-login.md)).
+- **Umgesetzt (31.10.2026, U4):**
+  - Tests rot in `f32cb74`.
+  - **415:** `JsonOnlyMiddleware` (`va_web_api.security`) lehnt jedes POST, PUT, PATCH und
+    DELETE ohne `application/json` ab, auch ohne Body. Ein `fetch` ohne Body käme sonst ohne
+    Vorabprüfung des Browsers durch.
+  - **Kein CORS:** Es gibt keine CORS-Middleware. Das sichern Tests ab, ebenso dass die OpenAPI
+    keine Secrets nennt (Passwort, SMTP, Datenbank-URL, Settings).
+  - **Noch offen:** Origin-Prüfung des WebSockets (P4.5) und Hostnamen-Filter in nginx (P3.6).
 
 #### P3.5 Angular-Gerüst und generierter Client
 

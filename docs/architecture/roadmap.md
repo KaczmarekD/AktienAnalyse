@@ -137,7 +137,8 @@ Details: [Implementierungsplan, Phase 3](implementierungsplan.md#phase-3--web-ap
 
 Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 folgen danach.
 
-- [ ] UI-Bibliothek festlegen (Angular Material oder PrimeNG), vor P3.5
+- [x] UI-Bibliothek festlegen (Angular Material oder PrimeNG), vor P3.5. Entschieden am
+      31.10.2026: Angular Material
 - [x] P3.1 Gerüst des web-api (U4) (`5c4e9d1`)
 - [x] P3.2 Lese-Endpunkte (U4) (`f9ba2a5`)
 - [ ] P3.3 Profil-Endpunkte und Vorschau (nach Phase 2b)
