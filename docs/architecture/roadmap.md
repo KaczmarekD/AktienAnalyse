@@ -17,7 +17,7 @@
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | 🚧 Lese-Teile über U4 erledigt (P3.1, P3.2, P3.4–P3.7), offen: P3.3 und Profil-Editor (nach 2b), P3.8; NAS: Deployment |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
-| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 und U4 erledigt, U5 (lokaler End-to-End-Test) als Nächstes, U2 nach dem NAS-Deployment |
+| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
 
 **Reihenfolge:**
@@ -101,10 +101,10 @@ Details: [umgebungen.md](umgebungen.md),
 - [x] Entscheidung (du): U4 Analysen im Browser, also P3.1, P3.2 und die Ansichten Ranking,
       Runs und Titel-Detail vor Phase 2b ziehen. Entschieden am 31.10.2026: ja
 - [x] U4 Analysen im Browser (Pakete unter Phase 3: P3.1, P3.2, P3.4, P3.5, P3.7, P3.6)
-- [ ] U5 Lokaler End-to-End-Test (`make local-e2e`, vor P2b.1)
-  - [ ] U5.1 Replay-Quelle statt Yahoo (`REPLAY_SOURCE`)
-  - [ ] U5.2 E2E-Stack mit Wegwerf-DB, Prüfungen von Mail, API und UI, auch in der CI
-  - [ ] U5.3 Browser-Test des UI (Playwright)
+- [x] U5 Lokaler End-to-End-Test (`make local-e2e`, vor P2b.1) (`3dfa605`)
+  - [x] U5.1 Replay-Quelle statt Yahoo (`REPLAY_SOURCE`)
+  - [x] U5.2 E2E-Stack mit Wegwerf-DB, Prüfungen von Mail, API und UI, auch in der CI
+  - [x] U5.3 Browser-Test des UI (Playwright); dabei behoben: Styles des UI hinter nginx
 
 **Fertig, wenn:** jede neue Implementierung lokal mit echten Daten im Browser und in Mailpit
 geprüft werden kann, bevor sie auf die NAS geht.
