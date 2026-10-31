@@ -17,7 +17,7 @@
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | offen |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
-| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 erledigt, U2 als Nächstes |
+| U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1 erledigt; U4 in Arbeit (P3.1 erledigt), U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
 
 **Reihenfolge:**
@@ -138,7 +138,7 @@ Details: [Implementierungsplan, Phase 3](implementierungsplan.md#phase-3--web-ap
 Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 folgen danach.
 
 - [ ] UI-Bibliothek festlegen (Angular Material oder PrimeNG), vor P3.5
-- [ ] P3.1 Gerüst des web-api (U4)
+- [x] P3.1 Gerüst des web-api (U4) (`5c4e9d1`)
 - [ ] P3.2 Lese-Endpunkte (U4)
 - [ ] P3.3 Profil-Endpunkte und Vorschau (nach Phase 2b)
 - [ ] P3.4 Sicherheitsgrundlagen 🔒 (U4)
