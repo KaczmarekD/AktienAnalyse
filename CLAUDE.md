@@ -118,7 +118,10 @@ Tippfehler.
 `frontend/src/app/api/` entsteht mit hey-api aus dem OpenAPI-Snapshot
 `tests/golden/openapi/v1.json` (`make ui-api`) und wird nie von Hand geändert. Die CI prüft, dass
 er zum Snapshot passt. Ändert sich die API, kommen neuer Snapshot und neuer Client in denselben
-Commit. Das UI ruft nur relative Pfade (`/api/v1/...`) und lädt nichts aus dem Internet.
+Commit. Die API ändert sich nur additiv: `oasdiff breaking` (P3.8, `make api-breaking`) vergleicht
+den Snapshot in der CI mit dem Abzweigpunkt von `main` und bricht bei inkompatiblen Änderungen
+ab. Braucht es einen Bruch, kommt er als `/api/v2`. Das UI ruft nur relative Pfade (`/api/v1/...`)
+und lädt nichts aus dem Internet.
 
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
 `services/market-data/src/va_market_data/adapters/yahoo.py`:

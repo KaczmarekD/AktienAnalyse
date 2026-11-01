@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api ui-install ui ui-api ui-check ui-e2e-install
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api api-breaking ui-install ui ui-api ui-check ui-e2e-install
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -39,6 +39,10 @@ force: ## Wie run, aber ignoriert den Abruf von heute in der DB
 
 api: ## web-api aus der .venv mit Reload, Swagger unter http://localhost:8000/api/docs
 	$(RUN) uvicorn --factory src.web:create_app --reload --host 127.0.0.1 --port 8000
+
+api-breaking: ## REST-API abwaertskompatibel zu main? (oasdiff breaking, P3.8; braucht Docker)
+	git fetch -q origin main
+	bash docker/api-breaking.sh origin/main
 
 # ---------- Qualitaetssicherung ----------------------------------------------
 test: ## Tests laufen lassen

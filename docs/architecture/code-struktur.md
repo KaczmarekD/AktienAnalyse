@@ -211,5 +211,5 @@ wandert nie in diese beiden Pakete.
   jeder Tabelle.
 - **Contracts:** JSON-Schema-Snapshots der Pydantic-Modelle (`tests/golden/contracts/v1/`,
   seit P1.2). Jede Schema-Änderung ist im Diff sichtbar.
-- **web-api:** OpenAPI-Snapshot plus `oasdiff breaking` gegen den letzten Release
-  ([frontend.md](frontend.md)).
+- **web-api:** OpenAPI-Snapshot plus `oasdiff breaking` gegen den Abzweigpunkt von `main`
+  (seit P3.8, [frontend.md](frontend.md)).

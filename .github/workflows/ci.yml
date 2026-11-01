@@ -50,6 +50,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Volle Historie: oasdiff vergleicht mit dem Abzweigpunkt von main (P3.8)
+          fetch-depth: 0
+
+      # P3.8: Die REST-API bleibt unter /api/v1 abwaertskompatibel. Frueh, damit ein Bruch
+      # auffaellt, bevor die Tests laufen. Referenz: der Snapshot am Abzweigpunkt von main.
+      - name: API-Kompatibilitaet (oasdiff breaking gegen main)
+        run: bash docker/api-breaking.sh origin/main
 
       # Python-Version kommt aus .python-version (eine Quelle mit requires-python)
       - name: uv installieren

@@ -123,8 +123,10 @@ enthalten.
 Frontend und Backend werden unabhängig ausgerollt. Deshalb braucht die Schnittstelle Disziplin:
 
 - Die REST-API bleibt unter `/api/v1` versioniert, Änderungen sind additiv.
-- Die CI vergleicht die OpenAPI-Beschreibung mit dem letzten Release (`oasdiff breaking`) und
-  bricht bei inkompatiblen Änderungen ab.
+- Die CI vergleicht den OpenAPI-Snapshot mit dem Stand am Abzweigpunkt von `main`
+  (`oasdiff breaking`, seit P3.8, `docker/api-breaking.sh`, lokal `make api-breaking`) und bricht
+  bei inkompatiblen Änderungen ab: entfernte Pfade, entfernte Pflichtfelder einer Antwort, neue
+  Pflichtfelder einer Anfrage. Neues ist erlaubt.
 - Das WebSocket-Protokoll ist über das Subprotokoll `va.v1` versioniert.
 - Reihenfolge beim Update: erst das Backend (abwärtskompatibel), dann das Frontend.
 

@@ -1394,6 +1394,33 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Test:** CI-Schritt `oasdiff breaking` gegen `main`. Mit einer absichtlich inkompatiblen
   Änderung wird er einmal rot gesehen.
 - **Implementierung:** Workflow-Schritt, Referenz ist die OpenAPI von `main`.
+- **Entwurf (01.11.2026):**
+  - **Werkzeug:** oasdiff v1.34.0 als Docker-Image `tufin/oasdiff`, lokal und in der CI
+    dasselbe. Node oder Go braucht es dafür nicht.
+  - **Vergleich:** `docker/api-breaking.sh` vergleicht den OpenAPI-Snapshot
+    `tests/golden/openapi/v1.json` mit dem Snapshot am Abzweigpunkt von `main` (`git
+    merge-base`). Auf `main` selbst nimmt es den Stand davor. Dass der Snapshot zur App passt,
+    sichert schon `tests/test_openapi.py`.
+  - **Regel:** `--fail-on ERR`. Neue Pfade, Felder und Endpunkte sind erlaubt. Inkompatibel sind
+    etwa entfernte Pfade, entfernte Pflichtfelder einer Antwort und neue Pflichtfelder einer
+    Anfrage.
+  - **CI:** Im Job „Lint + Type-Check + Tests“ früh, gleich nach dem Checkout mit voller
+    Historie. Ein Bruch fällt so auf, bevor die Tests laufen.
+  - **Lokal:** `make api-breaking`.
+  - **Gegenprobe (vorab lokal):**
+    - Der Snapshot gegen sich selbst ergibt Exit 0.
+    - Der Stand vor P3.3 gegen den nach P3.3 ergibt Exit 0, das ist additiv.
+    - Eine Kopie ohne `/api/v1/runs/{run_id}` und ohne `exit_code` in `RunSummary` ergibt
+      Exit 1 mit zwei Fehlern.
+  - **In der CI einmal rot:** Ein Commit auf dem Branch entfernt einen Pfad aus dem Snapshot, ein
+    zweiter nimmt das zurück.
+- **Umgesetzt (01.11.2026):** wie im Entwurf.
+  - Gesehen rot: CI-Lauf 41340270622. Der Schritt „API-Kompatibilität (oasdiff breaking gegen
+    main)“ meldete „api path removed without deprecation“. Nach dem Revert war die CI wieder grün.
+  - Eine absichtliche Änderung am Snapshot färbt zusätzlich die Prüfung „API-Client passt zum
+    OpenAPI-Snapshot“ im Frontend-Job rot. Eine echte inkompatible Änderung käme also nicht nur
+    an oasdiff vorbei.
+  - `.local/oasdiff/` nimmt die beiden verglichenen Fassungen auf (von git ignoriert).
 
 ### Phase 4 – Events und Echtzeit
 
