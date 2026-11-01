@@ -20,6 +20,14 @@ services:
       - /var/lib/postgresql
     ports: !reset []
 
+  nats:
+    container_name: value-analyzer-e2e-nats
+    # Wegwerf wie die Datenbank: JetStream auf tmpfs, kein Port nach aussen
+    volumes: !reset []
+    tmpfs:
+      - /data
+    ports: !reset []
+
   value-analyzer:
     container_name: value-analyzer-e2e
     # CI: das frisch gebaute Image (E2E_APP_IMAGE=value-analyzer:ci)

@@ -66,12 +66,15 @@ def ensure_login_role(url: str, role: str, password: str) -> None:
             verb = "ALTER" if exists else "CREATE"
             raw = conn.connection.dbapi_connection
             assert raw is not None
-            with raw.cursor() as cursor:
+            cursor = raw.cursor()
+            try:
                 cursor.execute(
                     sql.SQL(verb + " ROLE {} WITH LOGIN PASSWORD {}").format(
                         sql.Identifier(role), sql.Literal(password)
                     )
                 )
+            finally:
+                cursor.close()
     finally:
         engine.dispose()
 

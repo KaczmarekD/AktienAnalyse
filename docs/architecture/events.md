@@ -2,6 +2,8 @@
 
 > **Status:** Plan (30.09.2026). Ab Phase 1 mit einem Bus im Prozess, ab Phase 4 über NATS, siehe
 > [Roadmap](roadmap.md). Entscheidung: [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
+> Seit P4.1 (01.11.2026) gibt es den NATS-Dienst und die Provisionierung von Stream und Consumern
+> (`va_platform.nats`). Die Events laufen ab P4.3 darüber.
 
 ## Grundprinzipien
 

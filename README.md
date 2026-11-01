@@ -214,6 +214,8 @@ make ui             # Frontend mit Reload unter http://localhost:4200, Daten vom
 make check          # ruff + pyright + import-linter + pytest (DB-Tests ohne DB übersprungen)
 make test-db-up     # Wegwerf-Postgres auf Port 55432 (Docker)
 make test-db        # alle Tests inkl. DB-Tests
+make test-nats-up   # Wegwerf-NATS mit JetStream auf Port 54222 (Docker)
+make test-nats      # Integrationstests der JetStream-Provisionierung (P4.1)
 make test-cov       # Tests mit Coverage-HTML-Report
 make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Dependency-Upgrades
 ```

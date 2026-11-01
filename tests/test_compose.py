@@ -152,6 +152,7 @@ class TestLocalStack:
         }
         assert published == {
             ("db", "5432", "127.0.0.1"),
+            ("nats", "4222", "127.0.0.1"),  # P4.1: fuer make run/api aus der .venv
             ("mailpit", "8025", "127.0.0.1"),
             ("mailpit", "1025", "127.0.0.1"),
             ("pgweb", "8081", "127.0.0.1"),
@@ -181,6 +182,7 @@ class TestLocalStack:
     def test_database_and_logs_are_separate_from_the_nas(self, local):
         db = _mounts(local["services"]["db"])
         assert db["/var/lib/postgresql"].endswith("/.local/pgdata")
+        assert _mounts(local["services"]["nats"])["/data"].endswith("/.local/natsdata")
         batch = _mounts(local["services"]["value-analyzer"])
         assert batch["/app/logs"].endswith("/.local/logs")
         assert batch["/app/data"].endswith("/data")
@@ -249,8 +251,17 @@ class TestNasDefinition:
         assert "profiles" not in batch
 
     def test_services_on_the_nas(self, nas):
-        # Batch, Datenbank und seit P3.6 das UI: frontend (nginx) vor dem web-api
-        assert set(nas["services"]) == {"db", "value-analyzer", "web-api", "frontend"}
+        # Batch, Datenbank, seit P3.6 das UI (frontend vor dem web-api), seit P4.1 NATS
+        assert set(nas["services"]) == {"db", "value-analyzer", "web-api", "frontend", "nats"}
+
+    def test_nats_with_jetstream_and_its_own_data(self, nas):
+        # P4.1: fester Stand, Daten unter ./natsdata, nur im Docker-Netz erreichbar
+        nats = nas["services"]["nats"]
+        assert nats["image"] == "nats:2.15.1-alpine"
+        assert "-js" in nats["command"]
+        assert _mounts(nats)["/data"].endswith("/natsdata")
+        assert "ports" not in nats
+        assert "healthcheck" in nats
 
     def test_mail_healthcheck_and_lan_come_from_the_env(self, nas):
         env = nas["services"]["value-analyzer"]["environment"]
@@ -315,7 +326,20 @@ class TestE2eStack:
 
     def test_services(self, e2e):
         # pgweb braucht der Test nicht
-        assert set(e2e["services"]) == {"db", "value-analyzer", "web-api", "frontend", "mailpit"}
+        assert set(e2e["services"]) == {
+            "db",
+            "value-analyzer",
+            "web-api",
+            "frontend",
+            "mailpit",
+            "nats",
+        }
+
+    def test_nats_is_thrown_away_too(self, e2e):
+        nats = e2e["services"]["nats"]
+        assert "/data" not in _mounts(nats)
+        assert any(str(t).startswith("/data") for t in nats["tmpfs"])
+        assert "ports" not in nats
 
     def test_database_is_thrown_away(self, e2e):
         db = e2e["services"]["db"]

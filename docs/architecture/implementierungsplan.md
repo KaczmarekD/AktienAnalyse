@@ -1430,6 +1430,52 @@ prüft dieses Paket, für jede gespeicherte Woche.
   Subjects `va.>` und das Deduplizierungsfenster. Die Consumer werden idempotent angelegt.
 - **Implementierung:** Compose-Dienst und Provisionierung in `va-platform`
   ([events.md](events.md)).
+- **Entwurf (01.11.2026):**
+  - **Versionen:** NATS Server 2.15.1 (`nats:2.15.1-alpine`, ein Go-Binary ohne AVX) und der
+    Client `nats-py` 2.16.0. Diese Abhängigkeit kommt in `va-platform` dazu. FastStream folgt erst
+    mit P4.3, wenn NATS der Bus wird.
+  - **Provisionierung** in `va_platform.nats`:
+    - `provision(js)` legt Stream und Consumer an oder gleicht sie an die Vorgabe an. Ein
+      zweiter Aufruf ändert nichts.
+    - Stream `VA_EVENTS`: Subjects `va.>`, Speicherung in Dateien, Aufbewahrung 30 Tage,
+      Deduplizierung 10 Minuten. Flüchtige Meldungen (`live.va.…`) landen nicht darin.
+    - Durable Pull-Consumer aus der Tabelle in events.md, alle mit explizitem Ack und
+      `max_deliver` 5:
+      - `market-data` (`va.screening.run.requested`): Der Abruf dauert Minuten,
+        In-Progress-Acks kommen mit P4.3.
+      - `scoring` (`va.marketdata.snapshot.completed`).
+      - `notification` (`va.scoring.run.completed`, `va.screening.run.failed`).
+      - `web-api` (`va.>`).
+    - Aufruf von der Kommandozeile: `python -m va_platform.nats` mit `NATS_URL`, lokal
+      `make nats-provision`. Die Services rufen `provision` ab P4.3 beim Start selbst.
+  - **Compose:**
+    - Dienst `nats` mit JetStream und Daten unter `./natsdata`, ohne Port nach außen,
+      Healthcheck über `/healthz`.
+    - Lokal: `.local/natsdata` und Port `127.0.0.1:4222`. Im E2E-Stack auf tmpfs.
+    - Bis P4.3 nutzt ihn noch niemand.
+  - **Test (rot):** Integrationstests gegen einen echten NATS-Server.
+    - Ohne `TEST_NATS_URL` überspringen sie sich, wie die DB-Tests. Lokal
+      `make test-nats-up` (Port 54222), in der CI ein Container mit `-js`.
+    - Geprüft wird:
+      - Der Stream hat Subjects, Aufbewahrung, Deduplizierung und Dateispeicher.
+      - Ein zweiter Aufruf ändert nichts, eine abweichende Einstellung wird angeglichen.
+      - Alle Consumer existieren mit Filter, Ack und `max_deliver`.
+      - Dieselbe `Nats-Msg-Id` landet nur einmal im Stream.
+      - `live.va.…` landet nicht im Stream.
+    - Compose: `nats` mit fester Version, auf der NAS ohne Port, lokal getrennte Daten, im
+      E2E-Stack auf tmpfs.
+- **Umgesetzt (01.11.2026):** wie im Entwurf.
+  - Alle Consumer warten 60 s auf ein Ack (`ack_wait`). Länger braucht nur market-data, und das
+    regelt P4.3 über In-Progress-Acks.
+  - Ein Stream wird nur in den eigenen Feldern angeglichen (Subjects, Aufbewahrung,
+    Deduplizierung). Die übrigen behalten die Werte des Servers.
+  - Ein Consumer mit abweichendem Filter, Ack oder `max_deliver` wird über dieselbe Anfrage
+    geändert (NATS ab 2.10).
+  - nats-py meldet bei der ersten Nachricht `duplicate=None` statt `False`, die Tests prüfen
+    deshalb auf falsy.
+  - Der Healthcheck (`wget` auf `/healthz?js-enabled-only=true`) ist im Image ausprobiert.
+  - **NAS:** Beim nächsten `make up` startet `nats` mit, Daten unter `./natsdata`. Den Ordner
+    sollte Hyper Backup mitsichern, er ist aber nicht die Wahrheit, die liegt in Postgres.
 
 #### P4.2 Outbox und Inbox
 

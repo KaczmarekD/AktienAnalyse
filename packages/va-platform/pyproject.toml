@@ -9,6 +9,7 @@ dependencies = [
     "psycopg[binary]>=3.3,<4",  # die Engine erzwingt postgresql+psycopg (P1.10)
     "numpy>=2.3.2,<3",  # serialization
     "pandas>=3.0,<4",  # serialization
+    "nats-py>=2.16,<3",  # JetStream-Provisionierung (P4.1), reines Python ohne AVX
 ]
 
 [build-system]

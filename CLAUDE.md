@@ -39,6 +39,10 @@ Prozess, denn `va_web_api` darf `va_scoring` nicht importieren (ab Phase 4 per N
 laufen auf der NAS
 web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
 nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
+Seit P4.1 läuft im Compose auch `nats` (NATS 2.15 mit JetStream, Daten unter `./natsdata`, nur
+im Docker-Netz). `python -m va_platform.nats` legt Stream `VA_EVENTS` und die Consumer aus
+[docs/architecture/events.md](docs/architecture/events.md) an. Bis P4.3 nutzt ihn noch niemand,
+die Kette läuft weiter über den Bus im Prozess.
 `make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
 tmpfs, in dem der Batch eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, nur mit
 `SMTP_PLAIN` und ohne Healthcheck erlaubt).
@@ -365,7 +369,9 @@ SQLite oder Mocks – Trigger, Rollenrechte und `DISTINCT ON` sind der
 eigentliche Prüfgegenstand. Jede Testfunktion bekommt eine frische DB aus
 einer migrierten Vorlage (Löschen ist ja verboten). Ohne `TEST_DATABASE_URL`
 werden sie übersprungen; lokal `make test-db-up && make test-db`, in CI
-per Postgres-Service-Container.
+per Postgres-Service-Container. Genauso laufen die NATS-Integrationstests
+(`packages/va-platform/tests/test_nats_provision.py`) nur mit `TEST_NATS_URL`: lokal
+`make test-nats-up && make test-nats`, in der CI ein Container mit `-js`.
 
 **Replay-Regression** (`src/regression/`, P2b.0): Weil die DB nie löscht, ist jede gespeicherte
 Woche ein Testfall. `python -m src.regression` (`make regression`) schickt die Snapshots eines

@@ -31,3 +31,6 @@ pytest-cache-files-*/
 .vscode/
 .idea/
 .claude/
+
+# JetStream der NAS-Definition (P4.1), wie pgdata/
+natsdata/

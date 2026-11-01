@@ -23,6 +23,15 @@ services:
     ports: !override
       - "127.0.0.1:${LOCAL_DB_PORT:-5432}:5432"
 
+  nats:
+    container_name: value-analyzer-local-nats
+    # Eigene Daten, getrennt von ./natsdata der NAS-Definition
+    volumes: !override
+      - ./.local/natsdata:/data
+    # Fuer make run/api und make nats-provision aus der .venv
+    ports:
+      - "127.0.0.1:4222:4222"
+
   value-analyzer:
     container_name: value-analyzer-local
     # Aus dem Arbeitsstand gebaut statt aus GHCR

@@ -30,6 +30,22 @@ services:
       retries: 12
     shm_size: 128mb
 
+  nats:
+    # Event-Bus (Phase 4, ADR-0002): JetStream mit Daten in ./natsdata (wie pgdata: Bind-Mount,
+    # Hyper Backup sichert ihn mit). Nur im Docker-Netz erreichbar. Bis P4.3 nutzt ihn noch
+    # niemand; Stream und Consumer legt python -m va_platform.nats an (P4.1).
+    image: nats:2.15.1-alpine
+    container_name: value-analyzer-nats
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - ./natsdata:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
   value-analyzer:
     # Fertiges Image aus der CI (P0.6b, ADR-0008) - die NAS baut nicht selbst.
     # VERSION in der .env: latest folgt main, sha-<commit> oder eine Version pinnt.

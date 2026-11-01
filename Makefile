@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api api-breaking ui-install ui ui-api ui-check ui-e2e-install
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down test-nats test-nats-up test-nats-down nats-provision lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api api-breaking ui-install ui ui-api ui-check ui-e2e-install
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -79,6 +79,21 @@ test-db: ## Alle Tests inkl. DB-Tests (vorher: make test-db-up)
 
 test-db-down: ## Wegwerf-Postgres stoppen (entfernt nur den Test-Container)
 	docker stop va-test-pg
+
+# Wegwerf-NATS mit JetStream fuer die Integrationstests (P4.1); gleiche Version wie im Compose
+TEST_NATS_URL ?= nats://127.0.0.1:54222
+
+test-nats-up: ## Wegwerf-NATS mit JetStream fuer Tests starten (Port 54222)
+	docker run -d --rm --name va-test-nats -p 54222:4222 nats:2.15.1-alpine -js
+
+test-nats: ## Integrationstests gegen NATS (vorher: make test-nats-up)
+	TEST_NATS_URL=$(TEST_NATS_URL) $(RUN) pytest packages/va-platform/tests/test_nats_provision.py
+
+test-nats-down: ## Wegwerf-NATS stoppen (entfernt nur den Test-Container)
+	docker stop va-test-nats
+
+nats-provision: ## Stream und Consumer im lokalen NATS anlegen bzw. angleichen (P4.1)
+	NATS_URL=nats://127.0.0.1:4222 $(RUN) python -m va_platform.nats
 
 # J4125 der NAS (ADR-0008): kein AVX/AVX2. Die Stufe j4125-check im Dockerfile ist das
 # App-Image plus QEMU; Python laeuft dort mit einem CPU-Modell ohne AVX. Braucht ein Paket
