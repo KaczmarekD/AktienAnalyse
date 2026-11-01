@@ -22,13 +22,13 @@ describe('App', () => {
     expect(toolbar?.textContent).toContain('Value-Analyzer');
   });
 
-  it('links to ranking and runs', async () => {
+  it('links to ranking, runs and profiles', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const links = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('nav a'),
     ).map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/ranking', '/runs']);
+    expect(links).toEqual(['/ranking', '/runs', '/profiles']);
   });
 
   it('provides the HTTP client for the generated API', () => {

@@ -1,0 +1,281 @@
+<p><a routerLink="/profiles">← Alle Profile</a></p>
+
+@if (loadError(); as message) {
+  <p class="message">{{ message }}</p>
+} @else if (profile(); as profile) {
+  <h1>
+    {{ profile.name }}
+    @if (profile.active_version !== null) {
+      <span class="badge">aktiv: v{{ profile.active_version }}</span>
+    }
+  </h1>
+  <p class="basis">Grundlage: Version {{ basedOn() }}. Speichern legt eine neue Version an.</p>
+
+  @if (notice(); as notice) {
+    <p class="notice" role="status">{{ notice }}</p>
+  }
+  @if (conflict()) {
+    <div class="conflict" role="alert">
+      <span>
+        Inzwischen wurde eine neuere Version gespeichert. Neu laden verwirft die Änderungen hier.
+      </span>
+      <button matButton="outlined" type="button" data-action="reload" (click)="reload()">
+        Neu laden
+      </button>
+    </div>
+  }
+
+  <div class="layout">
+    <section class="editor" aria-label="Parameter">
+      <h2>Gewichtung und Schwellen</h2>
+
+      <mat-form-field>
+        <mat-label>Value-Gewicht (0 bis 1)</mat-label>
+        <input
+          matInput
+          type="number"
+          data-field="value_weight"
+          step="0.05"
+          [formField]="form.value_weight"
+        />
+        <mat-hint
+          >{{ model().value_weight | percent }} Value, {{ quality() | percent }} Quality</mat-hint
+        >
+      </mat-form-field>
+      @for (message of errorsOf('value_weight'); track $index) {
+        <p class="field-error" data-error="value_weight">{{ message }}</p>
+      }
+
+      <mat-form-field>
+        <mat-label>Mindest-Marktkapitalisierung (EUR)</mat-label>
+        <input
+          matInput
+          type="number"
+          data-field="min_market_cap"
+          step="50000000"
+          [formField]="form.min_market_cap"
+        />
+        <mat-hint>{{ model().min_market_cap | mrd }} EUR</mat-hint>
+      </mat-form-field>
+      @for (message of errorsOf('min_market_cap'); track $index) {
+        <p class="field-error" data-error="min_market_cap">{{ message }}</p>
+      }
+
+      <mat-form-field>
+        <mat-label>Mindestanteil Value-Faktoren (0 bis 1)</mat-label>
+        <input
+          matInput
+          type="number"
+          data-field="min_value_factor_share"
+          step="0.05"
+          [formField]="form.min_value_factor_share"
+        />
+      </mat-form-field>
+      @for (message of errorsOf('min_value_factor_share'); track $index) {
+        <p class="field-error" data-error="min_value_factor_share">{{ message }}</p>
+      }
+
+      <mat-form-field>
+        <mat-label>Mindestanteil Quality-Faktoren (0 bis 1)</mat-label>
+        <input
+          matInput
+          type="number"
+          data-field="min_quality_factor_share"
+          step="0.05"
+          [formField]="form.min_quality_factor_share"
+        />
+      </mat-form-field>
+      @for (message of errorsOf('min_quality_factor_share'); track $index) {
+        <p class="field-error" data-error="min_quality_factor_share">{{ message }}</p>
+      }
+
+      <mat-form-field>
+        <mat-label>Value-Trap ab Value-Score</mat-label>
+        <input
+          matInput
+          type="number"
+          data-field="value_trap_value_threshold"
+          step="0.05"
+          [formField]="form.value_trap_value_threshold"
+        />
+      </mat-form-field>
+      @for (message of errorsOf('value_trap_value_threshold'); track $index) {
+        <p class="field-error" data-error="value_trap_value_threshold">{{ message }}</p>
+      }
+
+      <mat-form-field>
+        <mat-label>Value-Trap bis Quality-Score</mat-label>
+        <input
+          matInput
+          type="number"
+          data-field="value_trap_quality_threshold"
+          step="0.05"
+          [formField]="form.value_trap_quality_threshold"
+        />
+      </mat-form-field>
+      @for (message of errorsOf('value_trap_quality_threshold'); track $index) {
+        <p class="field-error" data-error="value_trap_quality_threshold">{{ message }}</p>
+      }
+
+      <mat-checkbox
+        [checked]="model().drop_negative_value_metrics"
+        (change)="setDropNegative($event.checked)"
+      >
+        Negative Multiples aus dem Value-Ranking ausschließen
+      </mat-checkbox>
+
+      <h2>Value-Faktoren</h2>
+      @for (factor of valueFactors(); track factor.key) {
+        <div class="factor" [attr.data-factor]="factor.key">
+          <mat-checkbox
+            [checked]="isActive('value', factor.key)"
+            (change)="toggleFactor('value', factor.key, $event.checked)"
+          >
+            {{ factor.label }} <span class="direction">({{ direction(factor) }})</span>
+          </mat-checkbox>
+          <p class="hint">{{ factor.hint }}</p>
+        </div>
+      }
+
+      <h2>Quality-Faktoren</h2>
+      @for (factor of qualityFactors(); track factor.key) {
+        <div class="factor" [attr.data-factor]="factor.key">
+          <mat-checkbox
+            [checked]="isActive('quality', factor.key)"
+            (change)="toggleFactor('quality', factor.key, $event.checked)"
+          >
+            {{ factor.label }} <span class="direction">({{ direction(factor) }})</span>
+          </mat-checkbox>
+          <p class="hint">{{ factor.hint }}</p>
+        </div>
+      }
+
+      <mat-form-field class="comment">
+        <mat-label>Kommentar zur neuen Version</mat-label>
+        <textarea
+          matInput
+          data-field="comment"
+          rows="2"
+          [value]="comment()"
+          (input)="onComment($event)"
+        ></textarea>
+      </mat-form-field>
+
+      @if (ruleViolation(); as rule) {
+        <p class="field-error" role="alert">{{ rule }}</p>
+      }
+      <button
+        matButton="filled"
+        type="button"
+        data-action="save"
+        [disabled]="!canSave()"
+        (click)="save()"
+      >
+        Als neue Version speichern
+      </button>
+    </section>
+
+    <section class="preview" aria-label="Vorschau">
+      <h2>Vorschau gegen das aktive Profil</h2>
+      @if (previewError(); as message) {
+        <p class="message">{{ message }}</p>
+      } @else if (preview(); as preview) {
+        <p class="message">
+          Abruf vom {{ preview.fetched_on | date: 'dd.MM.yyyy' }}, verglichen mit
+          {{
+            preview.active
+              ? preview.active.name + ' v' + preview.active.version
+              : 'den Standardwerten'
+          }}.
+        </p>
+        @if (preview.entered.length === 0 && preview.left.length === 0) {
+          <p>Keine Änderung in den Top {{ preview.top }}.</p>
+        }
+        @if (preview.entered.length > 0) {
+          <p>
+            Neu in den Top {{ preview.top }}:
+            @for (symbol of preview.entered; track symbol; let last = $last) {
+              {{ nameOf(symbol) }}{{ last ? '' : ', ' }}
+            }
+          </p>
+        }
+        @if (preview.left.length > 0) {
+          <p>
+            Nicht mehr in den Top {{ preview.top }}:
+            @for (symbol of preview.left; track symbol; let last = $last) {
+              {{ nameOf(symbol) }}{{ last ? '' : ', ' }}
+            }
+          </p>
+        }
+        @if (preview.trap_changed.length > 0) {
+          <p>
+            Value-Trap geändert:
+            @for (symbol of preview.trap_changed; track symbol; let last = $last) {
+              {{ nameOf(symbol) }}{{ last ? '' : ', ' }}
+            }
+          </p>
+        }
+        <table>
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>vorher</th>
+              <th>Titel</th>
+              <th>Composite</th>
+              <th>Hinweis</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of topRows(); track row.symbol) {
+              <tr [attr.data-symbol]="row.symbol">
+                <td>{{ row.rank }}</td>
+                <td class="delta">{{ delta(row.rank, row.rank_active) }}</td>
+                <td>{{ row.name ?? row.symbol }}</td>
+                <td>{{ row.composite_score | num }}</td>
+                <td>{{ row.value_trap_flag ? 'Value-Trap?' : '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="message">Die Vorschau erscheint, sobald die Parameter gültig sind.</p>
+      }
+    </section>
+  </div>
+
+  <section class="versions" aria-label="Versionen">
+    <h2>Versionen</h2>
+    <p class="hint">
+      Aktivieren wirkt ab dem nächsten Lauf; eine ältere Version zu aktivieren ist das Zurückrollen.
+    </p>
+    <ul>
+      @for (version of profile.versions; track version.version) {
+        <li [attr.data-version]="version.version">
+          <strong>Version {{ version.version }}</strong>
+          <span>{{ version.created_at | date: 'dd.MM.yyyy HH:mm' }}</span>
+          @if (version.parent_version !== null) {
+            <span>auf Basis von v{{ version.parent_version }}</span>
+          }
+          @if (version.comment) {
+            <span class="comment-text">{{ version.comment }}</span>
+          }
+          @if (version.active) {
+            <span class="badge">aktiv</span>
+          } @else {
+            <button
+              matButton
+              type="button"
+              [attr.data-activate]="version.version"
+              [disabled]="busy()"
+              (click)="activate(version.version)"
+            >
+              Aktivieren
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+} @else {
+  <p class="message">Lade das Profil …</p>
+}

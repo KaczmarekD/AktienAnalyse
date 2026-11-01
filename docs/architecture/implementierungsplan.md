@@ -1307,6 +1307,56 @@ prüft dieses Paket, für jede gespeicherte Woche.
   Filter, Validierungsmeldungen, Aufruf der Vorschau, Umgang mit 409.
 - **Implementierung:** Ranking, Runs, Titel-Detail und der Profil-Editor (Signal Forms mit
   `validateStandardSchema`).
+- **Entwurf Profil-Editor (01.11.2026):** auf den Endpunkten aus P3.3 und dem erzeugten Client.
+  - **Routen:**
+    - `/profiles` zeigt die Profile mit neuester Version und markiert das aktive.
+    - `/profiles/:profileId` öffnet den Editor.
+    - In der Navigation steht „Profile“.
+  - **Formular:**
+    - Signal Forms (`form`, `[formField]`), geprüft mit `validateStandardSchema` und dem
+      erzeugten `zProfileParamsV1Input`. Die Meldungen stehen am Feld.
+    - Felder: Value-Gewicht (Quality als Rest daneben), Mindest-Marktkapitalisierung,
+      Mindestanteile, Value-Trap-Schwellen, Ausschluss negativer Multiples.
+    - Die Faktoren erscheinen als Checkboxen je Gruppe, mit Richtung und Methodik-Hinweis aus
+      `/scoring/factors`.
+    - Grundlage ist die neueste Version. Beim Laden und nach dem Speichern füllt sie das
+      Formular.
+  - **Live-Vorschau:**
+    - 300 ms nach der letzten Änderung geht die Anfrage an `/scoring/preview`, nur bei gültigem
+      Formular. Die Wartezeit ist ein Token, Tests setzen sie auf 0.
+    - Angezeigt werden neu und raus in den Top 20, geänderte Value-Trap-Markierungen und die
+      Top 20 mit Rang vorher und nachher.
+    - Regeln über mehrere Felder, etwa „mindestens 2 Faktoren“, meldet die Vorschau als 422.
+      Die Meldung erscheint im Editor, Speichern ist dann gesperrt. Die Regel steht so nur im
+      Contract.
+  - **Speichern:**
+    - Ein `PUT` mit `If-Match` der Grundlage und optionalem Kommentar.
+    - 201: Das Profil lädt neu, Hinweis „Version n gespeichert, noch nicht aktiv“.
+    - 409: Hinweis, dass inzwischen eine neuere Version gespeichert wurde, mit „Neu laden“.
+  - **Versionen:**
+    - Die Liste zeigt die neueste zuerst, mit Datum, Kommentar und Grundlage. Die aktive ist
+      markiert.
+    - „Aktivieren“ gibt es je Version, auch für ältere (Zurückrollen). Hinweis: Das wirkt ab
+      dem nächsten Lauf.
+  - **Test (rot):** Komponententests mit `HttpTestingController`:
+    - Liste.
+    - Der Editor lädt die neueste Version ins Formular.
+    - Ein ungültiger Wert zeigt eine Meldung und schickt keine Vorschau.
+    - Die Vorschau nach einer Änderung.
+    - Eine 422 erscheint als Meldung.
+    - Speichern mit `If-Match` und Kommentar.
+    - Eine 409 bietet „Neu laden“ an.
+    - Aktivieren.
+    - Im Browser-Test (`frontend/e2e`) ändert ein Lauf das Gewicht, sieht die Vorschau,
+      speichert und findet v2 in der Liste.
+- **Profil-Editor umgesetzt (01.11.2026):** wie im Entwurf.
+  - Signal Forms verbieten `name`, `min` und `max` an Feldern, die `[formField]` steuert. Die
+    Grenzen kommen aus dem Schema, Tests finden die Felder über `data-field`.
+  - Die erzeugten Ausgabe-Typen haben wegen der Standardwerte optionale Felder. Das Formular
+    normalisiert die Parameter deshalb über `zProfileParamsV1Input`.
+  - Zod meldet auf Deutsch (`z.config(z.locales.de())` in `locale.ts`).
+  - Der Browser-Test speichert nur im Wegwerf-Stack (`E2E_FIXTURE` gesetzt), nie in
+    `make local-check`.
 - **Umgesetzt für U4 (31.10.2026), ohne den Profil-Editor:**
   - Komponententests rot in `5a80ca3`, 24 Tests für drei Ansichten. Sie laufen gegen
     `HttpTestingController`, mit Beispieldaten im Format des generierten Clients.

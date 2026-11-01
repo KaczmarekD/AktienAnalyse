@@ -106,3 +106,33 @@ test('Lauf-Detail zeigt die Mail abgeschottet im iframe', async ({ page, request
     page.frameLocator('iframe[title="Mail des Laufs"]').locator('table').first(),
   ).toBeVisible();
 });
+
+interface ProfileSummary {
+  id: number;
+  name: string;
+  latest_version: number | null;
+}
+
+test('Profil-Editor: Vorschau, Speichern, neue Version in der Liste', async ({ page, request }) => {
+  // Legt eine Profil-Version an: nur im Wegwerf-Stack (make local-e2e, CI), nie im lokalen
+  test.skip(!process.env['E2E_FIXTURE'], 'schreibt in die Datenbank');
+  const profiles = await getJson<ProfileSummary[]>(request, '/api/v1/scoring/profiles');
+  const standard = profiles.find((profile) => profile.name === 'Standard');
+  if (standard === undefined || standard.latest_version === null) {
+    throw new Error('kein Profil Standard');
+  }
+  const next = standard.latest_version + 1;
+
+  await page.goto('/profiles');
+  await page.getByRole('link', { name: 'Standard', exact: true }).click();
+  await expect(page).toHaveURL(`/profiles/${standard.id}`);
+  await expect(page.getByText(`Grundlage: Version ${standard.latest_version}`)).toBeVisible();
+
+  await page.locator('[data-field="value_weight"]').fill('0.3');
+  await expect(page.locator('section.preview tbody tr').first()).toBeVisible();
+  await page.locator('[data-field="comment"]').fill('Browser-Test');
+  await page.locator('button[data-action="save"]').click();
+
+  await expect(page.getByText(`Version ${next} gespeichert`)).toBeVisible();
+  await expect(page.locator(`[data-version="${next}"]`)).toContainText('Browser-Test');
+});

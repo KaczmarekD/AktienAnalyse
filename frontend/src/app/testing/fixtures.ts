@@ -1,6 +1,12 @@
 // Beispieldaten im Format des web-api (Typen aus dem generierten Client).
 import type {
+  Factor,
   Instrument,
+  Preview,
+  PreviewRow,
+  ProfileDetail,
+  ProfileParamsV1Output,
+  ProfileSummary,
   Ranking,
   RankingRow,
   Report,
@@ -168,5 +174,159 @@ export const INSTRUMENT: Instrument = {
       composite_score: 0.71,
     }),
     point({ scoring_run_id: 2 }),
+  ],
+};
+
+// --- Scoring-Profile (P3.3, Editor in P3.7) --------------------------------------------------
+
+export const PARAMS: ProfileParamsV1Output = {
+  value_weight: 0.6,
+  min_market_cap: 300_000_000,
+  min_value_factor_share: 0.5,
+  min_quality_factor_share: 0.5,
+  min_factor_count: 2,
+  value_trap_value_threshold: 0.7,
+  value_trap_quality_threshold: 0.3,
+  drop_negative_value_metrics: true,
+  value_factors: ['ev_ebit', 'p_fcf', 'pb', 'shareholder_yield'],
+  quality_factors: [
+    'earnings_stability',
+    'fcf_margin',
+    'net_debt_ebitda',
+    'operating_margin',
+    'roic',
+  ],
+};
+
+export const PROFILES: ProfileSummary[] = [
+  {
+    id: 1,
+    name: 'Standard',
+    created_at: '2026-10-31T06:30:00+00:00',
+    latest_version: 2,
+    active_version: 1,
+  },
+  {
+    id: 2,
+    name: 'Defensiv',
+    created_at: '2026-11-01T08:00:00+00:00',
+    latest_version: 1,
+    active_version: null,
+  },
+];
+
+export const PROFILE: ProfileDetail = {
+  ...PROFILES[0],
+  versions: [
+    {
+      version: 2,
+      params: { ...PARAMS, value_weight: 0.5 },
+      parent_version: 1,
+      comment: 'mehr Quality',
+      created_at: '2026-11-01T09:00:00+00:00',
+      active: false,
+    },
+    {
+      version: 1,
+      params: PARAMS,
+      parent_version: null,
+      comment: 'Startwerte aus ENV',
+      created_at: '2026-10-31T06:30:00+00:00',
+      active: true,
+    },
+  ],
+};
+
+export const FACTORS: Factor[] = [
+  {
+    key: 'ev_ebit',
+    group: 'value',
+    label: 'EV/EBIT',
+    better: 'low',
+    hint: 'Unternehmenswert zu EBIT.',
+  },
+  { key: 'pb', group: 'value', label: 'Kurs-Buchwert', better: 'low', hint: 'Kurs zu Buchwert.' },
+  { key: 'p_fcf', group: 'value', label: 'Kurs/Free Cashflow', better: 'low', hint: 'FCF.' },
+  {
+    key: 'shareholder_yield',
+    group: 'value',
+    label: 'Shareholder Yield',
+    better: 'high',
+    hint: 'Dividende plus Rueckkaeufe.',
+  },
+  { key: 'roic', group: 'quality', label: 'ROIC', better: 'high', hint: 'Kapitalrendite.' },
+  {
+    key: 'fcf_margin',
+    group: 'quality',
+    label: 'FCF-Marge',
+    better: 'high',
+    hint: 'FCF zu Umsatz.',
+  },
+  {
+    key: 'operating_margin',
+    group: 'quality',
+    label: 'Operative Marge',
+    better: 'high',
+    hint: 'EBIT zu Umsatz.',
+  },
+  {
+    key: 'net_debt_ebitda',
+    group: 'quality',
+    label: 'Net Debt/EBITDA',
+    better: 'low',
+    hint: 'Verschuldung.',
+  },
+  {
+    key: 'earnings_stability',
+    group: 'quality',
+    label: 'Gewinnstabilitaet',
+    better: 'high',
+    hint: 'Schwankung.',
+  },
+];
+
+function previewRow(values: Partial<PreviewRow> & Pick<PreviewRow, 'symbol'>): PreviewRow {
+  return {
+    name: null,
+    index: 'DAX',
+    passed_filter: true,
+    rank: null,
+    rank_active: null,
+    composite_score: null,
+    value_score: null,
+    quality_score: null,
+    value_trap_flag: false,
+    value_trap_flag_active: false,
+    ...values,
+  };
+}
+
+export const PREVIEW: Preview = {
+  scoring_run_id: 7,
+  fetch_run_id: 5,
+  fetched_on: '2026-10-30',
+  active: { profile_id: 1, name: 'Standard', version: 1 },
+  top: 20,
+  entered: ['SAP.DE'],
+  left: ['DBK.DE'],
+  trap_changed: ['BAS.DE'],
+  rows: [
+    previewRow({
+      symbol: 'ALV.DE',
+      name: 'Allianz',
+      rank: 1,
+      rank_active: 1,
+      composite_score: 0.78,
+    }),
+    previewRow({ symbol: 'SAP.DE', name: 'SAP', rank: 2, rank_active: 25, composite_score: 0.74 }),
+    previewRow({
+      symbol: 'BAS.DE',
+      name: 'BASF',
+      rank: 3,
+      rank_active: 3,
+      composite_score: 0.7,
+      value_trap_flag: true,
+      value_trap_flag_active: false,
+    }),
   ],
 };

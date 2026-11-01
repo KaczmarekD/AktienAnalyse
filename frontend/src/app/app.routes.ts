@@ -24,6 +24,16 @@ export const routes: Routes = [
     loadComponent: () => import('./runs/run-detail-page').then((m) => m.RunDetailPage),
   },
   {
+    path: 'profiles',
+    title: 'Profile · Value-Analyzer',
+    loadComponent: () => import('./profiles/profiles-page').then((m) => m.ProfilesPage),
+  },
+  {
+    path: 'profiles/:profileId',
+    title: 'Profil · Value-Analyzer',
+    loadComponent: () => import('./profiles/profile-editor-page').then((m) => m.ProfileEditorPage),
+  },
+  {
     path: 'instruments/:symbol',
     title: 'Titel · Value-Analyzer',
     loadComponent: () => import('./instruments/instrument-page').then((m) => m.InstrumentPage),

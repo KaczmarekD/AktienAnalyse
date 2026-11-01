@@ -144,5 +144,9 @@ Seit P3.5 (Code unter `frontend/`, Befehle in [frontend/README.md](../../fronten
   CI erzeugt ihn neu und bricht ab, wenn er nicht zum Snapshot passt.
 - Die Operation-IDs der API sind die Funktionsnamen des web-api, daraus entstehen die Namen im
   Client.
+- Profil-Editor (seit P3.7, `/profiles`): Signal Forms (`form`, `[formField]`), geprüft mit
+  `validateStandardSchema` und dem erzeugten `zProfileParamsV1Input`, Meldungen auf Deutsch. Die
+  Live-Vorschau wartet 300 ms (`PREVIEW_DEBOUNCE_MS`). Speichern schickt `If-Match`, eine 409
+  bietet „Neu laden“ an.
 - Keine Ressourcen aus dem Internet: Systemschrift statt Roboto von Google Fonts, keine Icon-Fonts
   von außen. Das UI läuft im LAN, und jeder Aufruf ginge sonst an Google.
