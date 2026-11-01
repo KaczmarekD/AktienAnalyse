@@ -13,8 +13,8 @@
 | 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
 | 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1), NAS: neues Image laden |
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
-| 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; Editor mit P3.3; NAS: Deployment |
-| 3 | web-api + Angular (UI im LAN, Profil-Editor) | 🚧 Lese-Teile über U4 erledigt (P3.1, P3.2, P3.4–P3.7), offen: P3.3 und Profil-Editor (Phase 2b ist fertig), P3.8; NAS: Deployment |
+| 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; API seit P3.3, Editor im UI offen; NAS: Deployment |
+| 3 | web-api + Angular (UI im LAN, Profil-Editor) | 🚧 P3.1–P3.7 erledigt bis auf den Profil-Editor im UI (Rest von P3.7); offen: Profil-Editor, P3.8; NAS: Deployment |
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
@@ -147,13 +147,14 @@ Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 f
       31.10.2026: Angular Material
 - [x] P3.1 Gerüst des web-api (U4) (`5c4e9d1`)
 - [x] P3.2 Lese-Endpunkte (U4) (`f9ba2a5`)
-- [ ] P3.3 Profil-Endpunkte und Vorschau (nach Phase 2b)
+- [x] P3.3 Profil-Endpunkte und Vorschau, Rolle `va_profiles` (`4792548`)
 - [x] P3.4 Sicherheitsgrundlagen 🔒 (U4) (`7736091`)
 - [x] P3.5 Angular-Gerüst und generierter Client (U4) (`a342653`)
 - [x] P3.6 frontend-Container 🔒 (U4) (`07d234f`)
 - [x] P3.7 Ansichten: Ranking, Runs, Titel-Detail (U4) (`c8cf31e`); Profil-Editor nach Phase 2b
 - [ ] P3.8 Schutz der Schnittstelle
-- [ ] NAS (du): frontend-Container deployen, Firewall-Regel für Port 8080
+- [ ] NAS (du): frontend-Container deployen, Firewall-Regel für Port 8080; seit P3.3 gehört
+      `VA_PROFILES_PASSWORD` in die `.env`
 
 **Fertig, wenn:** das UI im LAN nutzbar ist und die Profile editierbar sind.
 
