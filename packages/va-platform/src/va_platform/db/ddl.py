@@ -124,3 +124,30 @@ BEGIN
 END
 $$;
 """
+
+
+# P3.3: Das web-api speichert Profile mit einer eigenen Rolle, nicht mit va_app (ADR-0009).
+# Ab Phase 4 schreibt der Service scoring selbst, die Rolle geht in P5.3 auf.
+PROFILES_ROLE = "va_profiles"
+
+
+def profiles_grant_statements() -> str:
+    """Rechte von ``va_profiles``: Profile lesen, Versionen und Aktivierungen anfuegen.
+
+    Nur, wenn es die Rolle gibt (idempotent). UPDATE und DELETE bekommt sie nie; die Trigger
+    aus ``protect_table`` gelten ohnehin fuer jede Rolle.
+    """
+    return f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{PROFILES_ROLE}') THEN
+        GRANT USAGE ON SCHEMA scoring TO {PROFILES_ROLE};
+        GRANT SELECT ON scoring.profile, scoring.profile_version, scoring.profile_activation
+            TO {PROFILES_ROLE};
+        GRANT INSERT ON scoring.profile_version, scoring.profile_activation TO {PROFILES_ROLE};
+        EXECUTE format('GRANT USAGE ON SEQUENCE %s TO {PROFILES_ROLE}',
+                       pg_get_serial_sequence('scoring.profile_activation', 'id'));
+    END IF;
+END
+$$;
+"""

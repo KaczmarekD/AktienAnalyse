@@ -243,6 +243,7 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 | `POSTGRES_PASSWORD` | – **Pflicht** | Passwort der Owner-Rolle `va_owner` (Migrationen) |
 | `VA_APP_PASSWORD` | – **Pflicht** | Passwort der App-Rolle `va_app` (kein DELETE); wirkt beim ersten DB-Start |
 | `VA_READ_PASSWORD` | – **Pflicht** | Passwort der Lese-Rolle `va_read` für Auswertungen; wirkt beim ersten DB-Start |
+| `VA_PROFILES_PASSWORD` | – **Pflicht** | Passwort der Rolle `va_profiles`, mit der das UI Scoring-Profile speichert (P3.3). Fehlt die Rolle in einer bestehenden DB, legt der Start des Batches sie an |
 | `DB_LAN_BIND` | `127.0.0.1` | IP, an die der Postgres-Port gebunden wird (NAS-IP = im LAN erreichbar) |
 | `LOCAL_DB_PORT` | `5432` | Nur lokaler Stack: Port der lokalen Datenbank, falls 5432 belegt ist |
 | `DATABASE_URL` | von Compose gesetzt | Nur lokal nötig: `postgresql+psycopg://va_app:<pw>@host:5432/value_analyzer` |
@@ -286,7 +287,7 @@ value-analyzer/
 │                           #   notification (Mail, Healthcheck); Handler am Event-Bus
 ├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR
 ├── migrations/             # Alembic-Migrationen (nur additiv)
-├── db/init/01_roles.sh     # Rollen va_app/va_read beim ersten DB-Start
+├── db/init/01_roles.sh     # Rollen va_app/va_read/va_profiles beim ersten DB-Start
 ├── tests/                  # pytest-Suite; tests/db/ gegen echtes PostgreSQL,
 │                           #   tests/fixtures/replay/ echte Wochen für die Replay-Regression
 ├── data/

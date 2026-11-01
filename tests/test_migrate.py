@@ -39,6 +39,37 @@ class TestMigrateMain:
             assert migrate.main() == 0
         assert "va_app" in upgrade.call_args.args[0]
 
+    def test_profiles_role_is_ensured_with_the_password_from_the_env(self, no_db_env, monkeypatch):
+        # P3.3: In einer bestehenden Datenbank fehlt va_profiles, das Init-Skript lief dort nicht
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.setenv("VA_PROFILES_PASSWORD", "geheim")
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_profiles_role") as ensure,
+        ):
+            assert migrate.main() == 0
+        ensure.assert_called_once_with("postgresql://va_owner:pw@db/va", "geheim")
+
+    def test_without_password_no_role_is_touched(self, no_db_env, monkeypatch):
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.delenv("VA_PROFILES_PASSWORD", raising=False)
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_profiles_role") as ensure,
+        ):
+            assert migrate.main() == 0
+        ensure.assert_not_called()
+
+    def test_role_failure_does_not_stop_the_batch(self, no_db_env, monkeypatch):
+        # Der Batch braucht die Rolle nicht; nur das Speichern im UI faellt dann aus
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.setenv("VA_PROFILES_PASSWORD", "geheim")
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_profiles_role", side_effect=RuntimeError("kein Recht")),
+        ):
+            assert migrate.main() == 0
+
     def test_without_any_url_fails_cleanly(self, no_db_env):
         with patch("src.db.migrate.upgrade") as upgrade:
             assert migrate.main() == 1

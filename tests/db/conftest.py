@@ -23,7 +23,11 @@ from src.db.migrate import upgrade
 from va_platform.db import create_db_engine, normalize_url
 
 ADMIN_URL = os.environ.get("TEST_DATABASE_URL")
-ROLE_PASSWORDS = {"va_app": "va_app_test", "va_read": "va_read_test"}
+ROLE_PASSWORDS = {
+    "va_app": "va_app_test",
+    "va_read": "va_read_test",
+    "va_profiles": "va_profiles_test",  # P3.3: Profil-Befehle des web-api
+}
 
 
 def _admin() -> Engine:
@@ -101,6 +105,13 @@ def app_engine(db_url: str) -> Iterator[Engine]:
 @pytest.fixture
 def read_engine(db_url: str) -> Iterator[Engine]:
     eng = _role_engine(db_url, "va_read")
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def profiles_engine(db_url: str) -> Iterator[Engine]:
+    eng = _role_engine(db_url, "va_profiles")
     yield eng
     eng.dispose()
 

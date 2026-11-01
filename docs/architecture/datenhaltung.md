@@ -38,6 +38,7 @@ Stand `261dc8f` (Migration `0001_initial_schema`):
 | `va_owner` (`POSTGRES_USER`) | alles | nur für Migrationen beim Container-Start |
 | `va_app` | `SELECT`/`INSERT`, `UPDATE` nur für freigegebene Tabellen, kein `DELETE` | der Batch |
 | `va_read` | nur `SELECT` | Auswertungen aus dem LAN; in Phase 3 auch das web-api |
+| `va_profiles` | `SELECT` auf den drei Profil-Tabellen, `INSERT` in `profile_version` und `profile_activation` | das web-api für die Profil-Befehle (P3.3), bis scoring sie ab Phase 4 selbst ausführt |
 
 Der Treiber ist psycopg 3 (`postgresql+psycopg://`) mit synchronem SQLAlchemy. Das passt für den
 Batch.

@@ -9,76 +9,71 @@ dem aktiven Profil und speichert dessen Version. Details: docs/architecture/scor
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Self, get_args
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from va_contracts.profile import (
+    MIN_ACTIVE_FACTORS,
+    ProfileParamsV1,
+    QualityFactorKey,
+    ValueFactorKey,
+)
 
 from .scoring import DEFAULT_QUALITY_FACTORS, DEFAULT_VALUE_FACTORS, ScoringConfig
 
-DEFAULT_PROFILE_NAME = "Standard"
-
-# Der Faktor-Katalog als Schluessel. Spalte und Richtung stehen in DEFAULT_*_FACTORS und sind im
-# UI nicht aenderbar; ein Test haelt beide Listen gleich.
-ValueFactorKey = Literal["ev_ebit", "pb", "p_fcf", "shareholder_yield"]
-QualityFactorKey = Literal[
-    "roic", "fcf_margin", "operating_margin", "net_debt_ebitda", "earnings_stability"
+__all__ = [
+    "DEFAULT_PROFILE_NAME",
+    "FACTOR_INFO",
+    "MIN_ACTIVE_FACTORS",
+    "ActiveProfile",
+    "ProfileVersionRef",
+    "QualityFactorKey",
+    "ScoringProfileParams",
+    "ValueFactorKey",
+    "profile_params",
 ]
 
-# _composite_mean braucht je Gruppe mindestens zwei vorhandene Faktoren
-MIN_ACTIVE_FACTORS = 2
+DEFAULT_PROFILE_NAME = "Standard"
+
+# Fuer das UI (P3.3): Name und Methodik-Hinweis je Faktor. Die Richtung steht im Katalog.
+FACTOR_INFO: dict[str, tuple[str, str]] = {
+    "ev_ebit": (
+        "EV/EBIT",
+        "Unternehmenswert zu operativem Gewinn, unabhaengig von der Kapitalstruktur "
+        "(Greenblatt). Negative Werte (Verluste) fallen aus dem Ranking.",
+    ),
+    "pb": ("Kurs-Buchwert", "Kurs zu Buchwert je Aktie. Negative Werte fallen aus dem Ranking."),
+    "p_fcf": (
+        "Kurs/Free Cashflow",
+        "Free Cashflow ist schwerer zu beschoenigen als der Gewinn. Negative Werte fallen aus "
+        "dem Ranking.",
+    ),
+    "shareholder_yield": (
+        "Shareholder Yield",
+        "Dividende plus Aktienrueckkaeufe im Verhaeltnis zum Boersenwert.",
+    ),
+    "roic": (
+        "ROIC",
+        "Rendite auf das eingesetzte Kapital, mit der effektiven Steuerquote des Unternehmens.",
+    ),
+    "fcf_margin": ("FCF-Marge", "Free Cashflow im Verhaeltnis zum Umsatz."),
+    "operating_margin": ("Operative Marge", "Operativer Gewinn (EBIT) im Verhaeltnis zum Umsatz."),
+    "net_debt_ebitda": (
+        "Net Debt/EBITDA",
+        "Nettoverschuldung in Jahren operativen Gewinns vor Abschreibungen.",
+    ),
+    "earnings_stability": (
+        "Gewinnstabilitaet",
+        "Wie wenig der Nettogewinn ueber die letzten fuenf Geschaeftsjahre schwankt.",
+    ),
+}
 
 
-class ScoringProfileParams(BaseModel):
-    """Die Parameter eines Profils mit ihren Regeln, an genau einer Stelle (ADR-0009).
+class ScoringProfileParams(ProfileParamsV1):
+    """Die Parameter mit ihrer Abbildung auf ``score()`` (P2b.2).
 
-    Die Grenzen stehen am Feld und landen so spaeter in OpenAPI und im Formular. Regeln ueber
-    mehrere Felder stehen im Validator. Unbekannte Felder sind ein Fehler: Ein Tippfehler in
-    gespeicherten params darf nicht still wegfallen.
+    Felder und Regeln stehen im Contract ``ProfileParamsV1`` (P3.3), denn das web-api braucht
+    sie fuer OpenAPI und die Pruefung, darf scoring aber nicht importieren.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    value_weight: float = Field(default=0.6, ge=0, le=1)
-    min_market_cap: float = Field(default=300_000_000.0, ge=0)
-    min_value_factor_share: float = Field(default=0.5, ge=0, le=1)
-    min_quality_factor_share: float = Field(default=0.5, ge=0, le=1)
-    # Im UI nicht aenderbar; steht drin, damit ein Profil das Scoring vollstaendig beschreibt
-    min_factor_count: int = Field(default=2, ge=1)
-    value_trap_value_threshold: float = Field(default=0.70, ge=0, le=1)
-    value_trap_quality_threshold: float = Field(default=0.30, ge=0, le=1)
-    drop_negative_value_metrics: bool = True
-    value_factors: frozenset[ValueFactorKey] = Field(
-        default_factory=lambda: frozenset(get_args(ValueFactorKey))
-    )
-    quality_factors: frozenset[QualityFactorKey] = Field(
-        default_factory=lambda: frozenset(get_args(QualityFactorKey))
-    )
-
-    @model_validator(mode="after")
-    def _enough_factors(self) -> Self:
-        for group, factors in (
-            ("value_factors", self.value_factors),
-            ("quality_factors", self.quality_factors),
-        ):
-            if len(factors) < MIN_ACTIVE_FACTORS:
-                msg = f"{group}: mindestens {MIN_ACTIVE_FACTORS} aktive Faktoren"
-                raise ValueError(msg)
-            if len(factors) < self.min_factor_count:
-                msg = (
-                    f"{group}: {len(factors)} aktive Faktoren, aber min_factor_count ist "
-                    f"{self.min_factor_count} - es entstuende nie ein Score"
-                )
-                raise ValueError(msg)
-        return self
-
-    @field_serializer("value_factors", "quality_factors")
-    def _sorted(self, factors: frozenset[str]) -> list[str]:
-        # Feste Reihenfolge: gleicher Hash fuer gleiche Parameter, lesbarer Diff
-        return sorted(factors)
-
-    @property
-    def quality_weight(self) -> float:
-        return 1.0 - self.value_weight
 
     @classmethod
     def from_config(cls, cfg: ScoringConfig) -> ScoringProfileParams:

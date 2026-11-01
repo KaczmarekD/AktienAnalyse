@@ -33,6 +33,8 @@ class DatabaseSettings(_OwnerUrl):
     """Nur die DB-Verbindung - reicht fuer Migration und Altdaten-Import."""
 
     database_url: SecretStr | None = None
+    # P3.3: Passwort der Rolle va_profiles; gesetzt legt die Migration sie an und gleicht es an
+    va_profiles_password: SecretStr | None = None
 
 
 class Settings(_OwnerUrl):

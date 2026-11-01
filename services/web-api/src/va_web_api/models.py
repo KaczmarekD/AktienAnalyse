@@ -7,8 +7,11 @@ Sie sind der Vertrag mit dem Frontend: Der OpenAPI-Snapshot und der daraus gener
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from va_contracts.profile import ProfileParamsV1
 
 
 class _Model(BaseModel):
@@ -129,3 +132,91 @@ class Report(_Model):
     generated_at: datetime
     csv_filename: str
     html: str
+
+
+# --- Scoring-Profile (P3.3, ADR-0009) -------------------------------------------------------
+
+
+class Factor(_Model):
+    """Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest."""
+
+    key: str
+    group: Literal["value", "quality"]
+    label: str
+    better: Literal["low", "high"]  # niedriger oder hoeher Wert ist besser
+    hint: str  # Methodik-Hinweis fuer das UI
+
+
+class ProfileVersion(_Model):
+    version: int
+    params: ProfileParamsV1
+    parent_version: int | None  # die Version, auf der diese beruht
+    comment: str | None
+    created_at: datetime
+    active: bool
+
+
+class ProfileSummary(_Model):
+    id: int
+    name: str
+    created_at: datetime
+    latest_version: int | None
+    active_version: int | None  # leer, wenn ein anderes Profil aktiv ist
+
+
+class ProfileDetail(ProfileSummary):
+    versions: list[ProfileVersion]  # neueste zuerst
+
+
+class SaveProfileVersion(_Model):
+    params: ProfileParamsV1
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class SavedProfileVersion(_Model):
+    profile_id: int
+    version: int
+    parent_version: int
+
+
+class ActivateProfileVersion(_Model):
+    version: int = Field(ge=1)
+
+
+class ActivatedProfile(_Model):
+    profile_id: int
+    version: int
+
+
+class ActiveProfileRef(_Model):
+    profile_id: int
+    name: str
+    version: int
+
+
+class PreviewRow(_Model):
+    """Ein Titel mit den neuen params und, zum Vergleich, mit dem aktiven Profil."""
+
+    symbol: str
+    name: str | None
+    index: str | None
+    passed_filter: bool
+    rank: int | None
+    rank_active: int | None
+    composite_score: float | None
+    value_score: float | None
+    quality_score: float | None
+    value_trap_flag: bool | None
+    value_trap_flag_active: bool | None
+
+
+class Preview(_Model):
+    scoring_run_id: int  # dessen Abruf ist die Grundlage
+    fetch_run_id: int
+    fetched_on: date | None
+    active: ActiveProfileRef | None
+    top: int
+    entered: list[str]  # neu in den Top ``top``, nach neuem Rang
+    left: list[str]  # nicht mehr in den Top ``top``, nach altem Rang
+    trap_changed: list[str]  # Value-Trap-Markierung geaendert
+    rows: list[PreviewRow]  # nach neuem Rang

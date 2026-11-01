@@ -3,11 +3,163 @@
 import * as z from 'zod';
 
 /**
+ * ActivateProfileVersion
+ */
+export const zActivateProfileVersion = z.object({
+  version: z.int().gte(1),
+});
+
+/**
+ * ActivatedProfile
+ */
+export const zActivatedProfile = z.object({
+  profile_id: z.int(),
+  version: z.int(),
+});
+
+/**
+ * ActiveProfileRef
+ */
+export const zActiveProfileRef = z.object({
+  name: z.string(),
+  profile_id: z.int(),
+  version: z.int(),
+});
+
+/**
+ * Factor
+ *
+ * Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.
+ */
+export const zFactor = z.object({
+  better: z.enum(['low', 'high']),
+  group: z.enum(['value', 'quality']),
+  hint: z.string(),
+  key: z.string(),
+  label: z.string(),
+});
+
+/**
  * Health
  */
 export const zHealth = z.object({
   status: z.literal('ok'),
   version: z.string(),
+});
+
+/**
+ * PreviewRow
+ *
+ * Ein Titel mit den neuen params und, zum Vergleich, mit dem aktiven Profil.
+ */
+export const zPreviewRow = z.object({
+  composite_score: z.number().nullable(),
+  index: z.string().nullable(),
+  name: z.string().nullable(),
+  passed_filter: z.boolean(),
+  quality_score: z.number().nullable(),
+  rank: z.int().nullable(),
+  rank_active: z.int().nullable(),
+  symbol: z.string(),
+  value_score: z.number().nullable(),
+  value_trap_flag: z.boolean().nullable(),
+  value_trap_flag_active: z.boolean().nullable(),
+});
+
+/**
+ * Preview
+ */
+export const zPreview = z.object({
+  active: zActiveProfileRef.nullable(),
+  entered: z.array(z.string()),
+  fetch_run_id: z.int(),
+  fetched_on: z.iso.date().nullable(),
+  left: z.array(z.string()),
+  rows: z.array(zPreviewRow),
+  scoring_run_id: z.int(),
+  top: z.int(),
+  trap_changed: z.array(z.string()),
+});
+
+/**
+ * ProfileParamsV1
+ *
+ * Die Parameter eines Profils mit ihren Regeln.
+ *
+ * Unbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten
+ * params oder im Formular darf nicht still wegfallen.
+ */
+export const zProfileParamsV1Input = z.object({
+  drop_negative_value_metrics: z.boolean().optional().default(true),
+  min_factor_count: z.int().gte(1).optional().default(2),
+  min_market_cap: z.number().gte(0).optional().default(300000000),
+  min_quality_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
+  min_value_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
+  quality_factors: z
+    .array(
+      z.enum(['roic', 'fcf_margin', 'operating_margin', 'net_debt_ebitda', 'earnings_stability']),
+    )
+    .optional(),
+  value_factors: z.array(z.enum(['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield'])).optional(),
+  value_trap_quality_threshold: z.number().gte(0).lte(1).optional().default(0.3),
+  value_trap_value_threshold: z.number().gte(0).lte(1).optional().default(0.7),
+  value_weight: z.number().gte(0).lte(1).optional().default(0.6),
+});
+
+/**
+ * ProfileParamsV1
+ *
+ * Die Parameter eines Profils mit ihren Regeln.
+ *
+ * Unbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten
+ * params oder im Formular darf nicht still wegfallen.
+ */
+export const zProfileParamsV1Output = z.object({
+  drop_negative_value_metrics: z.boolean().optional().default(true),
+  min_factor_count: z.int().gte(1).optional().default(2),
+  min_market_cap: z.number().gte(0).optional().default(300000000),
+  min_quality_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
+  min_value_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
+  quality_factors: z.array(z.string()).optional(),
+  value_factors: z.array(z.string()).optional(),
+  value_trap_quality_threshold: z.number().gte(0).lte(1).optional().default(0.3),
+  value_trap_value_threshold: z.number().gte(0).lte(1).optional().default(0.7),
+  value_weight: z.number().gte(0).lte(1).optional().default(0.6),
+});
+
+/**
+ * ProfileSummary
+ */
+export const zProfileSummary = z.object({
+  active_version: z.int().nullable(),
+  created_at: z.iso.datetime(),
+  id: z.int(),
+  latest_version: z.int().nullable(),
+  name: z.string(),
+});
+
+/**
+ * ProfileVersion
+ */
+export const zProfileVersion = z.object({
+  active: z.boolean(),
+  comment: z.string().nullable(),
+  created_at: z.iso.datetime(),
+  params: zProfileParamsV1Output,
+  parent_version: z.int().nullable(),
+  version: z.int(),
+});
+
+/**
+ * ProfileDetail
+ */
+export const zProfileDetail = z.object({
+  active_version: z.int().nullable(),
+  created_at: z.iso.datetime(),
+  id: z.int(),
+  latest_version: z.int().nullable(),
+  name: z.string(),
+  versions: z.array(zProfileVersion),
 });
 
 /**
@@ -104,6 +256,23 @@ export const zRunSummary = z.object({
   status: z.string(),
   universe_mode: z.string().nullable(),
   universe_size: z.int().nullable(),
+});
+
+/**
+ * SaveProfileVersion
+ */
+export const zSaveProfileVersion = z.object({
+  comment: z.string().max(500).nullish(),
+  params: zProfileParamsV1Input,
+});
+
+/**
+ * SavedProfileVersion
+ */
+export const zSavedProfileVersion = z.object({
+  parent_version: z.int(),
+  profile_id: z.int(),
+  version: z.int(),
 });
 
 /**
@@ -240,3 +409,63 @@ export const zGetRunPath = z.object({
  * Successful Response
  */
 export const zGetRunResponse = zRunDetail;
+
+/**
+ * Response List Factors
+ *
+ * Successful Response
+ */
+export const zListFactorsResponse = z.array(zFactor);
+
+export const zPreviewProfileBody = zProfileParamsV1Input;
+
+export const zPreviewProfileQuery = z.object({
+  top: z.int().gte(1).lte(100).optional().default(20),
+});
+
+/**
+ * Successful Response
+ */
+export const zPreviewProfileResponse = zPreview;
+
+/**
+ * Response List Profiles
+ *
+ * Successful Response
+ */
+export const zListProfilesResponse = z.array(zProfileSummary);
+
+export const zGetProfilePath = z.object({
+  profile_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zGetProfileResponse = zProfileDetail;
+
+export const zSaveProfileVersionBody = zSaveProfileVersion;
+
+export const zSaveProfileVersionHeaders = z.object({
+  'if-match': z.string().nullish(),
+});
+
+export const zSaveProfileVersionPath = z.object({
+  profile_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zSaveProfileVersionResponse = zSavedProfileVersion;
+
+export const zActivateProfileVersionBody = zActivateProfileVersion;
+
+export const zActivateProfileVersionPath = z.object({
+  profile_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zActivateProfileVersionResponse = zActivatedProfile;

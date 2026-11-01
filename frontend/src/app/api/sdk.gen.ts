@@ -5,9 +5,15 @@ import * as z from 'zod';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
 import type {
+  ActivateProfileVersionData,
+  ActivateProfileVersionErrors,
+  ActivateProfileVersionResponses,
   GetInstrumentData,
   GetInstrumentErrors,
   GetInstrumentResponses,
+  GetProfileData,
+  GetProfileErrors,
+  GetProfileResponses,
   GetRankingData,
   GetRankingErrors,
   GetRankingResponses,
@@ -25,13 +31,29 @@ import type {
   LatestRankingData,
   LatestRankingErrors,
   LatestRankingResponses,
+  ListFactorsData,
+  ListFactorsErrors,
+  ListFactorsResponses,
+  ListProfilesData,
+  ListProfilesResponses,
   ListRunsData,
   ListRunsErrors,
   ListRunsResponses,
+  PreviewProfileData,
+  PreviewProfileErrors,
+  PreviewProfileResponses,
+  SaveProfileVersionData,
+  SaveProfileVersionErrors,
+  SaveProfileVersionResponses,
 } from './types.gen';
 import {
+  zActivateProfileVersionBody,
+  zActivateProfileVersionPath,
+  zActivateProfileVersionResponse,
   zGetInstrumentPath,
   zGetInstrumentResponse,
+  zGetProfilePath,
+  zGetProfileResponse,
   zGetRankingPath,
   zGetRankingResponse,
   zGetReportCsvPath,
@@ -41,8 +63,17 @@ import {
   zGetRunResponse,
   zHealthResponse,
   zLatestRankingResponse,
+  zListFactorsResponse,
+  zListProfilesResponse,
   zListRunsQuery,
   zListRunsResponse,
+  zPreviewProfileBody,
+  zPreviewProfileQuery,
+  zPreviewProfileResponse,
+  zSaveProfileVersionBody,
+  zSaveProfileVersionHeaders,
+  zSaveProfileVersionPath,
+  zSaveProfileVersionResponse,
 } from './zod.gen';
 
 export type Options<
@@ -224,4 +255,156 @@ export const getRun = <ThrowOnError extends boolean = false>(
     responseValidator: async (data) => await zGetRunResponse.parseAsync(data),
     url: '/api/v1/runs/{run_id}',
     ...options,
+  });
+
+/**
+ * List Factors
+ *
+ * Der Faktor-Katalog mit Richtung und Methodik-Hinweis.
+ */
+export const listFactors = <ThrowOnError extends boolean = false>(
+  options?: Options<ListFactorsData, ThrowOnError>,
+): RequestResult<ListFactorsResponses, ListFactorsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListFactorsResponses, ListFactorsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zListFactorsResponse.parseAsync(data),
+    url: '/api/v1/scoring/factors',
+    ...options,
+  });
+
+/**
+ * Preview Profile
+ *
+ * Ranking mit ``params`` auf den Daten des juengsten Bewertungslaufs, verglichen mit dem
+ * aktiven Profil. Speichert nichts.
+ */
+export const previewProfile = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewProfileData, ThrowOnError>,
+): RequestResult<PreviewProfileResponses, PreviewProfileErrors, ThrowOnError> =>
+  (options.client ?? client).post<PreviewProfileResponses, PreviewProfileErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zPreviewProfileBody,
+          path: z.never().optional(),
+          query: zPreviewProfileQuery.optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zPreviewProfileResponse.parseAsync(data),
+    url: '/api/v1/scoring/preview',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * List Profiles
+ */
+export const listProfiles = <ThrowOnError extends boolean = false>(
+  options?: Options<ListProfilesData, ThrowOnError>,
+): RequestResult<ListProfilesResponses, unknown, ThrowOnError> =>
+  (options?.client ?? client).get<ListProfilesResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zListProfilesResponse.parseAsync(data),
+    url: '/api/v1/scoring/profiles',
+    ...options,
+  });
+
+/**
+ * Get Profile
+ *
+ * Ein Profil mit allen Versionen, neueste zuerst. ``ETag``: die neueste Version.
+ */
+export const getProfile = <ThrowOnError extends boolean = false>(
+  options: Options<GetProfileData, ThrowOnError>,
+): RequestResult<GetProfileResponses, GetProfileErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetProfileResponses, GetProfileErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zGetProfilePath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zGetProfileResponse.parseAsync(data),
+    url: '/api/v1/scoring/profiles/{profile_id}',
+    ...options,
+  });
+
+/**
+ * Save Profile Version
+ *
+ * Neue Version auf Grundlage der Version aus ``If-Match``. Aktiviert sie nicht.
+ */
+export const saveProfileVersion = <ThrowOnError extends boolean = false>(
+  options: Options<SaveProfileVersionData, ThrowOnError>,
+): RequestResult<SaveProfileVersionResponses, SaveProfileVersionErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    SaveProfileVersionResponses,
+    SaveProfileVersionErrors,
+    ThrowOnError
+  >({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zSaveProfileVersionBody,
+          headers: zSaveProfileVersionHeaders.optional(),
+          path: zSaveProfileVersionPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zSaveProfileVersionResponse.parseAsync(data),
+    url: '/api/v1/scoring/profiles/{profile_id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Activate Profile Version
+ *
+ * Macht die Version aktiv, auch eine aeltere. Der naechste Lauf rechnet damit.
+ */
+export const activateProfileVersion = <ThrowOnError extends boolean = false>(
+  options: Options<ActivateProfileVersionData, ThrowOnError>,
+): RequestResult<ActivateProfileVersionResponses, ActivateProfileVersionErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ActivateProfileVersionResponses,
+    ActivateProfileVersionErrors,
+    ThrowOnError
+  >({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zActivateProfileVersionBody,
+          path: zActivateProfileVersionPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zActivateProfileVersionResponse.parseAsync(data),
+    url: '/api/v1/scoring/profiles/{profile_id}/activate',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });

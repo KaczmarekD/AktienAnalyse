@@ -40,6 +40,7 @@ _COMPOSE_INPUTS = (
     "POSTGRES_PASSWORD",
     "VA_APP_PASSWORD",
     "VA_READ_PASSWORD",
+    "VA_PROFILES_PASSWORD",
     "DB_LAN_BIND",
     "REG",
     "VERSION",
@@ -191,15 +192,18 @@ class TestLocalWebApi:
     def test_runs_from_the_local_image_with_uvicorn(self, local):
         api = local["services"]["web-api"]
         assert api["image"] == "value-analyzer:local"
-        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle
+        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. P3.3: die Composition
+        # Root src.web, die Vorschau und Profil-Befehle aus scoring im selben Prozess verdrahtet
         assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
-        assert "va_web_api.main:create_app" in api["entrypoint"]
+        assert "src.web:create_app" in api["entrypoint"]
 
-    def test_gets_only_the_read_role(self, local):
+    def test_gets_only_the_read_and_the_profiles_role(self, local):
         env = local["services"]["web-api"]["environment"]
-        assert set(env) == {"TZ", "WEB_API_DATABASE_URL"}  # keine Zugangsdaten des Batches
+        # keine Zugangsdaten des Batches
+        assert set(env) == {"TZ", "WEB_API_DATABASE_URL", "WEB_API_PROFILES_DATABASE_URL"}
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
-        assert "@db:5432/value_analyzer" in env["WEB_API_DATABASE_URL"]
+        assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
+        assert "@db:5432/value_analyzer" in env["WEB_API_PROFILES_DATABASE_URL"]
 
 
 class TestLocalFrontend:
@@ -256,14 +260,20 @@ class TestNasDefinition:
         [port] = nas["services"]["db"]["ports"]
         assert port["host_ip"] == "192.168.1.10"
 
-    def test_web_api_has_no_port_and_only_the_read_role(self, nas):
+    def test_web_api_has_no_port_and_only_its_two_roles(self, nas):
         api = nas["services"]["web-api"]
         assert "ports" not in api  # nur hinter nginx erreichbar
         assert api["image"] == nas["services"]["value-analyzer"]["image"]
         assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
+        assert "src.web:create_app" in api["entrypoint"]
         env = api["environment"]
-        assert set(env) == {"TZ", "WEB_API_DATABASE_URL"}
+        assert set(env) == {"TZ", "WEB_API_DATABASE_URL", "WEB_API_PROFILES_DATABASE_URL"}
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
+        assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
+
+    def test_db_creates_the_profiles_role_on_first_start(self, nas):
+        env = nas["services"]["db"]["environment"]
+        assert "VA_PROFILES_PASSWORD" in env
 
     def test_frontend_from_ghcr_on_8080_in_the_lan(self, nas):
         frontend = nas["services"]["frontend"]

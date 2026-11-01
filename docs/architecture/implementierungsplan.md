@@ -1151,6 +1151,76 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Die Vorschau mit nur einem Faktor ergibt 422.
   - Aktivieren legt eine neue Aktivierung an.
 - **Implementierung:** Router `scoring`, dazu der Port `ScoringPreview`, vorerst im selben Prozess.
+- **Entwurf (01.11.2026):** Erst die API, der Editor im UI folgt als eigenes Paket (Rest von P3.7)
+  auf dem neu erzeugten Client.
+  - **Schreibrechte (Entscheidung 01.11.2026):**
+    - Eine eigene Rolle `va_profiles`, statt die Rolle `va_app` des Batches mitzunutzen. Sie darf
+      die drei Profil-Tabellen lesen und in `profile_version` und `profile_activation` anfügen,
+      sonst nichts.
+    - Das web-api bekommt dafür eine zweite Adresse (`WEB_API_PROFILES_DATABASE_URL`). Lesen
+      bleibt bei `va_read` mit schreibgeschützter Verbindung.
+    - Die Rolle entsteht in einer neuen Datenbank über `db/init/01_roles.sh`
+      (`VA_PROFILES_PASSWORD`). In einer bestehenden legt `python -m src.db.migrate` sie an,
+      wenn das Passwort gesetzt ist, und gleicht es an. Die Rechte vergibt die Migration
+      `0008`.
+    - Ab Phase 4 schreibt der Service scoring selbst (P4.8), die Rolle geht dann in den Rollen
+      je Service auf (P5.3).
+  - **Parameter als Contract:** `ScoringProfileParams` zieht als `ProfileParamsV1` nach
+    `va_contracts`, mit Feldern, Grenzen, Literal-Schlüsseln und Validator. Das web-api darf
+    `va_scoring` nicht importieren, braucht das Modell aber für OpenAPI und die 422.
+    `va_scoring` erbt davon und ergänzt `from_config()` und `to_config()`. Das Format im JSON
+    bleibt gleich, gespeicherte Versionen bleiben gültig.
+  - **Endpunkte** (Router `scoring`, [web-api-realtime.md](web-api-realtime.md)):
+    - `GET /scoring/factors`: der Katalog mit Gruppe, Richtung und Methodik-Hinweis.
+    - `GET /scoring/profiles` und `GET /scoring/profiles/{id}`: Profile, ihre Versionen und
+      welche aktiv ist. Die Detail-Antwort trägt die jüngste Version als `ETag`.
+    - `PUT /scoring/profiles/{id}`: neue Version aus `params` und `comment`.
+      - `If-Match` ist Pflicht und nennt die Version, auf der die Änderung beruht. Ohne ihn
+        antwortet der Server mit 428, mit veralteter Version mit 409.
+      - Die neue Version verweist auf diese als `parent_version`.
+      - Speichern zwei gleichzeitig, scheitert der zweite am Schlüssel (409).
+    - `POST /scoring/profiles/{id}/activate` mit `version`: legt eine Aktivierung an. Der
+      nächste Lauf rechnet damit. Einen Rescore löst die Aktivierung erst mit Phase 4 aus.
+    - `POST /scoring/preview` mit `params`: Ranking auf dem Abruf des jüngsten Bewertungslaufs,
+      verglichen mit dem aktiven Profil auf denselben Daten. Das ergibt Rang und Value-Trap je
+      Titel vorher und nachher sowie die neuen und weggefallenen Titel in den Top 20.
+      Ungültige params ergeben 422. Gespeichert wird nichts.
+  - **Im selben Prozess:** Die Ports `ScoringPreview` und `ProfileCommands` liegen im web-api,
+    ihre Umsetzung kommt von außen.
+    - `src/web.py` ist die Composition Root des web-api-Prozesses. Sie darf `va_scoring` und
+      `va_market_data` importieren und verdrahtet die Ports mit deren Code.
+    - Der Startbefehl wird `uvicorn --factory src.web:create_app`.
+    - Ohne `WEB_API_PROFILES_DATABASE_URL` antworten die schreibenden Endpunkte mit 503.
+  - **Test (rot):**
+    - Ohne Datenbank, mit Fake-Ports: 428 ohne und 409 mit veraltetem `If-Match`, 422 für die
+      Vorschau mit nur einem Faktor, 503 ohne Schreibzugang, 415 ohne JSON.
+    - DB-Tests über `src.web`, mit einem Replay-Lauf als Datenbestand:
+      - Versionen ansehen.
+      - Speichern ergibt v2 mit `parent_version` 1.
+      - Ein gleichzeitiges Speichern ergibt 409.
+      - Aktivieren legt eine neue Aktivierung an, und der nächste Lauf rechnet mit v2.
+      - Die Vorschau mit anderem Gewicht verschiebt Ränge.
+    - Rechte: `va_profiles` kann Versionen und Aktivierungen anlegen, aber keine Bewertungsläufe
+      und kein `market_data`. UPDATE und DELETE bleiben verboten. Die Migration legt die Rolle
+      in einer bestehenden Datenbank an.
+    - Compose: Das web-api bekommt genau die beiden Adressen und keine Zugangsdaten des
+      Batches.
+  - **Danach im selben Commit:** OpenAPI-Snapshot und der erzeugte TS-Client.
+- **Umgesetzt (01.11.2026):** wie im Entwurf.
+  - `ProfileParamsV1` in `va_contracts.profile`, `ScoringProfileParams` erbt davon. Methodik-
+    Hinweise je Faktor stehen in `FACTOR_INFO` (`va_scoring.domain.profile`).
+  - `src.db.migrate` legt fehlende Login-Rollen mit `ensure_login_role` an und setzt das
+    Passwort sonst neu. Name und Passwort gehen gequotet über psycopg ins SQL. Ein Fehler dabei
+    hält den Batch nicht auf, er landet als Warnung im Log.
+  - Die Vorschau rechnet auf dem Abruf des jüngsten Bewertungslaufs, ohne Rescores
+    (`get_latest_scoring_run`). Ohne aktives Profil gelten die Standardwerte.
+  - `tests/e2e` prüft im Stack: Standard ist aktiv, die Vorschau mit dem aktiven Profil
+    verschiebt nichts, und Speichern verlangt die neueste Version (201, dann 409).
+  - **NAS:** Vor `make up` gehört `VA_PROFILES_PASSWORD` in die `.env`, sonst bricht Compose mit
+    einem Hinweis ab. Die Rolle entsteht beim ersten Start des Batches.
+  - **Lokal:** Eine `.env` aus einer älteren `.env.local.example` braucht ebenfalls
+    `VA_PROFILES_PASSWORD` und für `make api` auch `WEB_API_PROFILES_DATABASE_URL`.
+  - **Als Nächstes:** der Profil-Editor im UI (Rest von P3.7) auf dem neuen Client.
 
 #### P3.4 Sicherheitsgrundlagen 🔒
 

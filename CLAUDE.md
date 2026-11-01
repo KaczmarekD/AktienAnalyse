@@ -30,8 +30,13 @@ Geplant via Cron im Container.
 (`make local-*`). Dort zeigt SMTP fest auf Mailpit (`SMTP_PLAIN`, ohne TLS und Login) und
 `HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht. Das web-api
 (`services/web-api`, FastAPI, ab P3.1) läuft aus demselben Image, lokal unter
-`localhost:8000`. Es bekommt nur `WEB_API_DATABASE_URL` mit der Rolle `va_read` und eine
-schreibgeschützte Verbindung, nie die Zugangsdaten des Batches. Seit P3.6 laufen auf der NAS
+`localhost:8000`. Es liest mit `WEB_API_DATABASE_URL` (Rolle `va_read`, schreibgeschützte
+Verbindung) und speichert Scoring-Profile mit `WEB_API_PROFILES_DATABASE_URL` (Rolle
+`va_profiles`, darf nur in `profile_version` und `profile_activation` anfügen, seit P3.3). Die
+Zugangsdaten des Batches bekommt es nie. Gestartet wird es über `src.web:create_app`: Diese
+Composition Root verdrahtet Vorschau und Profil-Befehle mit dem Code von scoring im selben
+Prozess, denn `va_web_api` darf `va_scoring` nicht importieren (ab Phase 4 per NATS). Seit P3.6
+laufen auf der NAS
 web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
 nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
 `make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
@@ -132,8 +137,10 @@ Deployment unterscheiden, geh durch `Settings`. Ausnahme seit P2b.3 (ADR-0009): 
 Scoring-Parameter stehen in den Profilen. `VALUE_WEIGHT`, `QUALITY_WEIGHT` und `MIN_MARKET_CAP`
 sind nur die Startwerte für das Profil „Standard“.
 
-**Magic Numbers im Scoring gehören in `ScoringProfileParams`** (`va_scoring.domain.profile`, mit
-Grenzen am Feld und Standardwert), von dort über `to_config()` in `ScoringConfig`. Ein neuer
+**Magic Numbers im Scoring gehören in die Profil-Parameter**: Felder, Grenzen und Regeln stehen
+im Contract `ProfileParamsV1` (`va_contracts.profile`, seit P3.3, das web-api braucht ihn für
+OpenAPI), `ScoringProfileParams` in `va_scoring.domain.profile` erbt davon und bildet über
+`to_config()` auf `ScoringConfig` ab. Ein neuer
 Schwellwert bekommt einen Standardwert, gespeicherte Profile ohne ihn erhalten ihn beim Lesen.
 
 **Universum-Quellen: iShares → Deka → Fallback-CSV** (Kette in
@@ -169,7 +176,9 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   DELETE/TRUNCATE auf jeder Tabelle, Faktentabellen zusätzlich gegen UPDATE.
   Einzige UPDATEs: einmaliger Abschluss von `batch.run`/`market_data.fetch_run`
   (das UPDATE muss `finished_at` setzen, Migration `0005`) und das Nachtragen einer
-  ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen).
+  ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
+  nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3). Eine Rolle, die nach
+  dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
@@ -262,8 +271,10 @@ ADR-0001 und ADR-0002 aufgehoben.
    nötig)
 5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS` (`va_scoring.domain.scoring`)
    und derselbe Schlüssel im Literal `ValueFactorKey` bzw. `QualityFactorKey`
-   (`va_scoring.domain.profile`), ein Test hält beide gleich. Bestehende Profile schalten ihn
-   nicht von selbst ein: Dafür braucht es eine neue Profil-Version
+   (`va_contracts.profile`), ein Test hält beide gleich, dazu Name und Methodik-Hinweis in
+   `FACTOR_INFO` (`va_scoring.domain.profile`, für das UI). Bestehende Profile schalten ihn
+   nicht von selbst ein: Dafür braucht es eine neue Profil-Version. Der OpenAPI-Snapshot und
+   der TS-Client ändern sich mit (`make ui-api`)
 6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und
    Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
    sonst lehnt `write_snapshot` die unbekannte Spalte ab

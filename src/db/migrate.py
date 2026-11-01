@@ -4,6 +4,10 @@
 
 Nutzt ``DATABASE_OWNER_URL`` (Fallback ``DATABASE_URL``). Migrationen sind
 ausschliesslich additiv: keine Tabelle und keine Spalte mit Daten wird entfernt.
+
+Danach die Login-Rolle ``va_profiles`` (P3.3), wenn ``VA_PROFILES_PASSWORD`` gesetzt ist: Das
+Init-Skript ``db/init/01_roles.sh`` laeuft nur in einer leeren Datenbank, eine bestehende
+bekommt die Rolle hier. Ihr Passwort folgt der ``.env``.
 """
 
 from __future__ import annotations
@@ -14,9 +18,12 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from psycopg import sql
+from sqlalchemy import create_engine, text
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from va_platform.db import normalize_url
+from va_platform.db.ddl import PROFILES_ROLE, profiles_grant_statements
 
 from ..config import DatabaseSettings
 
@@ -45,6 +52,41 @@ def _upgrade_with_retry(url: str) -> None:
     upgrade(url)
 
 
+def ensure_login_role(url: str, role: str, password: str) -> None:
+    """Legt die Login-Rolle an oder setzt ihr Passwort neu (idempotent).
+
+    Name und Passwort gehen gequotet ueber psycopg in das SQL, nie per String-Verkettung.
+    """
+    engine = create_engine(normalize_url(url))
+    try:
+        with engine.begin() as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": role}
+            ).scalar()
+            verb = "ALTER" if exists else "CREATE"
+            raw = conn.connection.dbapi_connection
+            assert raw is not None
+            with raw.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL(verb + " ROLE {} WITH LOGIN PASSWORD {}").format(
+                        sql.Identifier(role), sql.Literal(password)
+                    )
+                )
+    finally:
+        engine.dispose()
+
+
+def ensure_profiles_role(url: str, password: str) -> None:
+    """Die Rolle der Profil-Befehle samt Rechten, auch in einer Datenbank von vor P3.3."""
+    ensure_login_role(url, PROFILES_ROLE, password)
+    engine = create_engine(normalize_url(url))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(profiles_grant_statements()))
+    finally:
+        engine.dispose()
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s")
     settings = DatabaseSettings()
@@ -58,6 +100,14 @@ def main() -> int:
         log.exception("Migration fehlgeschlagen")
         return 1
     log.info("Datenbankschema ist aktuell")
+    if settings.va_profiles_password is not None:
+        try:
+            ensure_profiles_role(
+                secret.get_secret_value(), settings.va_profiles_password.get_secret_value()
+            )
+        except Exception:
+            # Der Batch braucht die Rolle nicht; nur das Speichern im UI faellt dann aus
+            log.warning("Rolle %s nicht eingerichtet", PROFILES_ROLE, exc_info=True)
     return 0
 
 

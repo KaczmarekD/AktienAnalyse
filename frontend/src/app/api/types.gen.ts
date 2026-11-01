@@ -5,6 +5,76 @@ export type ClientOptions = {
 };
 
 /**
+ * ActivateProfileVersion
+ */
+export type ActivateProfileVersion = {
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
+ * ActivatedProfile
+ */
+export type ActivatedProfile = {
+  /**
+   * Profile Id
+   */
+  profile_id: number;
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
+ * ActiveProfileRef
+ */
+export type ActiveProfileRef = {
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Profile Id
+   */
+  profile_id: number;
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
+ * Factor
+ *
+ * Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.
+ */
+export type Factor = {
+  /**
+   * Better
+   */
+  better: 'low' | 'high';
+  /**
+   * Group
+   */
+  group: 'value' | 'quality';
+  /**
+   * Hint
+   */
+  hint: string;
+  /**
+   * Key
+   */
+  key: string;
+  /**
+   * Label
+   */
+  label: string;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -61,6 +131,324 @@ export type Instrument = {
    * Symbol
    */
   symbol: string;
+};
+
+/**
+ * Preview
+ */
+export type Preview = {
+  active: ActiveProfileRef | null;
+  /**
+   * Entered
+   */
+  entered: Array<string>;
+  /**
+   * Fetch Run Id
+   */
+  fetch_run_id: number;
+  /**
+   * Fetched On
+   */
+  fetched_on: string | null;
+  /**
+   * Left
+   */
+  left: Array<string>;
+  /**
+   * Rows
+   */
+  rows: Array<PreviewRow>;
+  /**
+   * Scoring Run Id
+   */
+  scoring_run_id: number;
+  /**
+   * Top
+   */
+  top: number;
+  /**
+   * Trap Changed
+   */
+  trap_changed: Array<string>;
+};
+
+/**
+ * PreviewRow
+ *
+ * Ein Titel mit den neuen params und, zum Vergleich, mit dem aktiven Profil.
+ */
+export type PreviewRow = {
+  /**
+   * Composite Score
+   */
+  composite_score: number | null;
+  /**
+   * Index
+   */
+  index: string | null;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Passed Filter
+   */
+  passed_filter: boolean;
+  /**
+   * Quality Score
+   */
+  quality_score: number | null;
+  /**
+   * Rank
+   */
+  rank: number | null;
+  /**
+   * Rank Active
+   */
+  rank_active: number | null;
+  /**
+   * Symbol
+   */
+  symbol: string;
+  /**
+   * Value Score
+   */
+  value_score: number | null;
+  /**
+   * Value Trap Flag
+   */
+  value_trap_flag: boolean | null;
+  /**
+   * Value Trap Flag Active
+   */
+  value_trap_flag_active: boolean | null;
+};
+
+/**
+ * ProfileDetail
+ */
+export type ProfileDetail = {
+  /**
+   * Active Version
+   */
+  active_version: number | null;
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Latest Version
+   */
+  latest_version: number | null;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Versions
+   */
+  versions: Array<ProfileVersion>;
+};
+
+/**
+ * ProfileParamsV1
+ *
+ * Die Parameter eines Profils mit ihren Regeln.
+ *
+ * Unbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten
+ * params oder im Formular darf nicht still wegfallen.
+ */
+export type ProfileParamsV1Input = {
+  /**
+   * Drop Negative Value Metrics
+   *
+   * Negative Multiples aus dem Value-Ranking ausschliessen
+   */
+  drop_negative_value_metrics?: boolean;
+  /**
+   * Min Factor Count
+   *
+   * Mindestzahl vorhandener Faktoren je Gruppe
+   */
+  min_factor_count?: number;
+  /**
+   * Min Market Cap
+   *
+   * Mindest-Marktkapitalisierung (EUR)
+   */
+  min_market_cap?: number;
+  /**
+   * Min Quality Factor Share
+   *
+   * Mindestanteil vorhandener Quality-Faktoren
+   */
+  min_quality_factor_share?: number;
+  /**
+   * Min Value Factor Share
+   *
+   * Mindestanteil vorhandener Value-Faktoren
+   */
+  min_value_factor_share?: number;
+  /**
+   * Quality Factors
+   *
+   * Aktive Quality-Faktoren, mindestens 2
+   */
+  quality_factors?: Array<
+    'roic' | 'fcf_margin' | 'operating_margin' | 'net_debt_ebitda' | 'earnings_stability'
+  >;
+  /**
+   * Value Factors
+   *
+   * Aktive Value-Faktoren, mindestens 2
+   */
+  value_factors?: Array<'ev_ebit' | 'pb' | 'p_fcf' | 'shareholder_yield'>;
+  /**
+   * Value Trap Quality Threshold
+   *
+   * Value-Trap bis zu diesem Quality-Score
+   */
+  value_trap_quality_threshold?: number;
+  /**
+   * Value Trap Value Threshold
+   *
+   * Value-Trap ab diesem Value-Score
+   */
+  value_trap_value_threshold?: number;
+  /**
+   * Value Weight
+   *
+   * Gewicht von Value; Quality ist der Rest
+   */
+  value_weight?: number;
+};
+
+/**
+ * ProfileParamsV1
+ *
+ * Die Parameter eines Profils mit ihren Regeln.
+ *
+ * Unbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten
+ * params oder im Formular darf nicht still wegfallen.
+ */
+export type ProfileParamsV1Output = {
+  /**
+   * Drop Negative Value Metrics
+   *
+   * Negative Multiples aus dem Value-Ranking ausschliessen
+   */
+  drop_negative_value_metrics?: boolean;
+  /**
+   * Min Factor Count
+   *
+   * Mindestzahl vorhandener Faktoren je Gruppe
+   */
+  min_factor_count?: number;
+  /**
+   * Min Market Cap
+   *
+   * Mindest-Marktkapitalisierung (EUR)
+   */
+  min_market_cap?: number;
+  /**
+   * Min Quality Factor Share
+   *
+   * Mindestanteil vorhandener Quality-Faktoren
+   */
+  min_quality_factor_share?: number;
+  /**
+   * Min Value Factor Share
+   *
+   * Mindestanteil vorhandener Value-Faktoren
+   */
+  min_value_factor_share?: number;
+  /**
+   * Quality Factors
+   *
+   * Aktive Quality-Faktoren, mindestens 2
+   */
+  quality_factors?: Array<string>;
+  /**
+   * Value Factors
+   *
+   * Aktive Value-Faktoren, mindestens 2
+   */
+  value_factors?: Array<string>;
+  /**
+   * Value Trap Quality Threshold
+   *
+   * Value-Trap bis zu diesem Quality-Score
+   */
+  value_trap_quality_threshold?: number;
+  /**
+   * Value Trap Value Threshold
+   *
+   * Value-Trap ab diesem Value-Score
+   */
+  value_trap_value_threshold?: number;
+  /**
+   * Value Weight
+   *
+   * Gewicht von Value; Quality ist der Rest
+   */
+  value_weight?: number;
+};
+
+/**
+ * ProfileSummary
+ */
+export type ProfileSummary = {
+  /**
+   * Active Version
+   */
+  active_version: number | null;
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Latest Version
+   */
+  latest_version: number | null;
+  /**
+   * Name
+   */
+  name: string;
+};
+
+/**
+ * ProfileVersion
+ */
+export type ProfileVersion = {
+  /**
+   * Active
+   */
+  active: boolean;
+  /**
+   * Comment
+   */
+  comment: string | null;
+  /**
+   * Created At
+   */
+  created_at: string;
+  params: ProfileParamsV1Output;
+  /**
+   * Parent Version
+   */
+  parent_version: number | null;
+  /**
+   * Version
+   */
+  version: number;
 };
 
 /**
@@ -355,6 +743,35 @@ export type RunSummary = {
    * Universe Size
    */
   universe_size: number | null;
+};
+
+/**
+ * SaveProfileVersion
+ */
+export type SaveProfileVersion = {
+  /**
+   * Comment
+   */
+  comment?: string | null;
+  params: ProfileParamsV1Input;
+};
+
+/**
+ * SavedProfileVersion
+ */
+export type SavedProfileVersion = {
+  /**
+   * Parent Version
+   */
+  parent_version: number;
+  /**
+   * Profile Id
+   */
+  profile_id: number;
+  /**
+   * Version
+   */
+  version: number;
 };
 
 /**
@@ -755,3 +1172,211 @@ export type GetRunResponses = {
 };
 
 export type GetRunResponse = GetRunResponses[keyof GetRunResponses];
+
+export type ListFactorsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/scoring/factors';
+};
+
+export type ListFactorsErrors = {
+  /**
+   * Scoring nicht verfuegbar
+   */
+  503: unknown;
+};
+
+export type ListFactorsResponses = {
+  /**
+   * Response List Factors
+   *
+   * Successful Response
+   */
+  200: Array<Factor>;
+};
+
+export type ListFactorsResponse = ListFactorsResponses[keyof ListFactorsResponses];
+
+export type PreviewProfileData = {
+  body: ProfileParamsV1Input;
+  path?: never;
+  query?: {
+    /**
+     * Top
+     */
+    top?: number;
+  };
+  url: '/api/v1/scoring/preview';
+};
+
+export type PreviewProfileErrors = {
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Scoring nicht verfuegbar
+   */
+  503: unknown;
+};
+
+export type PreviewProfileError = PreviewProfileErrors[keyof PreviewProfileErrors];
+
+export type PreviewProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: Preview;
+};
+
+export type PreviewProfileResponse = PreviewProfileResponses[keyof PreviewProfileResponses];
+
+export type ListProfilesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/scoring/profiles';
+};
+
+export type ListProfilesResponses = {
+  /**
+   * Response List Profiles
+   *
+   * Successful Response
+   */
+  200: Array<ProfileSummary>;
+};
+
+export type ListProfilesResponse = ListProfilesResponses[keyof ListProfilesResponses];
+
+export type GetProfileData = {
+  body?: never;
+  path: {
+    /**
+     * Profile Id
+     */
+    profile_id: number;
+  };
+  query?: never;
+  url: '/api/v1/scoring/profiles/{profile_id}';
+};
+
+export type GetProfileErrors = {
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetProfileError = GetProfileErrors[keyof GetProfileErrors];
+
+export type GetProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: ProfileDetail;
+};
+
+export type GetProfileResponse = GetProfileResponses[keyof GetProfileResponses];
+
+export type SaveProfileVersionData = {
+  body: SaveProfileVersion;
+  headers?: {
+    /**
+     * If-Match
+     */
+    'if-match'?: string | null;
+  };
+  path: {
+    /**
+     * Profile Id
+     */
+    profile_id: number;
+  };
+  query?: never;
+  url: '/api/v1/scoring/profiles/{profile_id}';
+};
+
+export type SaveProfileVersionErrors = {
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Version ist nicht mehr die neueste
+   */
+  409: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * If-Match fehlt
+   */
+  428: unknown;
+  /**
+   * Scoring nicht verfuegbar
+   */
+  503: unknown;
+};
+
+export type SaveProfileVersionError = SaveProfileVersionErrors[keyof SaveProfileVersionErrors];
+
+export type SaveProfileVersionResponses = {
+  /**
+   * Successful Response
+   */
+  201: SavedProfileVersion;
+};
+
+export type SaveProfileVersionResponse =
+  SaveProfileVersionResponses[keyof SaveProfileVersionResponses];
+
+export type ActivateProfileVersionData = {
+  body: ActivateProfileVersion;
+  path: {
+    /**
+     * Profile Id
+     */
+    profile_id: number;
+  };
+  query?: never;
+  url: '/api/v1/scoring/profiles/{profile_id}/activate';
+};
+
+export type ActivateProfileVersionErrors = {
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Scoring nicht verfuegbar
+   */
+  503: unknown;
+};
+
+export type ActivateProfileVersionError =
+  ActivateProfileVersionErrors[keyof ActivateProfileVersionErrors];
+
+export type ActivateProfileVersionResponses = {
+  /**
+   * Successful Response
+   */
+  200: ActivatedProfile;
+};
+
+export type ActivateProfileVersionResponse =
+  ActivateProfileVersionResponses[keyof ActivateProfileVersionResponses];

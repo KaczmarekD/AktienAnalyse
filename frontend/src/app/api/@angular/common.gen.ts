@@ -5,8 +5,12 @@ import { type HttpRequest, httpResource } from '@angular/common/http';
 import { client } from '../client.gen';
 import type { Options } from '../sdk.gen';
 import type {
+  ActivateProfileVersionData,
+  ActivateProfileVersionResponse,
   GetInstrumentData,
   GetInstrumentResponse,
+  GetProfileData,
+  GetProfileResponse,
   GetRankingData,
   GetRankingResponse,
   GetReportCsvData,
@@ -18,8 +22,16 @@ import type {
   HealthResponse,
   LatestRankingData,
   LatestRankingResponse,
+  ListFactorsData,
+  ListFactorsResponse,
+  ListProfilesData,
+  ListProfilesResponse,
   ListRunsData,
   ListRunsResponse,
+  PreviewProfileData,
+  PreviewProfileResponse,
+  SaveProfileVersionData,
+  SaveProfileVersionResponse,
 } from '../types.gen';
 
 /**
@@ -131,6 +143,95 @@ export const getRunRequest = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List Factors
+ *
+ * Der Faktor-Katalog mit Richtung und Methodik-Hinweis.
+ */
+export const listFactorsRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<ListFactorsData, ThrowOnError>,
+): HttpRequest<ListFactorsResponse> =>
+  (options?.client ?? client).requestOptions<ListFactorsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/scoring/factors',
+    ...options,
+  });
+
+/**
+ * Preview Profile
+ *
+ * Ranking mit ``params`` auf den Daten des juengsten Bewertungslaufs, verglichen mit dem
+ * aktiven Profil. Speichert nichts.
+ */
+export const previewProfileRequest = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewProfileData, ThrowOnError>,
+): HttpRequest<PreviewProfileResponse> =>
+  (options?.client ?? client).requestOptions<PreviewProfileResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/scoring/preview',
+    ...options,
+  });
+
+/**
+ * List Profiles
+ */
+export const listProfilesRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<ListProfilesData, ThrowOnError>,
+): HttpRequest<ListProfilesResponse> =>
+  (options?.client ?? client).requestOptions<ListProfilesResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/scoring/profiles',
+    ...options,
+  });
+
+/**
+ * Get Profile
+ *
+ * Ein Profil mit allen Versionen, neueste zuerst. ``ETag``: die neueste Version.
+ */
+export const getProfileRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetProfileData, ThrowOnError>,
+): HttpRequest<GetProfileResponse> =>
+  (options?.client ?? client).requestOptions<GetProfileResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/scoring/profiles/{profile_id}',
+    ...options,
+  });
+
+/**
+ * Save Profile Version
+ *
+ * Neue Version auf Grundlage der Version aus ``If-Match``. Aktiviert sie nicht.
+ */
+export const saveProfileVersionRequest = <ThrowOnError extends boolean = false>(
+  options: Options<SaveProfileVersionData, ThrowOnError>,
+): HttpRequest<SaveProfileVersionResponse> =>
+  (options?.client ?? client).requestOptions<SaveProfileVersionResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/scoring/profiles/{profile_id}',
+    ...options,
+  });
+
+/**
+ * Activate Profile Version
+ *
+ * Macht die Version aktiv, auch eine aeltere. Der naechste Lauf rechnet damit.
+ */
+export const activateProfileVersionRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ActivateProfileVersionData, ThrowOnError>,
+): HttpRequest<ActivateProfileVersionResponse> =>
+  (options?.client ?? client).requestOptions<ActivateProfileVersionResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/scoring/profiles/{profile_id}/activate',
+    ...options,
+  });
+
+/**
  * Health
  */
 export const healthResource = <ThrowOnError extends boolean = false>(
@@ -220,4 +321,81 @@ export const getRunResource = <ThrowOnError extends boolean = false>(
   httpResource<GetRunResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? getRunRequest(opts) : undefined;
+  });
+
+/**
+ * List Factors
+ *
+ * Der Faktor-Katalog mit Richtung und Methodik-Hinweis.
+ */
+export const listFactorsResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<ListFactorsData, ThrowOnError> | undefined,
+) =>
+  httpResource<ListFactorsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? listFactorsRequest(opts) : undefined;
+  });
+
+/**
+ * Preview Profile
+ *
+ * Ranking mit ``params`` auf den Daten des juengsten Bewertungslaufs, verglichen mit dem
+ * aktiven Profil. Speichert nichts.
+ */
+export const previewProfileResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<PreviewProfileData, ThrowOnError> | undefined,
+) =>
+  httpResource<PreviewProfileResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? previewProfileRequest(opts) : undefined;
+  });
+
+/**
+ * List Profiles
+ */
+export const listProfilesResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<ListProfilesData, ThrowOnError> | undefined,
+) =>
+  httpResource<ListProfilesResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? listProfilesRequest(opts) : undefined;
+  });
+
+/**
+ * Get Profile
+ *
+ * Ein Profil mit allen Versionen, neueste zuerst. ``ETag``: die neueste Version.
+ */
+export const getProfileResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<GetProfileData, ThrowOnError> | undefined,
+) =>
+  httpResource<GetProfileResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? getProfileRequest(opts) : undefined;
+  });
+
+/**
+ * Save Profile Version
+ *
+ * Neue Version auf Grundlage der Version aus ``If-Match``. Aktiviert sie nicht.
+ */
+export const saveProfileVersionResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<SaveProfileVersionData, ThrowOnError> | undefined,
+) =>
+  httpResource<SaveProfileVersionResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? saveProfileVersionRequest(opts) : undefined;
+  });
+
+/**
+ * Activate Profile Version
+ *
+ * Macht die Version aktiv, auch eine aeltere. Der naechste Lauf rechnet damit.
+ */
+export const activateProfileVersionResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<ActivateProfileVersionData, ThrowOnError> | undefined,
+) =>
+  httpResource<ActivateProfileVersionResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? activateProfileVersionRequest(opts) : undefined;
   });

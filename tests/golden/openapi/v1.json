@@ -1,6 +1,107 @@
 {
   "components": {
     "schemas": {
+      "ActivateProfileVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ActivateProfileVersion",
+        "type": "object"
+      },
+      "ActivatedProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_id",
+          "version"
+        ],
+        "title": "ActivatedProfile",
+        "type": "object"
+      },
+      "ActiveProfileRef": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_id",
+          "name",
+          "version"
+        ],
+        "title": "ActiveProfileRef",
+        "type": "object"
+      },
+      "Factor": {
+        "additionalProperties": false,
+        "description": "Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.",
+        "properties": {
+          "better": {
+            "enum": [
+              "low",
+              "high"
+            ],
+            "title": "Better",
+            "type": "string"
+          },
+          "group": {
+            "enum": [
+              "value",
+              "quality"
+            ],
+            "title": "Group",
+            "type": "string"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "group",
+          "label",
+          "better",
+          "hint"
+        ],
+        "title": "Factor",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -124,6 +225,556 @@
           "score_history"
         ],
         "title": "Instrument",
+        "type": "object"
+      },
+      "Preview": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActiveProfileRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entered": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entered",
+            "type": "array"
+          },
+          "fetch_run_id": {
+            "title": "Fetch Run Id",
+            "type": "integer"
+          },
+          "fetched_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched On"
+          },
+          "left": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Left",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "scoring_run_id": {
+            "title": "Scoring Run Id",
+            "type": "integer"
+          },
+          "top": {
+            "title": "Top",
+            "type": "integer"
+          },
+          "trap_changed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trap Changed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scoring_run_id",
+          "fetch_run_id",
+          "fetched_on",
+          "active",
+          "top",
+          "entered",
+          "left",
+          "trap_changed",
+          "rows"
+        ],
+        "title": "Preview",
+        "type": "object"
+      },
+      "PreviewRow": {
+        "additionalProperties": false,
+        "description": "Ein Titel mit den neuen params und, zum Vergleich, mit dem aktiven Profil.",
+        "properties": {
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "passed_filter": {
+            "title": "Passed Filter",
+            "type": "boolean"
+          },
+          "quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Score"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "rank_active": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank Active"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "value_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Score"
+          },
+          "value_trap_flag": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Trap Flag"
+          },
+          "value_trap_flag_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Trap Flag Active"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "index",
+          "passed_filter",
+          "rank",
+          "rank_active",
+          "composite_score",
+          "value_score",
+          "quality_score",
+          "value_trap_flag",
+          "value_trap_flag_active"
+        ],
+        "title": "PreviewRow",
+        "type": "object"
+      },
+      "ProfileDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "active_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Version"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileVersion"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "latest_version",
+          "active_version",
+          "versions"
+        ],
+        "title": "ProfileDetail",
+        "type": "object"
+      },
+      "ProfileParamsV1-Input": {
+        "additionalProperties": false,
+        "description": "Die Parameter eines Profils mit ihren Regeln.\n\nUnbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten\nparams oder im Formular darf nicht still wegfallen.",
+        "properties": {
+          "drop_negative_value_metrics": {
+            "default": true,
+            "description": "Negative Multiples aus dem Value-Ranking ausschliessen",
+            "title": "Drop Negative Value Metrics",
+            "type": "boolean"
+          },
+          "min_factor_count": {
+            "default": 2,
+            "description": "Mindestzahl vorhandener Faktoren je Gruppe",
+            "minimum": 1.0,
+            "title": "Min Factor Count",
+            "type": "integer"
+          },
+          "min_market_cap": {
+            "default": 300000000.0,
+            "description": "Mindest-Marktkapitalisierung (EUR)",
+            "minimum": 0.0,
+            "title": "Min Market Cap",
+            "type": "number"
+          },
+          "min_quality_factor_share": {
+            "default": 0.5,
+            "description": "Mindestanteil vorhandener Quality-Faktoren",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Quality Factor Share",
+            "type": "number"
+          },
+          "min_value_factor_share": {
+            "default": 0.5,
+            "description": "Mindestanteil vorhandener Value-Faktoren",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Value Factor Share",
+            "type": "number"
+          },
+          "quality_factors": {
+            "description": "Aktive Quality-Faktoren, mindestens 2",
+            "items": {
+              "enum": [
+                "roic",
+                "fcf_margin",
+                "operating_margin",
+                "net_debt_ebitda",
+                "earnings_stability"
+              ],
+              "type": "string"
+            },
+            "title": "Quality Factors",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "value_factors": {
+            "description": "Aktive Value-Faktoren, mindestens 2",
+            "items": {
+              "enum": [
+                "ev_ebit",
+                "pb",
+                "p_fcf",
+                "shareholder_yield"
+              ],
+              "type": "string"
+            },
+            "title": "Value Factors",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "value_trap_quality_threshold": {
+            "default": 0.3,
+            "description": "Value-Trap bis zu diesem Quality-Score",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value Trap Quality Threshold",
+            "type": "number"
+          },
+          "value_trap_value_threshold": {
+            "default": 0.7,
+            "description": "Value-Trap ab diesem Value-Score",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value Trap Value Threshold",
+            "type": "number"
+          },
+          "value_weight": {
+            "default": 0.6,
+            "description": "Gewicht von Value; Quality ist der Rest",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value Weight",
+            "type": "number"
+          }
+        },
+        "title": "ProfileParamsV1",
+        "type": "object"
+      },
+      "ProfileParamsV1-Output": {
+        "additionalProperties": false,
+        "description": "Die Parameter eines Profils mit ihren Regeln.\n\nUnbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten\nparams oder im Formular darf nicht still wegfallen.",
+        "properties": {
+          "drop_negative_value_metrics": {
+            "default": true,
+            "description": "Negative Multiples aus dem Value-Ranking ausschliessen",
+            "title": "Drop Negative Value Metrics",
+            "type": "boolean"
+          },
+          "min_factor_count": {
+            "default": 2,
+            "description": "Mindestzahl vorhandener Faktoren je Gruppe",
+            "minimum": 1.0,
+            "title": "Min Factor Count",
+            "type": "integer"
+          },
+          "min_market_cap": {
+            "default": 300000000.0,
+            "description": "Mindest-Marktkapitalisierung (EUR)",
+            "minimum": 0.0,
+            "title": "Min Market Cap",
+            "type": "number"
+          },
+          "min_quality_factor_share": {
+            "default": 0.5,
+            "description": "Mindestanteil vorhandener Quality-Faktoren",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Quality Factor Share",
+            "type": "number"
+          },
+          "min_value_factor_share": {
+            "default": 0.5,
+            "description": "Mindestanteil vorhandener Value-Faktoren",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Value Factor Share",
+            "type": "number"
+          },
+          "quality_factors": {
+            "description": "Aktive Quality-Faktoren, mindestens 2",
+            "items": {
+              "type": "string"
+            },
+            "title": "Quality Factors",
+            "type": "array"
+          },
+          "value_factors": {
+            "description": "Aktive Value-Faktoren, mindestens 2",
+            "items": {
+              "type": "string"
+            },
+            "title": "Value Factors",
+            "type": "array"
+          },
+          "value_trap_quality_threshold": {
+            "default": 0.3,
+            "description": "Value-Trap bis zu diesem Quality-Score",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value Trap Quality Threshold",
+            "type": "number"
+          },
+          "value_trap_value_threshold": {
+            "default": 0.7,
+            "description": "Value-Trap ab diesem Value-Score",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value Trap Value Threshold",
+            "type": "number"
+          },
+          "value_weight": {
+            "default": 0.6,
+            "description": "Gewicht von Value; Quality ist der Rest",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Value Weight",
+            "type": "number"
+          }
+        },
+        "title": "ProfileParamsV1",
+        "type": "object"
+      },
+      "ProfileSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "active_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Version"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "latest_version",
+          "active_version"
+        ],
+        "title": "ProfileSummary",
+        "type": "object"
+      },
+      "ProfileVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/ProfileParamsV1-Output"
+          },
+          "parent_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Version"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "params",
+          "parent_version",
+          "comment",
+          "created_at",
+          "active"
+        ],
+        "title": "ProfileVersion",
         "type": "object"
       },
       "Ranking": {
@@ -803,6 +1454,55 @@
           "exit_code"
         ],
         "title": "RunSummary",
+        "type": "object"
+      },
+      "SaveProfileVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "params": {
+            "$ref": "#/components/schemas/ProfileParamsV1-Input"
+          }
+        },
+        "required": [
+          "params"
+        ],
+        "title": "SaveProfileVersion",
+        "type": "object"
+      },
+      "SavedProfileVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "parent_version": {
+            "title": "Parent Version",
+            "type": "integer"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_id",
+          "version",
+          "parent_version"
+        ],
+        "title": "SavedProfileVersion",
         "type": "object"
       },
       "ScorePoint": {
@@ -1493,6 +2193,306 @@
         "summary": "Get Run",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/v1/scoring/factors": {
+      "get": {
+        "description": "Der Faktor-Katalog mit Richtung und Methodik-Hinweis.",
+        "operationId": "list_factors",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Factor"
+                  },
+                  "title": "Response List Factors",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "Scoring nicht verfuegbar"
+          }
+        },
+        "summary": "List Factors",
+        "tags": [
+          "scoring"
+        ]
+      }
+    },
+    "/api/v1/scoring/preview": {
+      "post": {
+        "description": "Ranking mit ``params`` auf den Daten des juengsten Bewertungslaufs, verglichen mit dem\naktiven Profil. Speichert nichts.",
+        "operationId": "preview_profile",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "top",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Top",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileParamsV1-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Scoring nicht verfuegbar"
+          }
+        },
+        "summary": "Preview Profile",
+        "tags": [
+          "scoring"
+        ]
+      }
+    },
+    "/api/v1/scoring/profiles": {
+      "get": {
+        "operationId": "list_profiles",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileSummary"
+                  },
+                  "title": "Response List Profiles",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Profiles",
+        "tags": [
+          "scoring"
+        ]
+      }
+    },
+    "/api/v1/scoring/profiles/{profile_id}": {
+      "get": {
+        "description": "Ein Profil mit allen Versionen, neueste zuerst. ``ETag``: die neueste Version.",
+        "operationId": "get_profile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile",
+        "tags": [
+          "scoring"
+        ]
+      },
+      "put": {
+        "description": "Neue Version auf Grundlage der Version aus ``If-Match``. Aktiviert sie nicht.",
+        "operationId": "save_profile_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveProfileVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedProfileVersion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Version ist nicht mehr die neueste"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "428": {
+            "description": "If-Match fehlt"
+          },
+          "503": {
+            "description": "Scoring nicht verfuegbar"
+          }
+        },
+        "summary": "Save Profile Version",
+        "tags": [
+          "scoring"
+        ]
+      }
+    },
+    "/api/v1/scoring/profiles/{profile_id}/activate": {
+      "post": {
+        "description": "Macht die Version aktiv, auch eine aeltere. Der naechste Lauf rechnet damit.",
+        "operationId": "activate_profile_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateProfileVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivatedProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Scoring nicht verfuegbar"
+          }
+        },
+        "summary": "Activate Profile Version",
+        "tags": [
+          "scoring"
         ]
       }
     }

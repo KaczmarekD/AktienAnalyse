@@ -56,6 +56,12 @@ Phase 2 vorhanden) direkt aus den Schemas des Batches. Die Profil-Vorschau ruft 
 Scoring-Code über einen Port im selben Prozess auf. Ab Phase 4 werden daraus Projektionen und
 Request/Reply, ohne dass sich die REST-API ändert.
 
+Seit P3.3 gilt das auch für die Profil-Befehle (Speichern, Aktivieren). Die Ports stehen in
+`va_web_api.ports`, umgesetzt sind sie in `src/web.py`, der Composition Root des
+web-api-Prozesses. Geschrieben wird mit der Rolle `va_profiles`, die nur in die
+Profil-Tabellen anfügen darf, nicht mit der Rolle des Batches. Fehlt
+`WEB_API_PROFILES_DATABASE_URL`, antworten die schreibenden Endpunkte mit 503.
+
 ## Eventmanager
 
 Der Eventmanager ist die Drehscheibe im web-api. Er verarbeitet jedes Event in zwei Schritten:

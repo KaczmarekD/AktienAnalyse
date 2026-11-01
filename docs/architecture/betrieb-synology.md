@@ -136,6 +136,10 @@ Ablauf eines Updates:
 3. Import-Test (Regel 2), danach `docker compose up -d`.
 4. Jeder Service migriert beim Start sein eigenes Schema mit der Owner-Rolle.
 
+Neue Variablen in der `.env` nennt `.env.example`. Fehlt eine Pflichtvariable, bricht Compose mit
+einem Hinweis ab, etwa „VA_PROFILES_PASSWORD in .env setzen“ (seit P3.3, Rolle `va_profiles` für
+das Speichern von Profilen im UI). Der nächste Start des Batches legt die Rolle dann an.
+
 Sind die Images privat, braucht die NAS einmalig `docker login ghcr.io` mit einem Token, das nur
 `read:packages` darf.
 

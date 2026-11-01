@@ -38,7 +38,7 @@ force: ## Wie run, aber ignoriert den Abruf von heute in der DB
 	$(PYTHON) -m src.main --force-refresh
 
 api: ## web-api aus der .venv mit Reload, Swagger unter http://localhost:8000/api/docs
-	$(RUN) uvicorn --factory va_web_api.main:create_app --reload --host 127.0.0.1 --port 8000
+	$(RUN) uvicorn --factory src.web:create_app --reload --host 127.0.0.1 --port 8000
 
 # ---------- Qualitaetssicherung ----------------------------------------------
 test: ## Tests laufen lassen

@@ -120,3 +120,38 @@ class TestReplayResult:
         top = expected.scores.sort_values("rank_overall").iloc[0]["symbol"]
         names = expected.snapshots.set_index("symbol")["name"]
         assert f"Top: {names[top]}" in mail["Subject"]
+
+
+class TestScoringProfiles:
+    """P3.3: Profile ueber nginx; das web-api speichert mit va_profiles aus dem Init-Skript."""
+
+    def _standard(self, ui: httpx.Client) -> dict[str, Any]:
+        [standard] = [
+            p for p in get_json(ui, "/api/v1/scoring/profiles") if p["name"] == "Standard"
+        ]
+        return get_json(ui, f"/api/v1/scoring/profiles/{standard['id']}")
+
+    @pytest.mark.usefixtures("run")
+    def test_standard_is_active(self, ui):
+        assert self._standard(ui)["active_version"] is not None
+
+    @pytest.mark.usefixtures("run")
+    def test_preview_with_the_active_profile_changes_nothing(self, ui):
+        active = next(v for v in self._standard(ui)["versions"] if v["active"])
+        response = ui.post("/api/v1/scoring/preview", json=active["params"])
+        response.raise_for_status()
+        body = response.json()
+        assert (body["entered"], body["left"]) == ([], [])
+        assert all(r["rank"] == r["rank_active"] for r in body["rows"])
+
+    @pytest.mark.usefixtures("expected")  # nur im Wegwerf-Stack: legt eine Version an
+    def test_saving_needs_the_newest_version(self, ui):
+        detail = self._standard(ui)
+        newest = detail["latest_version"]
+        body = {"params": {**detail["versions"][0]["params"], "value_weight": 0.5}}
+        url = f"/api/v1/scoring/profiles/{detail['id']}"
+        saved = ui.put(url, json=body, headers={"If-Match": f'"{newest}"'})
+        assert saved.status_code == 201, saved.text
+        assert saved.json()["version"] == newest + 1
+        stale = ui.put(url, json=body, headers={"If-Match": f'"{newest}"'})
+        assert stale.status_code == 409

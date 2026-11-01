@@ -201,6 +201,13 @@ class ScoringRepository:
             raise LookupError(msg)
         return active, new_id is not None
 
+    def get_profile_name(self, profile_id: int) -> str | None:
+        return self.session.execute(select(Profile.name).where(Profile.id == profile_id)).scalar()
+
+    def get_newest_profile_version(self, profile_id: int) -> int | None:
+        newest = self._newest_version(profile_id)
+        return newest or None
+
     def get_profile_id(self, name: str) -> int | None:
         return self.session.execute(select(Profile.id).where(Profile.name == name)).scalar()
 
@@ -239,6 +246,18 @@ class ScoringRepository:
 
     def get_scoring_run(self, scoring_run_id: int) -> ScoringRun | None:
         return self.session.get(ScoringRun, scoring_run_id)
+
+    def get_latest_scoring_run(
+        self, *, exclude_origins: Collection[str] = ("rescore",)
+    ) -> ScoringRun | None:
+        """Der juengste Bewertungslauf, ohne Rescores (die bewerten absichtlich anders)."""
+        stmt = (
+            select(ScoringRun)
+            .where(ScoringRun.origin.not_in(list(exclude_origins)))
+            .order_by(ScoringRun.created_at.desc(), ScoringRun.id.desc())
+            .limit(1)
+        )
+        return self.session.scalars(stmt).first()
 
     def get_scoring_runs(
         self,

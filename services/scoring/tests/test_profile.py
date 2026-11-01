@@ -196,3 +196,22 @@ class TestDisabledFactor:
         before = default.set_index("symbol")["value_score"]
         after = without_pb.set_index("symbol")["value_score"].reindex(before.index)
         assert not before.equals(after)
+
+
+# --- P3.3: Katalog fuer das UI, Modell als Contract ------------------------------------------
+
+
+def test_every_factor_has_label_and_hint():
+    from va_scoring.domain.profile import FACTOR_INFO
+
+    assert set(FACTOR_INFO) == ALL_VALUE | ALL_QUALITY
+    assert all(label and hint for label, hint in FACTOR_INFO.values())
+
+
+def test_params_are_the_shared_contract():
+    # Das web-api kennt nur den Contract; scoring ergaenzt die Abbildung auf score()
+    from va_contracts.profile import ProfileParamsV1
+
+    assert issubclass(ScoringProfileParams, ProfileParamsV1)
+    stored = ProfileParamsV1().model_dump(mode="json")
+    assert ScoringProfileParams.model_validate(stored).to_config() == ScoringConfig()

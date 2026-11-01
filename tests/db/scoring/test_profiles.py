@@ -235,3 +235,41 @@ class TestScoringRunReference:
         repo.write_profile_version(pid, PARAMS)
         with pytest.raises(IntegrityError):
             repo.write_scoring_run(fetch_run_id=1, config=PARAMS, app_version="0", profile_id=pid)
+
+
+class TestProfilesRole:
+    """P3.3: va_profiles darf Profile lesen und Versionen/Aktivierungen anlegen, sonst nichts."""
+
+    @pytest.fixture
+    def profile_id(self, engine) -> int:
+        with session_scope(engine) as s:
+            repo = ScoringRepository(s)
+            pid = repo.write_profile("Standard")
+            repo.write_profile_version(pid, PARAMS)
+            repo.write_profile_activation(pid, 1)
+        return pid
+
+    def test_can_save_and_activate(self, profiles_engine, profile_id):
+        with session_scope(profiles_engine) as s:
+            repo = ScoringRepository(s)
+            version = repo.write_profile_version(profile_id, PARAMS, parent_version=1)
+            repo.write_profile_activation(profile_id, version)
+            active = repo.get_active_profile_version()
+        assert active is not None
+        assert active.version == 2
+
+    @pytest.mark.usefixtures("profile_id")
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "INSERT INTO scoring.profile (name) VALUES ('Neu')",
+            "INSERT INTO scoring.scoring_run (origin, app_version) VALUES ('live', '0')",
+            "SELECT count(*) FROM market_data.fundamental_snapshot",
+            "SELECT count(*) FROM batch.run",
+            "UPDATE scoring.profile_version SET comment = 'x'",
+            "DELETE FROM scoring.profile_activation",
+        ],
+    )
+    def test_nothing_else(self, profiles_engine, sql):
+        with pytest.raises(DBAPIError, match="permission denied"):
+            _exec(profiles_engine, sql)

@@ -14,6 +14,8 @@ from sqlalchemy import text
 
 from .models import (
     Instrument,
+    ProfileDetail,
+    ProfileSummary,
     Ranking,
     RankingRow,
     Report,
@@ -213,3 +215,52 @@ def get_report_csv(conn: Connection, report_id: int) -> tuple[str, bytes] | None
 def _day(moment: datetime | None) -> date | None:
     """Tag in lokaler Zeit (Container: TZ=Europe/Berlin), wie im Batch."""
     return None if moment is None else moment.astimezone().date()
+
+
+# --- Scoring-Profile (P3.3) -----------------------------------------------------------------
+
+_ACTIVE = """
+    SELECT profile_id, version FROM scoring.profile_activation
+    ORDER BY activated_at DESC, id DESC LIMIT 1
+"""
+
+_PROFILE_COLUMNS = f"""
+    p.id, p.name, p.created_at,
+    (SELECT max(v.version) FROM scoring.profile_version v WHERE v.profile_id = p.id)
+        AS latest_version,
+    (SELECT a.version FROM ({_ACTIVE}) a WHERE a.profile_id = p.id) AS active_version
+"""
+
+
+def list_profiles(conn: Connection) -> list[ProfileSummary]:
+    rows = conn.execute(
+        text(f"SELECT {_PROFILE_COLUMNS} FROM scoring.profile p ORDER BY p.name, p.id")
+    ).mappings()
+    return [ProfileSummary.model_validate(dict(row)) for row in rows]
+
+
+def get_profile(conn: Connection, profile_id: int) -> ProfileDetail | None:
+    head = (
+        conn.execute(
+            text(f"SELECT {_PROFILE_COLUMNS} FROM scoring.profile p WHERE p.id = :id"),
+            {"id": profile_id},
+        )
+        .mappings()
+        .first()
+    )
+    if head is None:
+        return None
+    versions = conn.execute(
+        text("""
+            SELECT version, params, parent_version, comment, created_at
+            FROM scoring.profile_version WHERE profile_id = :id ORDER BY version DESC
+        """),
+        {"id": profile_id},
+    ).mappings()
+    active = head["active_version"]
+    return ProfileDetail.model_validate(
+        {
+            **dict(head),
+            "versions": [{**dict(v), "active": v["version"] == active} for v in versions],
+        }
+    )

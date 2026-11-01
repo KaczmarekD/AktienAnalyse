@@ -11,6 +11,9 @@ services:
       # Nur beim allerersten Start (leeres pgdata/) von db/init/01_roles.sh genutzt
       VA_APP_PASSWORD: ${VA_APP_PASSWORD:?VA_APP_PASSWORD in .env setzen}
       VA_READ_PASSWORD: ${VA_READ_PASSWORD:?VA_READ_PASSWORD in .env setzen}
+      # P3.3: Rolle fuer die Profil-Befehle des web-api. In einer bestehenden Datenbank legt
+      # sie die Migration beim Start des Batches an (python -m src.db.migrate)
+      VA_PROFILES_PASSWORD: ${VA_PROFILES_PASSWORD:?VA_PROFILES_PASSWORD in .env setzen}
     volumes:
       # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
       # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,
@@ -63,14 +66,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle
+    # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. src.web verdrahtet
+    # Vorschau und Profil-Befehle aus scoring im selben Prozess (P3.3, ab Phase 4 per NATS)
     entrypoint:
-      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
+      ["python", "-m", "uvicorn", "--factory", "src.web:create_app",
        "--host", "0.0.0.0", "--port", "8000"]
-    # Bewusst ohne env_file: nur die Leserolle, keine Zugangsdaten des Batches
+    # Bewusst ohne env_file: keine Zugangsdaten des Batches. Lesen mit va_read, Profile
+    # speichern mit va_profiles (darf nur in die Profil-Tabellen anfuegen)
     environment:
       TZ: Europe/Berlin
       WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
+      WEB_API_PROFILES_DATABASE_URL: postgresql+psycopg://va_profiles:${VA_PROFILES_PASSWORD}@db:5432/value_analyzer
 
   frontend:
     # Einziger Einstieg im LAN (P3.6, ADR-0005/0007): Angular-Build und /api/ an das web-api.
