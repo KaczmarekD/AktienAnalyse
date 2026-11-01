@@ -15,7 +15,7 @@
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; API seit P3.3, Editor im UI offen; NAS: Deployment |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | ✅ im Code erledigt (P3.1–P3.8): Analysen, Profil-Editor und Schutz der Schnittstelle; NAS: Deployment |
-| 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | offen |
+| 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | 🚧 P4.1 erledigt (NATS-Dienst, Stream und Consumer), ab P4.2 offen |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
@@ -162,7 +162,7 @@ Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 f
 
 Details: [Implementierungsplan, Phase 4](implementierungsplan.md#phase-4--events-und-echtzeit)
 
-- [ ] P4.1 NATS-Infrastruktur
+- [x] P4.1 NATS-Infrastruktur (`935dedc`)
 - [ ] P4.2 Outbox und Inbox
 - [ ] P4.3 NATS als Bus
 - [ ] P4.4 Eventmanager und Projektionen
