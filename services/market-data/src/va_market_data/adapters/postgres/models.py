@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from va_market_data.domain.consensus import CONSENSUS_KINDS, CONSENSUS_STATUSES
 from va_platform.db import Base, in_values
+from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
 
 FETCH_ORIGINS = ("live", "import")
 STATEMENTS = ("income", "balance", "cashflow")
@@ -281,3 +282,15 @@ class FundamentalSnapshot(Base):
     # Status
     fetch_ok: Mapped[bool]
     errors: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
+
+
+class MarketDataOutbox(OutboxMixin, Base):
+    """Events von market-data, bis das Relay sie veroeffentlicht hat (P4.2)."""
+
+    __table_args__ = outbox_table_args("market_data")
+
+
+class MarketDataInbox(InboxMixin, Base):
+    """Events, die market-data verarbeitet hat, je Consumer einmal (P4.2)."""
+
+    __table_args__ = {"schema": "market_data"}  # noqa: RUF012

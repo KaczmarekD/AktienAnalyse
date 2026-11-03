@@ -18,6 +18,9 @@ from va_scoring.adapters.postgres import ScoreRow, ScoringRepository
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 
+# Die Outbox (P4.2) darf published_at einmal setzen, wie ein Lauf seinen Abschluss
+GUARDED_UPDATE = {*UPDATABLE_TABLES, *(f"{s}.outbox" for s in APP_SCHEMAS)}
+
 
 def _fetch_run(repo: MarketDataRepository) -> int:
     return repo.write_fetch_run_start(
@@ -50,7 +53,7 @@ def _unguarded(engine: Engine) -> list[str]:
     """Alle Luecken im Schutz der App-Tabellen, leer bei vollstaendigem Schutz.
 
     Jede Tabelle braucht Trigger gegen DELETE und TRUNCATE. Gegen UPDATE schuetzt
-    ``va_no_update``, nur ``UPDATABLE_TABLES`` haben stattdessen ``va_guard_update``.
+    ``va_no_update``, nur ``GUARDED_UPDATE`` hat stattdessen ``va_guard_update``.
     """
     gaps: list[str] = []
     with engine.connect() as conn:
@@ -71,11 +74,11 @@ def _unguarded(engine: Engine) -> list[str]:
                     {"t": table},
                 ).scalars()
             )
-            update_guard = "va_guard_update" if table in UPDATABLE_TABLES else "va_no_update"
+            update_guard = "va_guard_update" if table in GUARDED_UPDATE else "va_no_update"
             for guard in ("va_no_delete", "va_no_truncate", update_guard):
                 if guard not in names:
                     gaps.append(f"{table} ohne {guard}")
-            if table in UPDATABLE_TABLES and "va_no_update" in names:
+            if table in GUARDED_UPDATE and "va_no_update" in names:
                 gaps.append(f"{table} darf abgeschlossen werden, hat aber va_no_update")
     return gaps
 

@@ -7,6 +7,8 @@ der Zustellung und dem Nachspielen. Fluechtige Meldungen (``live.va.…``) und R
 
 Von der Kommandozeile: ``python -m va_platform.nats`` mit ``NATS_URL``. Ab P4.3 rufen die
 Services ``provision`` beim Start selbst.
+
+``JetStreamPublisher`` (P4.2) sendet fuer das Relay der Outbox (``va_platform.messaging``).
 """
 
 from __future__ import annotations
@@ -19,7 +21,10 @@ from nats.js.api import AckPolicy, ConsumerConfig, StorageType, StreamConfig
 from nats.js.errors import NotFoundError
 
 if TYPE_CHECKING:
+    from nats.js.client import JetStreamContext
     from nats.js.manager import JetStreamManager
+
+    from ..messaging import OutboxMessage
 
 log = logging.getLogger(__name__)
 
@@ -116,3 +121,25 @@ async def _ensure_consumer(jsm: JetStreamManager, spec: ConsumerSpec) -> None:
         # Dieselbe Anfrage aendert einen bestehenden durable Consumer (NATS ab 2.10)
         await jsm.add_consumer(STREAM_NAME, wanted)
         log.info("Consumer %s angeglichen", spec.durable)
+
+
+class JetStreamPublisher:
+    """``Publisher`` der Outbox fuer JetStream (P4.2).
+
+    ``Nats-Msg-Id`` ist die Event-ID: Sendet das Relay ein Event noch einmal, verwirft JetStream
+    es im Deduplizierungsfenster. ``stream`` verlangt die Bestaetigung von ``VA_EVENTS``. Fehlt
+    der Stream oder antwortet NATS nicht, wirft ``publish``, und der Eintrag bleibt offen.
+    """
+
+    def __init__(self, js: JetStreamContext, *, timeout: float = 5.0) -> None:
+        self._js = js
+        self._timeout = timeout
+
+    async def publish(self, message: OutboxMessage) -> None:
+        await self._js.publish(
+            message.subject,
+            message.payload,
+            timeout=self._timeout,
+            stream=STREAM_NAME,
+            headers={"Nats-Msg-Id": str(message.id)},
+        )

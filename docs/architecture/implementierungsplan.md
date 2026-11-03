@@ -1485,6 +1485,83 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Eine doppelte Event-ID wird nur einmal verarbeitet.
   - `UPDATE` auf der Outbox ist nur für `published_at` erlaubt.
 - **Implementierung:** Outbox, Relay und Inbox in `va-platform`.
+- **Entwurf (01.11.2026):**
+  - **Tabellen** (Migration `0009`): `outbox` und `inbox` in jedem der vier Schemas, wie in
+    [events.md](events.md).
+    - Die Modelle legt der Besitzer des Schemas an (`ScoringOutbox`, `ScoringInbox` usw.), die
+      Spalten kommen aus Mixins in `va_platform.messaging`. So bleibt jede Tabelle bei ihrem
+      Modul, und die Logik gibt es nur einmal.
+    - `outbox`: `id` (Event-ID), `subject`, `payload` (die ganze Hülle als JSONB),
+      `created_at` und `published_at`. Ein Teilindex deckt die offenen Einträge ab.
+    - `inbox`: `message_id`, `consumer`, `processed_at` und `error`, Schlüssel ist
+      `(message_id, consumer)`. `error` ist nur bei einem aufgegebenen Event gesetzt
+      (Dead Letter, ab P4.3).
+  - **Schreibschutz:**
+    - Die Inbox ist nur zum Anfügen da, wie die Faktentabellen.
+    - Auf der Outbox lässt der Trigger `va_guard_outbox` nur ein UPDATE zu, das `published_at`
+      einmal setzt. Er vergleicht die Zeile ohne `published_at`, also bleibt jede andere Spalte
+      gleich, auch eine spätere. Ein zweites Setzen ist verboten.
+    - `va_app` bekommt nur das Spaltenrecht `UPDATE (published_at)`.
+  - **`va_platform.messaging`:**
+    - `Outbox(model).add(session, envelope)` schreibt das Event in die Transaktion des
+      Aufrufers. Das Subject kommt aus dem Katalog (`va.<type>`). Flüchtige Events (`live.va.…`)
+      lehnt sie ab, die laufen nie über die Outbox.
+    - `OutboxRelay(engine, outbox, publisher)`:
+      - `publish_pending()` veröffentlicht die offenen Einträge in der Reihenfolge ihres
+        Entstehens und markiert jeden nach dem Ack des Publishers.
+      - Scheitert ein Versand, bricht es ab. Dieser und alle späteren Einträge bleiben offen und
+        kommen beim nächsten Mal dran. Doppelt veröffentlichen ist harmlos, JetStream verwirft
+        Duplikate über die `Nats-Msg-Id`.
+      - `run(stop, interval=…)` wiederholt das, bis `stop` gesetzt ist. Ein Fehler wird geloggt
+        und beendet die Schleife nicht.
+      - Die Datenbank läuft synchron und deshalb per `asyncio.to_thread`
+        ([datenhaltung.md](datenhaltung.md)).
+    - `Inbox(model)`:
+      - `claim(session, message_id, consumer)` legt den Eintrag in der Transaktion des Handlers
+        an und meldet, ob das Event für diesen Consumer neu ist.
+      - `process_once(engine, message_id, consumer, work)` verpackt das: Inbox-Eintrag,
+        Fachdaten und Folge-Events (über die Outbox) landen in einer Transaktion oder gar nicht.
+      - `record_dead_letter(…)` vermerkt ein aufgegebenes Event mit Fehler, danach gilt es für
+        den Consumer als erledigt.
+  - **Publisher für NATS:** `va_platform.nats.JetStreamPublisher` setzt `Nats-Msg-Id` gleich der
+    Event-ID und verlangt den Stream `VA_EVENTS`.
+  - **Nicht in P4.2:** Die Kette läuft weiter über den Bus im Prozess. Handler, die über Inbox
+    und Outbox laufen, und das Relay in den Services kommen mit P4.3.
+  - **Test (rot):**
+    - DB-Tests:
+      - Ein Event entsteht nur bei Commit: Vor dem Commit sieht das Relay nichts, nach einem
+        Rollback gibt es keinen Eintrag.
+      - Das Relay veröffentlicht offene Einträge in Reihenfolge und markiert sie. Ein zweiter
+        Lauf veröffentlicht nichts.
+      - Scheitert ein Versand, bleiben dieser und alle späteren Einträge offen, der nächste Lauf
+        holt sie nach. `run` übersteht einen Fehler.
+      - Eine doppelte Event-ID wird je Consumer nur einmal verarbeitet.
+      - Scheitert die Verarbeitung, bleibt kein Inbox-Eintrag. Inbox-Eintrag, Fachdaten und
+        Folge-Event fallen gemeinsam weg.
+      - Nach einem Dead Letter wird das Event nicht mehr verarbeitet.
+      - Ein UPDATE auf der Outbox ist nur für `published_at` erlaubt und nur einmal, in allen
+        vier Schemas. `va_app` darf keine andere Spalte ändern.
+      - Flüchtige Events landen nicht in der Outbox.
+      - Jedes Schema hat `outbox` und `inbox`, als Modell und in der migrierten Datenbank.
+    - Ohne Datenbank: Die Filter der Consumer aus P4.1 sind Subjects dauerhafter Events im
+      Katalog.
+    - NATS: Der Publisher veröffentlicht mit `Nats-Msg-Id`, dasselbe Event zweimal landet nur
+      einmal im Stream.
+- **Umgesetzt (01.11.2026):** wie im Entwurf, dazu:
+  - **Parallele Zustellung:** Kommt dasselbe Event noch einmal, während die erste Zustellung
+    läuft, wartet die zweite auf deren Transaktion. Nach einem Commit überspringt sie das Event,
+    nach einem Rollback verarbeitet sie es selbst (Test mit zwei echten Transaktionen).
+  - **Backoff im Relay:** `run` verdoppelt die Pause nach einem Fehler bis `max_interval`
+    (30 s). Nur der erste Fehler einer Serie kommt mit Traceback ins Log, die Erholung wird
+    gemeldet. Sonst schriebe ein NATS-Ausfall jede Sekunde einen Traceback.
+  - **Reihenfolge:** Innerhalb einer Transaktion bleibt sie erhalten, über Transaktionen nur
+    ungefähr. `created_at` ist der Beginn der Transaktion, nicht ihr Commit.
+  - **Migration `0009`:** Die Trigger-Funktion `va_guard_outbox` steht ausgeschrieben in der
+    Migration, wie in `0005`. Die Schemas stehen dort fest, nicht aus `ddl.SCHEMAS`.
+  - Modelle und migrierte Datenbank stimmen überein: Alembic findet beim Vergleich keine
+    Abweichung.
+  - Ohne Nutzer bis P4.3. Die neuen Tabellen bleiben auf der NAS leer, bis die Services über
+    Inbox und Outbox laufen.
 
 #### P4.3 NATS als Bus
 

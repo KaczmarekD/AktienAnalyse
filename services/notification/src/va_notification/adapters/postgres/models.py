@@ -8,6 +8,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Identity, LargeBinary, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_platform.db import Base, in_values
+from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
 
 CHANNELS = ("mail", "healthcheck")
 DELIVERY_KINDS = ("report", "error", "ping_ok", "ping_fail")
@@ -49,3 +50,15 @@ class Delivery(Base):
     success: Mapped[bool]
     error: Mapped[str | None]
     sent_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ReportingOutbox(OutboxMixin, Base):
+    """Events von notification, bis das Relay sie veroeffentlicht hat (P4.2)."""
+
+    __table_args__ = outbox_table_args("reporting")
+
+
+class ReportingInbox(InboxMixin, Base):
+    """Events, die notification verarbeitet hat, je Consumer einmal (P4.2)."""
+
+    __table_args__ = {"schema": "reporting"}  # noqa: RUF012

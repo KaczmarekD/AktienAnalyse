@@ -5,7 +5,8 @@ Jede neue Tabelle braucht ``protect_table()`` in ihrer Migration - der Test
 
 Rollen (legt ``db/init/01_roles.sh`` an, bzw. der DBA bei fremdem Postgres):
 - Owner (``POSTGRES_USER``): fuehrt Migrationen aus.
-- ``va_app``: SELECT/INSERT, UPDATE nur fuer Laufabschluss und ISIN - kein DELETE.
+- ``va_app``: SELECT/INSERT, UPDATE nur fuer Laufabschluss, ISIN und ``published_at`` der
+  Outbox - kein DELETE.
 - ``va_read``: nur SELECT, fuer Auswertungen aus dem LAN.
 """
 
@@ -75,7 +76,13 @@ def protect_table(table: str) -> list[str]:
         f"CREATE TRIGGER va_no_truncate BEFORE TRUNCATE ON {table} "
         "FOR EACH STATEMENT EXECUTE FUNCTION public.va_forbid_change()",
     ]
-    if table == "market_data.instrument":
+    if table.endswith(".outbox"):
+        # va_guard_outbox legt Migration 0009 an: published_at einmal setzen, sonst nichts
+        statements.append(
+            f"CREATE TRIGGER va_guard_update BEFORE UPDATE ON {table} "
+            "FOR EACH ROW EXECUTE FUNCTION public.va_guard_outbox()"
+        )
+    elif table == "market_data.instrument":
         statements.append(
             f"CREATE TRIGGER va_guard_update BEFORE UPDATE ON {table} "
             "FOR EACH ROW EXECUTE FUNCTION public.va_guard_instrument()"
@@ -120,6 +127,23 @@ BEGIN
             EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I '
                            'GRANT SELECT ON TABLES TO va_read', s);
         END LOOP;
+    END IF;
+END
+$$;
+"""
+
+
+def outbox_grant_statements(schemas: Iterable[str]) -> str:
+    """``va_app`` darf in der Outbox nur ``published_at`` setzen (Spaltenrecht, P4.2).
+
+    SELECT und INSERT kommen ueber ``grant_statements``. Nur, wenn es die Rolle gibt.
+    """
+    tables = ", ".join(f"{schema}.outbox" for schema in schemas)
+    return f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'va_app') THEN
+        GRANT UPDATE (published_at) ON {tables} TO va_app;
     END IF;
 END
 $$;

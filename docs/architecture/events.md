@@ -3,7 +3,8 @@
 > **Status:** Plan (30.09.2026). Ab Phase 1 mit einem Bus im Prozess, ab Phase 4 über NATS, siehe
 > [Roadmap](roadmap.md). Entscheidung: [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
 > Seit P4.1 (01.11.2026) gibt es den NATS-Dienst und die Provisionierung von Stream und Consumern
-> (`va_platform.nats`). Die Events laufen ab P4.3 darüber.
+> (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Die Events laufen
+> ab P4.3 darüber.
 
 ## Grundprinzipien
 
@@ -154,6 +155,29 @@ create table inbox (
 Beide Tabellen gibt es in jedem Service-Schema, die Implementierung liegt einmal in
 `va-platform`. Die Outbox braucht `UPDATE` auf `published_at` und damit eine bewusste Ausnahme im
 Schreibschutz ([datenhaltung.md](datenhaltung.md)).
+
+**Umgesetzt seit P4.2 (01.11.2026)**, genutzt ab P4.3:
+
+- **Tabellen** (Migration `0009`): wie oben, in `batch`, `market_data`, `scoring` und
+  `reporting`. Die Inbox hat zusätzlich `error`, gesetzt nur bei einem aufgegebenen Event.
+  - Die Modelle liegen beim Besitzer des Schemas (`ScoringOutbox`, `ScoringInbox` usw.).
+  - Die Spalten kommen aus `OutboxMixin` und `InboxMixin` (`va_platform.messaging`).
+- **Senden:**
+  - `Outbox(model).add(session, envelope)` schreibt in die Transaktion des Aufrufers. Das
+    Subject kommt aus dem Katalog, flüchtige Events lehnt sie ab.
+  - `OutboxRelay(engine, outbox, publisher)` veröffentlicht offene Einträge in der Reihenfolge
+    ihres Entstehens und setzt danach `published_at`.
+    - Scheitert ein Versand, bleiben dieser und alle späteren Einträge offen.
+    - `run(stop, interval=…)` versucht es weiter, bis der Dienst stoppt.
+  - Publisher für NATS ist `va_platform.nats.JetStreamPublisher` (`Nats-Msg-Id` gleich Event-ID,
+    Stream `VA_EVENTS` verlangt).
+- **Empfangen:**
+  - `Inbox(model).process_once(engine, message_id, consumer, work)` führt `work` nur für ein neues
+    Event aus. Inbox-Eintrag, Fachdaten und Folge-Events teilen sich eine Transaktion.
+  - `record_dead_letter` vermerkt ein aufgegebenes Event.
+- **Schreibschutz:**
+  - Der Trigger `va_guard_outbox` lässt nur ein UPDATE zu, das `published_at` einmal setzt.
+  - `va_app` hat dafür nur das Spaltenrecht `UPDATE (published_at)`.
 
 ## Consumer
 

@@ -2,7 +2,8 @@
 
 > **Status:** Die Postgres-Persistenz ist seit `261dc8f` auf `main` umgesetzt (Phase 2).
 > Maßgeblich für Tabellen und Spalten sind die Alembic-Migrationen unter
-> `migrations/versions/` (`0001` Grundschema, `0002` bis `0004` Track F1). Dieses Dokument beschreibt das Konzept und wie es
+> `migrations/versions/` (`0001` Grundschema, `0002` bis `0004` Track F1, `0005` Laufabschluss,
+> `0006` bis `0008` Scoring-Profile, `0009` Outbox und Inbox). Dieses Dokument beschreibt das Konzept und wie es
 > in die Zielarchitektur wächst. Entscheidung:
 > [ADR-0003](../adr/0003-postgresql-schema-pro-service.md).
 
@@ -12,7 +13,8 @@
   Grenzen trotzdem klar.
 - **Nichts wird gelöscht oder überschrieben.** Trigger verbieten `DELETE` und `TRUNCATE` auf
   allen Tabellen der Fach-Schemas. `UPDATE` ist nur dort erlaubt, wo es fachlich nötig ist
-  (Laufabschluss, ISIN-Nachtrag). Jede neue Tabelle braucht diesen Schutz, ein Test prüft das.
+  (Laufabschluss, ISIN-Nachtrag, seit P4.2 `published_at` der Outbox). Jede neue Tabelle braucht
+  diesen Schutz, ein Test prüft das.
 - **Stichtagsdaten sind unersetzlich.** yfinance liefert nur etwa 4 Geschäftsjahre und
   nachträglich korrigierte (restated) Zahlen. Was nicht zum Abrufzeitpunkt gespeichert wird,
   lässt sich später nicht rekonstruieren. Postgres ist damit die Historien-Schicht für
@@ -36,7 +38,7 @@ Stand `261dc8f` (Migration `0001_initial_schema`):
 | Rolle | Rechte | Verwendung |
 |---|---|---|
 | `va_owner` (`POSTGRES_USER`) | alles | nur für Migrationen beim Container-Start |
-| `va_app` | `SELECT`/`INSERT`, `UPDATE` nur für freigegebene Tabellen, kein `DELETE` | der Batch |
+| `va_app` | `SELECT`/`INSERT`, `UPDATE` nur für freigegebene Tabellen und in der Outbox nur für die Spalte `published_at`, kein `DELETE` | der Batch |
 | `va_read` | nur `SELECT` | Auswertungen aus dem LAN; in Phase 3 auch das web-api |
 | `va_profiles` | `SELECT` auf den drei Profil-Tabellen, `INSERT` in `profile_version` und `profile_activation` | das web-api für die Profil-Befehle (P3.3), bis scoring sie ab Phase 4 selbst ausführt |
 
@@ -50,8 +52,14 @@ Batch.
 | `market_data` | `market-data` | `outbox`, `inbox` |
 | `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie des letzten Snapshots, `outbox`, `inbox` |
 | `reporting` | `notification` | `outbox`, `inbox` |
-| `batch` | `web-api` | Runs werden vom web-api angelegt (Scheduler/UI); `inbox` |
+| `batch` | `web-api` | Runs werden vom web-api angelegt (Scheduler/UI); `outbox` (`screening.run.requested`), `inbox` |
 | `web` (neu) | `web-api` | Read-Models für das UI: aktuelles Ranking, Score-Verlauf je Titel |
+
+`outbox` und `inbox` gibt es seit P4.2 in allen vier Schemas (Migration `0009`). Die Modelle
+liegen beim Besitzer des Schemas, die Logik in `va_platform.messaging`
+([events.md](events.md#zuverlässigkeit-outbox-und-inbox)). Die Outbox ist die bewusst
+gekennzeichnete Ausnahme unten: Der Trigger `va_guard_outbox` lässt nur zu, dass `published_at`
+einmal gesetzt wird.
 
 Regeln für den Übergang:
 

@@ -49,6 +49,26 @@ def test_every_table_belongs_to_an_owner():
     assert set(Base.metadata.tables) == owned
 
 
+@pytest.mark.parametrize("schema", APP_SCHEMAS)
+def test_every_schema_has_outbox_and_inbox(schema):
+    """P4.2: Jeder Service sendet ueber seine Outbox und empfaengt ueber seine Inbox."""
+    assert {f"{schema}.outbox", f"{schema}.inbox"} <= set(Base.metadata.tables)
+
+
+def test_migrated_database_has_outbox_and_inbox(engine: Engine):
+    with engine.connect() as conn:
+        tables = set(
+            conn.execute(
+                text(
+                    "SELECT table_schema || '.' || table_name FROM information_schema.tables "
+                    "WHERE table_schema = ANY(:schemas) AND table_name IN ('outbox', 'inbox')"
+                ),
+                {"schemas": list(APP_SCHEMAS)},
+            ).scalars()
+        )
+    assert tables == {f"{s}.{t}" for s in APP_SCHEMAS for t in ("outbox", "inbox")}
+
+
 def test_models_have_no_foreign_keys_across_schemas():
     crossing = [
         f"{table.fullname}.{fk.parent.name} -> {fk.target_fullname}"

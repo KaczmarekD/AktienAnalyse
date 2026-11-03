@@ -182,8 +182,9 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Die DB erzwingt „niemals löschen“ selbst (`va_platform.db.ddl`): Trigger gegen
   DELETE/TRUNCATE auf jeder Tabelle, Faktentabellen zusätzlich gegen UPDATE.
   Einzige UPDATEs: einmaliger Abschluss von `batch.run`/`market_data.fetch_run`
-  (das UPDATE muss `finished_at` setzen, Migration `0005`) und das Nachtragen einer
-  ISIN. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
+  (das UPDATE muss `finished_at` setzen, Migration `0005`), das Nachtragen einer
+  ISIN und das einmalige Setzen von `published_at` in der Outbox (Trigger `va_guard_outbox`,
+  `va_app` hat nur dieses Spaltenrecht). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
   nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3). Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
@@ -195,6 +196,11 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   von scoring legt beim ersten Bewertungslauf „Standard“ aus den ENV-Werten an
   (`StoredProfile`) und rechnet seit P2b.3 immer mit der aktiven Version.
   `scoring_run.profile_id`/`profile_version` halten fest, welche das war.
+- Outbox und Inbox (P4.2, Migration `0009`): Jedes Schema hat `outbox` und `inbox`. Die Modelle
+  legt der Besitzer mit `OutboxMixin`/`InboxMixin` an (`ScoringOutbox` usw.), die Logik steht in
+  `va_platform.messaging` (`Outbox`, `OutboxRelay`, `Inbox`). Events gehen mit den Fachdaten in
+  einer Transaktion in die Outbox, empfangene Events über `Inbox.process_once`. Bis P4.3 nutzt
+  sie noch niemand.
 - Zugriffe nur über die Repositories der Module (`get_*`/`write_*`,
   bewusst ohne delete). Jeder Titel wird sofort nach dem Abruf gespeichert.
 - Migrationen (Alembic, `migrations/`) sind nur additiv; jede neue Tabelle

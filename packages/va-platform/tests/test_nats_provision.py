@@ -1,4 +1,5 @@
-"""JetStream-Provisionierung (P4.1) gegen einen echten NATS-Server (docs/architecture/events.md).
+"""JetStream gegen einen echten NATS-Server (docs/architecture/events.md): Provisionierung (P4.1)
+und der Publisher der Outbox (P4.2).
 
 Ohne ``TEST_NATS_URL`` uebersprungen, wie die DB-Tests ohne ``TEST_DATABASE_URL``. Lokal
 ``make test-nats-up`` (Port 54222), in der CI ein Container mit JetStream. Der Server ist ein
@@ -14,6 +15,7 @@ import subprocess
 import sys
 from collections.abc import Awaitable, Callable
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -124,6 +126,50 @@ def test_same_message_id_lands_once():
         assert not first.duplicate
         assert again.duplicate is True
         assert (await jsm.stream_info("VA_EVENTS")).state.messages == 1
+
+    _run(scenario)
+
+
+def test_outbox_publisher_sends_the_event_id_as_message_id():
+    """P4.2: Das Relay darf doppelt senden, im Stream landet das Event einmal."""
+    from va_contracts import new_envelope, parse_envelope
+    from va_contracts.events.v1 import REPORT_SENT, ReportSentV1
+    from va_platform.messaging import OutboxMessage
+    from va_platform.nats import JetStreamPublisher, provision
+
+    data = ReportSentV1(run_id=1, report_id=7, subject="[ok 1/1]", dry_run=False)
+    envelope = new_envelope(REPORT_SENT, data, source="va/test")
+    message = OutboxMessage(envelope.id, REPORT_SENT.subject, envelope.model_dump_json().encode())
+
+    async def scenario(nc: Any, jsm: Any) -> None:
+        await provision(jsm)
+        publisher = JetStreamPublisher(nc.jetstream())
+        await publisher.publish(message)
+        await publisher.publish(message)
+        state = (await jsm.stream_info("VA_EVENTS")).state
+        assert state.messages == 1
+        stored = await jsm.get_msg("VA_EVENTS", state.last_seq)
+        assert stored.subject == "va.notification.report.sent"
+        assert stored.headers["Nats-Msg-Id"] == str(envelope.id)
+        assert parse_envelope(stored.data) == envelope
+
+    _run(scenario)
+
+
+def test_outbox_publisher_fails_without_the_stream():
+    """Ohne Stream kein Ack: Der Eintrag bleibt offen, statt still verloren zu gehen."""
+    from nats.js.errors import NoStreamResponseError
+
+    from va_platform.messaging import OutboxMessage
+    from va_platform.nats import JetStreamPublisher
+
+    message = OutboxMessage(
+        UUID("0193f5a2-0000-7000-8000-000000000002"), "va.notification.report.sent", b"{}"
+    )
+
+    async def scenario(nc: Any, jsm: Any) -> None:  # _run hat den Stream geloescht
+        with pytest.raises(NoStreamResponseError):
+            await JetStreamPublisher(nc.jetstream(), timeout=2).publish(message)
 
     _run(scenario)
 

@@ -9,6 +9,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Identity, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_platform.db import Base, in_values
+from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
 
 RUN_KINDS = ("batch", "rescore", "import")
 RUN_STATUSES = ("running", "success", "partial", "no_data", "failed")
@@ -69,3 +70,15 @@ class ImportFile(Base):
     kind: Mapped[str]
     run_id: Mapped[int | None] = mapped_column(ForeignKey("batch.run.id"))
     imported_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class BatchOutbox(OutboxMixin, Base):
+    """Events der Ablaufsteuerung (heute der Batch, spaeter das web-api), bis zum Senden (P4.2)."""
+
+    __table_args__ = outbox_table_args("batch")
+
+
+class BatchInbox(InboxMixin, Base):
+    """Events, die die Ablaufsteuerung verarbeitet hat, je Consumer einmal (P4.2)."""
+
+    __table_args__ = {"schema": "batch"}  # noqa: RUF012

@@ -15,6 +15,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, ForeignKeyConstraint, Identi
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_platform.db import Base, in_values
+from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
 
 SCORING_ORIGINS = ("live", "rescore", "import")
 
@@ -134,3 +135,15 @@ class ProfileActivation(Base):
     profile_id: Mapped[int]
     version: Mapped[int]
     activated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ScoringOutbox(OutboxMixin, Base):
+    """Events von scoring, bis das Relay sie veroeffentlicht hat (P4.2)."""
+
+    __table_args__ = outbox_table_args("scoring")
+
+
+class ScoringInbox(InboxMixin, Base):
+    """Events, die scoring verarbeitet hat, je Consumer einmal (P4.2)."""
+
+    __table_args__ = {"schema": "scoring"}  # noqa: RUF012

@@ -9,13 +9,20 @@ from va_market_data.adapters.postgres.models import (
     FundamentalSnapshot,
     FxRate,
     Instrument,
+    MarketDataInbox,
+    MarketDataOutbox,
     PriceBar,
     RawInfo,
     ShareCount,
     StatementValue,
     UniverseMember,
 )
-from va_notification.adapters.postgres.models import Delivery, Report
+from va_notification.adapters.postgres.models import (
+    Delivery,
+    Report,
+    ReportingInbox,
+    ReportingOutbox,
+)
 from va_platform.db import APP_SCHEMAS, Base
 from va_scoring.adapters.postgres.models import (
     FactorScore,
@@ -23,14 +30,18 @@ from va_scoring.adapters.postgres.models import (
     ProfileActivation,
     ProfileVersion,
     ScoreResult,
+    ScoringInbox,
+    ScoringOutbox,
     ScoringRun,
 )
 
-from .batch import ImportFile, Run, RunLog
+from .batch import BatchInbox, BatchOutbox, ImportFile, Run, RunLog
 
 __all__ = [
     "APP_SCHEMAS",
     "Base",
+    "BatchInbox",
+    "BatchOutbox",
     "ConsensusSnapshot",
     "Delivery",
     "FactorScore",
@@ -39,15 +50,21 @@ __all__ = [
     "FxRate",
     "ImportFile",
     "Instrument",
+    "MarketDataInbox",
+    "MarketDataOutbox",
     "PriceBar",
     "Profile",
     "ProfileActivation",
     "ProfileVersion",
     "RawInfo",
     "Report",
+    "ReportingInbox",
+    "ReportingOutbox",
     "Run",
     "RunLog",
     "ScoreResult",
+    "ScoringInbox",
+    "ScoringOutbox",
     "ScoringRun",
     "ShareCount",
     "StatementValue",
