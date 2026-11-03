@@ -1,9 +1,9 @@
-<h1>Ranking</h1>
+<app-page-header>Ranking</app-page-header>
 
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
 } @else if (ranking(); as run) {
-  <p class="run">
+  <p class="meta">
     Bewertungslauf {{ run.scoring_run_id }}
     @if (run.fetched_on) {
       · Abruf vom {{ run.fetched_on | date: 'dd.MM.yyyy' }}
@@ -14,7 +14,7 @@
     }
   </p>
 
-  <div class="controls">
+  <div class="cluster">
     <mat-button-toggle-group
       aria-label="Index"
       [value]="index()"
@@ -78,7 +78,7 @@
       <th mat-header-cell *matHeaderCellDef>Hinweis</th>
       <td mat-cell *matCellDef="let row">
         @if (row.value_trap_flag) {
-          <span class="badge">Value-Trap</span>
+          <span class="badge badge--error">Value-Trap</span>
         }
       </td>
     </ng-container>

@@ -1,4 +1,4 @@
-<h1>Runs</h1>
+<app-page-header>Runs</app-page-header>
 
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
@@ -27,7 +27,7 @@
       <ng-container matColumnDef="status">
         <th mat-header-cell *matHeaderCellDef>Status</th>
         <td mat-cell *matCellDef="let run">
-          <span class="status" [attr.data-status]="run.status">{{ run.status | runStatus }}</span>
+          <span [attr.data-status]="run.status">{{ run.status | runStatus }}</span>
         </td>
       </ng-container>
       <ng-container matColumnDef="scored">

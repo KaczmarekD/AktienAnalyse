@@ -127,6 +127,12 @@ den Snapshot in der CI mit dem Abzweigpunkt von `main` und bricht bei inkompatib
 ab. Braucht es einen Bruch, kommt er als `/api/v2`. Das UI ruft nur relative Pfade (`/api/v1/...`)
 und lädt nichts aus dem Internet.
 
+**Gestaltung des UI nach dem Styleguide** ([docs/architecture/styleguide.md](docs/architecture/styleguide.md)):
+Farben nur aus `--mat-sys-*`, Abstände und Größen nur aus `--va-*`. Was auf zwei Seiten
+vorkommt, ist eine Muster-Klasse in `frontend/src/styles/_patterns.scss` oder eine Komponente in
+`frontend/src/app/shared/ui/`; die SCSS einer Seite enthält nur Einmaliges. Fehlt ein Baustein,
+kommt er zuerst in den Styleguide.
+
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
 `services/market-data/src/va_market_data/adapters/yahoo.py`:
 - `FIELD_MAP`: Zeilen der Abschlüsse

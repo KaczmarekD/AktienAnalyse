@@ -1,4 +1,4 @@
-<h1>Scoring-Profile</h1>
+<app-page-header>Scoring-Profile</app-page-header>
 
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
@@ -6,11 +6,11 @@
   @if (profiles.length === 0) {
     <p class="message">Noch kein Profil. „Standard“ entsteht mit dem ersten Lauf.</p>
   } @else {
-    <ul class="profiles">
+    <ul class="divided-list">
       @for (profile of profiles; track profile.id) {
         <li [attr.data-profile]="profile.id">
           <a [routerLink]="['/profiles', profile.id]">{{ profile.name }}</a>
-          <span class="version">v{{ profile.latest_version ?? '–' }}</span>
+          <span class="meta">v{{ profile.latest_version ?? '–' }}</span>
           @if (profile.active_version !== null) {
             <span class="badge">aktiv: v{{ profile.active_version }}</span>
           }

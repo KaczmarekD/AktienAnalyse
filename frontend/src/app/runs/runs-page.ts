@@ -6,13 +6,13 @@ import { RouterLink } from '@angular/router';
 import { listRunsResource } from '../api/@angular/common.gen';
 import { errorMessage } from '../shared/api-error';
 import { RunStatusPipe } from '../shared/format';
+import { PageHeader } from '../shared/ui/page-header';
 
 /** Die letzten Laeufe des Batches, neueste zuerst. */
 @Component({
   selector: 'app-runs-page',
-  imports: [DatePipe, MatTableModule, RouterLink, RunStatusPipe],
+  imports: [DatePipe, MatTableModule, PageHeader, RouterLink, RunStatusPipe],
   templateUrl: './runs-page.html',
-  styleUrl: './runs-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RunsPage {

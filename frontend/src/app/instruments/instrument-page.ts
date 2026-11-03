@@ -6,13 +6,14 @@ import { RouterLink } from '@angular/router';
 import { getInstrumentResource } from '../api/@angular/common.gen';
 import { errorMessage } from '../shared/api-error';
 import { MrdPipe, NumPipe, PctPipe } from '../shared/format';
+import { BackLink } from '../shared/ui/back-link';
+import { PageHeader } from '../shared/ui/page-header';
 
 /** Ein Titel: Stammdaten, Kennzahlen des neuesten Abrufs, Score-Verlauf (/instruments/:symbol). */
 @Component({
   selector: 'app-instrument-page',
-  imports: [DatePipe, MatTableModule, MrdPipe, NumPipe, PctPipe, RouterLink],
+  imports: [BackLink, DatePipe, MatTableModule, MrdPipe, NumPipe, PageHeader, PctPipe, RouterLink],
   templateUrl: './instrument-page.html',
-  styleUrl: './instrument-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InstrumentPage {

@@ -12,6 +12,7 @@ import { getRankingResource, latestRankingResource } from '../api/@angular/commo
 import type { RankingRow } from '../api/types.gen';
 import { errorMessage, optionalNumber } from '../shared/api-error';
 import { MrdPipe, NumPipe, PctPipe } from '../shared/format';
+import { PageHeader } from '../shared/ui/page-header';
 
 type IndexFilter = 'all' | 'DAX' | 'MDAX';
 type SortKey = keyof RankingRow;
@@ -29,6 +30,7 @@ type SortKey = keyof RankingRow;
     MatTableModule,
     MrdPipe,
     NumPipe,
+    PageHeader,
     PctPipe,
     PercentPipe,
     RouterLink,

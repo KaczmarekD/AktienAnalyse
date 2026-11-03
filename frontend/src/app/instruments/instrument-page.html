@@ -1,10 +1,10 @@
-<p><a routerLink="/ranking">← Ranking</a></p>
+<app-back-link to="/ranking">Ranking</app-back-link>
 
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
 } @else if (instrument(); as title) {
-  <h1>{{ title.name ?? title.symbol }}</h1>
-  <p class="identity">
+  <app-page-header>{{ title.name ?? title.symbol }}</app-page-header>
+  <p class="meta">
     {{ title.symbol }}
     @if (title.isin) {
       · ISIN {{ title.isin }}
@@ -20,43 +20,73 @@
 
   @if (title.latest; as figures) {
     <h2>Kennzahlen</h2>
-    <p class="as-of">
+    <p class="meta">
       Stand {{ figures.fetched_on | date: 'dd.MM.yyyy' }}
       @if (!figures.fetch_ok) {
         · Abruf unvollständig
       }
     </p>
-    <dl class="figures">
-      <dt>Kurs</dt>
-      <dd>{{ figures.price | num }} {{ figures.currency ?? '' }}</dd>
-      <dt>Marktkap.</dt>
-      <dd>{{ figures.market_cap | mrd }}</dd>
-      <dt>EV/EBIT</dt>
-      <dd>{{ figures.ev_ebit | num }}</dd>
-      <dt>KGV</dt>
-      <dd>{{ figures.pe_ratio | num }}</dd>
-      <dt>KBV</dt>
-      <dd>{{ figures.pb_ratio | num }}</dd>
-      <dt>Kurs/FCF</dt>
-      <dd>{{ figures.p_fcf | num }}</dd>
-      <dt>Dividendenrendite</dt>
-      <dd>{{ figures.dividend_yield | pct }}</dd>
-      <dt>Shareholder Yield</dt>
-      <dd>{{ figures.shareholder_yield | pct }}</dd>
-      <dt>ROIC</dt>
-      <dd>{{ figures.roic | pct }}</dd>
-      <dt>FCF-Marge</dt>
-      <dd>{{ figures.fcf_margin | pct }}</dd>
-      <dt>Operative Marge</dt>
-      <dd>{{ figures.operating_margin | pct }}</dd>
-      <dt>Net Debt/EBITDA</dt>
-      <dd>{{ figures.net_debt_ebitda | num }}</dd>
-      <dt>Gewinnstabilität</dt>
-      <dd>{{ figures.earnings_stability | num }}</dd>
-      <dt>Umsatzwachstum 5 J.</dt>
-      <dd>{{ figures.revenue_growth_5y | pct }}</dd>
-      <dt>EPS-Wachstum 5 J.</dt>
-      <dd>{{ figures.eps_growth_5y | pct }}</dd>
+    <dl class="kv-list kv-list--grid">
+      <div>
+        <dt>Kurs</dt>
+        <dd>{{ figures.price | num }} {{ figures.currency ?? '' }}</dd>
+      </div>
+      <div>
+        <dt>Marktkap.</dt>
+        <dd>{{ figures.market_cap | mrd }}</dd>
+      </div>
+      <div>
+        <dt>EV/EBIT</dt>
+        <dd>{{ figures.ev_ebit | num }}</dd>
+      </div>
+      <div>
+        <dt>KGV</dt>
+        <dd>{{ figures.pe_ratio | num }}</dd>
+      </div>
+      <div>
+        <dt>KBV</dt>
+        <dd>{{ figures.pb_ratio | num }}</dd>
+      </div>
+      <div>
+        <dt>Kurs/FCF</dt>
+        <dd>{{ figures.p_fcf | num }}</dd>
+      </div>
+      <div>
+        <dt>Dividendenrendite</dt>
+        <dd>{{ figures.dividend_yield | pct }}</dd>
+      </div>
+      <div>
+        <dt>Shareholder Yield</dt>
+        <dd>{{ figures.shareholder_yield | pct }}</dd>
+      </div>
+      <div>
+        <dt>ROIC</dt>
+        <dd>{{ figures.roic | pct }}</dd>
+      </div>
+      <div>
+        <dt>FCF-Marge</dt>
+        <dd>{{ figures.fcf_margin | pct }}</dd>
+      </div>
+      <div>
+        <dt>Operative Marge</dt>
+        <dd>{{ figures.operating_margin | pct }}</dd>
+      </div>
+      <div>
+        <dt>Net Debt/EBITDA</dt>
+        <dd>{{ figures.net_debt_ebitda | num }}</dd>
+      </div>
+      <div>
+        <dt>Gewinnstabilität</dt>
+        <dd>{{ figures.earnings_stability | num }}</dd>
+      </div>
+      <div>
+        <dt>Umsatzwachstum 5 J.</dt>
+        <dd>{{ figures.revenue_growth_5y | pct }}</dd>
+      </div>
+      <div>
+        <dt>EPS-Wachstum 5 J.</dt>
+        <dd>{{ figures.eps_growth_5y | pct }}</dd>
+      </div>
     </dl>
     @if (figures.errors.length > 0) {
       <p class="message">Hinweise vom Abruf: {{ figures.errors.join('; ') }}</p>
@@ -96,7 +126,11 @@
       </ng-container>
       <ng-container matColumnDef="value_trap_flag">
         <th mat-header-cell *matHeaderCellDef>Hinweis</th>
-        <td mat-cell *matCellDef="let point">{{ point.value_trap_flag ? 'Value-Trap' : '' }}</td>
+        <td mat-cell *matCellDef="let point">
+          @if (point.value_trap_flag) {
+            <span class="badge badge--error">Value-Trap</span>
+          }
+        </td>
       </ng-container>
 
       <tr mat-header-row *matHeaderRowDef="columns"></tr>

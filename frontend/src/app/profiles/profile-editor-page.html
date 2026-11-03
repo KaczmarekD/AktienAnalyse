@@ -1,21 +1,21 @@
-<p><a routerLink="/profiles">← Alle Profile</a></p>
+<app-back-link to="/profiles">Alle Profile</app-back-link>
 
 @if (loadError(); as message) {
   <p class="message">{{ message }}</p>
 } @else if (profile(); as profile) {
-  <h1>
+  <app-page-header>
     {{ profile.name }}
     @if (profile.active_version !== null) {
       <span class="badge">aktiv: v{{ profile.active_version }}</span>
     }
-  </h1>
-  <p class="basis">Grundlage: Version {{ basedOn() }}. Speichern legt eine neue Version an.</p>
+  </app-page-header>
+  <p class="meta">Grundlage: Version {{ basedOn() }}. Speichern legt eine neue Version an.</p>
 
   @if (notice(); as notice) {
     <p class="notice" role="status">{{ notice }}</p>
   }
   @if (conflict()) {
-    <div class="conflict" role="alert">
+    <div class="notice notice--error" role="alert">
       <span>
         Inzwischen wurde eine neuere Version gespeichert. Neu laden verwirft die Änderungen hier.
       </span>
@@ -131,7 +131,7 @@
             [checked]="isActive('value', factor.key)"
             (change)="toggleFactor('value', factor.key, $event.checked)"
           >
-            {{ factor.label }} <span class="direction">({{ direction(factor) }})</span>
+            {{ factor.label }} <span class="meta">({{ direction(factor) }})</span>
           </mat-checkbox>
           <p class="hint">{{ factor.hint }}</p>
         </div>
@@ -144,7 +144,7 @@
             [checked]="isActive('quality', factor.key)"
             (change)="toggleFactor('quality', factor.key, $event.checked)"
           >
-            {{ factor.label }} <span class="direction">({{ direction(factor) }})</span>
+            {{ factor.label }} <span class="meta">({{ direction(factor) }})</span>
           </mat-checkbox>
           <p class="hint">{{ factor.hint }}</p>
         </div>
@@ -215,7 +215,7 @@
             }
           </p>
         }
-        <table>
+        <table class="data-table">
           <thead>
             <tr>
               <th>Rang</th>
@@ -232,7 +232,11 @@
                 <td class="delta">{{ delta(row.rank, row.rank_active) }}</td>
                 <td>{{ row.name ?? row.symbol }}</td>
                 <td>{{ row.composite_score | num }}</td>
-                <td>{{ row.value_trap_flag ? 'Value-Trap?' : '' }}</td>
+                <td>
+                  @if (row.value_trap_flag) {
+                    <span class="badge badge--error">Value-Trap?</span>
+                  }
+                </td>
               </tr>
             }
           </tbody>
@@ -248,7 +252,7 @@
     <p class="hint">
       Aktivieren wirkt ab dem nächsten Lauf; eine ältere Version zu aktivieren ist das Zurückrollen.
     </p>
-    <ul>
+    <ul class="divided-list">
       @for (version of profile.versions; track version.version) {
         <li [attr.data-version]="version.version">
           <strong>Version {{ version.version }}</strong>

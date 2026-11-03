@@ -6,11 +6,13 @@ import { RouterLink } from '@angular/router';
 import { getReportResource, getRunResource } from '../api/@angular/common.gen';
 import { errorMessage, optionalNumber } from '../shared/api-error';
 import { RunStatusPipe } from '../shared/format';
+import { BackLink } from '../shared/ui/back-link';
+import { PageHeader } from '../shared/ui/page-header';
 
 /** Ein Lauf mit Zaehlern, Fehler und der gerenderten Mail (/runs/:runId). */
 @Component({
   selector: 'app-run-detail-page',
-  imports: [DatePipe, RouterLink, RunStatusPipe],
+  imports: [BackLink, DatePipe, PageHeader, RouterLink, RunStatusPipe],
   templateUrl: './run-detail-page.html',
   styleUrl: './run-detail-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

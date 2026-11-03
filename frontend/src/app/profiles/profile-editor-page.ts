@@ -16,7 +16,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { RouterLink } from '@angular/router';
 
 import {
   getProfileResource,
@@ -33,6 +32,8 @@ import type {
 import { zProfileParamsV1Input } from '../api/zod.gen';
 import { errorMessage, optionalNumber } from '../shared/api-error';
 import { MrdPipe, NumPipe } from '../shared/format';
+import { BackLink } from '../shared/ui/back-link';
+import { PageHeader } from '../shared/ui/page-header';
 
 /** Wartezeit der Live-Vorschau nach der letzten Aenderung (ms); Tests setzen 0. */
 export const PREVIEW_DEBOUNCE_MS = new InjectionToken<number>('PREVIEW_DEBOUNCE_MS', {
@@ -82,10 +83,11 @@ function validationMessage(error: HttpErrorResponse): string {
     MatCheckboxModule,
     MatFormFieldModule,
     MatInputModule,
+    BackLink,
     MrdPipe,
     NumPipe,
+    PageHeader,
     PercentPipe,
-    RouterLink,
   ],
   templateUrl: './profile-editor-page.html',
   styleUrl: './profile-editor-page.scss',

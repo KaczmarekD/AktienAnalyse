@@ -1,16 +1,16 @@
-<p><a routerLink="/runs">← Alle Läufe</a></p>
+<app-back-link to="/runs">Alle Läufe</app-back-link>
 
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
 } @else if (run(); as run) {
-  <h1>
+  <app-page-header>
     Lauf {{ run.id }}
     @if (run.dry_run) {
       <span class="badge">Dry-Run</span>
     }
-  </h1>
+  </app-page-header>
 
-  <dl>
+  <dl class="kv-list">
     <dt>Status</dt>
     <dd [attr.data-status]="run.status">{{ run.status | runStatus }}</dd>
     <dt>Art</dt>
@@ -35,7 +35,7 @@
     <pre class="error">{{ run.error }}</pre>
   }
 
-  <p class="links">
+  <p class="cluster">
     @if (run.scoring_run_id !== null) {
       <a [routerLink]="['/ranking', run.scoring_run_id]">Ranking dieses Laufs</a>
     }

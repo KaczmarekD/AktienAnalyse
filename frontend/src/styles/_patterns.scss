@@ -1,0 +1,150 @@
+// Gemeinsame Muster-Klassen (docs/architecture/styleguide.md). Seiten-SCSS enthält nur, was
+// es genau auf einer Seite gibt; alles, was zweimal vorkommt, gehört hierher.
+
+// Überschriften: Schriftstufen aus dem Material-Theme statt Browser-Standard
+h1 {
+  font: var(--mat-sys-headline-small);
+}
+
+h2 {
+  margin: var(--va-space-lg) 0 var(--va-space-sm);
+  font: var(--mat-sys-title-large);
+}
+
+// Text
+.message,
+.meta {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.hint {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: var(--va-text-sm);
+}
+
+.field-error {
+  margin: calc(-1 * var(--va-space-sm)) 0 var(--va-space-md);
+  color: var(--mat-sys-error);
+  font-size: var(--va-text-sm);
+}
+
+// Badge: neutral als Standard, --error nur für Warnungen, die zum Handeln auffordern
+.badge {
+  display: inline-block;
+  padding: 0.1rem var(--va-space-sm);
+  border-radius: var(--va-radius-pill);
+  background-color: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font: var(--mat-sys-label-medium);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+// Angular entfernt Leerraum zwischen Elementen; in Zeilen mit gap übernimmt der gap den Abstand
+* + .badge {
+  margin-left: var(--va-space-sm);
+}
+
+.cluster > .badge,
+.divided-list > li > .badge {
+  margin-left: 0;
+}
+
+.badge--error {
+  background-color: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+}
+
+// Status eines Laufs: jedes Element mit data-status
+[data-status='failed'],
+[data-status='no_data'] {
+  color: var(--mat-sys-error);
+  font-weight: 500;
+}
+
+// Hinweis-Box: neutral als Standard, --error für Konflikte und Fehler
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-md);
+  align-items: center;
+  padding: var(--va-space-sm) 0.75rem;
+  border-radius: var(--va-radius-box);
+  background-color: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.notice--error {
+  background-color: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+// Zeile aus Bedienelementen oder Links
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--va-space-md);
+  margin-bottom: var(--va-space-md);
+}
+
+// Schlüssel/Wert-Liste: zweispaltig; --grid für viele kurze Kennzahlen, je Paar ein <div>
+.kv-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--va-space-xs) var(--va-space-lg);
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.kv-list--grid {
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--va-space-md) var(--va-space-xl);
+
+  dt {
+    font-size: var(--va-text-sm);
+  }
+
+  dd {
+    font-weight: 500;
+  }
+}
+
+// Liste mit Trennlinien
+.divided-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  > li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: var(--va-space-sm) 0;
+    border-bottom: var(--va-divider);
+  }
+}
+
+// Tabellen: immer volle Breite; .data-table für schlichte HTML-Tabellen ohne mat-table
+table {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table {
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: var(--va-space-xs) var(--va-space-sm);
+    border-bottom: var(--va-divider);
+    text-align: left;
+  }
+}
