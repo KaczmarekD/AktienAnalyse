@@ -163,7 +163,7 @@ Mit U4 kommen die Lese-Teile vor Phase 2b. P3.3 und der Profil-Editor aus P3.7 f
 Details: [Implementierungsplan, Phase 4](implementierungsplan.md#phase-4--events-und-echtzeit)
 
 - [x] P4.1 NATS-Infrastruktur (`935dedc`)
-- [x] P4.2 Outbox und Inbox (`e0210be`)
+- [x] P4.2 Outbox und Inbox (`97d231b`)
 - [ ] P4.3 NATS als Bus
 - [ ] P4.4 Eventmanager und Projektionen
 - [ ] P4.5 WebSocket-Hub und Protokoll v1 🔒
