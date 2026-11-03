@@ -9,6 +9,7 @@ Von der Kommandozeile: ``python -m va_platform.nats`` mit ``NATS_URL``. Ab P4.3 
 Services ``provision`` beim Start selbst.
 
 ``JetStreamPublisher`` (P4.2) sendet fuer das Relay der Outbox (``va_platform.messaging``).
+``NatsBus`` (P4.3, ``va_platform.nats.bus``) ist der ``EventBus`` ueber JetStream.
 """
 
 from __future__ import annotations
@@ -63,6 +64,16 @@ CONSUMERS = (
     ConsumerSpec("scoring", ("va.marketdata.snapshot.completed",)),
     ConsumerSpec("notification", ("va.scoring.run.completed", "va.screening.run.failed")),
     ConsumerSpec("web-api", ("va.>",)),
+    # P4.3: der RunTracker des Batches, Vorlaeufer der Run-Projektion im web-api
+    ConsumerSpec(
+        "batch",
+        (
+            "va.marketdata.snapshot.completed",
+            "va.scoring.run.completed",
+            "va.notification.report.sent",
+            "va.screening.run.failed",
+        ),
+    ),
 )
 
 
@@ -143,3 +154,19 @@ class JetStreamPublisher:
             stream=STREAM_NAME,
             headers={"Nats-Msg-Id": str(message.id)},
         )
+
+
+# Am Ende: bus.py nutzt die Namen oben (Stream, Grenzen, Provisionierung, Publisher)
+from .bus import NatsBus  # noqa: E402
+
+__all__ = [
+    "ACK_WAIT",
+    "CONSUMERS",
+    "MAX_DELIVER",
+    "STREAM_NAME",
+    "ConsumerSpec",
+    "JetStreamPublisher",
+    "NatsBus",
+    "provision",
+    "stream_config",
+]

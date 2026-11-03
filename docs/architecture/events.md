@@ -3,8 +3,9 @@
 > **Status:** Plan (30.09.2026). Ab Phase 1 mit einem Bus im Prozess, ab Phase 4 über NATS, siehe
 > [Roadmap](roadmap.md). Entscheidung: [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
 > Seit P4.1 (01.11.2026) gibt es den NATS-Dienst und die Provisionierung von Stream und Consumern
-> (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Die Events laufen
-> ab P4.3 darüber.
+> (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Seit P4.3 kann der
+> Batch die Kette über NATS laufen lassen (`EVENT_BUS=nats`, `va_platform.nats.NatsBus`).
+> Standard bleibt der Bus im Prozess, bis die Handler idempotent sind (P4.3b).
 
 ## Grundprinzipien
 
@@ -187,9 +188,27 @@ Schreibschutz ([datenhaltung.md](datenhaltung.md)).
 | `scoring` | `va.marketdata.snapshot.completed` | speichert den Snapshot zusätzlich lokal, für Vorschau und Rescore |
 | `notification` | `va.scoring.run.completed`, `va.screening.run.failed` | ignoriert `trigger=rescore`, bei `dry_run` nur rendern und speichern |
 | `web-api` | `va.>` | Projektionen und WebSocket, siehe [web-api-realtime.md](web-api-realtime.md) |
+| `batch` | `va.marketdata.snapshot.completed`, `va.scoring.run.completed`, `va.notification.report.sent`, `va.screening.run.failed` | seit P4.3: der `RunTracker` des Batches, Vorläufer der Run-Projektion im web-api |
 
 Alle Consumer begrenzen die Wiederholungen (`max_deliver`, z. B. 5). Danach wird die Nachricht
 mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.failed`.
+
+**`NatsBus` (P4.3):**
+
+- **Consumer:**
+  - Einen provisionierten Consumer nutzt der Bus so, wie er ist. Sein Filter muss die
+    abonnierten Subjects abdecken.
+  - Einen unbekannten Namen (Tests) legt er mit genau diesen Subjects an, nur für neue
+    Nachrichten.
+  - Je Consumer holt eine Schleife die Nachrichten einzeln ab und verteilt sie nach Event-Typ.
+- **Wiederholungen:**
+  - Es gilt die Grenze des Busses. Der Batch bleibt bei 1, wie im Prozess.
+  - Danach kommt der Dead-Letter-Callback, dann `term()`.
+  - Die Grenze des Busses darf höchstens die des Consumers sein.
+- **Laufende Handler:** Der Bus sendet In-Progress-Acks alle `ack_wait / 3`.
+- **Senden:** Folge-Events stehen im Stream, bevor das auslösende Event bestätigt wird.
+- **Batch:** Über NATS wartet `src/main.py`, bis der `RunTracker` ein Ergebnis hat (höchstens
+  `RUN_TIMEOUT_MINUTES`). Dann wartet es, bis nichts mehr offen ist, und schließt den Bus geordnet.
 
 ## Run-Optionen und Sonderfälle
 

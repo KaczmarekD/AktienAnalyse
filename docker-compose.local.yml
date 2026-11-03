@@ -48,6 +48,8 @@ services:
       SMTP_PORT: "1025"
       SMTP_PLAIN: "true"
       HEALTHCHECK_URL: ""
+      # Fuer EVENT_BUS=nats aus der .env (P4.3); ohne den Schalter ungenutzt
+      NATS_URL: nats://nats:4222
       # Pfade im Container, auch wenn die .env sie fuer make run/dry aus der .venv setzt
       DATA_DIR: /app/data
       LOGS_DIR: /app/logs

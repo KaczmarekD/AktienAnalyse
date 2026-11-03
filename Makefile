@@ -87,7 +87,7 @@ test-nats-up: ## Wegwerf-NATS mit JetStream fuer Tests starten (Port 54222)
 	docker run -d --rm --name va-test-nats -p 54222:4222 nats:2.15.1-alpine -js
 
 test-nats: ## Integrationstests gegen NATS (vorher: make test-nats-up)
-	TEST_NATS_URL=$(TEST_NATS_URL) $(RUN) pytest packages/va-platform/tests/test_nats_provision.py
+	TEST_NATS_URL=$(TEST_NATS_URL) $(RUN) pytest packages/va-platform/tests tests/test_pipeline_bus.py tests/test_main_nats.py
 
 test-nats-down: ## Wegwerf-NATS stoppen (entfernt nur den Test-Container)
 	docker stop va-test-nats

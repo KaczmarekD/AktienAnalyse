@@ -165,6 +165,7 @@ Details: [Implementierungsplan, Phase 4](implementierungsplan.md#phase-4--events
 - [x] P4.1 NATS-Infrastruktur (`935dedc`)
 - [x] P4.2 Outbox und Inbox (`97d231b`)
 - [ ] P4.3 NATS als Bus
+- [ ] P4.3b Idempotente Handler (Inbox/Outbox in den Stores), danach NATS auf der NAS
 - [ ] P4.4 Eventmanager und Projektionen
 - [ ] P4.5 WebSocket-Hub und Protokoll v1 🔒
 - [ ] P4.6 Echtzeit im Frontend

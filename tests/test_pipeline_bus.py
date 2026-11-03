@@ -1,7 +1,7 @@
 """Ende-zu-Ende ueber den Bus: Der eingefrorene Golden-Datensatz ergibt die Golden-Mail (P1.8).
 
-Universum, Abruf, Speicher, Versand und Heartbeat sind Fakes; Handler, Contracts und
-``InProcessBus`` sind echt. Jede Stufe sieht nur die Events der vorherigen - die Daten
+Universum, Abruf, Speicher, Versand und Heartbeat sind Fakes; Handler, Contracts und der Bus
+sind echt: im Prozess und, mit ``TEST_NATS_URL``, ueber NATS JetStream (P4.3). Jede Stufe sieht nur die Events der vorherigen - die Daten
 gehen also zweimal ueber JSON (Snapshot und Ranking).
 
 Verglichen wird mit ``mail_deka.html``, weil der Fall ohne Zu- und Abgaenge auskommt (die
@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import io
 import json
+from collections.abc import Callable, Iterator
 from datetime import datetime
 
 import pandas as pd
+import pytest
 
 from src.composition import Adapters, wire
 from tests.conftest import GOLDEN_DIR
@@ -30,7 +32,7 @@ from va_contracts.events.v1 import (
     ScreeningRunRequestedV1,
 )
 from va_market_data.domain.universe import Ticker, Universe
-from va_platform.bus import InProcessBus
+from va_platform.bus import EventBus, InProcessBus
 from va_scoring.domain.profile import ProfileVersionRef
 
 FIXED_NOW = datetime(2026, 10, 3, 7, 30)
@@ -97,7 +99,23 @@ def _fetch(tickers, *, on_result, history):
     return pd.DataFrame(RECORDS)
 
 
-def _run(settings) -> tuple[Sender, list[str]]:
+@pytest.fixture(params=["in_process", "nats"])
+def chain(request) -> Iterator[tuple[EventBus, Callable[[], None]]]:
+    """Der Bus der Kette und wie man auf ihr Ende wartet (im Prozess: gar nicht)."""
+    if request.param == "in_process":
+        yield InProcessBus(max_deliver=1), lambda: None
+        return
+    from va_platform.nats import NatsBus
+
+    bus = NatsBus(request.getfixturevalue("nats_url"), max_deliver=1)
+    bus.start()
+    try:
+        yield bus, lambda: bus.settle(timeout=60)
+    finally:
+        bus.close()
+
+
+def _run(settings, chain: tuple[EventBus, Callable[[], None]]) -> tuple[Sender, list[str]]:
     store, sender = Store(), Sender()
     adapters = Adapters(
         batch=store,
@@ -112,7 +130,7 @@ def _run(settings) -> tuple[Sender, list[str]]:
         heartbeat=NoHeartbeat(),
         clock=lambda: FIXED_NOW,
     )
-    bus = InProcessBus(max_deliver=1)
+    bus, settle = chain
     settings = settings.model_copy(update={"top_n": 5, "bottom_n": 3})
     wire(bus, adapters, settings, version="0.0.0-golden")
     ends: list[str] = []
@@ -120,6 +138,7 @@ def _run(settings) -> tuple[Sender, list[str]]:
     bus.subscribe(RUN_FAILED, "probe-failed", lambda env: ends.append(env.data.reason))
     request = ScreeningRunRequestedV1(run_id=1, trigger="scheduled", options=RunOptionsV1())
     bus.publish(new_envelope(RUN_REQUESTED, request, source="va/test", correlationid="1"))
+    settle()
     return sender, ends
 
 
@@ -127,8 +146,8 @@ def _csv(raw: bytes) -> pd.DataFrame:
     return pd.read_csv(io.BytesIO(raw), sep=";", decimal=",", encoding="utf-8-sig")
 
 
-def test_golden_mail_through_the_bus(settings):
-    sender, ends = _run(settings)
+def test_golden_mail_through_the_bus(settings, chain):
+    sender, ends = _run(settings, chain)
     assert ends == [REPORT_SENT.type]
     assert len(sender.sent) == 1
     subject, html, attachment = sender.sent[0]

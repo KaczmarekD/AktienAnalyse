@@ -83,6 +83,23 @@ class Settings(_OwnerUrl):
     # kommen dann aus der Datei statt von iShares, Deka, OpenFIGI und Yahoo. Nur lokal.
     replay_source: FilePath | None = None
 
+    # --- Event-Bus (P4.3, docs/architecture/events.md) ---
+    # in_process: die Kette laeuft im Batch-Prozess (Standard, auch auf der NAS).
+    # nats: ueber NATS JetStream. Die Handler sind erst ab P4.3b idempotent, also vorerst nur
+    # zum Testen.
+    event_bus: Literal["in_process", "nats"] = "in_process"
+    nats_url: str | None = None  # z. B. nats://nats:4222, Pflicht bei EVENT_BUS=nats
+    # So lange wartet der Batch ueber NATS auf das Ende der Kette (der Abruf allein braucht
+    # mit Wiederholungen bis zu einer Stunde)
+    run_timeout_minutes: float = Field(default=120, gt=0)
+
+    @model_validator(mode="after")
+    def _nats_needs_a_url(self) -> Settings:
+        if self.event_bus == "nats" and not (self.nats_url or "").strip():
+            msg = "EVENT_BUS=nats braucht NATS_URL (z. B. nats://nats:4222)"
+            raise ValueError(msg)
+        return self
+
     @model_validator(mode="after")
     def _replay_only_locally(self) -> Settings:
         """Eine Mail mit Replay-Daten darf nie ueber einen echten Mailserver hinausgehen."""

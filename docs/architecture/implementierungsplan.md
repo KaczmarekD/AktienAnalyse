@@ -1567,6 +1567,114 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Die Bus-Vertragstests aus P1.8 laufen zusätzlich gegen NATS und sind dort zunächst rot.
 - **Implementierung:** NATS-Implementierung der Bus-Schnittstelle, Umschaltung per Konfiguration.
+- **Entwurf (03.11.2026):**
+  - **Entscheidung (User, 03.11.2026):** ein eigener Adapter mit nats-py statt FastStream.
+    - Die Schnittstelle `EventBus` aus P1.8 bleibt, Handler und Contracts ändern sich nicht.
+    - nats-py ist seit P4.1 da, es kommt keine Abhängigkeit dazu.
+    - [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md) bekommt einen Nachtrag: FastStream
+      frühestens, wenn die Services in Phase 5 eigene Prozesse werden.
+  - **`va_platform.nats.NatsBus`:**
+    - `EventBus` über JetStream, synchron nach außen. Intern läuft eine Event-Loop in einem
+      eigenen Thread. Die Handler laufen in einem Thread-Pool und dürfen selbst `publish`
+      aufrufen.
+    - Beim Start ruft er `provision()` aus P4.1. Der Stream entsteht also nie anders als
+      vorgegeben (Dateispeicher, 30 Tage, Deduplizierung).
+    - **Consumer:**
+      - Ein Consumer, den die Provisionierung kennt, wird so benutzt, wie er ist. Deckt sein
+        Filter ein abonniertes Subject nicht ab, ist das ein Fehler beim `subscribe`.
+      - Einen unbekannten Namen (in den Tests) legt der Bus selbst an, mit genau den
+        abonnierten Subjects. Er bekommt nur neue Nachrichten, alte im Stream nicht.
+      - Je Consumer läuft eine Abholschleife. Er verarbeitet nacheinander und verteilt nach
+        Event-Typ an die Handler. Ein Typ ohne Handler wird bestätigt und übersprungen.
+    - **Senden:**
+      - `Nats-Msg-Id` ist die Event-ID, das übernimmt der `JetStreamPublisher` aus P4.2.
+      - `publish` kehrt erst nach dem Ack von JetStream zurück. Folge-Events liegen also im
+        Stream, bevor das auslösende Event bestätigt wird.
+      - Flüchtige Events (`live.va.…`) gehen über Core-NATS. Sie zu abonnieren kommt mit P4.5.
+    - **Wiederholungen:**
+      - Es gilt die Grenze des Busses, wie im Prozess. Der Batch bleibt bei `max_deliver=1`,
+        eine Mail geht also nicht durch eine Wiederholung doppelt raus.
+      - Ist die Grenze erreicht: Dead-Letter-Callback, danach `term()`. Darunter `nak()` mit
+        kurzer Pause.
+      - Die Grenze des Busses darf höchstens die des Consumers sein (5), sonst verwürfe NATS
+        das Event still.
+    - **In-Progress-Acks:** Solange ein Handler läuft, meldet der Bus alle `ack_wait / 3`
+      Sekunden, dass er noch arbeitet. Der Abruf von market-data dauert Minuten, ohne das
+      stellte JetStream nach 60 s erneut zu.
+    - **Nicht lesbar:** Ist schon die Hülle unlesbar, wird die Nachricht geloggt und mit
+      `term()` verworfen. Eine unbekannte Payload behandelt der Bus wie einen gescheiterten
+      Handler: erst Wiederholung, dann Dead Letter mit der Hülle.
+    - **`settle(timeout)`:** wartet, bis die eigenen Consumer nichts mehr offen haben und kein
+      Handler mehr läuft (zweimal hintereinander geprüft).
+    - **`close()`:** holt nichts Neues mehr ab, lässt laufende Handler zu Ende laufen und
+      bestätigen, dann trennt er die Verbindung.
+  - **Umschaltung im Batch:**
+    - In `Settings` kommen dazu:
+      - `EVENT_BUS` (`in_process` oder `nats`, Standard `in_process`)
+      - `NATS_URL`, Pflicht bei `nats`
+      - `RUN_TIMEOUT_MINUTES` (Standard 120)
+    - Der Bus im Prozess ist fertig, wenn `publish` zurückkehrt. Über NATS wartet `src/main.py`:
+      - bis der `RunTracker` ein Ergebnis hat, höchstens `RUN_TIMEOUT_MINUTES`;
+      - dann bis `settle`, damit ein spätes `screening.run.failed` noch zählt;
+      - dann `close`.
+      - Ohne Ergebnis endet der Lauf wie bisher als „Lauf ohne Ergebnis“ mit Alarm.
+    - Der `RunTracker` meldet sein Ergebnis über ein `threading.Event` und ist gegen parallele
+      Aufrufe geschützt.
+    - Er bekommt einen eigenen provisionierten Consumer `batch` mit seinen vier Subjects. Er ist
+      der Vorläufer der Run-Projektion im web-api.
+    - Mit `EVENT_BUS=nats` warnt der Batch im Log: Die Handler sind erst ab P4.3b idempotent.
+      Auf der NAS bleibt der Standard `in_process`.
+  - **Nicht in P4.3** (eigenes Paket P4.3b, User-Entscheidung 03.11.2026):
+    - Handler über Inbox und Outbox
+    - Umgang mit veralteten Events aus einem abgebrochenen Lauf
+  - **Test (rot):**
+    - Die Vertragstests aus `test_bus.py` laufen unverändert zusätzlich gegen NATS (Fixture
+      `nats`, mit `TEST_NATS_URL`, jeder Test mit frischem Stream).
+    - Zusätzlich gegen NATS:
+      - Eine unlesbare Payload wird nach der Grenze zum Dead Letter.
+      - Ein Handler, der länger als `ack_wait` läuft, wird nur einmal aufgerufen
+        (In-Progress-Acks).
+      - `close` während eines laufenden Handlers: Er läuft zu Ende, die Nachricht ist danach
+        bestätigt und kommt nicht wieder.
+      - Der Stream des Busses hat Dateispeicher, ein provisionierter Consumer bleibt
+        unverändert.
+      - Ein provisionierter Consumer, dessen Filter das Subject nicht abdeckt, lehnt das Abo
+        ab.
+      - Die Grenze des Busses darf nicht über der des Consumers liegen.
+      - Flüchtige Events gehen nicht in den Stream.
+    - Die Kette aus `tests/test_pipeline_bus.py` (Golden-Datensatz ergibt die Golden-Mail) läuft
+      auch über NATS.
+    - Der Batch mit `EVENT_BUS=nats`:
+      - Er wartet auf das Ergebnis, schließt den Lauf mit Erfolg ab und schickt genau eine Mail.
+      - Ein Dead Letter beendet den Lauf als gescheitert mit Alarm.
+      - Ein Timeout endet als „Lauf ohne Ergebnis“.
+    - Settings: `EVENT_BUS=nats` ohne `NATS_URL` ist ein Konfigurationsfehler.
+    - Provisionierung: Der Consumer `batch` existiert mit seinen Subjects.
+- **Umgesetzt (03.11.2026):** wie im Entwurf, dazu:
+  - **Schließen ohne `drain()`:** `drain()` von nats-py lief mit Pull-Abos in sein Timeout
+    von 30 s. Der Bus wartet stattdessen auf seine Abholschleifen, schickt mit `flush()` die
+    letzten Acks und trennt dann.
+  - `NATS_URL` steht bei den Settings, die nie in `batch.run` landen (Verbindungs-URL).
+  - `make test-nats` führt jetzt alle NATS-Integrationstests aus, nicht nur die
+    Provisionierung.
+  - Lokal setzt `docker-compose.local.yml` für den Batch `NATS_URL`. Mit `EVENT_BUS=nats` in
+    der `.env` läuft `make local-run` über NATS.
+  - **Bekannte Grenze, gilt nur für `EVENT_BUS=nats`:**
+    - Hängt ein Handler über `RUN_TIMEOUT_MINUTES` hinaus, endet der Lauf als „Lauf ohne
+      Ergebnis“, der Handler-Thread läuft aber weiter.
+    - Python wartet beim Beenden auf ihn.
+    - Der Watchdog (P4.7) und P4.3b gehen das an.
+
+#### P4.3b Idempotente Handler
+
+- **Test:**
+  - Eine erneute Zustellung desselben Events ändert nichts mehr: kein zweiter Abruf, kein
+    zweiter Bewertungslauf, keine zweite Mail.
+  - Folge-Events entstehen in derselben Transaktion wie die Fachdaten.
+  - Ein veraltetes Event aus einem abgebrochenen Lauf startet keinen neuen Abruf.
+- **Implementierung:** Die Stores von market-data, scoring und notification schreiben
+  Inbox-Eintrag, Fachdaten und Folge-Event über die Outbox in einer Transaktion (P4.2). Das
+  Relay läuft im Batch mit. Erst danach wird NATS auf der NAS eingeschaltet.
 
 #### P4.4 Eventmanager und Projektionen
 
