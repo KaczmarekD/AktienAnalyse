@@ -76,32 +76,74 @@ services:
     # Altdaten importieren (einmalig, mehrfach ausfuehrbar):
     #   docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
 
-  worker:
-    # P4.7: Dienste-Prozess fuer die Runs aus dem web-api (Start im UI, Scheduler): market-data,
-    # scoring und notification dauerhaft an NATS. Nur mit dem Profil nats
-    # (docker compose --profile nats up -d), bis die Kette ueber NATS Standard ist; dann
-    # braucht das web-api auch WEB_API_NATS_URL und WEB_API_PROJECTIONS_DATABASE_URL.
-    # In P5.1 wird daraus ein Image je Service.
-    image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
-    container_name: value-analyzer-worker
+  # P5.1: ein Container je Service aus seinem eigenen Image (uv sync --package). Sie fuehren
+  # die Runs ueber NATS aus und beantworten Request/Reply des web-api. Nur mit dem Profil nats
+  # (docker compose --profile nats up -d), bis die Kette ueber NATS Standard ist (P5.4); dann
+  # braucht das web-api auch WEB_API_NATS_URL und WEB_API_PROJECTIONS_DATABASE_URL. Jeder sieht
+  # nur seine Variablen, SMTP nur notification. Leer heisst Standardwert. Die Migration macht
+  # der Batch-Container beim Start.
+  market-data:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-market-data:${VERSION:-latest}
+    container_name: value-analyzer-market-data
     profiles: ["nats"]
     restart: unless-stopped
-    depends_on:
+    depends_on: &service-depends-on
       db:
         condition: service_healthy
       nats:
         condition: service_healthy
-    # Eigener Einstieg: keine Migration, die macht der Batch-Container beim Start
-    entrypoint: ["python", "-m", "src.worker"]
-    env_file:
-      - .env
     environment:
-      - TZ=Europe/Berlin
-      - DATABASE_URL=postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
-      - NATS_URL=nats://nats:4222
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      NATS_URL: nats://nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      UNIVERSE: ${UNIVERSE:-}
+      DEFAULT_TAX_RATE: ${DEFAULT_TAX_RATE:-}
     volumes:
+      # Fallback-CSV wie beim Batch aus ./data (von Hand gepflegt)
+      - ./data:/app/data:ro
+
+  scoring:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-scoring:${VERSION:-latest}
+    container_name: value-analyzer-scoring
+    profiles: ["nats"]
+    restart: unless-stopped
+    depends_on: *service-depends-on
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      NATS_URL: nats://nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      # Nur Startwerte fuer das Profil "Standard" (ADR-0009)
+      MIN_MARKET_CAP: ${MIN_MARKET_CAP:-}
+      VALUE_WEIGHT: ${VALUE_WEIGHT:-}
+      QUALITY_WEIGHT: ${QUALITY_WEIGHT:-}
+
+  notification:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-notification:${VERSION:-latest}
+    container_name: value-analyzer-notification
+    profiles: ["nats"]
+    restart: unless-stopped
+    depends_on: *service-depends-on
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      NATS_URL: nats://nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_TO: ${MAIL_TO:-}
+      MAIL_SUBJECT_PREFIX: ${MAIL_SUBJECT_PREFIX:-}
+      TOP_N: ${TOP_N:-}
+      BOTTOM_N: ${BOTTOM_N:-}
+      HEALTHCHECK_URL: ${HEALTHCHECK_URL:-}
+    volumes:
+      # Vorschau eines Dry-Runs (HTML und CSV), wie beim Batch
       - ./data:/app/data
-      - ./logs:/app/logs
 
   web-api:
     # REST fuer das UI (P3.1-P3.6). Dasselbe Image wie der Batch, aber ohne Port: Nur das

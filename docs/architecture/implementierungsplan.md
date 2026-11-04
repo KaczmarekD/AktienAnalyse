@@ -2334,6 +2334,50 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Test:** Smoke-Test je Image (Import, Startbefehl) und die J4125-Prüfung aus P0.6.
 - **Implementierung:** Dockerfiles mit `uv sync --package`, CI baut alle Images
   ([betrieb-synology.md](betrieb-synology.md)).
+- **Entwurf (04.11.2026):**
+  - **Dockerfile:** neue Stufen neben `runtime`.
+    - `service-base`: Python und Zeitzone, ohne Cron.
+    - Daraus je Service eine Stufe `market-data`, `scoring`, `notification` und `web-api`.
+    - Jede installiert mit `uv sync --package va-<service>` nur ihr Paket samt `va-platform`
+      und `va-contracts`.
+    - Einstieg ist `python -m va_<service>` bzw. Uvicorn mit `va_web_api.main:create_app`.
+    - market-data bekommt dazu `data/` mit der Fallback-CSV.
+    - Das App-Image (`runtime`) bleibt für Batch, Migration und das web-api ohne NATS.
+  - **CI:** Der Docker-Job baut die vier Images und prüft jedes:
+    - Der Service ist importierbar.
+    - Kein anderer Service ist im Image.
+    - Ohne Konfiguration endet der Start mit Exit 2.
+
+    Auf `main` schiebt die CI sie nach GHCR (`va-market-data`, `va-scoring`, `va-notification`,
+    `va-web-api`), mit denselben Tags wie `value-analyzer`.
+  - **J4125:** Die Service-Images enthalten nur Teilmengen derselben Pakete aus `uv.lock`.
+    Die QEMU-Prüfung des App-Images deckt sie deshalb mit ab. Vier weitere QEMU-Läufe brächten
+    keine neue Aussage.
+  - **Compose:**
+    - Auf der NAS (`docker-compose.yml`) ersetzen die Dienste `market-data`, `scoring` und
+      `notification` mit den neuen Images den Worker, weiter mit dem Profil `nats`.
+    - Jeder bekommt nur seine Variablen. Die Zugangsdaten für SMTP sieht nur notification.
+    - Das web-api bleibt bis P5.4 auf dem App-Image, weil es ohne NATS den Code von scoring im
+      Prozess braucht.
+    - Lokal laufen die drei Dienste aus dem App-Image (`value-analyzer:local`) mit ihrem
+      eigenen Einstieg. So entsteht lokal kein weiteres Image, auf C: ist wenig Platz.
+  - **Test (rot):**
+    - Dockerfile: Stufen je Service mit `uv sync --package`, Einstieg und Fallback-CSV.
+    - CI: baut, prüft und schiebt die vier Images.
+    - Compose:
+      - Die drei Dienste stehen mit Profil `nats` und eigenem Image auf der NAS.
+      - Nur notification sieht SMTP.
+      - Lokal kommen sie aus dem App-Image, mit Mailpit.
+      - Den Worker gibt es im Compose nicht mehr.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Prüfskript:** `docker/service_smoke.sh` prüft die vier Images in der CI. Das web-api
+    startet erst mit Datenbank-URL, für sein Image gilt nur der Import.
+  - **Leere Variablen:** Compose reicht nicht gesetzte Variablen als leeren Text durch
+    (`${MAIL_FROM:-}`). `ServiceSettings` lässt sie deshalb weg (`env_ignore_empty`), es gilt der
+    Standardwert. Das gilt auch für den Batch.
+  - **Größe:** Lokal gebaut ist das Image von scoring 469 MB groß.
+  - **Worker:** `src.worker` bleibt als Modul für einen Prozess mit allen drei Services, etwa beim
+    Entwickeln aus der `.venv`.
 
 #### P5.2 End-to-End-Test des ganzen Stacks
 

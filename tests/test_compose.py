@@ -440,33 +440,54 @@ class TestE2eStack:
         assert services["frontend"]["image"] == "va-frontend:ci"
 
 
-class TestWorker:
-    """P4.7: Der Dienste-Prozess fuehrt die Runs des web-api ueber NATS aus."""
+SERVICES = {
+    "market-data": "va_market_data",
+    "scoring": "va_scoring",
+    "notification": "va_notification",
+}
 
-    def test_the_nas_starts_it_only_with_the_nats_profile(self, nas, nas_nats):
-        assert "worker" not in nas["services"]
-        assert "worker" in nas_nats["services"]
 
-    def test_runs_the_app_image_without_migration(self, nas_nats):
-        worker = nas_nats["services"]["worker"]
-        assert worker["image"] == nas_nats["services"]["value-analyzer"]["image"]
-        # Eigener Einstieg: Die Migration macht der Batch-Container, nicht zwei zugleich
-        assert worker["entrypoint"] == ["python", "-m", "src.worker"]
-        assert "ports" not in worker
-        assert set(worker["depends_on"]) == {"db", "nats"}
+class TestServices:
+    """P5.1: Ein Container je Service aus seinem eigenen Image, nur mit dem Profil nats."""
 
-    def test_uses_the_app_role_and_nats(self, nas_nats):
-        env = nas_nats["services"]["worker"]["environment"]
-        assert env["DATABASE_URL"].startswith("postgresql+psycopg://va_app:")
-        assert "DATABASE_OWNER_URL" not in env
-        assert env["NATS_URL"] == "nats://nats:4222"
-        assert env["SMTP_HOST"] == "smtp.gmail.com"  # aus der .env, wie der Batch
+    def test_the_nas_starts_them_only_with_the_nats_profile(self, nas, nas_nats):
+        for name in SERVICES:
+            assert name not in nas["services"]
+            assert name in nas_nats["services"]
+        assert "worker" not in nas_nats["services"]  # bis P5.1 ein Prozess fuer alle drei
 
-    def test_local_worker_uses_the_working_tree_and_mailpit(self, local_nats):
-        worker = local_nats["services"]["worker"]
-        assert worker["image"] == "value-analyzer:local"
-        assert worker["container_name"] == "value-analyzer-local-worker"
-        env = worker["environment"]
+    def test_each_runs_its_own_image(self, nas_nats):
+        for name in SERVICES:
+            service = nas_nats["services"][name]
+            assert service["image"] == f"ghcr.io/kaczmarekd/va-{name}:latest"
+            assert service.get("entrypoint") is None  # der Einstieg steht im Image
+            assert "ports" not in service
+            assert set(service["depends_on"]) == {"db", "nats"}
+
+    def test_each_gets_only_its_variables(self, nas_nats):
+        for name in SERVICES:
+            env = nas_nats["services"][name]["environment"]
+            assert env["DATABASE_URL"].startswith("postgresql+psycopg://va_app:")
+            assert env["NATS_URL"] == "nats://nats:4222"
+            assert "DATABASE_OWNER_URL" not in env
+            assert "POSTGRES_PASSWORD" not in env
+            has_smtp = any(key.startswith("SMTP_") for key in env)
+            assert has_smtp == (name == "notification"), name
+
+    def test_notification_mails_and_pings_like_the_batch(self, nas_nats):
+        env = nas_nats["services"]["notification"]["environment"]
+        assert env["SMTP_HOST"] == "smtp.gmail.com"
+        assert env["HEALTHCHECK_URL"].startswith("https://hc-ping.com/")
+
+    def test_local_services_run_from_the_app_image(self, local_nats):
+        for name, module in SERVICES.items():
+            service = local_nats["services"][name]
+            assert service["image"] == "value-analyzer:local"
+            assert service["entrypoint"] == ["python", "-m", module]
+            assert service["container_name"] == f"value-analyzer-local-{name}"
+
+    def test_local_mail_stays_on_the_machine(self, local_nats):
+        env = local_nats["services"]["notification"]["environment"]
         assert (env["SMTP_HOST"], env["SMTP_PORT"], env["SMTP_PLAIN"]) == (
             "mailpit",
             "1025",
@@ -475,5 +496,6 @@ class TestWorker:
         assert env["HEALTHCHECK_URL"] == ""
         assert env["DATA_DIR"] == "/app/data"
 
-    def test_the_e2e_stack_has_no_worker(self, e2e):
-        assert "worker" not in e2e["services"]
+    def test_the_e2e_stack_has_none_of_them(self, e2e):
+        for name in (*SERVICES, "worker"):
+            assert name not in e2e["services"]

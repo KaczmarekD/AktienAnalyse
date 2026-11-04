@@ -46,8 +46,14 @@ EXIT_CONFIG = 2
 class ServiceSettings(BaseSettings):
     """Felder aller Services; jeder Service ergaenzt seine eigenen (``entrypoints/settings.py``)."""
 
+    # env_ignore_empty: Compose reicht nicht gesetzte Variablen als leeren Text durch
+    # (${MAIL_FROM:-}); leer heisst dann "nicht gesetzt", es gilt der Standardwert (P5.1)
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        env_ignore_empty=True,
     )
 
     # postgresql+psycopg://va_app:<pw>@db:5432/value_analyzer

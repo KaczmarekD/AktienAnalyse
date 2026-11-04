@@ -184,6 +184,63 @@ jobs:
       - name: Smoke-Test im Image
         run: docker run --rm --entrypoint python value-analyzer:ci -c "import src.main"
 
+      # P5.1: ein Image je Service (uv sync --package), nur mit seinem Paket
+      - name: Service-Image market-data bauen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: market-data
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: va-market-data:ci
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=svc-market-data
+          cache-to: type=gha,scope=svc-market-data,mode=max
+
+      - name: Service-Image scoring bauen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: scoring
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: va-scoring:ci
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=svc-scoring
+          cache-to: type=gha,scope=svc-scoring,mode=max
+
+      - name: Service-Image notification bauen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: notification
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: va-notification:ci
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=svc-notification
+          cache-to: type=gha,scope=svc-notification,mode=max
+
+      - name: Service-Image web-api bauen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: web-api
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: va-web-api:ci
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=svc-web-api
+          cache-to: type=gha,scope=svc-web-api,mode=max
+
+      # Je Image: importierbar, kein fremder Service darin, ohne Konfiguration Exit 2
+      - name: Smoke-Test der Service-Images
+        run: docker/service_smoke.sh ci
+
       # P3.6: das UI hinter nginx, zusammen mit dem web-api aus dem Image oben
       - name: Frontend-Image bauen
         run: docker build -t va-frontend:ci frontend
@@ -226,6 +283,11 @@ jobs:
           echo "$images"
           grep -qx "ghcr.io/kaczmarekd/value-analyzer:latest" <<< "$images"
           grep -qx "ghcr.io/kaczmarekd/va-frontend:latest" <<< "$images"
+          # P5.1: die Services mit dem Profil nats
+          services=$(docker compose --profile nats config --images)
+          for image in va-market-data va-scoring va-notification; do
+            grep -qx "ghcr.io/kaczmarekd/$image:latest" <<< "$services"
+          done
 
       # ADR-0008: dieselben Pakete wie im Laufzeit-Image, unter QEMU mit einem
       # CPU-Modell ohne AVX (J4125 der NAS). Wie make check-j4125.
@@ -265,8 +327,9 @@ jobs:
           registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           tags=$(python3 docker/image_tags.py)
           for tag in $tags; do
-            # Batch und web-api (ein Image), dazu das frontend (P3.6) mit denselben Tags
-            for image in value-analyzer va-frontend; do
+            # App-Image (Batch, web-api ohne NATS), frontend (P3.6), die Services (P5.1)
+            for image in value-analyzer va-frontend va-market-data va-scoring \
+                va-notification va-web-api; do
               docker tag "$image:ci" "$registry/$image:$tag"
               docker push "$registry/$image:$tag"
             done

@@ -60,8 +60,9 @@ Consumer `web-api` (`va_web_api.events.EventManager`). Seit P4.5 meldet der WebS
 (Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) die Änderungen an die
 offenen Tabs, nginx reicht `/ws` weiter. Seit P4.7 legt das web-api Runs an (`POST /api/v1/runs`, Scheduler mit
 `WEB_API_SCHEDULE`, standardmäßig aus) und überwacht sie (Watchdog). Es schreibt dafür mit `va_web` in
-`batch.run` und `web.run_request`. Ausgeführt werden diese Runs vom Worker `python -m src.worker`
-(Compose-Dienst `worker`, Profil `nats`). Seit P4.3b hängt jeder Service über einen
+`batch.run` und `web.run_request`. Ausgeführt werden diese Runs von den drei Services. Sie
+laufen seit P5.1 je in einem Container mit eigenem Image (`va-market-data`, `va-scoring`,
+`va-notification`, Profil `nats`). `python -m src.worker` startet alle drei in einem Prozess. Seit P4.3b hängt jeder Service über einen
 `ReliableBus` am Bus, in beiden Modi:
 Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
 `RUN_TIMEOUT_MINUTES`) und schickt Folge-Events über seine Outbox.
@@ -287,7 +288,10 @@ Gemergt wird erst nach Abnahme durch den User. Abgehakt wird in
   Python darin mit einem CPU-Modell ohne AVX (Denverton). Ein Paket, das AVX
   braucht, bricht dort mit „Illegal instruction“ ab.
 - DSM-Kernel 4.4: Images entstehen nur in der CI (`linux/amd64`, Job
-  „Docker Build + J4125-Pruefung“) und liegen in GHCR. Die NAS zieht sie
+  „Docker Build + J4125-Pruefung“) und liegen in GHCR. Seit P5.1 sind das das App-Image
+  (`value-analyzer`), `va-frontend` und je Service ein Image (`va-market-data`, `va-scoring`,
+  `va-notification`, `va-web-api`, Dockerfile-Stufen mit `uv sync --package`). Sie enthalten
+  dieselben Pakete wie das App-Image, dessen J4125-Prüfung deckt sie mit ab. Die NAS zieht sie
   (`make pull`) und baut nichts selbst. Node/Bun laufen nie auf der NAS.
 
 ## Was NICHT in dieses Projekt gehört

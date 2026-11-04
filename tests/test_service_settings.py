@@ -100,3 +100,18 @@ class TestBatch:
             for name in set(settings.model_fields) - shared:
                 assert name not in seen, f"{name} in {settings.__name__} und {seen[name]}"
                 seen[name] = settings.__name__
+
+
+class TestEmptyVariables:
+    """P5.1: Compose reicht nicht gesetzte Variablen als leeren Text durch (``${MAIL_FROM:-}``)."""
+
+    def test_an_empty_variable_counts_as_unset(self, monkeypatch):
+        monkeypatch.setenv("DATABASE_URL", DB)
+        monkeypatch.setenv("SMTP_USER", "absender@gmail.com")
+        monkeypatch.setenv("SMTP_PASSWORD", "pw")
+        monkeypatch.setenv("MAIL_TO", "empfaenger@example.com")
+        monkeypatch.setenv("MAIL_FROM", "")
+        monkeypatch.setenv("HEALTHCHECK_URL", "")
+        settings = NotificationSettings()  # type: ignore[call-arg]
+        assert settings.mail_from is None
+        assert settings.healthcheck_url is None

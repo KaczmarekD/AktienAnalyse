@@ -249,7 +249,8 @@ mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.fail
 
 Seit P4.7 in `va_web_api.runs`. Beides läuft nur mit NATS und Projektions-Datenbank, in einer
 Hintergrund-Aufgabe des web-api (Takt 60 s). Ausgeführt werden die Runs vom Dienste-Prozess
-`python -m src.worker` (Compose-Dienst `worker`, Profil `nats`).
+den drei Services (seit P5.1 je ein Container, Profil `nats`; `python -m src.worker` startet
+alle drei in einem Prozess).
 
 - **Anlegen:** Ein Run des web-api entsteht in einer Transaktion: `batch.run`, `web.run_request`
   und `screening.run.requested` in `web.outbox`. Danach leert das web-api die Outbox an NATS.
