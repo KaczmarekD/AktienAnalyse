@@ -245,8 +245,9 @@ jobs:
       - name: Frontend-Image bauen
         run: docker build -t va-frontend:ci frontend
 
-      # U5.2: die ganze Kette mit Replay-Daten statt Yahoo, mit genau diesen Images: Batch,
-      # Mail in Mailpit, web-api hinter nginx, UI. Die Pruefungen (tests/e2e) laufen mit uv.
+      # U5.2/P5.2: der ganze Stack mit Replay-Daten statt Yahoo, mit genau diesen Images: NATS,
+      # Services, Mail in Mailpit, web-api hinter nginx, UI; der Lauf startet ueber die API.
+      # Die Pruefungen (tests/e2e) laufen mit uv.
       - name: uv installieren (E2E-Pruefungen)
         uses: astral-sh/setup-uv@v10.2.0
         with:
@@ -273,6 +274,11 @@ jobs:
         env:
           E2E_APP_IMAGE: value-analyzer:ci
           E2E_FRONTEND_IMAGE: va-frontend:ci
+          # P5.2: der ganze Stack mit den Images aus P5.1
+          E2E_WEB_API_IMAGE: va-web-api:ci
+          E2E_MARKET_DATA_IMAGE: va-market-data:ci
+          E2E_SCORING_IMAGE: va-scoring:ci
+          E2E_NOTIFICATION_IMAGE: va-notification:ci
         run: docker/e2e.sh
 
       # P0.6b: Die NAS baut nicht selbst, Compose zieht das Image aus GHCR

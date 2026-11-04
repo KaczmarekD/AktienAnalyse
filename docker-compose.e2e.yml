@@ -4,9 +4,10 @@
 #   docker compose --env-file docker/e2e.env \
 #     -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml ...
 #
-# Ein Wegwerf-Stack: Die Datenbank liegt auf tmpfs, der Batch liest eine Replay-Fixture statt
-# Yahoo, die Mail landet in Mailpit. Von der .env des Rechners kommt nichts hinein. Eigene
-# Namen und Ports, damit er neben dem lokalen Stack laeuft.
+# Ein Wegwerf-Stack: Die Datenbank liegt auf tmpfs, market-data liest eine Replay-Fixture
+# statt Yahoo, die Mail landet in Mailpit. Von der .env des Rechners kommt nichts hinein. Eigene
+# Namen und Ports, damit er neben dem lokalen Stack laeuft. Seit P5.2 der ganze Stack: NATS,
+# die drei Services und das web-api mit Projektionen; der Lauf startet ueber die API.
 
 name: value-analyzer-e2e
 
@@ -45,14 +46,43 @@ services:
 
   web-api:
     container_name: value-analyzer-e2e-web-api
-    image: ${E2E_APP_IMAGE:-value-analyzer:local}
+    # CI: das Image des web-api (P5.1, E2E_WEB_API_IMAGE=va-web-api:ci); lokal das App-Image
+    image: ${E2E_WEB_API_IMAGE:-value-analyzer:local}
     # Wie auf der NAS nur hinter nginx erreichbar
     ports: !reset []
-    # Wie auf der NAS ohne Projektionen (P4.4): Die Kette laeuft im Prozess, NATS startet hier
-    # nicht mit. Leer heisst: kein Event-Consumer
+    # Ohne src: mit NATS beantworten die Services Vorschau, Profile und Reports (P5.2). NATS und
+    # die Projektionen (va_web) setzt docker-compose.local.yml
+    entrypoint:
+      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
+       "--host", "0.0.0.0", "--port", "8000"]
+
+  # P5.2: die drei Services; CI mit ihren Images aus P5.1, lokal aus dem App-Image
+  market-data:
+    container_name: value-analyzer-e2e-market-data
+    image: ${E2E_MARKET_DATA_IMAGE:-value-analyzer:local}
+    profiles: !reset []
     environment:
-      WEB_API_NATS_URL: ""
-      WEB_API_PROJECTIONS_DATABASE_URL: ""
+      REPLAY_SOURCE: /app/e2e/${E2E_FIXTURE:?E2E_FIXTURE in docker/e2e.env setzen}
+    # Nur die Fixtures; die Fallback-CSV (ISINs) bringt das Image mit
+    volumes: !override
+      - ./tests/fixtures/replay:/app/e2e:ro
+
+  scoring:
+    container_name: value-analyzer-e2e-scoring
+    image: ${E2E_SCORING_IMAGE:-value-analyzer:local}
+    profiles: !reset []
+
+  notification:
+    container_name: value-analyzer-e2e-notification
+    image: ${E2E_NOTIFICATION_IMAGE:-value-analyzer:local}
+    profiles: !reset []
+    environment:
+      # Pflichtfelder der Settings; SMTP_PLAIN sendet kein Passwort (Mailpit aus local)
+      SMTP_USER: e2e@example.com
+      SMTP_PASSWORD: e2e
+      MAIL_TO: e2e@example.com
+    # Vorschau eines Dry-Runs bleibt im Container und geht mit ihm
+    volumes: !reset []
 
   frontend:
     container_name: value-analyzer-e2e-frontend

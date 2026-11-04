@@ -1,6 +1,6 @@
 [project]
 name = "va-scoring"
-version = "0.1.0"
+version = "0.3.0"
 description = "Service scoring: Value-/Quality-Ranking"
 requires-python = ">=3.14"
 dependencies = [

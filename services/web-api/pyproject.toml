@@ -1,6 +1,6 @@
 [project]
 name = "va-web-api"
-version = "0.1.0"
+version = "0.3.0"
 description = "Service web-api: REST fuer das Frontend (Backend for Frontend, Phase 3)"
 requires-python = ">=3.14"
 dependencies = [

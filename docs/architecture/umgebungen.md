@@ -77,6 +77,9 @@ Zeitplan:
   Batch, Mail in Mailpit, web-api hinter nginx und das UI im Browser (Playwright). Die Daten
   kommen aus einer Replay-Fixture statt von Yahoo, damit das Ergebnis feststeht. Umgesetzt am
   31.10.2026, vor P2b.1 ([Implementierungsplan](implementierungsplan.md#u5-lokaler-end-to-end-test)).
+  Seit P5.2 läuft er über den ganzen Stack: NATS, die drei Services, das web-api mit
+  Projektionen. Den Lauf startet `docker/e2e_run.py` über die API, wie ein Klick im UI. Lokal
+  laufen alle Dienste aus dem App-Image, die CI nimmt die Images je Service.
 
 ## Neue Implementierung lokal prüfen (ab U5)
 

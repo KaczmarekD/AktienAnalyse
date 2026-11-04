@@ -231,11 +231,14 @@ class TestLocalWebApi:
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
         assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
 
-    def test_e2e_web_api_stays_without_projections(self, e2e):
-        """Der E2E-Stack bildet die NAS nach; NATS startet dort nicht (P4.4)."""
-        env = e2e["services"]["web-api"]["environment"]
-        assert env["WEB_API_NATS_URL"] == ""
-        assert env["WEB_API_PROJECTIONS_DATABASE_URL"] == ""
+    def test_e2e_web_api_runs_the_full_stack(self, e2e):
+        """P5.2: Der E2E-Stack prueft die Zielarchitektur: NATS, Projektionen, Services."""
+        api = e2e["services"]["web-api"]
+        env = api["environment"]
+        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        # Ohne src: laeuft mit dem App-Image wie mit dem Image des web-api (P5.1)
+        assert "va_web_api.main:create_app" in api["entrypoint"]
 
     def test_nas_web_api_stays_without_projections(self, nas):
         """Auf der NAS laeuft die Kette im Prozess: Es gaebe nichts zu projizieren (P4.4)."""
@@ -361,7 +364,7 @@ class TestE2eStack:
         assert not names & others
 
     def test_services(self, e2e):
-        # pgweb braucht der Test nicht
+        # pgweb braucht der Test nicht; seit P5.2 der ganze Stack mit den drei Services
         assert set(e2e["services"]) == {
             "db",
             "value-analyzer",
@@ -369,7 +372,30 @@ class TestE2eStack:
             "frontend",
             "mailpit",
             "nats",
+            "market-data",
+            "scoring",
+            "notification",
         }
+
+    def test_market_data_replays_the_fixture(self, e2e):
+        service = e2e["services"]["market-data"]
+        fixture = service["environment"]["REPLAY_SOURCE"]
+        assert fixture.startswith("/app/e2e/")
+        assert (ROOT / "tests/fixtures/replay" / fixture.removeprefix("/app/e2e/")).is_file()
+        assert _mounts(service)["/app/e2e"].endswith("/tests/fixtures/replay")
+        assert "profiles" not in service
+
+    def test_notification_mails_only_to_mailpit(self, e2e):
+        service = e2e["services"]["notification"]
+        env = service["environment"]
+        assert (env["SMTP_HOST"], env["SMTP_PORT"], env["SMTP_PLAIN"]) == (
+            "mailpit",
+            "1025",
+            "true",
+        )
+        assert env["HEALTHCHECK_URL"] == ""
+        assert {"SMTP_USER", "SMTP_PASSWORD", "MAIL_TO"} <= set(env)
+        assert "profiles" not in service
 
     def test_nats_is_thrown_away_too(self, e2e):
         nats = e2e["services"]["nats"]
@@ -432,12 +458,25 @@ class TestE2eStack:
         assert services["web-api"]["image"] == "value-analyzer:local"
 
     def test_ci_uses_the_images_under_test(self, tmp_path):
-        images = {"E2E_APP_IMAGE": "value-analyzer:ci", "E2E_FRONTEND_IMAGE": "va-frontend:ci"}
+        images = {
+            "E2E_APP_IMAGE": "value-analyzer:ci",
+            "E2E_FRONTEND_IMAGE": "va-frontend:ci",
+            "E2E_WEB_API_IMAGE": "va-web-api:ci",
+            "E2E_MARKET_DATA_IMAGE": "va-market-data:ci",
+            "E2E_SCORING_IMAGE": "va-scoring:ci",
+            "E2E_NOTIFICATION_IMAGE": "va-notification:ci",
+        }
         ci = _config(tmp_path, NAS, LOCAL, E2E, env_file=E2E_ENV, extra_env=images)
         services = ci["services"]
         assert services["value-analyzer"]["image"] == "value-analyzer:ci"
-        assert services["web-api"]["image"] == "value-analyzer:ci"
+        assert services["web-api"]["image"] == "va-web-api:ci"
         assert services["frontend"]["image"] == "va-frontend:ci"
+        for name in ("market-data", "scoring", "notification"):
+            assert services[name]["image"] == f"va-{name}:ci"
+
+    def test_locally_everything_runs_from_the_app_image(self, e2e):
+        for name in ("web-api", "market-data", "scoring", "notification"):
+            assert e2e["services"][name]["image"] == "value-analyzer:local"
 
 
 SERVICES = {
@@ -496,6 +535,7 @@ class TestServices:
         assert env["HEALTHCHECK_URL"] == ""
         assert env["DATA_DIR"] == "/app/data"
 
-    def test_the_e2e_stack_has_none_of_them(self, e2e):
-        for name in (*SERVICES, "worker"):
-            assert name not in e2e["services"]
+    def test_the_e2e_stack_runs_them_without_a_worker(self, e2e):
+        for name in SERVICES:
+            assert name in e2e["services"]  # P5.2: der ganze Stack
+        assert "worker" not in e2e["services"]

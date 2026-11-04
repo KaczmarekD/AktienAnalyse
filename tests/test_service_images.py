@@ -85,3 +85,38 @@ class TestSmokeScript:
         assert "exit 2" in script or "!= 2" in script or "-ne 2" in script
         for module in ("va_market_data", "va_scoring", "va_notification", "va_web_api"):
             assert module in script
+
+
+class TestFullStackE2e:
+    """P5.2: Die CI startet den ganzen Stack und loest den Lauf ueber die API aus."""
+
+    SCRIPT = (ROOT / "docker" / "e2e.sh").read_text(encoding="utf-8")
+
+    def test_the_run_starts_through_the_api(self):
+        assert "docker/e2e_run.py" in self.SCRIPT
+        assert "python -m src.main" not in self.SCRIPT  # kein Batch-Lauf mehr
+
+    def test_the_schema_is_migrated_first(self):
+        assert "--entrypoint python value-analyzer -m src.db.migrate" in self.SCRIPT
+        assert self.SCRIPT.index("-m src.db.migrate") < self.SCRIPT.index(
+            "python -I docker/e2e_run.py"
+        )
+
+    def test_the_services_are_started(self):
+        for name in ("nats", "market-data", "scoring", "notification", "web-api"):
+            assert name in self.SCRIPT
+
+    def test_ci_passes_the_service_images(self):
+        e2e = WORKFLOW[WORKFLOW.index("E2E (ganze Kette") :]
+        for variable, image in (
+            ("E2E_WEB_API_IMAGE", "va-web-api:ci"),
+            ("E2E_MARKET_DATA_IMAGE", "va-market-data:ci"),
+            ("E2E_SCORING_IMAGE", "va-scoring:ci"),
+            ("E2E_NOTIFICATION_IMAGE", "va-notification:ci"),
+        ):
+            assert f"{variable}: {image}" in e2e
+
+    def test_the_run_helper_waits_for_the_end(self):
+        helper = (ROOT / "docker" / "e2e_run.py").read_text(encoding="utf-8")
+        assert "/api/v1/runs" in helper
+        assert "finished_at" in helper

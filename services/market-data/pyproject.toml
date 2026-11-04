@@ -1,6 +1,6 @@
 [project]
 name = "va-market-data"
-version = "0.1.0"
+version = "0.3.0"
 description = "Service market-data: Universum, Marktdaten, Kennzahlen"
 requires-python = ">=3.14"
 dependencies = [

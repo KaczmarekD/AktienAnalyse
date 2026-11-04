@@ -67,8 +67,9 @@ laufen seit P5.1 je in einem Container mit eigenem Image (`va-market-data`, `va-
 Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
 `RUN_TIMEOUT_MINUTES`) und schickt Folge-Events über seine Outbox.
 `make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
-tmpfs, in dem der Batch eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, nur mit
-`SMTP_PLAIN` und ohne Healthcheck erlaubt).
+tmpfs, in dem market-data eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, Mail nur an
+Mailpit). Seit P5.2 ist das der ganze Stack mit NATS, den drei Services und dem web-api mit
+Projektionen, der Lauf startet über die API (`docker/e2e_run.py`).
 
 ## Methodik-Entscheidungen
 
@@ -429,8 +430,9 @@ schreibgeschützt (`create_db_engine(read_only=True)`). Echte Wochen liegen als 
 Methodik-Änderung schreibt ihre erwarteten Werte mit `--update-golden` neu, wie beim
 Golden-Master. Auf der NAS läuft `make regression` nach `make pull` und vor `make up`.
 
-**End-to-End-Test** (U5, `docker/e2e.sh`, `make local-e2e`, in der CI im Docker-Job): Ein Batch
-mit der Replay-Fixture aus `docker/e2e.env` läuft durch den ganzen Stack. Dann prüfen
+**End-to-End-Test** (U5, `docker/e2e.sh`, `make local-e2e`, in der CI im Docker-Job): Ein Lauf
+mit der Replay-Fixture aus `docker/e2e.env` läuft durch den ganzen Stack (seit P5.2 über NATS
+und die drei Services, gestartet über `POST /api/v1/runs`; die CI nimmt die Images je Service). Dann prüfen
 `tests/e2e/` (pytest, von außen über nginx und die Mailpit-API) und `frontend/e2e/` (Playwright,
 Chromium unter `.local/playwright`), dass Mail, API und UI denselben Lauf mit den Werten der
 Fixture zeigen. Die Browser-Tests verlangen eine leere Konsole: Ein CSP-Verstoß ist ein Fehler.

@@ -1227,7 +1227,7 @@ wheels = [
 
 [[package]]
 name = "va-contracts"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "packages/va-contracts" }
 dependencies = [
     { name = "pydantic" },
@@ -1238,7 +1238,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.13,<3" }]
 
 [[package]]
 name = "va-market-data"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "services/market-data" }
 dependencies = [
     { name = "numpy" },
@@ -1267,7 +1267,7 @@ requires-dist = [
 
 [[package]]
 name = "va-notification"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "services/notification" }
 dependencies = [
     { name = "jinja2" },
@@ -1292,7 +1292,7 @@ requires-dist = [
 
 [[package]]
 name = "va-platform"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "packages/va-platform" }
 dependencies = [
     { name = "nats-py" },
@@ -1317,7 +1317,7 @@ requires-dist = [
 
 [[package]]
 name = "va-scoring"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "services/scoring" }
 dependencies = [
     { name = "numpy" },
@@ -1340,7 +1340,7 @@ requires-dist = [
 
 [[package]]
 name = "va-web-api"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "services/web-api" }
 dependencies = [
     { name = "cronsim" },

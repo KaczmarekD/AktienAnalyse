@@ -2384,6 +2384,41 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Test:** Die CI startet den kompletten Compose-Stack, löst über die API einen Dry-Run aus und
   vergleicht die Mail mit dem Golden-File.
 - **Implementierung:** Compose-Datei für die CI und Warte-Logik auf `notification.report.sent`.
+- **Entwurf (04.11.2026):** Der E2E-Stack aus U5 (`docker-compose.e2e.yml`, `docker/e2e.sh`)
+  wird zum ganzen Stack. Die Prüfungen unter `tests/e2e` und `frontend/e2e` bleiben gleich.
+  - **Stack:**
+    - NATS, die drei Services und das web-api mit NATS und Projektionen (Rolle `va_web`,
+      `VA_WEB_PASSWORD` in `docker/e2e.env`).
+    - market-data liest die Replay-Fixture, notification schickt an Mailpit.
+    - In der CI laufen die vier Service-Images aus P5.1 (`E2E_WEB_API_IMAGE`,
+      `E2E_MARKET_DATA_IMAGE` usw.). Lokal laufen sie aus dem App-Image, wie im lokalen Stack.
+    - Das web-api startet mit `va_web_api.main:create_app`. Das geht mit beiden Images.
+  - **Ablauf von `docker/e2e.sh`:**
+    1. Datenbank, NATS und Mailpit starten.
+    2. Mit dem App-Image migrieren (`python -m src.db.migrate`).
+    3. Services, web-api und frontend starten.
+    4. `docker/e2e_run.py` startet den Lauf über `POST /api/v1/runs`, über nginx wie das UI.
+       Vorher wartet es, bis scoring antwortet.
+    5. Warten, bis `batch.run` abgeschlossen ist. Das geschieht mit
+       `notification.report.sent` (P4.7).
+    6. Die Prüfungen laufen.
+  - **Kein Dry-Run:** Ein Dry-Run verschickt keine Mail. Verglichen wird aber die Mail in Mailpit
+    mit der Fixture, wie bisher. Der Lauf startet deshalb mit Versand.
+  - **Test (rot):**
+    - Compose:
+      - Der E2E-Stack hat NATS, die Services und das web-api mit Projektionen.
+      - market-data spielt die Fixture ab, notification schickt nur an Mailpit.
+      - Die CI setzt die Images unter Test, lokal kommt alles aus dem App-Image.
+    - Skript und CI:
+      - Erst die Migration, dann der Start über die API, kein Batch-Lauf mehr.
+      - Die CI reicht die Service-Images durch.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Eine Version für alle Pakete:** Seit P5.1 kennt jeder Service nur seine Paketversion. Die
+    stand bei 0.1.0 und wäre in die Fußzeile der Mail und in `scoring_run.app_version`
+    gelangt. Alle Workspace-Pakete tragen jetzt die Version des Projekts (0.3.0). Das prüft
+    `tests/test_versions.py`. Im OpenAPI-Snapshot ändert sich nur `info.version`.
+  - **Migration im E2E-Stack:** `docker compose run --entrypoint python value-analyzer -m
+    src.db.migrate`, ohne den Cron des Entrypoints.
 
 #### P5.3 Eine DB-Rolle je Service 🔒
 
