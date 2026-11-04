@@ -114,29 +114,50 @@ das nur `read:packages` darf.
 
 Bis P5.4 lief auf der NAS der Batch-Container `value-analyzer` mit einem Cron. Seit P5.4 hat er das
 Profil `run`. `make up` startet ihn nicht mehr, ein laufender alter Container bliebe aber stehen und
-startete am Samstag einen zweiten Lauf. Deshalb einmalig:
+startete am Samstag einen zweiten Lauf. Läuft auf der NAS noch eine Fassung vor Phase 2 (ohne
+Datenbank), kommen die Altdateien dazu: Kennzahlen als `fundamentals_*.parquet` und Rankings als
+`value_ranking_*.csv` in `data/`. Dieser Abschnitt deckt beide Fälle ab und erledigt alle offenen
+NAS-Punkte der Roadmap in einem Durchgang.
 
-1. Sicherung: `make db-backup` (Dump nach `backups/`).
-2. `git pull`, dann die `.env` mit `.env.example` vergleichen. Neu sind seit dem Batch mit Cron je
-   nach Stand `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4) und die drei
-   `VA_<SERVICE>_PASSWORD` (P5.3). Für das UI im LAN `UI_LAN_BIND` und `UI_SERVER_NAMES`
-   setzen.
+**Vorab, solange der alte Batch läuft:** In der `.env` `RETENTION_DAYS=0` setzen und den
+Container mit `docker compose up -d` neu anlegen, damit er die Variable liest. Sonst löscht das alte
+Housekeeping beim nächsten Lauf Altdateien, die der Import braucht.
+
+1. Sicherung des Projektordners (Hyper Backup oder Kopie). Wichtig sind `data/` mit den
+   Altdateien, die `.env` und, falls es ihn schon gibt, `pgdata/`.
+2. `git pull`, dann die `.env` mit `.env.example` vergleichen. Neu sind je nach Stand
+   `POSTGRES_PASSWORD`, `VA_APP_PASSWORD` und `VA_READ_PASSWORD` (Phase 2),
+   `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4) und die drei `VA_<SERVICE>_PASSWORD`
+   (P5.3). Für das UI im LAN `UI_LAN_BIND` und `UI_SERVER_NAMES` setzen.
 3. `make pull` und der Import-Test aus Regel 2.
-4. `make regression`: Die gespeicherten Wochen müssen mit dem neuen Code dieselben Ergebnisse
-   liefern (Exit 0). Abweichungen sind nur dort in Ordnung, wo die Roadmap eine
-   Methodik-Änderung nennt.
-5. Alles stoppen, auch den alten Batch-Container:
+4. Alles stoppen, auch den alten Batch-Container:
    ```bash
    docker compose --profile run down
    ```
-   `down` entfernt nur Container, `./pgdata` und `./natsdata` bleiben.
-6. `make up`. Der Dienst `migrate` migriert das Schema und legt die neuen Rollen an. Die
-   Historie der alten Läufe füllt er in die Projektionen des web-api nach.
-7. Prüfen:
+   `down` entfernt nur Container. `./data`, `./pgdata` und `./natsdata` bleiben.
+5. Altdaten importieren:
+   ```bash
+   make db-import
+   ```
+   Das startet die Datenbank, migriert das Schema und liest die Parquet- und CSV-Dateien aus
+   `data/` ein. Je Datum entsteht ein Lauf vom Typ `import`. Jede Datei wird über ihren SHA-256
+   genau einmal importiert, ein zweiter Aufruf ändert nichts. Die Dateien bleiben liegen. Am Ende
+   steht „Fertig: N Dateien importiert, M bereits vorhanden“, ohne Altdateien mit N = 0.
+6. `make regression`: Die gespeicherten Wochen, auch die importierten, müssen mit dem neuen Code
+   dieselben Ergebnisse liefern (Exit 0). Abweichungen sind nur dort in Ordnung, wo die Roadmap eine
+   Methodik-Änderung nennt. Bei Wochen vor M1 fehlt Banken wie Deutsche Bank und Commerzbank
+   jetzt der Composite. Exit 2 mit „nichts zu vergleichen“ heißt: Es gibt noch keine Wochen.
+7. `make up`. Der Dienst `migrate` legt die neuen Rollen an und füllt die Projektionen des
+   web-api mit allen Läufen nach, auch mit den importierten. Deshalb kommt der Import vorher.
+8. Prüfen:
    - `docker compose ps`: kein Container `value-analyzer` mehr.
    - Das UI unter `http://<nas>:8080` zeigt die alten Läufe.
    - Auf der Seite „Runs“ einen Dry-Run starten. Er läuft durch die drei Services und speichert
      die Mail, ohne sie zu senden.
+9. Aufräumen und sichern:
+   - `RETENTION_DAYS` aus der `.env` entfernen. Das neue Image kennt die Variable nicht mehr und
+     löscht nie etwas.
+   - Die Sicherung einrichten wie unter [Backup](#backup) beschrieben.
 
 Zurück geht es mit `VERSION` auf dem alten Stand und der alten Compose-Datei
 (`git checkout <commit> -- docker-compose.yml`). Die Datenbank bleibt gültig, denn Migrationen
@@ -149,6 +170,7 @@ NAS:
 
 ```bash
 cd /volume1/docker/value-analyzer
+make db-backup     # Dump nach backups/
 git pull           # Compose-Datei, Fallback-CSV, Doku
 make pull
 docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
@@ -179,9 +201,8 @@ Das Volume `./data` verdeckt die Fallback-CSV im Image, neue Fassungen kommen de
 | Keine Mail und kein Ping am Samstag | Healthchecks.io meldet den fehlenden Ping. `docker compose logs web-api` zeigt, ob der Run angelegt wurde. |
 
 Die Logs liegen bei Docker (`make logs` oder `docker compose logs -f <dienst>`). Für die Spans
-eines Runs `OTEL_TRACES_EXPORTER=console` in der
-`.env` setzen und `make up`: Jeder Dienst schreibt dann seine Spans als JSON ins Log, alle Spans
-eines Runs haben dieselbe Trace-ID (P5.5).
+eines Runs `OTEL_TRACES_EXPORTER=console` in der `.env` setzen und `make up`: Jeder Dienst schreibt
+dann seine Spans als JSON ins Log, alle Spans eines Runs haben dieselbe Trace-ID (P5.5).
 
 ## Secrets
 
@@ -191,11 +212,22 @@ lesbar. Docker-Secrets (`/run/secrets`) sind möglich, aber nicht umgesetzt.
 
 ## Backup
 
-- `./pgdata` ist die einzige Quelle der Wahrheit. Hyper Backup sichert den Ordner mit.
-- `make db-backup` schreibt zusätzlich einen Dump nach `backups/`, vor jedem Update empfohlen.
-  Alte Dumps bleiben liegen.
-- `./natsdata` braucht kein Backup. Der Stream hält Zustellungen 30 Tage, die Fachdaten liegen in
-  Postgres.
+Die Datenbank in `./pgdata` ist die einzige Quelle der Wahrheit, gelöscht wird dort nie etwas.
+
+- **Dump:** `make db-backup` schreibt einen Dump (`pg_dump -Fc`) nach
+  `backups/value_analyzer_<datum>_<zeit>.dump`. Er ist die verlässliche Sicherung. Eine Kopie von
+  `pgdata/` im laufenden Betrieb kann inkonsistent sein. Alte Dumps bleiben liegen.
+- **Einrichten (einmalig):**
+  - Im DSM-Aufgabenplaner eine geplante Aufgabe anlegen: benutzerdefiniertes Skript, Benutzer
+    `root`, wöchentlich nach dem Lauf, etwa Sonntag 03:00:
+    ```bash
+    cd /volume1/docker/value-analyzer && make db-backup
+    ```
+  - Eine Hyper-Backup-Aufgabe für den Projektordner anlegen, mit `backups/`, `data/` und der
+    `.env`. Das Ziel verschlüsseln, denn die `.env` enthält die Passwörter.
+- **Vor jedem Update** zusätzlich `make db-backup` (siehe [Update](#update)).
+- **`./natsdata`** braucht kein Backup. Der Stream hält Zustellungen 30 Tage, die Fachdaten liegen
+  in Postgres.
 
 ## Überwachung
 

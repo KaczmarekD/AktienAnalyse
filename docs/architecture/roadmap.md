@@ -1,6 +1,6 @@
 # Roadmap
 
-> Stand: 30.10.2026. Hier steht, *was* in welcher Phase passiert und was erledigt ist. *Wie*
+> Stand: 04.11.2026. Hier steht, *was* in welcher Phase passiert und was erledigt ist. *Wie*
 > jedes Arbeitspaket umgesetzt wird (Test → Implementierung → Grün → Review), steht im
 > [Implementierungsplan](implementierungsplan.md). Abgehakt wird nur hier, jeweils mit Commit.
 > Die Samstags-Mail muss nach jedem Paket unverändert funktionieren.
@@ -10,15 +10,18 @@
 | Phase | Ziel | Status |
 |---|---|---|
 | – | Universum aus iShares/Deka statt Wikipedia | ✅ erledigt (`ca85d93`, `c14fa32`) |
-| 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8), NAS: Images aus GHCR laden |
-| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1), NAS: neues Image laden |
-| 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
-| 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; API seit P3.3, Editor im UI offen; NAS: Deployment |
-| 3 | web-api + Angular (UI im LAN, Profil-Editor) | ✅ im Code erledigt (P3.1–P3.8): Analysen, Profil-Editor und Schutz der Schnittstelle; NAS: Deployment |
-| 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | 🚧 P4.1–P4.9 erledigt (NATS, Outbox/Inbox, NATS als Bus, idempotente Handler, Eventmanager mit Projektionen, WebSocket-Hub, Echtzeit im UI, Runs aus dem UI mit Worker, Scheduler und Watchdog, Vorschau und Profil-Befehle über NATS, REST aus Projektionen; Standard noch im Prozess). Im Code fertig |
-| 5 | Aufteilen in Services (Zielarchitektur) | offen |
+| 0 | Fundament: Golden-Master, CI, uv, Python 3.14, aktuelle Dependencies, Images aus CI | ✅ im Code erledigt (P0.1–P0.8); NAS: mit der Umstellung |
+| 1 | Modularer Monolith mit den späteren Service-Grenzen | ✅ im Code erledigt (P1.1–P1.10, M1); NAS: mit der Umstellung |
+| 2 | Postgres als Historien-Schicht | ✅ im Code erledigt (`261dc8f`); NAS: mit der Umstellung, inklusive Altdaten-Import |
+| 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; Editor im UI seit `913ea7c`; NAS: mit der Umstellung |
+| 3 | web-api + Angular (UI im LAN, Profil-Editor) | ✅ im Code erledigt (P3.1–P3.8): Analysen, Profil-Editor und Schutz der Schnittstelle; NAS: mit der Umstellung |
+| 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | ✅ im Code erledigt (P4.1–P4.9): NATS, Outbox/Inbox, idempotente Handler, Eventmanager mit Projektionen, WebSocket-Hub, Echtzeit im UI, Runs aus dem UI mit Scheduler und Watchdog, Request/Reply, REST aus Projektionen |
+| 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
-| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
+| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; F2/F3 warten auf ADR-0011 |
+
+**NAS:** Alle offenen NAS-Punkte (unter „Sofort“ und in Phase 0, 2, 3, 5 und F1) erledigt ein
+Durchgang nach dem [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig). Er enthält auch den Altdaten-Import und die Sicherung.
 
 **Reihenfolge:**
 - Phase 2 wurde vorgezogen, weil jede Woche ohne Stichtagsdaten verloren ist.
@@ -37,7 +40,8 @@
 ## Sofort (du, auf der NAS)
 
 - [ ] `RETENTION_DAYS=0` setzen, bis die Postgres-Persistenz inklusive Altdaten-Import läuft.
-      Sonst löscht das alte Housekeeping die Dateien, die importiert werden sollen.
+      Sonst löscht das alte Housekeeping die Dateien, die importiert werden sollen. Im
+      [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig) der Schritt „Vorab“.
 
 ## Phase 0 – Fundament
 
@@ -120,8 +124,8 @@ Umgesetzt in `261dc8f`. Details in [datenhaltung.md](datenhaltung.md).
 - [x] Nach GitHub gepusht (`c584561`)
 - [ ] NAS (du): Deployment, danach den Altdaten-Import ausführen (`make db-import`)
 - [ ] NAS (du): danach `RETENTION_DAYS` aus der `.env` entfernen
-- [ ] NAS (du): Backup per `pg_dump` einrichten (`make db-backup`, Ordner in Hyper Backup
-      aufnehmen, siehe [betrieb-synology.md](betrieb-synology.md))
+- [ ] NAS (du): Backup per `pg_dump` einrichten (`make db-backup` im DSM-Aufgabenplaner, Ordner in
+      Hyper Backup aufnehmen, siehe [Runbook, Backup](betrieb-synology.md#backup))
 
 **Fertig, wenn:** jeder Lauf vollständig in der Datenbank steht und die Altdaten importiert sind.
 
