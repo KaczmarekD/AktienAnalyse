@@ -1,5 +1,5 @@
 import { DatePipe, PercentPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -12,6 +12,7 @@ import { getRankingResource, latestRankingResource } from '../api/@angular/commo
 import type { RankingRow } from '../api/types.gen';
 import { errorMessage, optionalNumber } from '../shared/api-error';
 import { MrdPipe, NumPipe, PctPipe } from '../shared/format';
+import { LiveStore } from '../shared/realtime/live.store';
 
 type IndexFilter = 'all' | 'DAX' | 'MDAX';
 type SortKey = keyof RankingRow;
@@ -43,9 +44,12 @@ export class RankingPage {
   });
 
   // Eine der beiden Resources bleibt untaetig: ohne Optionen schickt sie keine Anfrage
-  private readonly latest = latestRankingResource(() =>
-    this.scoringRunId() === undefined ? {} : undefined,
-  );
+  private readonly live = inject(LiveStore);
+  // Das neueste Ranking laedt neu, wenn der WebSocket ein neues meldet (P4.6)
+  private readonly latest = latestRankingResource(() => {
+    this.live.rankingVersion();
+    return this.scoringRunId() === undefined ? {} : undefined;
+  });
   private readonly byId = getRankingResource(() => {
     const id = this.scoringRunId();
     return id === undefined ? undefined : { path: { scoring_run_id: id } };

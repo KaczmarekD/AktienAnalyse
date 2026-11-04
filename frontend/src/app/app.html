@@ -5,6 +5,11 @@
     <a matButton routerLink="/runs" routerLinkActive="active">Runs</a>
     <a matButton routerLink="/profiles" routerLinkActive="active">Profile</a>
   </nav>
+  <span class="realtime" [attr.data-realtime]="realtime.status()">
+    @if (realtime.status() === 'offline') {
+      offline
+    }
+  </span>
 </mat-toolbar>
 <main>
   <router-outlet />

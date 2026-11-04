@@ -1,0 +1,258 @@
+{
+  "client": {
+    "$defs": {
+      "Ping": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "ping",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "Ping",
+        "type": "object"
+      },
+      "Subscribe": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "subscribe",
+            "title": "Op",
+            "type": "string"
+          },
+          "resumeFrom": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resumefrom"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "op",
+          "topics"
+        ],
+        "title": "Subscribe",
+        "type": "object"
+      },
+      "Unsubscribe": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "unsubscribe",
+            "title": "Op",
+            "type": "string"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "op",
+          "topics"
+        ],
+        "title": "Unsubscribe",
+        "type": "object"
+      }
+    },
+    "discriminator": {
+      "mapping": {
+        "ping": "#/$defs/Ping",
+        "subscribe": "#/$defs/Subscribe",
+        "unsubscribe": "#/$defs/Unsubscribe"
+      },
+      "propertyName": "op"
+    },
+    "oneOf": [
+      {
+        "$ref": "#/$defs/Subscribe"
+      },
+      {
+        "$ref": "#/$defs/Unsubscribe"
+      },
+      {
+        "$ref": "#/$defs/Ping"
+      }
+    ]
+  },
+  "server": {
+    "$defs": {
+      "Error": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "op": {
+            "const": "error",
+            "default": "error",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "Event": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "op": {
+            "const": "event",
+            "default": "event",
+            "title": "Op",
+            "type": "string"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic",
+          "type",
+          "seq",
+          "data"
+        ],
+        "title": "Event",
+        "type": "object"
+      },
+      "Hello": {
+        "additionalProperties": false,
+        "properties": {
+          "lastSeq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastseq"
+          },
+          "op": {
+            "const": "hello",
+            "default": "hello",
+            "title": "Op",
+            "type": "string"
+          },
+          "serverTime": {
+            "format": "date-time",
+            "title": "Servertime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "serverTime",
+          "lastSeq"
+        ],
+        "title": "Hello",
+        "type": "object"
+      },
+      "Pong": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "pong",
+            "default": "pong",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "title": "Pong",
+        "type": "object"
+      },
+      "Resync": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "resync",
+            "default": "resync",
+            "title": "Op",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "title": "Resync",
+        "type": "object"
+      }
+    },
+    "anyOf": [
+      {
+        "$ref": "#/$defs/Hello"
+      },
+      {
+        "$ref": "#/$defs/Event"
+      },
+      {
+        "$ref": "#/$defs/Resync"
+      },
+      {
+        "$ref": "#/$defs/Pong"
+      },
+      {
+        "$ref": "#/$defs/Error"
+      }
+    ]
+  }
+}

@@ -135,8 +135,11 @@ Tippfehler.
 er zum Snapshot passt. Ändert sich die API, kommen neuer Snapshot und neuer Client in denselben
 Commit. Die API ändert sich nur additiv: `oasdiff breaking` (P3.8, `make api-breaking`) vergleicht
 den Snapshot in der CI mit dem Abzweigpunkt von `main` und bricht bei inkompatiblen Änderungen
-ab. Braucht es einen Bruch, kommt er als `/api/v2`. Das UI ruft nur relative Pfade (`/api/v1/...`)
-und lädt nichts aus dem Internet.
+ab. Braucht es einen Bruch, kommt er als `/api/v2`. Das UI ruft nur relative Pfade (`/api/v1/...`,
+seit P4.6 auch den WebSocket `/ws`) und lädt nichts aus dem Internet. Echtzeit (P4.6):
+`RealtimeService` und `LiveStore` (NgRx SignalStore) unter `frontend/src/app/shared/realtime/`. Die
+Protokoll-Typen dort sind von Hand gespiegelt, das Golden-Schema `tests/golden/realtime/v1.json`
+und `protocol.ts` ändern sich im selben Commit.
 
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
 `services/market-data/src/va_market_data/adapters/yahoo.py`:

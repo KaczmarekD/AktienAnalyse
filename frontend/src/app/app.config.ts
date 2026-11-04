@@ -1,10 +1,17 @@
 import { provideHttpClient, withFetch } from '@angular/common/http';
-import { ApplicationConfig, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  LOCALE_ID,
+  provideAppInitializer,
+  provideBrowserGlobalErrorListeners,
+} from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 
 import { client } from './api/client.gen';
 import { provideHeyApiClient } from './api/client/client.gen';
 import { routes } from './app.routes';
+import { RealtimeService } from './shared/realtime/realtime.service';
 import './locale';
 
 export const appConfig: ApplicationConfig = {
@@ -17,5 +24,7 @@ export const appConfig: ApplicationConfig = {
     provideHeyApiClient(client),
     // Zahlen und Datum im deutschen Format (0,78; 12,3 %; 30.10.2026)
     { provide: LOCALE_ID, useValue: 'de-DE' },
+    // P4.6: WebSocket beim Start; Aenderungen melden sich, REST liefert den Zustand
+    provideAppInitializer(() => inject(RealtimeService).start()),
   ],
 };

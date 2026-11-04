@@ -39,6 +39,15 @@ Fortschritt und „Run starten“ kommen mit Phase 4, der Profil-Editor nach Pha
 - **Stores** reagieren mit `withReducer` (z. B. Fortschritt übernehmen) oder laden über
   `withEventHandlers` nach (z. B. bei `resync` oder neuem Ranking).
 - Protokoll und Synchronisationsregeln: [web-api-realtime.md](web-api-realtime.md).
+- **Umgesetzt seit P4.6** (`frontend/src/app/shared/realtime/`):
+  - Der `RealtimeService` startet mit der App (`provideAppInitializer`) und abonniert `runs`,
+    `ranking` und `profiles`.
+  - Der `LiveStore` (SignalStore mit `withReducer`) zählt je Topic eine Version und hält den
+    Fortschritt laufender Runs.
+  - Runs und Ranking lesen die Version und laden neu, wenn sie steigt. Die Toolbar zeigt
+    „offline“.
+  - Die Protokoll-Typen in `protocol.ts` sind von Hand gespiegelt. Das Golden-Schema
+    `tests/golden/realtime/v1.json` macht Änderungen am Protokoll sichtbar.
 
 ## Container
 
@@ -115,8 +124,8 @@ server {
 }
 ```
 
-Offen für die Umsetzung: eine Content-Security-Policy. `connect-src` muss das WebSocket-Ziel
-enthalten.
+Die Content-Security-Policy steht seit P3.6 in nginx. `connect-src 'self'` deckt auch den
+WebSocket auf demselben Host ab (`ws:`/`wss:`), seit P4.6 im Browser-Test geprüft.
 
 ## Regeln für getrennte Deployments
 

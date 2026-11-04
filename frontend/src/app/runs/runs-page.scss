@@ -20,3 +20,10 @@ table {
 .message {
   color: var(--mat-sys-on-surface-variant);
 }
+
+// P4.6: Fortschritt eines laufenden Abrufs neben dem Status
+.progress {
+  margin-left: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}

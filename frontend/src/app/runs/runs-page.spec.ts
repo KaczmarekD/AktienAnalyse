@@ -1,8 +1,10 @@
 // Liste der Laeufe (P3.7).
 import { TestBed } from '@angular/core/testing';
+import { Dispatcher } from '@ngrx/signals/events';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { run } from '../testing/fixtures';
+import { serverEvents } from '../shared/realtime/realtime.events';
 import { RunsPage } from './runs-page';
 
 const RUNS = '/api/v1/runs?limit=50';
@@ -45,5 +47,42 @@ describe('RunsPage', () => {
     const fixture = render();
     await respond(fixture, RUNS, null, 503);
     expect(text(fixture)).toContain('nicht erreichbar');
+  });
+
+  // P4.6: Echtzeit ueber den LiveStore
+  it('reloads when a run event arrives', async () => {
+    const fixture = render();
+    await respond(fixture, RUNS, [run({ id: 1 })]);
+    TestBed.inject(Dispatcher).dispatch(
+      serverEvents.event({
+        op: 'event',
+        topic: 'runs',
+        type: 'screening.run.requested',
+        seq: 7,
+        data: { runId: 2 },
+      }),
+    );
+    await respond(fixture, RUNS, [run({ id: 2, status: 'running' }), run({ id: 1 })]);
+    expect(query(fixture, 'tr[data-run]').map((r) => r.getAttribute('data-run'))).toEqual([
+      '2',
+      '1',
+    ]);
+  });
+
+  it('shows the progress of a running fetch', async () => {
+    const fixture = render();
+    await respond(fixture, RUNS, [run({ id: 3, status: 'running' })]);
+    TestBed.inject(Dispatcher).dispatch(
+      serverEvents.event({
+        op: 'event',
+        topic: 'runs',
+        type: 'marketdata.fetch.progressed',
+        seq: null,
+        data: { runId: 3, done: 57, total: 90, symbol: 'SAP.DE', ok: true },
+      }),
+    );
+    await fixture.whenStable();
+    const progress = query(fixture, 'tr[data-run="3"] [data-progress]')[0];
+    expect(progress?.textContent).toContain('57/90');
   });
 });

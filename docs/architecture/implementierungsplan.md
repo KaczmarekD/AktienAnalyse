@@ -1912,6 +1912,61 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - `resumeFrom` beim Wiederverbinden
   - Events landen im Store
 - **Implementierung:** Service, NgRx-Events und Reducer.
+- **Entwurf (04.11.2026):**
+  - **Abhängigkeit:** `@ngrx/signals` 22.0.1 (passt zu Angular 22), daraus SignalStore und das
+    Events-Plugin (`@ngrx/signals/events`), wie in [frontend.md](frontend.md) vorgesehen.
+  - **`RealtimeService`** (`frontend/src/app/shared/realtime/`):
+    - Kapselt `rxjs/webSocket` mit dem Subprotokoll `va.v1`. Die Adresse ist relativ zur Seite
+      (`ws://<host>/ws`, unter HTTPS `wss`).
+    - Status als Signal: `connecting`, `online`, `offline`.
+    - Abonniert beim Öffnen die Topics `runs`, `ranking` und `profiles`. Beim Wiederverbinden
+      schickt er dazu `resumeFrom` mit der letzten gesehenen `seq`. Vor dem ersten Event gilt
+      die `lastSeq` aus `hello`.
+    - Bricht die Verbindung ab, verbindet er neu: 1 s, 2 s, 4 s … bis 30 s, je mit Zufallsanteil
+      (50–100 %). Nach einer erfolgreichen Verbindung beginnt die Folge von vorn.
+    - Servernachrichten gehen als NgRx-Events weiter (`eventGroup({ source: 'Server' })`):
+      `event` und `resync`. `pong` und `error` schluckt er, damit die Konsole leer bleibt
+      (Regel der Browser-Tests).
+    - Für Tests ist die WebSocket-Klasse austauschbar (`WebSocketCtor` von `rxjs/webSocket`),
+      ebenso Wartezeiten und Zufall.
+  - **`LiveStore`** (SignalStore, `withReducer`):
+    - Je Topic ein Zähler `version`. Er steigt bei jedem dauerhaften Event und bei `resync`
+      dieses Topics.
+    - Fortschritt je Run aus `marketdata.fetch.progressed` (`done`, `total`, `symbol`). Mit dem
+      Abschluss des Runs fällt er weg.
+  - **Ansichten:**
+    - Die Liste der Runs lädt neu, wenn `version('runs')` steigt, und zeigt den Fortschritt
+      laufender Runs.
+    - Das Ranking lädt neu bei `version('ranking')`.
+    - Die Toolbar zeigt „offline“, solange keine Verbindung besteht.
+  - **Protokoll-Typen** (`protocol.ts`): von Hand, gespiegelt aus `va_web_api.realtime.protocol`.
+    Damit eine Änderung auffällt, hält ein Python-Golden-Test das JSON-Schema der
+    Protokoll-Modelle fest (`tests/golden/realtime/v1.json`). Generiert wird erst, wenn das
+    Protokoll wächst.
+  - **Entwicklung:** `proxy.conf.json` reicht `/ws` (mit `ws: true`) an das web-api weiter.
+  - **Test (rot):**
+    - `RealtimeService` mit Fake-WebSocket:
+      - Verbindet mit `va.v1` und abonniert die Topics.
+      - Status `online`, nach Abbruch `offline`.
+      - Wiederverbinden mit wachsender, gedeckelter Wartezeit und Zufallsanteil, nach Erfolg
+        wieder ab 1 s.
+      - `resumeFrom` mit der letzten `seq`, ohne Events mit der `lastSeq` aus `hello`.
+      - Events und `resync` landen im `LiveStore`.
+    - `LiveStore`: Versionen je Topic, Fortschritt kommt und geht.
+    - Ansichten:
+      - Runs laden bei einem Run-Event neu und zeigen den Fortschritt.
+      - Das Ranking lädt bei einem Ranking-Event neu.
+      - Die Toolbar zeigt „offline“.
+    - Python: Golden-Schema des Protokolls.
+    - E2E (Playwright): Die Toolbar steht nach dem Laden auf „online“, die Konsole bleibt leer.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Status `idle`:** Er gilt, solange der Service nicht gestartet ist. Nur die App startet
+    ihn (`provideAppInitializer`). Komponententests ohne App bauen also keine Verbindung auf.
+  - **Senden:** Das Abo geht im `openObserver` raus. `rxjs/webSocket` puffert es und sendet es
+    nach dem Öffnen.
+  - **Budget:** Der Build warnt weiter wegen des initialen Budgets (500 kB). Das Bundle liegt
+    bei 753 kB, NgRx trägt einige kB bei. Das war schon vorher über der Grenze und ist keine
+    neue Warnung.
 
 #### P4.7 Runs aus dem UI, Watchdog, Scheduler
 
