@@ -46,6 +46,20 @@ server {
         proxy_read_timeout 60s;
     }
 
+    # P4.5: WebSocket des web-api. Host mit Port, damit das web-api die Herkunft (Origin) mit
+    # dem Host vergleichen kann. Uvicorn pingt alle 20 s, die Timeouts liegen weit darueber.
+    location = /ws {
+        proxy_pass http://$web_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
     # Nie cachen, damit ein neues Image sofort greift (expires statt add_header, siehe oben)
     location = /index.html {
         expires -1;

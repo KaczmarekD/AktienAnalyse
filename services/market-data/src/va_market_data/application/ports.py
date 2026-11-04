@@ -58,6 +58,10 @@ class SnapshotStore(Protocol):
 
     def finish_fetch(self, fetch_run_id: int, df: pd.DataFrame) -> None: ...
 
+    def instrument_ids(self, symbols: Collection[str]) -> Mapping[str, int]:
+        """IDs der Titel (``market_data.instrument``) fuer das Snapshot-Event (P5.3)."""
+        ...
+
 
 class Fetch(Protocol):
     """Die Abrufschleife mit fertig verdrahtetem Provider (``fetch_all`` ohne Provider)."""

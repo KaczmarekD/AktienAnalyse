@@ -28,7 +28,7 @@ from .models import (
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-_RUN_COLUMNS = """
+RUN_COLUMNS = """
     r.id, r.kind, r.status, r.started_at, r.finished_at, r.dry_run, r.force_refresh,
     r.universe_mode, r.universe_size, r.scored_count, r.failed_count, r.exit_code
 """
@@ -58,7 +58,7 @@ _SNAPSHOT_COLUMNS = """
 def list_runs(conn: Connection, *, limit: int, offset: int) -> list[RunSummary]:
     rows = conn.execute(
         text(f"""
-            SELECT {_RUN_COLUMNS} FROM batch.run r
+            SELECT {RUN_COLUMNS} FROM batch.run r
             ORDER BY r.started_at DESC, r.id DESC LIMIT :limit OFFSET :offset
         """),
         {"limit": limit, "offset": offset},
@@ -71,7 +71,7 @@ def get_run(conn: Connection, run_id: int) -> RunDetail | None:
     row = (
         conn.execute(
             text(f"""
-                SELECT {_RUN_COLUMNS}, r.app_version, r.error, r.fetch_run_id, r.scoring_run_id,
+                SELECT {RUN_COLUMNS}, r.app_version, r.error, r.fetch_run_id, r.scoring_run_id,
                        COALESCE(r.report_id, (SELECT max(rep.id) FROM reporting.report rep
                                               WHERE rep.run_id = r.id)) AS report_id
                 FROM batch.run r WHERE r.id = :run_id

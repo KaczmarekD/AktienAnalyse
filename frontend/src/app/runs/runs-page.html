@@ -1,10 +1,45 @@
 <app-page-header>Runs</app-page-header>
 
+<section class="cluster" aria-label="Lauf starten">
+  <mat-checkbox
+    data-option="dry_run"
+    [checked]="options().dry_run"
+    (change)="setOption('dry_run', $event.checked)"
+    >Dry-Run (Mail nur speichern)</mat-checkbox
+  >
+  <mat-checkbox
+    data-option="notify"
+    [checked]="options().notify"
+    (change)="setOption('notify', $event.checked)"
+    >Mail verschicken</mat-checkbox
+  >
+  <mat-checkbox
+    data-option="force_refresh"
+    [checked]="options().force_refresh"
+    (change)="setOption('force_refresh', $event.checked)"
+    >Neu abrufen (Abruf von heute ignorieren)</mat-checkbox
+  >
+  <button
+    matButton="filled"
+    type="button"
+    data-action="start"
+    [disabled]="starting()"
+    (click)="start()"
+  >
+    Lauf starten
+  </button>
+</section>
+@if (notice(); as message) {
+  <p class="notice" role="status" data-notice>{{ message }}</p>
+}
+
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
 } @else if (runs(); as runs) {
   @if (runs.length === 0) {
-    <p class="message">Noch keine Läufe. Der erste entsteht mit <code>make local-run</code>.</p>
+    <p class="message">
+      Noch keine Läufe. Starte den ersten oben (mit NATS) oder mit <code>make local-run</code>.
+    </p>
   } @else {
     <table mat-table [dataSource]="runs">
       <ng-container matColumnDef="id">
@@ -28,6 +63,11 @@
         <th mat-header-cell *matHeaderCellDef>Status</th>
         <td mat-cell *matCellDef="let run">
           <span [attr.data-status]="run.status">{{ run.status | runStatus }}</span>
+          @if (run.status === 'running' && progress()[run.id]; as step) {
+            <span class="progress" data-progress [title]="step.symbol"
+              >{{ step.done }}/{{ step.total }}</span
+            >
+          }
         </td>
       </ng-container>
       <ng-container matColumnDef="scored">

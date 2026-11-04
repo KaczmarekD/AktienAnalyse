@@ -2,65 +2,63 @@
 
 ``Adapters`` buendelt alles, was nach aussen geht. Tests tauschen einzelne Teile per
 ``dataclasses.replace`` oder bauen eigene; die Handler sehen nur ihre Ports.
+
+Seit P5.1a baut jeder Service seine Adapter und Handler selbst (``va_<service>.entrypoints
+.service``); hier werden dieselben Funktionen mit den Settings des Batches aufgerufen. So laeuft
+die Kette im Batch, im Worker und in getrennten Services mit demselben Code.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from functools import cached_property, partial
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from va_market_data.adapters.csv_universe import load_fallback
-from va_market_data.adapters.deka import DekaSource
-from va_market_data.adapters.ishares import IsharesSource
-from va_market_data.adapters.openfigi import resolve_isins_openfigi
-from va_market_data.adapters.postgres.store import PostgresSnapshotStore
-from va_market_data.adapters.replay import PROVIDER as REPLAY_PROVIDER
-from va_market_data.adapters.replay import ReplayFundamentals, replay_universe
-from va_market_data.adapters.yahoo import (
-    PROVIDER,
-    FetcherConfig,
-    YahooFundamentals,
-    provider_version,
-)
-from va_market_data.application.fetch import fetch_all
-from va_market_data.application.universe import load_universe as load_universe_chain
-from va_market_data.domain.universe import UniverseConfig
-from va_market_data.entrypoints.handlers import RunRequestedHandler
-from va_notification.adapters.healthchecks import HealthchecksHeartbeat, ping_target
-from va_notification.adapters.postgres.store import PostgresReportStore
-from va_notification.adapters.smtp import SmtpConfig, SmtpSender
-from va_notification.entrypoints.handlers import NotificationConfig, NotificationHandler
+from va_market_data.adapters.postgres.models import MarketDataInbox, MarketDataOutbox
+from va_market_data.entrypoints import service as market_data_service
+from va_notification.adapters.postgres.models import ReportingInbox, ReportingOutbox
+from va_notification.entrypoints import service as notification_service
+from va_notification.entrypoints.service import alert_channels, smtp_config
 from va_platform.db import create_db_engine
+from va_platform.messaging import ReliableBus
+from va_scoring.adapters.postgres.models import ScoringInbox, ScoringOutbox
 from va_scoring.adapters.postgres.store import PostgresScoringStore
-from va_scoring.application.ports import ProfileStore, ScoringStore
-from va_scoring.application.profiles import StoredProfile
-from va_scoring.domain.profile import profile_params
-from va_scoring.domain.scoring import ScoringConfig
-from va_scoring.entrypoints.handlers import SnapshotCompletedHandler
+from va_scoring.application.ports import ScoringAdapter
+from va_scoring.entrypoints import service as scoring_service
+from va_scoring.entrypoints.service import scoring_config
 
 from . import __version__
 from .db.recorder import BatchRecorder
-from .regression.case import ReplayCase
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
-    import pandas as pd
+    from sqlalchemy import Engine
 
-    from va_market_data.application.ports import Fetch, FundamentalsProvider, SnapshotStore
-    from va_market_data.domain.fundamentals import Fundamentals
-    from va_market_data.domain.history import HistoryState
-    from va_market_data.domain.universe import Ticker, Universe
+    from va_market_data.application.ports import Fetch, SnapshotStore
+    from va_market_data.domain.universe import Universe, UniverseConfig
     from va_notification.application.ports import Heartbeat, ReportSender, ReportStore
     from va_platform.bus import EventBus
+    from va_platform.messaging import InboxMixin, OutboxMixin
 
     from .config import Settings
     from .db.log_handler import LogEntry
 
+__all__ = [
+    "DEFAULT_FALLBACK_CSV",
+    "Adapters",
+    "BatchStore",
+    "Messaging",
+    "ScoringAdapter",
+    "alert_channels",
+    "build_adapters",
+    "load_universe",
+    "scoring_config",
+    "smtp_config",
+    "wire",
+]
 
 # Von Hand gepflegt, liegt im Repo (im Image unter /app/data). Das Paket market-data liegt
 # installiert in site-packages und kennt den Pfad deshalb nicht selbst.
@@ -85,8 +83,20 @@ class BatchStore(Protocol):
     def record_logs(self, run_id: int, entries: Sequence[LogEntry]) -> None: ...
 
 
-class ScoringAdapter(ScoringStore, ProfileStore, Protocol):
-    """Speicher von scoring: Bewertungslaeufe und Profile (P2b.3)."""
+@dataclass(frozen=True)
+class Messaging:
+    """Inbox und Outbox der Services (P4.3b): je Service ein ``ReliableBus``.
+
+    ``max_age``: aelter ist ein Event der Rest eines abgebrochenen Laufs (``RUN_TIMEOUT_MINUTES``).
+    """
+
+    engine: Engine
+    max_age: timedelta
+
+    def wrap(
+        self, bus: EventBus, *, inbox: type[InboxMixin], outbox: type[OutboxMixin]
+    ) -> EventBus:
+        return ReliableBus(bus, self.engine, inbox=inbox, outbox=outbox, max_age=self.max_age)
 
 
 @dataclass(frozen=True)
@@ -100,6 +110,17 @@ class Adapters:
     sender: ReportSender
     heartbeat: Heartbeat
     clock: Callable[[], datetime] = field(default=datetime.now)
+    # Ohne (Tests mit Fakes) haengen die Handler direkt am Bus
+    messaging: Messaging | None = None
+
+
+def _fallback_csv(settings: Settings) -> Path:
+    """Die CSV im Repo, ausser ``FALLBACK_CSV`` ist ausdruecklich gesetzt (Tests wechseln cwd)."""
+    return (
+        settings.fallback_csv
+        if "fallback_csv" in settings.model_fields_set
+        else (DEFAULT_FALLBACK_CSV)
+    )
 
 
 def build_adapters(settings: Settings) -> Adapters:
@@ -110,63 +131,21 @@ def build_adapters(settings: Settings) -> Adapters:
     zeigt sich also beim Start des Laufs, nicht hier.
     """
     engine = create_db_engine(settings.database_url.get_secret_value())
-    fetcher = FetcherConfig(default_tax_rate=settings.default_tax_rate)
-    sender, heartbeat = alert_channels(settings)
-
-    universe: Callable[[], Universe]
-    if settings.replay_source is None:
-        provider_name, version = PROVIDER, provider_version()
-        universe, sleep_between = load_universe, fetcher.sleep_between
-        provider: Callable[[], FundamentalsProvider] = partial(YahooFundamentals, fetcher)
-    else:
-        replay = _ReplayFile(settings.replay_source)
-        provider_name, version = REPLAY_PROVIDER, settings.replay_source.name
-        universe, sleep_between = replay.universe, 0.0
-        provider = replay.fundamentals
-
-    def fetch(
-        tickers: list[Ticker],
-        *,
-        on_result: Callable[[Fundamentals], None],
-        history: Mapping[str, HistoryState],
-    ) -> pd.DataFrame:
-        return fetch_all(
-            tickers,
-            provider(),
-            sleep_between=sleep_between,
-            on_result=on_result,
-            history=history,
-        )
-
+    market = market_data_service.build_adapters(
+        settings, engine, fallback_csv=_fallback_csv(settings)
+    )
+    reporting = notification_service.build_adapters(settings, engine)
     return Adapters(
         batch=BatchRecorder(engine),
-        market_data=PostgresSnapshotStore(engine, provider=provider_name, provider_version=version),
+        market_data=market.store,
         scoring=PostgresScoringStore(engine, app_version=__version__),
-        reporting=PostgresReportStore(engine),
-        load_universe=universe,
-        fetch=fetch,
-        sender=sender,
-        heartbeat=heartbeat,
+        reporting=reporting.store,
+        load_universe=market.load_universe,
+        fetch=market.fetch,
+        sender=reporting.sender,
+        heartbeat=reporting.heartbeat,
+        messaging=Messaging(engine, timedelta(minutes=settings.run_timeout_minutes)),
     )
-
-
-class _ReplayFile:
-    """Eine Replay-Fixture als Quelle (U5). Gelesen erst im Lauf: Ein Fehler in der Datei
-    laesst dann den Lauf scheitern, statt wie eine ausgefallene Datenbank auszusehen."""
-
-    def __init__(self, path: Path) -> None:
-        self._path = path
-
-    @cached_property
-    def _rows(self) -> list[dict[str, Any]]:
-        case = ReplayCase.from_json(self._path.read_text(encoding="utf-8"))
-        return [{str(k): v for k, v in row.items()} for row in case.snapshots.to_dict("records")]
-
-    def universe(self) -> Universe:
-        return replay_universe(self._rows, load_fallback(DEFAULT_FALLBACK_CSV))
-
-    def fundamentals(self) -> FundamentalsProvider:
-        return ReplayFundamentals(self._rows)
 
 
 def load_universe(
@@ -176,69 +155,40 @@ def load_universe(
     today: date | None = None,
 ) -> Universe:
     """DAX + MDAX aus der ersten gueltigen Quelle: iShares -> Deka -> Fallback-CSV."""
-    return load_universe_chain(
-        [IsharesSource(), DekaSource(resolver=resolve_isins_openfigi)],
-        load_fallback(fallback_csv or DEFAULT_FALLBACK_CSV),
-        cfg or UniverseConfig(),
-        today or date.today(),
-        force_fallback=force_fallback,
-    )
-
-
-def smtp_config(settings: Settings) -> SmtpConfig:
-    return SmtpConfig(
-        host=settings.smtp_host,
-        port=settings.smtp_port,
-        user=settings.smtp_user,
-        password=settings.smtp_password.get_secret_value(),
-        use_tls=settings.smtp_use_tls,
-        plain=settings.smtp_plain,
-        mail_from=settings.effective_mail_from,
-        mail_to=str(settings.mail_to),
-        subject_prefix=settings.mail_subject_prefix,
-    )
-
-
-def alert_channels(settings: Settings) -> tuple[ReportSender, Heartbeat]:
-    """Mail und Healthcheck - auch fuer den Fall, dass die anderen Adapter nicht entstehen."""
-    return SmtpSender(smtp_config(settings)), HealthchecksHeartbeat(settings.healthcheck_url)
-
-
-def scoring_config(settings: Settings) -> ScoringConfig:
-    """Die Bewertung aus den Settings - fuer den Batch und die Replay-Regression gleich."""
-    return ScoringConfig(
-        min_market_cap=settings.min_market_cap,
-        value_weight=settings.value_weight,
-        quality_weight=settings.quality_weight,
+    return market_data_service.live_universe(
+        fallback_csv or DEFAULT_FALLBACK_CSV, cfg, force_fallback=force_fallback, today=today
     )
 
 
 def wire(bus: EventBus, adapters: Adapters, settings: Settings, *, version: str) -> None:
-    """Haengt die Handler aller Module an den Bus. Reihenfolge = Reihenfolge der Kette."""
-    RunRequestedHandler(
-        bus,
-        load_universe=adapters.load_universe,
-        store=adapters.market_data,
-        fetch=adapters.fetch,
-        dax_only=settings.universe == "DAX_ONLY",
-    ).subscribe()
+    """Haengt die Handler aller Module an den Bus. Reihenfolge = Reihenfolge der Kette.
+
+    Mit ``adapters.messaging`` (P4.3b) bekommt jeder Service seinen ``ReliableBus``: Er
+    verarbeitet ein Event einmal und schickt Folge-Events ueber seine Outbox.
+    """
+
+    def service_bus(inbox: type[InboxMixin], outbox: type[OutboxMixin]) -> EventBus:
+        if adapters.messaging is None:
+            return bus
+        return adapters.messaging.wrap(bus, inbox=inbox, outbox=outbox)
+
+    market_data_service.wire(
+        service_bus(MarketDataInbox, MarketDataOutbox),
+        market_data_service.MarketDataAdapters(
+            store=adapters.market_data, load_universe=adapters.load_universe, fetch=adapters.fetch
+        ),
+        settings,
+    )
     # Die ENV-Werte sind nur Startwerte fuer das Profil "Standard" (ADR-0009, P2b.3)
-    start_params = profile_params(scoring_config(settings))
-    SnapshotCompletedHandler(
-        bus, store=adapters.scoring, profile=StoredProfile(adapters.scoring, start_params)
-    ).subscribe()
-    NotificationHandler(
-        bus,
-        sender=adapters.sender,
-        heartbeat=adapters.heartbeat,
-        store=adapters.reporting,
-        config=NotificationConfig(
-            top_n=settings.top_n,
-            bottom_n=settings.bottom_n,
-            version=version,
-            recipient=str(settings.mail_to),
-            preview_dir=settings.data_dir,
-            heartbeat_target=ping_target(settings.healthcheck_url),
+    scoring_service.wire(service_bus(ScoringInbox, ScoringOutbox), adapters.scoring, settings)
+    notification_service.wire(
+        service_bus(ReportingInbox, ReportingOutbox),
+        notification_service.NotificationAdapters(
+            store=adapters.reporting,
+            sender=adapters.sender,
+            heartbeat=adapters.heartbeat,
             clock=adapters.clock,
         ),
-    ).subscribe()
+        settings,
+        version=version,
+    )

@@ -1,6 +1,12 @@
 # web-api, Eventmanager und WebSocket
 
-> **Status:** Plan (30.09.2026). REST ab Phase 3, Eventmanager und WebSocket ab Phase 4, siehe
+> **Status:** REST seit Phase 3. Seit P4.4 (04.11.2026) gibt es den Eventmanager
+> (`va_web_api.events`) mit den Projektionen `web.run_status` und `web.ranking_row`, gespeist aus
+> NATS. Seit P4.5 (04.11.2026) meldet der WebSocket-Hub sie unter `/ws` an die offenen Tabs
+> (`va_web_api.realtime`, Protokoll v1, Nachspielen mit `resumeFrom`). Seit P4.9 lesen die
+> REST-Endpunkte mit NATS aus den Projektionen und per Request/Reply, ohne NATS weiter aus den
+> Tabellen des Batches (Port `ReadModel`). Plan (30.09.2026): REST
+> ab Phase 3, Eventmanager und WebSocket ab Phase 4, siehe
 > [Roadmap](roadmap.md). Entscheidungen:
 > [ADR-0006](../adr/0006-websocket-und-eventmanager.md), [ADR-0007](../adr/0007-lan-only-ohne-login.md).
 
@@ -29,9 +35,8 @@ services/web-api/src/va_web_api/
 └── main.py         # FastAPI-App; der Lifespan startet DB-Pool, Broker und Scheduler
 ```
 
-Der FastStream-Broker wird im Lifespan von FastAPI gestartet und gestoppt. Die frühere
-eingebaute FastAPI-Integration von FastStream ist veraltet und wurde in das Paket
-`faststream_fastapi` ausgelagert. Wir brauchen sie nicht.
+Der `NatsBus` (eigener Adapter mit nats-py, Nachtrag in ADR-0002) wird im Lifespan von
+FastAPI gestartet und gestoppt, ebenso der Takt von Scheduler und Watchdog.
 
 ## REST-API (v1)
 
@@ -61,6 +66,31 @@ Seit P3.3 gilt das auch für die Profil-Befehle (Speichern, Aktivieren). Die Por
 web-api-Prozesses. Geschrieben wird mit der Rolle `va_profiles`, die nur in die
 Profil-Tabellen anfügen darf, nicht mit der Rolle des Batches. Fehlt
 `WEB_API_PROFILES_DATABASE_URL`, antworten die schreibenden Endpunkte mit 503.
+
+**Request/Reply (seit P4.8):** Mit `WEB_API_NATS_URL` gehen Faktor-Katalog, Vorschau, Speichern und
+Aktivieren als Request/Reply an scoring (`rpc.va.scoring.*`, Contracts in `va_contracts.rpc.v1`).
+`va_web_api.rpc.RemoteScoring` setzt dafür die Ports um, `scoring_handlers` ist die Gegenseite im
+Worker. Die REST-API bleibt gleich, die API-Tests aus P3.3 laufen in beiden Varianten. Antwortet
+niemand, kommt 503 („Scoring nicht erreichbar“). Nach Speichern und Aktivieren meldet der Worker
+`scoring.profile.saved` bzw. `.activated`, die offenen Tabs bekommen das über das Topic `profiles`.
+
+**Lesemodell (seit P4.9):** Die Router fragen den Port `ReadModel`.
+
+- Ohne NATS ist es `TableReadModel` mit den Abfragen aus P3.2 (Rolle `va_read`).
+- Mit `WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` ist es `ProjectionReadModel`
+  (Rolle `va_web`). Es liest nur `web` und `batch.run`:
+  - Ranking und Titelseite aus `snapshot_row`, `ranking_run` und `ranking_row`;
+  - Profile und Reports per Request/Reply von scoring bzw. notification.
+
+Die Historie füllt `src.db.backfill` beim Start der Migration aus den Tabellen nach. Die Antworten
+sind in beiden Fällen dieselben.
+
+**Runs aus dem UI (seit P4.7):** `POST /api/v1/runs` antwortet mit 202 und der ID des Runs.
+`va_web_api.runs.RunManager` legt ihn mit der Rolle `va_web` in `batch.run` an, dazu
+`web.run_request` und das Event in `web.outbox`. Läuft schon ein Run, kommt 409. Ohne
+`WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` gibt es keine Run-Verwaltung, dann
+kommt 503. Ausgeführt wird der Run von den Services (seit P5.1 je ein Container). Scheduler und Watchdog
+laufen im Takt einer Hintergrund-Aufgabe ([events.md](events.md#scheduler-und-watchdog-im-web-api)).
 
 ## Eventmanager
 
@@ -118,7 +148,8 @@ Hub, ohne `seq`.
   synchronisiert sich. Ein langsamer Client blockiert nie die anderen.
 - Heartbeat: Uvicorn sendet standardmäßig alle 20 s WebSocket-Pings. Der
   `proxy_read_timeout` in nginx muss deutlich länger sein.
-- Beim Verbindungsaufbau prüft der Hub den `Origin`-Header gegen `WEB_ALLOWED_ORIGINS`.
+- Beim Verbindungsaufbau prüft der Endpunkt den `Origin`-Header: ohne `WEB_API_ALLOWED_ORIGINS`
+  (durch Komma getrennt) nur dieselbe Herkunft wie der `Host`, sonst genau die Liste.
 
 ```python
 class WebSocketHub:

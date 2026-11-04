@@ -92,14 +92,28 @@ class NotificationHandler:
         event = env.data
         if event.trigger == "rescore":
             return
+        deliver = event.options.notify and not event.options.dry_run
         try:
-            report = self._build(event)
-            report_id = self._store.record_report(event.run_id, event.scoring_run_id, report)
-            deliver = event.options.notify and not event.options.dry_run
-            if event.options.dry_run:
-                self._write_preview(report)
-            if deliver:
-                self._send_report(event.run_id, report_id, report)
+            # P4.3b: Kommt dasselbe Ergebnis erneut an (etwa nach einem Absturz zwischen Mail
+            # und Abschluss), geht keine zweite Mail raus
+            already = self._store.delivered_report(event.scoring_run_id) if deliver else None
+            if already is None:
+                report = self._build(event)
+                report_id = self._store.record_report(event.run_id, event.scoring_run_id, report)
+                subject, summary = report.subject, f"scored {report.scored}/{report.universe_size}"
+                if event.options.dry_run:
+                    self._write_preview(report)
+                if deliver:
+                    self._send_report(event.run_id, report_id, report)
+            else:
+                report_id, subject = already
+                summary = None
+                log.warning(
+                    "Report fuer Bewertungslauf %s ist schon verschickt (Report %s), keine "
+                    "zweite Mail",
+                    event.scoring_run_id,
+                    report_id,
+                )
         except Exception as e:
             log.exception("Report nicht verschickt")
             failed = RunFailedV1(
@@ -113,14 +127,14 @@ class NotificationHandler:
             self._bus.publish(follow_up(env, RUN_FAILED, failed, source=SOURCE))
             return
 
-        if deliver and event.trigger == "scheduled":
-            self._ping(event.run_id, True, f"scored {report.scored}/{report.universe_size}")
+        if deliver and event.trigger == "scheduled" and summary is not None:
+            self._ping(event.run_id, True, summary)
         if event.run_id is None:  # nur ein Rescore hat keinen Run, der kam oben nicht durch
             return
         sent = ReportSentV1(
             run_id=event.run_id,
             report_id=report_id,
-            subject=report.subject,
+            subject=subject,
             dry_run=event.options.dry_run,
         )
         self._bus.publish(follow_up(env, REPORT_SENT, sent, source=SOURCE))

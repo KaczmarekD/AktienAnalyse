@@ -87,7 +87,7 @@ test-nats-up: ## Wegwerf-NATS mit JetStream fuer Tests starten (Port 54222)
 	docker run -d --rm --name va-test-nats -p 54222:4222 nats:2.15.1-alpine -js
 
 test-nats: ## Integrationstests gegen NATS (vorher: make test-nats-up)
-	TEST_NATS_URL=$(TEST_NATS_URL) $(RUN) pytest packages/va-platform/tests/test_nats_provision.py
+	TEST_NATS_URL=$(TEST_NATS_URL) $(RUN) pytest packages/va-platform/tests tests/test_pipeline_bus.py tests/test_main_nats.py
 
 test-nats-down: ## Wegwerf-NATS stoppen (entfernt nur den Test-Container)
 	docker stop va-test-nats
@@ -110,13 +110,13 @@ REG ?= ghcr.io/kaczmarekd
 VERSION ?= latest
 IMAGE ?= $(REG)/value-analyzer:$(VERSION)
 
-pull: ## Images aus GHCR laden: Batch/web-api und frontend (NAS: danach make up)
-	docker compose pull value-analyzer frontend
+pull: ## Images aus GHCR laden: App-Image, Services, web-api und frontend (NAS: danach make up)
+	docker compose --profile run pull
 
 build: ## Image lokal bauen, unter dem Namen aus docker-compose.yml (nicht auf der NAS)
 	docker build --target runtime -t $(IMAGE) .
 
-up: ## Container starten (Cron-Mode)
+up: ## Stack starten: Migration, NATS, Services, web-api mit Wochenplan, frontend
 	docker compose up -d
 
 down: ## Container stoppen
@@ -140,8 +140,8 @@ docker-run: ## Einmaliger echter Lauf im Container
 db-up: ## Nur die Datenbank starten
 	docker compose up -d db
 
-db-migrate: ## Schema-Migrationen ausfuehren (passiert auch bei jedem App-Start)
-	docker compose run --rm value-analyzer true
+db-migrate: ## Schema-Migrationen ausfuehren (passiert auch bei jedem make up)
+	docker compose run --rm migrate
 
 db-import: ## Altdateien aus data/ importieren (mehrfach ausfuehrbar)
 	docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
@@ -166,7 +166,7 @@ regression-export: ## Wie regression, dazu je Lauf eine Fixture nach data/replay
 # Arbeitsstand, Mails landen in Mailpit, kein Healthcheck-Ping. Die NAS nutzt diese Targets nicht.
 LOCAL = docker compose -f docker-compose.yml -f docker-compose.local.yml
 
-local-up: ## Lokal: DB, Mailpit (:8025), pgweb (:8081) und web-api (:8000) starten
+local-up: ## Lokal: DB, NATS, Mailpit (:8025), pgweb (:8081), web-api (:8000) und Worker starten
 	$(LOCAL) build value-analyzer
 	$(LOCAL) up -d
 

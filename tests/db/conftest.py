@@ -27,6 +27,11 @@ ROLE_PASSWORDS = {
     "va_app": "va_app_test",
     "va_read": "va_read_test",
     "va_profiles": "va_profiles_test",  # P3.3: Profil-Befehle des web-api
+    "va_web": "va_web_test",  # P4.4: Projektionen des web-api im Schema web
+    # P5.3: eine Rolle je Service, nur im eigenen Schema
+    "va_market_data": "va_market_data_test",
+    "va_scoring": "va_scoring_test",
+    "va_notification": "va_notification_test",
 }
 
 
@@ -112,6 +117,13 @@ def read_engine(db_url: str) -> Iterator[Engine]:
 @pytest.fixture
 def profiles_engine(db_url: str) -> Iterator[Engine]:
     eng = _role_engine(db_url, "va_profiles")
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def web_engine(db_url: str) -> Iterator[Engine]:
+    eng = _role_engine(db_url, "va_web")
     yield eng
     eng.dispose()
 

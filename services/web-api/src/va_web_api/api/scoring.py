@@ -16,7 +16,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 
 from va_contracts.profile import ProfileParamsV1
 
-from .. import read
 from ..models import (
     ActivatedProfile,
     ActivateProfileVersion,
@@ -39,7 +38,7 @@ from ..ports import (
     UnknownProfile,
     UnknownVersion,
 )
-from .deps import NOT_FOUND, Conn, not_found
+from .deps import NOT_FOUND, Reader, not_found
 
 router = APIRouter(tags=["scoring"])
 
@@ -76,14 +75,14 @@ def list_factors(preview: PreviewPort) -> list[Factor]:
 
 
 @router.get("/scoring/profiles")
-def list_profiles(conn: Conn) -> list[ProfileSummary]:
-    return read.list_profiles(conn)
+def list_profiles(reader: Reader) -> list[ProfileSummary]:
+    return reader.list_profiles()
 
 
 @router.get("/scoring/profiles/{profile_id}", responses=NOT_FOUND)
-def get_profile(profile_id: int, conn: Conn, response: Response) -> ProfileDetail:
+def get_profile(profile_id: int, reader: Reader, response: Response) -> ProfileDetail:
     """Ein Profil mit allen Versionen, neueste zuerst. ``ETag``: die neueste Version."""
-    profile = read.get_profile(conn, profile_id)
+    profile = reader.get_profile(profile_id)
     if profile is None:
         raise not_found("Profil")
     if profile.latest_version is not None:

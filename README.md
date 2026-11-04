@@ -1,6 +1,6 @@
 # Value-Analyzer DAX/MDAX
 
-> Wöchentlicher Fundamentaldaten-Screener für DAX und MDAX. Läuft als Docker-Container auf einer Synology und verschickt jeden Samstag eine HTML-Mail mit den besten und schlechtesten Titeln nach Value- und Quality-Kriterien.
+> Wöchentlicher Fundamentaldaten-Screener für DAX und MDAX. Läuft als Docker-Stack auf einer Synology (drei Services an NATS, PostgreSQL, Web-UI) und verschickt jeden Samstag eine HTML-Mail mit den besten und schlechtesten Titeln nach Value- und Quality-Kriterien.
 
 [![CI](https://github.com/KaczmarekD/AktienAnalyse/actions/workflows/ci.yml/badge.svg)](https://github.com/KaczmarekD/AktienAnalyse/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.14-blue)
@@ -18,13 +18,15 @@
 - Markiert potenzielle **Value Traps** (billig, aber schlechte Qualität)
 - Verschickt jeden **Samstag 07:30 Europe/Berlin** eine HTML-Mail mit Top/Bottom-Tabellen und CSV-Anhang
 - Optionaler **Healthchecks.io**-Heartbeat als Dead-Man's-Switch
+- **Web-UI** im LAN: Läufe live verfolgen und starten, Ranking und Historie je Titel, Scoring-Profile mit Vorschau
 
 ---
 
 ## Pipeline
 
-`src/main.py` legt den Lauf an und startet die Kette auf dem Event-Bus im Prozess. Die Module
-reagieren auf Events, verdrahtet in `src/composition.py`:
+Das web-api legt den Lauf an, nach Wochenplan oder aus dem UI. Drei Services führen ihn aus,
+jeder in seinem Container mit eigenem Schema in PostgreSQL. Sie reagieren auf Events über NATS
+JetStream ([events.md](docs/architecture/events.md)):
 
 ```
 screening.run.requested
@@ -40,12 +42,16 @@ scoring.run.completed
 notification             HTML-Mail-Body + CSV-Vollranking; Versand über den Port ReportSender
       │                  (SMTP, Gmail App-Passwort), Report + Versand in PostgreSQL;
       │                  Healthchecks.io (optional)
-notification.report.sent → Abschluss von batch.run
+notification.report.sent → web-api schließt batch.run ab, das UI aktualisiert sich (WebSocket)
 ```
 
 Scheitert eine Stufe, meldet sie `screening.run.failed`. notification pingt dann
 Healthchecks.io mit `/fail` (bei geplanten Läufen immer) und schickt eine Fehlermail, außer im
-Dry-Run und wenn es nur keine bewertbaren Daten gab.
+Dry-Run und wenn es nur keine bewertbaren Daten gab. Der Watchdog im web-api meldet einen Run,
+der in einer Stufe hängen bleibt, ebenfalls als gescheitert.
+
+Der Batch `src/main.py` führt dieselbe Kette auf Wunsch in einem Prozess aus (`make docker-run`),
+verdrahtet in `src/composition.py`.
 
 ---
 
@@ -91,36 +97,43 @@ cd /volume1/docker/
 git clone https://github.com/KaczmarekD/AktienAnalyse.git value-analyzer
 cd value-analyzer
 cp .env.example .env
-nano .env          # SMTP_*, MAIL_TO und die drei DB-Passwörter setzen
-docker compose pull    # fertiges Image aus der CI (GHCR); die NAS baut nichts selbst
+nano .env          # SMTP_*, MAIL_TO, die DB-Passwörter, UI_LAN_BIND und UI_SERVER_NAMES setzen
+make pull          # fertige Images aus der CI (GHCR); die NAS baut nichts selbst
 docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
-docker compose up -d   # startet Postgres (db) und den Batch; Schema wird beim Start migriert
-docker compose logs -f
+make up            # db, nats, Migration, die drei Services, web-api und frontend
+docker compose ps
 ```
 
-Das Image `ghcr.io/kaczmarekd/value-analyzer` entsteht in GitHub Actions bei jedem Push auf
-`main` (`latest`, `sha-<commit>`) und bei Tags `vX.Y.Z` passend zur Version in `pyproject.toml`.
-`VERSION` in der `.env` pinnt eine bestimmte Fassung. Der Import-Test prüft das Image auf der
-echten CPU der NAS (kein AVX, ADR-0008). Ist das Paket in GHCR privat, vorher einmalig
+Die Images (`value-analyzer`, `va-market-data`, `va-scoring`, `va-notification`, `va-web-api`,
+`va-frontend` unter `ghcr.io/kaczmarekd`) entstehen in GitHub Actions bei jedem Push auf `main`
+(`latest`, `sha-<commit>`) und bei Tags `vX.Y.Z` passend zur Version in `pyproject.toml`.
+`VERSION` in der `.env` pinnt eine bestimmte Fassung. Der Import-Test prüft das App-Image auf der
+echten CPU der NAS (kein AVX, ADR-0008). Ist ein Paket in GHCR privat, vorher einmalig
 `docker login ghcr.io` mit einem Token, das nur `read:packages` darf. Lokal baut `make build`
-dasselbe Image.
+das App-Image.
+
+Betrieb, Updates und die einmalige Umstellung vom Batch mit Cron beschreibt das Runbook
+[betrieb-synology.md](docs/architecture/betrieb-synology.md).
 
 **Update** (nach einem Merge auf `main`):
 ```bash
 cd /volume1/docker/value-analyzer
 git pull               # Compose-Datei, Fallback-CSV, Doku (die CSV im Image wird von ./data verdeckt)
-docker compose pull
+make pull
 docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
 make regression        # gespeicherte Wochen mit dem neuen Image nachspielen, schreibt nichts
-docker compose up -d
+make up
 ```
 
-**Web-UI** (seit P3.6): `docker compose up -d` startet neben dem Batch das web-api und den
-`frontend`-Container (nginx). Damit das UI im LAN unter `http://<nas-ip>:8080` erreichbar ist,
-in der `.env` `UI_LAN_BIND` auf die NAS-IP setzen und in `UI_SERVER_NAMES` die Namen eintragen,
-unter denen du es aufrufst (z. B. `nas nas.fritz.box 192.168.1.10`). In der DSM-Firewall Port 8080
-nur für das eigene Subnetz freigeben. Ist das Paket `va-frontend` in GHCR privat, gilt dasselbe
-wie für das Image des Batches (`docker login ghcr.io`).
+**Web-UI** (seit P3.6): `make up` startet das web-api und den `frontend`-Container (nginx).
+Damit das UI im LAN unter `http://<nas-ip>:8080` erreichbar ist, in der `.env` `UI_LAN_BIND`
+auf die NAS-IP setzen und in `UI_SERVER_NAMES` die Namen eintragen, unter denen du es aufrufst
+(z. B. `nas nas.fritz.box 192.168.1.10`). In der DSM-Firewall Port 8080 nur für das eigene
+Subnetz freigeben. Ist das Paket `va-frontend` in GHCR privat, gilt dasselbe
+wie für die anderen Images (`docker login ghcr.io`).
+
+**Wochenlauf:** Das web-api plant ihn nach `CRON_SCHEDULE` (Standard Samstag 07:30,
+Europe/Berlin). Von Hand startet ihn die Seite „Runs“ im UI, wahlweise als Dry-Run.
 
 `make regression` bewertet jede gespeicherte Woche mit dem neuen Code und vergleicht mit dem
 Ergebnis von damals. Exit 0 heißt: alles gleich. Abweichungen sind nur dort in Ordnung, wo die
@@ -132,14 +145,10 @@ vergleichen“. Wie jeder Container-Start migriert es vorher das Schema (nur add
 make db-import
 ```
 
-**Dry-Run** (kein Mailversand, erzeugt nur HTML+CSV):
+**Batch ohne Services** (Notweg, der Lauf läuft im Batch-Container, ohne NATS):
 ```bash
-docker compose run --rm value-analyzer python -m src.main --dry-run
-```
-
-**Sofortiger echter Lauf**:
-```bash
-docker compose run --rm value-analyzer python -m src.main
+make docker-dry    # Dry-Run: kein Mailversand, erzeugt nur HTML+CSV
+make docker-run    # echter Lauf
 ```
 
 ### Datenbank & Auswertungen
@@ -178,7 +187,7 @@ Arbeitsstand, die Mail landet im lokalen Postfach Mailpit, und nichts geht nach 
 
 ```bash
 cp .env.local.example .env
-make local-up          # Datenbank, Mailpit, pgweb und web-api starten (Image aus dem Arbeitsstand)
+make local-up          # DB, NATS, Mailpit, pgweb, web-api und Worker (Image aus dem Arbeitsstand)
 make local-run         # ein Lauf wie am Samstag; die Mail erscheint in Mailpit
 make local-regression  # alle gespeicherten Wochen mit dem Arbeitsstand nachspielen
 make local-ui          # das UI hinter nginx unter http://localhost:8080
@@ -187,7 +196,8 @@ make local-down        # stoppen, die Daten in .local/ bleiben
 ```
 
 **End-to-End-Test** (U5): `make local-e2e` prüft die ganze Kette mit einem Befehl, ohne Yahoo.
-Der Batch läuft mit einer gespeicherten echten Woche (`tests/fixtures/replay/`). Geprüft werden
+Der ganze Stack (NATS, die drei Services, web-api) bewertet eine gespeicherte echte Woche
+(`tests/fixtures/replay/`), gestartet über die API. Geprüft werden
 die Mail in Mailpit, das web-api hinter nginx und das UI, jeweils gegen die Erwartungswerte der
 Woche. Der Stack ist ein Wegwerf-Stack mit eigener Datenbank auf tmpfs, der neben dem lokalen
 läuft (UI auf `:18080`, Mailpit auf `:18025`) und danach verschwindet. `E2E_KEEP=1 make
@@ -197,11 +207,12 @@ local-e2e` lässt ihn zum Ansehen stehen. Die CI macht dasselbe bei jedem Push.
 |---|---|
 | <http://localhost:8025> | Mailpit: die Mails mit CSV-Anhang |
 | <http://localhost:8081> | pgweb: alle Tabellen, nur lesend (Rolle `va_read`) |
-| <http://localhost:8000/api/docs> | web-api: REST-Schnittstelle mit Swagger (ab P3.1, nur lesend) |
+| <http://localhost:8000/api/docs> | web-api: REST-Schnittstelle mit Swagger |
 | `127.0.0.1:5432` | Postgres (`LOCAL_DB_PORT`), z. B. für DBeaver |
 
 Lokal zeigt SMTP immer auf Mailpit und `HEALTHCHECK_URL` ist leer, auch wenn die `.env` echte
-Zugangsdaten enthält. Der Batch läuft lokal nur auf Knopfdruck, ohne Cron.
+Zugangsdaten enthält. Lokal plant das web-api keine Läufe: `make local-run` startet einen im
+Batch, die Seite „Runs“ im UI einen über die Services.
 
 **Schneller Weg** ohne Image-Build, aus der `.venv` gegen denselben lokalen Stack:
 
@@ -241,15 +252,20 @@ make check-j4125    # Image unter QEMU ohne AVX prüfen (CPU der NAS), nach Depe
 | `MIN_MARKET_CAP` | `300000000` | Mindest-Marktkapitalisierung in EUR, nur Startwert (siehe unten) |
 | `VALUE_WEIGHT` / `QUALITY_WEIGHT` | `0.6` / `0.4` | Composite-Gewichtung (wird auf Summe 1 normiert), nur Startwert (siehe unten) |
 | `DEFAULT_TAX_RATE` | `0.27` | Fallback-Steuersatz für ROIC-Berechnung |
-| `CRON_SCHEDULE` | `30 7 * * 6` | Cron-Ausdruck (Sa 07:30); Format: `m h dom mon dow` |
+| `CRON_SCHEDULE` | `30 7 * * 6` | Wochenplan des web-api (Sa 07:30, Europe/Berlin); Format: `m h dom mon dow` |
 | `POSTGRES_PASSWORD` | – **Pflicht** | Passwort der Owner-Rolle `va_owner` (Migrationen) |
 | `VA_APP_PASSWORD` | – **Pflicht** | Passwort der App-Rolle `va_app` (kein DELETE); wirkt beim ersten DB-Start |
 | `VA_READ_PASSWORD` | – **Pflicht** | Passwort der Lese-Rolle `va_read` für Auswertungen; wirkt beim ersten DB-Start |
-| `VA_PROFILES_PASSWORD` | – **Pflicht** | Passwort der Rolle `va_profiles`, mit der das UI Scoring-Profile speichert (P3.3). Fehlt die Rolle in einer bestehenden DB, legt der Start des Batches sie an |
+| `VA_PROFILES_PASSWORD` | – **Pflicht** | Passwort der Rolle `va_profiles` für das web-api ohne NATS (`make api`, P3.3). Fehlt die Rolle in einer bestehenden DB, legt der Dienst `migrate` sie an |
+| `VA_WEB_PASSWORD` | – **Pflicht** | Passwort der Rolle `va_web` des web-api: Projektionen, Runs anlegen und abschließen (P4.4, P4.7) |
+| `VA_MARKET_DATA_PASSWORD` / `VA_SCORING_PASSWORD` / `VA_NOTIFICATION_PASSWORD` | – **Pflicht** | Je Service eine Rolle nur für das eigene Schema (P5.3); `migrate` legt sie an |
 | `DB_LAN_BIND` | `127.0.0.1` | IP, an die der Postgres-Port gebunden wird (NAS-IP = im LAN erreichbar) |
 | `LOCAL_DB_PORT` | `5432` | Nur lokaler Stack: Port der lokalen Datenbank, falls 5432 belegt ist |
 | `DATABASE_URL` | von Compose gesetzt | Nur lokal nötig: `postgresql+psycopg://va_app:<pw>@host:5432/value_analyzer` |
 | `HEALTHCHECK_URL` | – | Optional: `https://hc-ping.com/<uuid>` |
+| `UI_LAN_BIND` / `UI_SERVER_NAMES` | `127.0.0.1` / – | IP für Port 8080 des UI und die Hostnamen, unter denen es aufgerufen wird |
+| `RUN_TIMEOUT_MINUTES` | `120` | Ältere Events gelten als Reste abgebrochener Läufe; so lange wartet auch der Batch über NATS |
+| `OTEL_TRACES_EXPORTER` | `none` | `console`: die Spans jedes Runs als JSON ins Log (OpenTelemetry, P5.5) |
 | `TZ` | `Europe/Berlin` | Container-Zeitzone |
 | `REG` | `ghcr.io/kaczmarekd` | Registry des Images (Compose) |
 | `VERSION` | `latest` | Image-Tag: `latest` folgt `main`, `sha-<commit>` oder `X.Y.Z` pinnt |
@@ -272,9 +288,10 @@ dem aktiven Profil, und der Footer der Mail nennt es („Profil Standard v1“).
 ```
 value-analyzer/
 ├── src/
-│   ├── main.py             # Einstieg: Lauf anlegen, Event-Kette starten, abschließen
-│   ├── composition.py      # Adapter bauen (DB, Yahoo, Universum-Kette, SMTP), Handler
-│   │                       #   der Module an den Bus hängen
+│   ├── main.py             # Batch: Lauf anlegen, Event-Kette im Prozess, abschließen
+│   ├── composition.py      # Batch: die drei Services an einen Bus hängen
+│   ├── worker.py           # die drei Services in einem Prozess über NATS
+│   ├── web.py              # web-api ohne NATS (make api): Vorschau und Profile im Prozess
 │   ├── run_tracker.py      # Abschluss von batch.run aus den Events
 │   ├── config.py           # Pydantic Settings (validiert beim Start)
 │   ├── logging_setup.py    # RotatingFileHandler (5 MB × 10)
@@ -282,14 +299,15 @@ value-analyzer/
 │   │                       #   Altdaten-Import (Modelle der Module: adapters/postgres/)
 │   └── regression/         # Replay-Regression: gespeicherte Wochen nachspielen
 │                           #   und vergleichen (make regression)
-├── packages/               # uv-Workspace: va-contracts (Events), va-platform (Event-Bus,
-│                           #   DB-Basis, Löschschutz in va_platform/db/ddl.py)
+├── packages/               # uv-Workspace: va-contracts (Events, RPC), va-platform (Busse,
+│                           #   NATS, Outbox/Inbox, Tracing, DB-Basis, Löschschutz)
 ├── services/               # uv-Workspace, je domain/application/adapters/entrypoints:
 │                           #   market-data (Universum, Yahoo, Kennzahlen), scoring,
-│                           #   notification (Mail, Healthcheck); Handler am Event-Bus
-├── docker/                 # J4125-Prüfung (QEMU), Image-Tags für GHCR
+│                           #   notification (Mail, Healthcheck), web-api (FastAPI)
+├── frontend/               # Angular-UI, im Image va-frontend hinter nginx
+├── docker/                 # J4125-Prüfung (QEMU), E2E-Test, Image-Tags für GHCR
 ├── migrations/             # Alembic-Migrationen (nur additiv)
-├── db/init/01_roles.sh     # Rollen va_app/va_read/va_profiles beim ersten DB-Start
+├── db/init/01_roles.sh     # Rollen beim ersten DB-Start (danach legt migrate neue an)
 ├── tests/                  # pytest-Suite; tests/db/ gegen echtes PostgreSQL,
 │                           #   tests/fixtures/replay/ echte Wochen für die Replay-Regression
 ├── data/
@@ -298,7 +316,7 @@ value-analyzer/
 ├── uv.lock                 # Exakt gepinnte Versionen aller Abhängigkeiten (uv)
 ├── Dockerfile              # Installiert exakt aus uv.lock, uv selbst bleibt draußen
 ├── docker-compose.yml
-├── entrypoint.sh           # Generiert crontab aus CRON_SCHEDULE-Env
+├── entrypoint.sh           # App-Image: migrieren, dann den übergebenen Befehl ausführen
 ├── Makefile                # make help für alle Kommandos
 └── .env.example
 ```
@@ -327,8 +345,10 @@ make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 - `lint-imports` (Grenzen zwischen den Workspace-Paketen)
 - Migration gegen leere DB + `alembic check` (Modelle ↔ Migration)
 - `pytest` mit Coverage, DB-Tests gegen einen PostgreSQL-18-Service-Container
-- Docker-Build mit Smoke-Test, Compose-Prüfung und J4125-Prüfung (QEMU ohne AVX)
-- Push des geprüften Images nach GHCR, nur auf `main` und bei Tags `vX.Y.Z`
+- Frontend: Format, Lint, Tests und Build
+- Docker-Build aller Images mit Smoke-Test, Compose-Prüfung und J4125-Prüfung (QEMU ohne AVX)
+- End-to-End-Test des ganzen Stacks mit einer gespeicherten Woche (Mail, API, UI)
+- Push der geprüften Images nach GHCR, nur auf `main` und bei Tags `vX.Y.Z`
 
 ---
 
@@ -336,7 +356,7 @@ make upgrade     # Alle Pakete auf neueste kompatible Versionen aktualisieren
 
 Details zu Faktorwahl, Defaults, bekannten Grenzen und Konventionen: [CLAUDE.md](CLAUDE.md)
 
-Geplanter Umbau zu Microservices mit Angular-Frontend, FastAPI, NATS und PostgreSQL: [Zielarchitektur und Roadmap](docs/architecture/README.md), [Architekturentscheidungen (ADRs)](docs/adr/README.md)
+Ereignisgetriebene Services mit Angular-Frontend, FastAPI, NATS und PostgreSQL: [Architektur und Roadmap](docs/architecture/README.md), [Architekturentscheidungen (ADRs)](docs/adr/README.md), [Betrieb auf der Synology](docs/architecture/betrieb-synology.md)
 
 ---
 

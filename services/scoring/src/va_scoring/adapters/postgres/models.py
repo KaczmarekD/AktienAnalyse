@@ -147,3 +147,19 @@ class ScoringInbox(InboxMixin, Base):
     """Events, die scoring verarbeitet hat, je Consumer einmal (P4.2)."""
 
     __table_args__ = {"schema": "scoring"}  # noqa: RUF012
+
+
+class InputSnapshot(Base):
+    """Eingangsdaten der Bewertung (P5.1a): je Abruf und Titel die flache Zeile fuer ``score()``.
+
+    Daraus rechnet die Vorschau, ohne ``market_data`` zu lesen. Nur zum Anfuegen; ein Rescore
+    desselben Abrufs fuegt nichts hinzu. Aeltere Laeufe fuellt ``src.db.backfill`` nach.
+    """
+
+    __tablename__ = "input_snapshot"
+    __table_args__ = {"schema": "scoring"}  # noqa: RUF012
+
+    fetch_run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    symbol: Mapped[str] = mapped_column(primary_key=True)
+    row: Mapped[dict[str, Any]]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

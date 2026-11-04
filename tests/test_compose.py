@@ -59,6 +59,7 @@ def _config(
     env: str | None = None,
     env_file: str | None = None,
     extra_env: dict[str, str] | None = None,
+    profiles: tuple[str, ...] = ("run", "ui"),
 ) -> dict[str, Any]:
     """``env``: Inhalt der .env; ohne Angabe .env.example mit echt wirkenden Werten.
 
@@ -86,7 +87,7 @@ def _config(
     environ = {k: v for k, v in os.environ.items() if k not in _COMPOSE_INPUTS}
     environ |= extra_env or {}
     result = subprocess.run(  # feste Argumente, keine Shell
-        [*args, "--profile", "run", "--profile", "ui", "config", "--format", "json"],
+        [*args, *(f"--profile={name}" for name in profiles), "config", "--format", "json"],
         capture_output=True,
         text=True,
         check=False,
@@ -117,6 +118,20 @@ def e2e(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def nas(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _config(tmp_path_factory.mktemp("nas"), NAS)
+
+
+@pytest.fixture(scope="module")
+def nas_nats(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """Die NAS mit dem Profil ``nats`` (P4.7): Erst dann laeuft der Worker."""
+    return _config(tmp_path_factory.mktemp("nas-nats"), NAS, profiles=("nats",))
+
+
+@pytest.fixture(scope="module")
+def local_nats(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """Wie ``make local-up``: lokal mit dem Profil ``nats``."""
+    return _config(
+        tmp_path_factory.mktemp("local-nats"), NAS, LOCAL, profiles=("run", "ui", "nats")
+    )
 
 
 def _mounts(service: dict[str, Any]) -> dict[str, str]:
@@ -194,18 +209,43 @@ class TestLocalWebApi:
     def test_runs_from_the_local_image_with_uvicorn(self, local):
         api = local["services"]["web-api"]
         assert api["image"] == "value-analyzer:local"
-        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. P3.3: die Composition
-        # Root src.web, die Vorschau und Profil-Befehle aus scoring im selben Prozess verdrahtet
+        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. Seit P5.4 wie auf der
+        # NAS ohne src: Vorschau, Profile und Reports beantworten die Services ueber NATS
         assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
-        assert "src.web:create_app" in api["entrypoint"]
+        assert "va_web_api.main:create_app" in api["entrypoint"]
 
-    def test_gets_only_the_read_and_the_profiles_role(self, local):
+    def test_gets_only_its_own_roles(self, local):
         env = local["services"]["web-api"]["environment"]
-        # keine Zugangsdaten des Batches
-        assert set(env) == {"TZ", "WEB_API_DATABASE_URL", "WEB_API_PROFILES_DATABASE_URL"}
+        # keine Zugangsdaten des Batches: lesen (va_read) und Projektionen (va_web, P4.4), dazu
+        # NATS. Seit P5.4 speichert scoring die Profile selbst, va_profiles braucht es nicht mehr
+        assert set(env) == {
+            "TZ",
+            "WEB_API_DATABASE_URL",
+            "WEB_API_NATS_URL",
+            "WEB_API_PROJECTIONS_DATABASE_URL",
+            "WEB_API_SCHEDULE",
+            "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
+        }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
-        assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
-        assert "@db:5432/value_analyzer" in env["WEB_API_PROFILES_DATABASE_URL"]
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert env["WEB_API_SCHEDULE"] == ""  # lokal keine Wochenlaeufe von selbst
+
+    def test_e2e_web_api_runs_the_full_stack(self, e2e):
+        """P5.2: Der E2E-Stack prueft die Zielarchitektur: NATS, Projektionen, Services."""
+        api = e2e["services"]["web-api"]
+        env = api["environment"]
+        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        # Ohne src: laeuft mit dem App-Image wie mit dem Image des web-api (P5.1)
+        assert "va_web_api.main:create_app" in api["entrypoint"]
+
+    def test_nas_web_api_runs_with_nats_and_plans_the_week(self, nas):
+        """P5.4: Auf der NAS ist NATS Standard; das web-api plant den Wochenlauf statt Cron."""
+        env = nas["services"]["web-api"]["environment"]
+        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_SCHEDULE"] == "30 7 * * 6"  # CRON_SCHEDULE aus der .env
 
 
 class TestLocalFrontend:
@@ -248,11 +288,42 @@ class TestNasDefinition:
         batch = nas["services"]["value-analyzer"]
         assert batch["image"] == "ghcr.io/kaczmarekd/value-analyzer:latest"
         assert "build" not in batch
-        assert "profiles" not in batch
+        # P5.4: kein Cron mehr, der Batch laeuft nur auf Wunsch (make docker-run, Regression)
+        assert batch["profiles"] == ["run"]
 
-    def test_services_on_the_nas(self, nas):
-        # Batch, Datenbank, seit P3.6 das UI (frontend vor dem web-api), seit P4.1 NATS
-        assert set(nas["services"]) == {"db", "value-analyzer", "web-api", "frontend", "nats"}
+    def test_services_on_the_nas(self, tmp_path):
+        # P5.4: die Zielarchitektur ohne Profil: Migration, NATS, drei Services, web-api, UI
+        nas = _config(tmp_path, NAS, profiles=())
+        assert set(nas["services"]) == {
+            "db",
+            "migrate",
+            "nats",
+            "market-data",
+            "scoring",
+            "notification",
+            "web-api",
+            "frontend",
+        }
+
+    def test_migration_runs_once_before_everything(self, nas):
+        migrate = nas["services"]["migrate"]
+        assert migrate["image"] == nas["services"]["value-analyzer"]["image"]
+        assert migrate["entrypoint"] == ["python", "-m", "src.db.migrate"]
+        assert migrate["restart"] == "no"
+        env = migrate["environment"]
+        assert env["DATABASE_OWNER_URL"].startswith("postgresql+psycopg://va_owner:")
+        for variable in (
+            "VA_PROFILES_PASSWORD",
+            "VA_WEB_PASSWORD",
+            "VA_MARKET_DATA_PASSWORD",
+            "VA_SCORING_PASSWORD",
+            "VA_NOTIFICATION_PASSWORD",
+        ):
+            assert variable in env
+        for name in ("market-data", "scoring", "notification", "web-api"):
+            assert nas["services"][name]["depends_on"]["migrate"]["condition"] == (
+                "service_completed_successfully"
+            )
 
     def test_nats_with_jetstream_and_its_own_data(self, nas):
         # P4.1: fester Stand, Daten unter ./natsdata, nur im Docker-Netz erreichbar
@@ -274,13 +345,26 @@ class TestNasDefinition:
     def test_web_api_has_no_port_and_only_its_two_roles(self, nas):
         api = nas["services"]["web-api"]
         assert "ports" not in api  # nur hinter nginx erreichbar
-        assert api["image"] == nas["services"]["value-analyzer"]["image"]
-        assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
-        assert "src.web:create_app" in api["entrypoint"]
+        # P5.4: das eigene Image (P5.1), der Einstieg steht darin
+        assert api["image"] == "ghcr.io/kaczmarekd/va-web-api:latest"
+        assert api.get("entrypoint") is None
         env = api["environment"]
-        assert set(env) == {"TZ", "WEB_API_DATABASE_URL", "WEB_API_PROFILES_DATABASE_URL"}
+        assert set(env) == {
+            "TZ",
+            "WEB_API_DATABASE_URL",
+            "WEB_API_NATS_URL",
+            "WEB_API_PROJECTIONS_DATABASE_URL",
+            "WEB_API_SCHEDULE",
+            "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
+        }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
-        assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_OTEL_TRACES_EXPORTER"] == "none"
+
+    def test_tracing_is_one_switch_for_all_services(self, nas):
+        """P5.5: OTEL_TRACES_EXPORTER aus der .env gilt fuer jeden Dienst, der einen Run sieht."""
+        for name in ("market-data", "scoring", "notification"):
+            assert nas["services"][name]["environment"]["OTEL_TRACES_EXPORTER"] == ""
 
     def test_db_creates_the_profiles_role_on_first_start(self, nas):
         env = nas["services"]["db"]["environment"]
@@ -325,7 +409,7 @@ class TestE2eStack:
         assert not names & others
 
     def test_services(self, e2e):
-        # pgweb braucht der Test nicht
+        # pgweb braucht der Test nicht; seit P5.2 der ganze Stack mit den drei Services
         assert set(e2e["services"]) == {
             "db",
             "value-analyzer",
@@ -333,7 +417,31 @@ class TestE2eStack:
             "frontend",
             "mailpit",
             "nats",
+            "market-data",
+            "scoring",
+            "notification",
+            "migrate",
         }
+
+    def test_market_data_replays_the_fixture(self, e2e):
+        service = e2e["services"]["market-data"]
+        fixture = service["environment"]["REPLAY_SOURCE"]
+        assert fixture.startswith("/app/e2e/")
+        assert (ROOT / "tests/fixtures/replay" / fixture.removeprefix("/app/e2e/")).is_file()
+        assert _mounts(service)["/app/e2e"].endswith("/tests/fixtures/replay")
+        assert "profiles" not in service
+
+    def test_notification_mails_only_to_mailpit(self, e2e):
+        service = e2e["services"]["notification"]
+        env = service["environment"]
+        assert (env["SMTP_HOST"], env["SMTP_PORT"], env["SMTP_PLAIN"]) == (
+            "mailpit",
+            "1025",
+            "true",
+        )
+        assert env["HEALTHCHECK_URL"] == ""
+        assert {"SMTP_USER", "SMTP_PASSWORD", "MAIL_TO"} <= set(env)
+        assert "profiles" not in service
 
     def test_nats_is_thrown_away_too(self, e2e):
         nats = e2e["services"]["nats"]
@@ -396,9 +504,96 @@ class TestE2eStack:
         assert services["web-api"]["image"] == "value-analyzer:local"
 
     def test_ci_uses_the_images_under_test(self, tmp_path):
-        images = {"E2E_APP_IMAGE": "value-analyzer:ci", "E2E_FRONTEND_IMAGE": "va-frontend:ci"}
+        images = {
+            "E2E_APP_IMAGE": "value-analyzer:ci",
+            "E2E_FRONTEND_IMAGE": "va-frontend:ci",
+            "E2E_WEB_API_IMAGE": "va-web-api:ci",
+            "E2E_MARKET_DATA_IMAGE": "va-market-data:ci",
+            "E2E_SCORING_IMAGE": "va-scoring:ci",
+            "E2E_NOTIFICATION_IMAGE": "va-notification:ci",
+        }
         ci = _config(tmp_path, NAS, LOCAL, E2E, env_file=E2E_ENV, extra_env=images)
         services = ci["services"]
         assert services["value-analyzer"]["image"] == "value-analyzer:ci"
-        assert services["web-api"]["image"] == "value-analyzer:ci"
+        assert services["web-api"]["image"] == "va-web-api:ci"
         assert services["frontend"]["image"] == "va-frontend:ci"
+        for name in ("market-data", "scoring", "notification"):
+            assert services[name]["image"] == f"va-{name}:ci"
+
+    def test_locally_everything_runs_from_the_app_image(self, e2e):
+        for name in ("web-api", "market-data", "scoring", "notification"):
+            assert e2e["services"][name]["image"] == "value-analyzer:local"
+
+
+SERVICES = {
+    "market-data": "va_market_data",
+    "scoring": "va_scoring",
+    "notification": "va_notification",
+}
+
+
+class TestServices:
+    """P5.1: Ein Container je Service aus seinem eigenen Image, nur mit dem Profil nats."""
+
+    def test_the_nas_starts_them_without_a_profile(self, nas):
+        # P5.4: NATS und die Services sind Standard, kein Profil nats mehr
+        for name in SERVICES:
+            assert name in nas["services"]
+            assert "profiles" not in nas["services"][name]
+        assert "worker" not in nas["services"]
+
+    def test_each_runs_its_own_image(self, nas_nats):
+        for name in SERVICES:
+            service = nas_nats["services"][name]
+            assert service["image"] == f"ghcr.io/kaczmarekd/va-{name}:latest"
+            assert service.get("entrypoint") is None  # der Einstieg steht im Image
+            assert "ports" not in service
+            assert set(service["depends_on"]) == {"db", "nats", "migrate"}
+
+    def test_each_gets_only_its_variables(self, nas_nats):
+        for name in SERVICES:
+            env = nas_nats["services"][name]["environment"]
+            # P5.3: eine Rolle je Service, nur im eigenen Schema
+            role = "va_" + name.replace("-", "_")
+            assert env["DATABASE_URL"].startswith(f"postgresql+psycopg://{role}:")
+            assert env["NATS_URL"] == "nats://nats:4222"
+            assert "DATABASE_OWNER_URL" not in env
+            assert "POSTGRES_PASSWORD" not in env
+            has_smtp = any(key.startswith("SMTP_") for key in env)
+            assert has_smtp == (name == "notification"), name
+
+    def test_the_database_creates_the_service_roles(self, nas_nats):
+        env = nas_nats["services"]["db"]["environment"]
+        for variable in (
+            "VA_MARKET_DATA_PASSWORD",
+            "VA_SCORING_PASSWORD",
+            "VA_NOTIFICATION_PASSWORD",
+        ):
+            assert variable in env
+
+    def test_notification_mails_and_pings_like_the_batch(self, nas_nats):
+        env = nas_nats["services"]["notification"]["environment"]
+        assert env["SMTP_HOST"] == "smtp.gmail.com"
+        assert env["HEALTHCHECK_URL"].startswith("https://hc-ping.com/")
+
+    def test_local_services_run_from_the_app_image(self, local_nats):
+        for name, module in SERVICES.items():
+            service = local_nats["services"][name]
+            assert service["image"] == "value-analyzer:local"
+            assert service["entrypoint"] == ["python", "-m", module]
+            assert service["container_name"] == f"value-analyzer-local-{name}"
+
+    def test_local_mail_stays_on_the_machine(self, local_nats):
+        env = local_nats["services"]["notification"]["environment"]
+        assert (env["SMTP_HOST"], env["SMTP_PORT"], env["SMTP_PLAIN"]) == (
+            "mailpit",
+            "1025",
+            "true",
+        )
+        assert env["HEALTHCHECK_URL"] == ""
+        assert env["DATA_DIR"] == "/app/data"
+
+    def test_the_e2e_stack_runs_them_without_a_worker(self, e2e):
+        for name in SERVICES:
+            assert name in e2e["services"]  # P5.2: der ganze Stack
+        assert "worker" not in e2e["services"]

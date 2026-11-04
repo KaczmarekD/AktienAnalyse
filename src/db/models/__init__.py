@@ -26,6 +26,7 @@ from va_notification.adapters.postgres.models import (
 from va_platform.db import APP_SCHEMAS, Base
 from va_scoring.adapters.postgres.models import (
     FactorScore,
+    InputSnapshot,
     Profile,
     ProfileActivation,
     ProfileVersion,
@@ -33,6 +34,15 @@ from va_scoring.adapters.postgres.models import (
     ScoringInbox,
     ScoringOutbox,
     ScoringRun,
+)
+from va_web_api.adapters.postgres.models import (
+    RankingRow,
+    RankingRun,
+    RunRequest,
+    RunStatus,
+    SnapshotRow,
+    WebInbox,
+    WebOutbox,
 )
 
 from .batch import BatchInbox, BatchOutbox, ImportFile, Run, RunLog
@@ -49,6 +59,7 @@ __all__ = [
     "FundamentalSnapshot",
     "FxRate",
     "ImportFile",
+    "InputSnapshot",
     "Instrument",
     "MarketDataInbox",
     "MarketDataOutbox",
@@ -56,17 +67,24 @@ __all__ = [
     "Profile",
     "ProfileActivation",
     "ProfileVersion",
+    "RankingRow",
+    "RankingRun",
     "RawInfo",
     "Report",
     "ReportingInbox",
     "ReportingOutbox",
     "Run",
     "RunLog",
+    "RunRequest",
+    "RunStatus",
     "ScoreResult",
     "ScoringInbox",
     "ScoringOutbox",
     "ScoringRun",
     "ShareCount",
+    "SnapshotRow",
     "StatementValue",
     "UniverseMember",
+    "WebInbox",
+    "WebOutbox",
 ]

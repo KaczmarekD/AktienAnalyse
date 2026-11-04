@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import difflib
 import json
 import os
@@ -106,3 +108,31 @@ def mock_universe_df() -> pd.DataFrame:
             ).read_text(encoding="utf-8")
         )
     )
+
+
+TEST_NATS_URL = os.environ.get("TEST_NATS_URL", "").strip()
+
+
+@pytest.fixture
+def nats_url() -> str:
+    """NATS mit JetStream (P4.3), nur mit ``TEST_NATS_URL``; jeder Test ohne alte Events.
+
+    Wie ``packages/va-platform/tests/conftest.py``: Der Stream wird vorher geloescht, der Bus
+    legt ihn beim Start neu an (Wegwerf-Server, nie die NAS).
+    """
+    if not TEST_NATS_URL:
+        pytest.skip("TEST_NATS_URL nicht gesetzt (make test-nats-up)")
+
+    async def wipe() -> None:
+        import nats
+        from nats.js.errors import NotFoundError
+
+        nc = await nats.connect(TEST_NATS_URL)
+        try:
+            with contextlib.suppress(NotFoundError):
+                await nc.jsm().delete_stream("VA_EVENTS")
+        finally:
+            await nc.close()
+
+    asyncio.run(wipe())
+    return TEST_NATS_URL

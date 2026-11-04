@@ -8,6 +8,7 @@ Abschluesse, Konsens, Quartale, Aktienanzahl und Kurse bleiben leer.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 from va_contracts.events.v1 import FundamentalsV1
@@ -25,6 +26,7 @@ from ..domain.universe import Ticker, Universe, dedupe
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
+    from pathlib import Path
 
     from ..domain.history import HistoryState
 
@@ -64,6 +66,17 @@ class ReplayFundamentals:
                 errors=[f"replay: kein Snapshot fuer {ticker.symbol}"],
             )
         return fundamentals_from_flat(row)
+
+
+def load_replay_rows(path: Path) -> list[dict[str, Any]]:
+    """Die Snapshot-Zeilen einer Replay-Fixture (``tests/fixtures/replay/*.json``, P5.1a).
+
+    Die Fixture haelt sie als Tabelle (``columns`` und ``rows``). Gelesen wird nur dieser Teil,
+    ohne das Werkzeug der Replay-Regression (``src.regression``).
+    """
+    table = json.loads(path.read_text(encoding="utf-8"))["snapshots"]
+    columns = [str(c) for c in table["columns"]]
+    return [dict(zip(columns, row, strict=True)) for row in table["rows"]]
 
 
 def replay_universe(rows: Iterable[Mapping[str, Any]], fallback: list[Ticker]) -> Universe:

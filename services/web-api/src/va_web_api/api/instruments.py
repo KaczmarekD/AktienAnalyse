@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .. import read
 from ..models import Instrument
-from .deps import NOT_FOUND, Conn, not_found
+from .deps import NOT_FOUND, Reader, not_found
 
 router = APIRouter(tags=["instruments"])
 
 
 @router.get("/instruments/{symbol}", responses=NOT_FOUND)
-def get_instrument(symbol: str, conn: Conn) -> Instrument:
-    instrument = read.get_instrument(conn, symbol)
+def get_instrument(symbol: str, reader: Reader) -> Instrument:
+    instrument = reader.get_instrument(symbol)
     if instrument is None:
         raise not_found("Titel")
     return instrument

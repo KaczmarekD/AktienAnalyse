@@ -63,10 +63,14 @@ class FakeHeartbeat:
 
 
 class FakeStore:
-    def __init__(self, fail_report: bool = False) -> None:
+    def __init__(self, fail_report: bool = False, delivered: tuple[int, str] | None = None) -> None:
         self.fail_report = fail_report
+        self.delivered = delivered  # P4.3b: schon verschickter Report (report_id, Betreff)
         self.reports: list[tuple[int | None, int | None, Any]] = []
         self.deliveries: list[dict[str, Any]] = []
+
+    def delivered_report(self, scoring_run_id):
+        return self.delivered
 
     def record_report(self, run_id, scoring_run_id, report):
         if self.fail_report:
@@ -340,3 +344,24 @@ class TestProfileInTheMail:
 
     def test_without_profile_no_profile_line(self, setup):
         assert "Profil " not in self._html(setup, None)
+
+
+class TestAlreadyDelivered:
+    """P4.3b: Kommt dasselbe Ergebnis erneut an, geht keine zweite Mail raus."""
+
+    def test_no_second_mail_but_report_sent(self, tmp_path):
+        setup = Setup(tmp_path, store=FakeStore(delivered=(31, "[ok 2/2] Value-Screening")))
+        setup.bus.publish(new_envelope(SCORING_RUN_COMPLETED, _completed(), source="va/test"))
+        assert setup.sender.sent == []
+        assert setup.store.reports == []
+        assert setup.heartbeat.pings == []
+        [sent] = setup.seen
+        assert sent.type == REPORT_SENT.type
+        assert (sent.data.report_id, sent.data.subject) == (31, "[ok 2/2] Value-Screening")
+
+    def test_dry_run_is_not_affected(self, tmp_path):
+        """Ein Dry-Run verschickt ohnehin nichts und darf beliebig oft laufen."""
+        setup = Setup(tmp_path, store=FakeStore(delivered=(31, "x")))
+        completed = _completed(dry_run=True)
+        setup.bus.publish(new_envelope(SCORING_RUN_COMPLETED, completed, source="va/test"))
+        assert len(setup.store.reports) == 1

@@ -28,6 +28,7 @@ class ScoringStore(Protocol):
         scored: pd.DataFrame,
         cfg: ScoringConfig,
         profile: ProfileVersionRef | None = None,
+        instrument_ids: Mapping[str, int] | None = None,
     ) -> int: ...
 
 
@@ -40,6 +41,10 @@ class ProfileStore(Protocol):
         Die Werte aus ENV dienen nur beim ersten Mal als Startwerte (ADR-0009, P2b.1).
         """
         ...
+
+
+class ScoringAdapter(ScoringStore, ProfileStore, Protocol):
+    """Speicher von scoring: Bewertungslaeufe und Profile (P2b.3), wie ``PostgresScoringStore``."""
 
 
 class ProfileSource(Protocol):

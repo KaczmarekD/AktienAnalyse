@@ -32,6 +32,11 @@ class ReportStore(Protocol):
         self, run_id: int | None, scoring_run_id: int | None, report: ReportArtifacts
     ) -> int: ...
 
+    def delivered_report(self, scoring_run_id: int) -> tuple[int, str] | None:
+        """``(report_id, Betreff)``, wenn fuer den Bewertungslauf schon eine Report-Mail
+        erfolgreich verschickt ist; sonst ``None`` (P4.3b, keine zweite Mail)."""
+        ...
+
     def record_delivery(
         self,
         *,

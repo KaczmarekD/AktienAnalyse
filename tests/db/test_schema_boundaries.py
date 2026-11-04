@@ -21,6 +21,7 @@ OWNERS = {
     "va_market_data.adapters.postgres.models": "market_data",
     "va_scoring.adapters.postgres.models": "scoring",
     "va_notification.adapters.postgres.models": "reporting",
+    "va_web_api.adapters.postgres.models": "web",  # P4.4: Projektionen
 }
 
 

@@ -1,9 +1,10 @@
 # Code-Struktur
 
-> **Status:** Plan vom 30.09.2026, Phase 1 im Code umgesetzt (P1.1–P1.9, 19.10.2026), siehe
-> [Roadmap](roadmap.md). Die Ist-Analyse beschreibt den Stand nach Phase 1. Layout und Aufbau
-> eines Service zeigen das Ziel. Was dort noch fehlt (`web-api`, FastStream-Worker, CLI,
-> Migrationen und Dockerfile je Service), kommt mit Phase 3 bis 5.
+> **Status:** Plan vom 30.09.2026, umgesetzt bis Phase 5 (04.11.2026), siehe
+> [Roadmap](roadmap.md). Die Ist-Analyse beschreibt den Stand nach Phase 1. Abweichungen vom
+> Layout unten: kein FastStream (eigener `NatsBus`, Nachtrag in ADR-0002), eine
+> Alembic-Historie und ein Dockerfile mit einer Stufe je Service im Root, kein `deploy/` (die
+> Compose-Dateien liegen im Root), eine CI-Datei (`.github/workflows/ci.yml`).
 
 ## Ist-Analyse (nach Phase 1)
 
@@ -72,9 +73,10 @@ aktien-analyse/
 └── .github/workflows/          # python, frontend, images (mit Pfad-Filtern)
 ```
 
-Das ist das Zielbild. Heute fehlen `services/web-api/`, `frontend/` und `deploy/`. `va-platform`
-enthält bisher den Event-Bus (`bus`), die DB-Basis mit Löschschutz (`db`) und `serialization`.
-`Dockerfile`, `docker-compose.yml`, `migrations/` und der Batch `src/` liegen im Root.
+Das war das Zielbild. Heute fehlt nur `deploy/`. `va-platform` enthält die Busse (`bus`,
+`nats`), Outbox und Inbox (`messaging`), den Laufrahmen der Services (`service`), Tracing
+(`tracing`), die DB-Basis mit Löschschutz (`db`) und `serialization`. `Dockerfile`, die
+Compose-Dateien, `migrations/` und der Batch `src/` liegen im Root.
 
 `va` steht für value-analyzer. Die Import-Namen sind durchgehend präfixiert (`va_scoring` statt
 `scoring`). Im gemeinsamen Workspace-Environment gibt es so keine Kollision mit Paketen von PyPI.
@@ -86,9 +88,8 @@ Service-Namen (Container, Verzeichnisse) bleiben kurz: `market-data`, `scoring`,
 ```
 services/market-data/
 ├── pyproject.toml
-├── Dockerfile                  # Ziel (P5.1), heute ein Image im Root
-├── migrations/                 # Ziel: Alembic, eigene version_table im Schema market_data;
-│                               # heute eine Historie unter migrations/ im Root
+├── (Dockerfile)                # Stufe va-market-data im Dockerfile im Root (P5.1)
+├── (migrations/)               # eine Alembic-Historie unter migrations/ im Root
 ├── src/va_market_data/
 │   ├── domain/                 # reine Logik: Kennzahlen inkl. FX-Umrechnung, Universum-Regeln,
 │   │                           # Perioden, Konsens, Zeitreihen
@@ -96,7 +97,7 @@ services/market-data/
 │   ├── adapters/               # yahoo.py (Tabellen der yfinance-Namen), ishares.py, deka.py,
 │   │                           # csv_universe.py, openfigi.py, http.py, postgres/ (Paket:
 │   │                           # Modelle, Repository, Store)
-│   └── entrypoints/            # heute handlers.py (Bus); Ziel: worker.py (FastStream), cli.py
+│   └── entrypoints/            # handlers.py, settings.py, service.py (python -m), rpc.py
 └── tests/
 ```
 
@@ -106,9 +107,9 @@ Regeln:
   Teile, testbar mit reinen Daten.
 - `application/` beschreibt die Anwendungsfälle und definiert die Ports als `typing.Protocol`.
 - `adapters/` implementiert die Ports: Yahoo, iShares, Deka, CSV, OpenFIGI, Postgres, SMTP.
-- `entrypoints/` verdrahtet alles (Composition Root): FastStream-Worker und CLI, beim web-api
-  die FastAPI-App. Bis Phase 5 liegt die Composition Root beim Batch (`src/composition.py`),
-  `entrypoints/handlers.py` enthält nur die Handler am Bus.
+- `entrypoints/` verdrahtet alles (Composition Root): `service.py` baut die Adapter und hängt
+  die Handler an den Bus (`python -m va_<name>`), beim web-api die FastAPI-App. Der Batch
+  (`src/composition.py`) nutzt dieselben `wire`-Funktionen.
 - yfinance arbeitet synchron. Im asynchronen Worker läuft der Abruf per `asyncio.to_thread`.
 
 Die Ports von `market-data` (`application/ports.py`, gekürzt):
@@ -202,9 +203,8 @@ wandert nie in diese beiden Pakete.
 - **Domain:** reine Funktionen mit festen Eingabedaten, darunter als JSON gespeicherte
   Roh-Statements echter Titel. Damit sind die Kennzahlen testbar, ohne yfinance zu mocken.
   Die CLAUDE.md-Regel „yfinance-Calls werden in Tests nicht gemockt“ bleibt bestehen.
-- **Event-Handler:** FastStream-`TestNatsBroker` (im Speicher, ohne laufendes NATS). Bis Phase 4
-  laufen sie gegen `InProcessBus`, die Bus-Verträge in `packages/va-platform/tests/` sind schon
-  für beide Umsetzungen geschrieben.
+- **Event-Handler:** gegen `InProcessBus`. Die Bus-Verträge in `packages/va-platform/tests/`
+  laufen gegen beide Umsetzungen, die NATS-Variante mit `TEST_NATS_URL` gegen ein echtes NATS.
 - **Repositories und Migrationen:** gegen ein echtes Postgres 18, wie seit `261dc8f` in
   `tests/db/` umgesetzt. Jeder Test bekommt eine frische Datenbank aus einer migrierten Vorlage,
   lokal per `make test-db-up`, in der CI als Service-Container. Ein Test prüft den Löschschutz

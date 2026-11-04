@@ -1,7 +1,8 @@
 # Betrieb auf der Synology
 
-> **Status:** Plan (30.09.2026). Entscheidungen: [ADR-0007](../adr/0007-lan-only-ohne-login.md)
-> (nur LAN) und [ADR-0008](../adr/0008-zielhardware-j4125.md) (Zielhardware).
+> **Status:** Runbook für den Stack mit Services (P5.6, 04.11.2026). Entscheidungen:
+> [ADR-0007](../adr/0007-lan-only-ohne-login.md) (nur LAN) und
+> [ADR-0008](../adr/0008-zielhardware-j4125.md) (Zielhardware).
 
 ## Zielhardware
 
@@ -35,10 +36,11 @@
    Ranking, Mail-Report, Parquet-Durchlauf. Ein Paket mit AVX-Code beendet den Lauf mit
    Exit-Code 132.
 
-   Seit P0.6b kommen die Images aus der CI: Der Job „Docker Build + J4125-Pruefung“ baut sie,
-   prüft sie (Smoke-Test, J4125) und schiebt sie bei einem Push auf `main` und bei Tags `v*`
-   nach `ghcr.io/kaczmarekd/value-analyzer` (`sha-<commit>`, `latest`, `<version>`). Nach jedem
-   `docker compose pull` zusätzlich auf der echten CPU prüfen (ohne DB, ohne Migration):
+   Die Images kommen aus der CI: Der Job „Docker Build + J4125-Pruefung“ baut sie, prüft sie
+   (Smoke-Test, J4125, End-to-End-Test) und schiebt sie bei einem Push auf `main` und bei Tags
+   `v*` nach `ghcr.io/kaczmarekd/` (`sha-<commit>`, `latest`, `<version>`). Die Images der
+   Services enthalten dieselben Pakete wie das App-Image, dessen J4125-Prüfung deckt sie mit ab.
+   Nach jedem `make pull` zusätzlich auf der echten CPU prüfen (ohne DB, ohne Migration):
    ```
    docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
    ```
@@ -58,109 +60,180 @@
 - Weitere Sicherheitsregeln (Origin-Prüfung, nur JSON, Hostnamen-Filter):
   [web-api-realtime.md](web-api-realtime.md#sicherheitsregeln-lan-ohne-login).
 
-## Compose (Skizze, Zielbild ab Phase 5)
+## Dienste
 
-```yaml
-# deploy/compose.yaml
-x-base: &base
-  restart: unless-stopped
-  networks: [internal]
-x-py: &py
-  <<: *base
-  env_file: .env
+`docker-compose.yml` im Repo ist die Compose-Datei der NAS. Alle Dienste hängen im internen
+Docker-Netz des Projekts, nur `frontend` hat einen Port im LAN.
 
-services:
-  frontend:                       # einziger Container mit Port im LAN
-    <<: *base
-    image: ${REG}/va-frontend:${VERSION}
-    ports: ["8080:8080"]
-    mem_limit: 128m
-  web-api:     { <<: *py, image: "${REG}/va-web-api:${VERSION}",     mem_limit: 1g }
-  market-data: { <<: *py, image: "${REG}/va-market-data:${VERSION}", mem_limit: 1g }
-  scoring:     { <<: *py, image: "${REG}/va-scoring:${VERSION}",     mem_limit: 1g }
-  notification:
-    <<: *py
-    image: ${REG}/va-notification:${VERSION}
-    mem_limit: 512m
-    secrets: [smtp_password]      # -> /run/secrets, gelesen via pydantic secrets_dir
-  postgres:
-    <<: *py
-    image: postgres:18-alpine
-    command: postgres -c shared_buffers=512MB
-    volumes: ["./volumes/postgres:/var/lib/postgresql"]   # ab PG 18 nicht mehr .../data
-    mem_limit: 2g
-  nats:
-    <<: *base
-    image: nats:2.12-alpine
-    command: -js -sd /data        # JetStream mit Datei-Storage
-    volumes: ["./volumes/nats:/data"]
-    mem_limit: 512m
+| Dienst | Image | Startet nach | Aufgabe |
+|---|---|---|---|
+| `db` | `postgres:18` | – | Datenbank, Daten in `./pgdata` |
+| `nats` | `nats:2.15.1-alpine` | – | Event-Bus mit JetStream, Daten in `./natsdata` |
+| `migrate` | `value-analyzer` | `db` gesund | migriert, legt neue Rollen an, füllt die Projektionen nach; endet danach |
+| `market-data` | `va-market-data` | `db`, `nats`, `migrate` | Universum, Abruf bei Yahoo, Kennzahlen |
+| `scoring` | `va-scoring` | wie oben | Bewertung, Scoring-Profile, Vorschau |
+| `notification` | `va-notification` | wie oben | Mail (SMTP), Healthchecks.io |
+| `web-api` | `va-web-api` | wie oben | REST, WebSocket, Wochenplan, Watchdog |
+| `frontend` | `va-frontend` | `web-api` | UI (nginx), Port 8080 |
+| `value-analyzer` | `value-analyzer` | `db` | Batch und Werkzeuge, nur mit Profil `run` |
 
-networks:
-  internal: {}
-secrets:
-  smtp_password: { file: ./secrets/smtp_password }
+`REG` (Standard `ghcr.io/kaczmarekd`) und `VERSION` (Standard `latest`) in der `.env` wählen die
+Images. `latest` folgt `main`, `sha-<commit>` oder eine Version wie `0.3.0` pinnt. Jeder Dienst
+bekommt nur die Variablen, die in der Compose-Datei bei ihm stehen. SMTP sieht nur
+`notification`, und jeder Service meldet sich mit seiner eigenen Rolle an der Datenbank an
+(`va_market_data`, `va_scoring`, `va_notification`, `va_web`, seit P5.3).
+
+Den Wochenlauf plant das web-api nach `CRON_SCHEDULE` aus der `.env` (Standard `30 7 * * 6`,
+also Samstag 07:30, Zeitzone `Europe/Berlin`). Einen Cron im Container gibt es nicht mehr.
+
+## Erstinstallation
+
+```bash
+cd /volume1/docker/
+git clone https://github.com/KaczmarekD/AktienAnalyse.git value-analyzer
+cd value-analyzer
+cp .env.example .env
+nano .env          # Passwörter, SMTP_*, MAIL_TO, UI_LAN_BIND, UI_SERVER_NAMES
+make pull          # alle Images aus GHCR, die NAS baut nichts
+docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
+make up            # db, nats, migrate, Services, web-api, frontend
+docker compose ps  # migrate "exited (0)", alle anderen "running" bzw. "healthy"
 ```
 
-`REG` (z. B. `ghcr.io/kaczmarekd`) und `VERSION` stehen in der `.env` neben der Compose-Datei.
-Bei 18 GB RAM sind die Limits großzügig. Sie verhindern nur, dass ein fehlerhafter Service DSM
-den Speicher wegnimmt.
+Pflicht in der `.env` sind `POSTGRES_PASSWORD`, `VA_APP_PASSWORD`, `VA_READ_PASSWORD`,
+`VA_PROFILES_PASSWORD`, `VA_WEB_PASSWORD`, `VA_MARKET_DATA_PASSWORD`, `VA_SCORING_PASSWORD`,
+`VA_NOTIFICATION_PASSWORD`, dazu `SMTP_USER`, `SMTP_PASSWORD` und `MAIL_TO`. Fehlt ein
+Passwort, bricht Compose mit einem Hinweis wie „VA_WEB_PASSWORD in .env setzen“ ab. Fehlen die
+Angaben für die Mail, startet `notification` nicht und nennt das Feld in
+`docker compose logs notification`.
 
-## Build und Deployment
+Sind die Pakete in GHCR privat, braucht die NAS einmalig `docker login ghcr.io` mit einem Token,
+das nur `read:packages` darf.
 
-```dockerfile
-# services/scoring/Dockerfile – Skizze (Build nur in CI)
-FROM python:3.14-slim AS build
-COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
-WORKDIR /repo
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
-COPY . .
-RUN uv sync --frozen --no-dev --package va-scoring --no-editable
+## Umstellung vom Batch mit Cron (einmalig)
 
-FROM python:3.14-slim
-COPY --from=build /repo/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-CMD ["faststream", "run", "va_scoring.entrypoints.worker:app"]
+Bis P5.4 lief auf der NAS der Batch-Container `value-analyzer` mit einem Cron. Seit P5.4 hat er das
+Profil `run`. `make up` startet ihn nicht mehr, ein laufender alter Container bliebe aber stehen und
+startete am Samstag einen zweiten Lauf. Läuft auf der NAS noch eine Fassung vor Phase 2 (ohne
+Datenbank), kommen die Altdateien dazu: Kennzahlen als `fundamentals_*.parquet` und Rankings als
+`value_ranking_*.csv` in `data/`. Dieser Abschnitt deckt beide Fälle ab und erledigt alle offenen
+NAS-Punkte der Roadmap in einem Durchgang.
+
+**Vorab, solange der alte Batch läuft:** In der `.env` `RETENTION_DAYS=0` setzen und den
+Container mit `docker compose up -d` neu anlegen, damit er die Variable liest. Sonst löscht das alte
+Housekeeping beim nächsten Lauf Altdateien, die der Import braucht.
+
+1. Sicherung des Projektordners (Hyper Backup oder Kopie). Wichtig sind `data/` mit den
+   Altdateien, die `.env` und, falls es ihn schon gibt, `pgdata/`.
+2. `git pull`, dann die `.env` mit `.env.example` vergleichen. Neu sind je nach Stand
+   `POSTGRES_PASSWORD`, `VA_APP_PASSWORD` und `VA_READ_PASSWORD` (Phase 2),
+   `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4) und die drei `VA_<SERVICE>_PASSWORD`
+   (P5.3). Für das UI im LAN `UI_LAN_BIND` und `UI_SERVER_NAMES` setzen.
+3. `make pull` und der Import-Test aus Regel 2.
+4. Alles stoppen, auch den alten Batch-Container:
+   ```bash
+   docker compose --profile run down
+   ```
+   `down` entfernt nur Container. `./data`, `./pgdata` und `./natsdata` bleiben.
+5. Altdaten importieren:
+   ```bash
+   make db-import
+   ```
+   Das startet die Datenbank, migriert das Schema und liest die Parquet- und CSV-Dateien aus
+   `data/` ein. Je Datum entsteht ein Lauf vom Typ `import`. Jede Datei wird über ihren SHA-256
+   genau einmal importiert, ein zweiter Aufruf ändert nichts. Die Dateien bleiben liegen. Am Ende
+   steht „Fertig: N Dateien importiert, M bereits vorhanden“, ohne Altdateien mit N = 0.
+6. `make regression`: Die gespeicherten Wochen, auch die importierten, müssen mit dem neuen Code
+   dieselben Ergebnisse liefern (Exit 0). Abweichungen sind nur dort in Ordnung, wo die Roadmap eine
+   Methodik-Änderung nennt. Bei Wochen vor M1 fehlt Banken wie Deutsche Bank und Commerzbank
+   jetzt der Composite. Exit 2 mit „nichts zu vergleichen“ heißt: Es gibt noch keine Wochen.
+7. `make up`. Der Dienst `migrate` legt die neuen Rollen an und füllt die Projektionen des
+   web-api mit allen Läufen nach, auch mit den importierten. Deshalb kommt der Import vorher.
+8. Prüfen:
+   - `docker compose ps`: kein Container `value-analyzer` mehr.
+   - Das UI unter `http://<nas>:8080` zeigt die alten Läufe.
+   - Auf der Seite „Runs“ einen Dry-Run starten. Er läuft durch die drei Services und speichert
+     die Mail, ohne sie zu senden.
+9. Aufräumen und sichern:
+   - `RETENTION_DAYS` aus der `.env` entfernen. Das neue Image kennt die Variable nicht mehr und
+     löscht nie etwas.
+   - Die Sicherung einrichten wie unter [Backup](#backup) beschrieben.
+
+Zurück geht es mit `VERSION` auf dem alten Stand und der alten Compose-Datei
+(`git checkout <commit> -- docker-compose.yml`). Die Datenbank bleibt gültig, denn Migrationen
+sind nur additiv.
+
+## Update
+
+Nach einem Merge auf `main` baut die CI die Images, prüft sie und schiebt sie nach GHCR. Auf der
+NAS:
+
+```bash
+cd /volume1/docker/value-analyzer
+make db-backup     # Dump nach backups/
+git pull           # Compose-Datei, Fallback-CSV, Doku
+make pull
+docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
+make regression    # schreibt nichts, Exit 0 heißt: alles gleich
+make up            # migrate läuft zuerst, dann starten die geänderten Dienste neu
 ```
 
-Die Version des uv-Images in der Skizze ist nur ein Platzhalter und wird bei der Umsetzung
-festgelegt.
+Das Volume `./data` verdeckt die Fallback-CSV im Image, neue Fassungen kommen deshalb mit
+`git pull`. Neue Variablen nennt `.env.example`.
 
-Ablauf eines Updates:
+## Läufe
 
-1. Tag oder Merge auf `main` → GitHub Actions baut alle geänderten Images (`linux/amd64`) und
-   schiebt sie nach GHCR.
-2. Auf der NAS: `git pull` (Compose-Datei, Fallback-CSV), `VERSION` in der `.env` setzen, dann
-   `docker compose pull`. Das Volume `./data` verdeckt die Fallback-CSV im Image, neue Fassungen
-   kommen also mit `git pull`.
-3. Import-Test (Regel 2), danach `docker compose up -d`.
-4. Jeder Service migriert beim Start sein eigenes Schema mit der Owner-Rolle.
+- **Geplant:** Das web-api legt zum Termin aus `CRON_SCHEDULE` einen Run an, je Termin einen.
+  Einen verpassten Termin holt es bis eine Stunde danach nach, später nicht mehr.
+- **Von Hand:** im UI auf der Seite „Runs“, mit den Optionen Dry-Run, Mail und Neu abrufen.
+  Läuft schon ein Run, lehnt das web-api einen zweiten ab.
+- **Batch im Prozess:** `make docker-run` (`make docker-dry` ohne Mail) führt einen Lauf ohne
+  NATS im Batch-Container aus. Das ist der Notweg, wenn die Services nicht laufen.
 
-Neue Variablen in der `.env` nennt `.env.example`. Fehlt eine Pflichtvariable, bricht Compose mit
-einem Hinweis ab, etwa „VA_PROFILES_PASSWORD in .env setzen“ (seit P3.3, Rolle `va_profiles` für
-das Speichern von Profilen im UI). Der nächste Start des Batches legt die Rolle dann an.
+## Störungen
 
-Sind die Images privat, braucht die NAS einmalig `docker login ghcr.io` mit einem Token, das nur
-`read:packages` darf.
+| Was man sieht | Ursache und Abhilfe |
+|---|---|
+| Run bleibt hängen, nach einer Weile „gescheitert (watchdog)“ | Der Watchdog meldet eine Stufe, die zu lange braucht: Abruf 45, Bewertung 5, Mail 5 Minuten. `docker compose logs market-data` (bzw. `scoring`, `notification`) zeigt den Grund, oft ein Rate-Limit von Yahoo. |
+| UI meldet 503 „… nicht erreichbar“ | Der zuständige Service läuft nicht. `docker compose ps`, dann `docker compose up -d <dienst>`. |
+| Mail „FEHLER beim Batch-Run“ | Eine Stufe ist gescheitert. Die Mail nennt den Grund, die Logs des Dienstes den Rest. |
+| Ein Dienst startet nicht, `migrate` „exited (1)“ | `docker compose logs migrate`. Meist fehlt eine Variable oder die Datenbank war nicht bereit; `make up` erneut. |
+| Keine Mail und kein Ping am Samstag | Healthchecks.io meldet den fehlenden Ping. `docker compose logs web-api` zeigt, ob der Run angelegt wurde. |
+
+Die Logs liegen bei Docker (`make logs` oder `docker compose logs -f <dienst>`). Für die Spans
+eines Runs `OTEL_TRACES_EXPORTER=console` in der `.env` setzen und `make up`: Jeder Dienst schreibt
+dann seine Spans als JSON ins Log, alle Spans eines Runs haben dieselbe Trace-ID (P5.5).
 
 ## Secrets
 
-Secrets liegen als Docker-Secrets unter `/run/secrets` und werden über `secrets_dir` in
-pydantic-settings gelesen. Sie stehen nicht in einer großen `.env`. Über die API sind sie nie
-lesbar.
+Zugangsdaten stehen in der `.env` neben der Compose-Datei. Die Datei gehört dem Admin und ist
+nicht im Repo. Jeder Dienst bekommt nur die Variablen, die er braucht, über die API ist keine
+lesbar. Docker-Secrets (`/run/secrets`) sind möglich, aber nicht umgesetzt.
 
 ## Backup
 
-- Täglich `pg_dump` per Cron-Container in ein eigenes Volume, das Hyper Backup mitsichert.
-- NATS braucht kein Backup. Der Stream hält nur Zustellungen der letzten 30 Tage, die Wahrheit
-  liegt in Postgres.
+Die Datenbank in `./pgdata` ist die einzige Quelle der Wahrheit, gelöscht wird dort nie etwas.
+
+- **Dump:** `make db-backup` schreibt einen Dump (`pg_dump -Fc`) nach
+  `backups/value_analyzer_<datum>_<zeit>.dump`. Er ist die verlässliche Sicherung. Eine Kopie von
+  `pgdata/` im laufenden Betrieb kann inkonsistent sein. Alte Dumps bleiben liegen.
+- **Einrichten (einmalig):**
+  - Im DSM-Aufgabenplaner eine geplante Aufgabe anlegen: benutzerdefiniertes Skript, Benutzer
+    `root`, wöchentlich nach dem Lauf, etwa Sonntag 03:00:
+    ```bash
+    cd /volume1/docker/value-analyzer && make db-backup
+    ```
+  - Eine Hyper-Backup-Aufgabe für den Projektordner anlegen, mit `backups/`, `data/` und der
+    `.env`. Das Ziel verschlüsseln, denn die `.env` enthält die Passwörter.
+- **Vor jedem Update** zusätzlich `make db-backup` (siehe [Update](#update)).
+- **`./natsdata`** braucht kein Backup. Der Stream hält Zustellungen 30 Tage, die Fachdaten liegen
+  in Postgres.
 
 ## Überwachung
 
-- Healthchecks.io bleibt der Dead-Man's-Switch. Gepingt wird nur bei geplanten Runs
-  ([events.md](events.md)).
-- Jeder Container hat einen Healthcheck.
-- Logs gehen als JSON auf stdout, Docker rotiert sie.
-- Optional ab Phase 5: OpenTelemetry-Tracing über alle Services mit einem Grafana-Stack (z. B.
-  `grafana/otel-lgtm`). Der RAM reicht dafür. Weil es Go-Binaries sind, ist kein AVX nötig, trotzdem
-  vorher auf der NAS testen.
+- Healthchecks.io bleibt der Dead-Man's-Switch (`HEALTHCHECK_URL`). notification pingt bei
+  geplanten Runs, bei einem Fehlschlag mit `/fail` ([events.md](events.md)).
+- `db` und `nats` haben einen Healthcheck, die Services starten erst danach.
+- Docker rotiert die Logs.
+- Tracing: siehe Störungen. Ein Grafana-Stack (etwa `grafana/otel-lgtm`) wäre mit einem
+  OTLP-Exporter möglich, ist aber nicht vorgesehen.

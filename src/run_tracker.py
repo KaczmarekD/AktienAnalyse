@@ -7,6 +7,9 @@ Fehlschlag gewinnt immer, auch gegen ein spaeteres Erfolgs-Event.
 
 from __future__ import annotations
 
+import functools
+import threading
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +56,19 @@ class RunOutcome:
         return asdict(self)
 
 
+def _locked[**P, R](method: Callable[P, R]) -> Callable[P, R]:
+    """Ueber NATS laufen die Handler in Threads (P4.3): immer nur einer zur Zeit."""
+
+    @functools.wraps(method)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        tracker = args[0]
+        assert isinstance(tracker, RunTracker)
+        with tracker._lock:
+            return method(*args, **kwargs)
+
+    return wrapper
+
+
 class RunTracker:
     def __init__(self, run_id: int) -> None:
         self._run_id = run_id
@@ -60,7 +76,24 @@ class RunTracker:
         self._scoring_run_id: int | None = None
         self._universe_size: int | None = None
         self._scored: int | None = None
-        self.outcome: RunOutcome | None = None
+        self._result: RunOutcome | None = None
+        self._lock = threading.RLock()
+        self._decided = threading.Event()
+
+    @property
+    def outcome(self) -> RunOutcome | None:
+        return self._result
+
+    @outcome.setter
+    def outcome(self, value: RunOutcome | None) -> None:
+        self._result = value
+        if value is not None:
+            self._decided.set()
+
+    def wait(self, timeout: float) -> bool:
+        """``True``, sobald ein Ergebnis feststeht (P4.3: ueber NATS kehrt publish sofort
+        zurueck). Ein spaeterer Fehlschlag kann ein Erfolgs-Ergebnis noch ersetzen."""
+        return self._decided.wait(timeout)
 
     def subscribe(self, bus: EventBus) -> None:
         bus.subscribe(SNAPSHOT_COMPLETED, CONSUMER, self._on_snapshot)
@@ -68,11 +101,13 @@ class RunTracker:
         bus.subscribe(REPORT_SENT, CONSUMER, self._on_report_sent)
         bus.subscribe(RUN_FAILED, CONSUMER, self._on_failed)
 
+    @_locked
     def _on_snapshot(self, env: Envelope[SnapshotCompletedV1]) -> None:
         if env.data.run_id == self._run_id:
             self._fetch_run_id = env.data.fetch_run_id
             self._universe_size = env.data.universe.size
 
+    @_locked
     def _on_scoring(self, env: Envelope[ScoringRunCompletedV1]) -> None:
         event = env.data
         if event.run_id != self._run_id:
@@ -82,6 +117,7 @@ class RunTracker:
         self._universe_size = event.universe.size
         self._scored = sum(row.composite_score is not None for row in event.ranking)
 
+    @_locked
     def _on_report_sent(self, env: Envelope[ReportSentV1]) -> None:
         if env.data.run_id != self._run_id or self._failed:
             return
@@ -96,6 +132,7 @@ class RunTracker:
             failed_count=failed,
         )
 
+    @_locked
     def _on_failed(self, env: Envelope[RunFailedV1]) -> None:
         event = env.data
         if event.run_id != self._run_id or self._failed:
@@ -109,6 +146,7 @@ class RunTracker:
         else:
             self.outcome = self._outcome("failed", EXIT_FAILED, error=event.detail or event.reason)
 
+    @_locked
     def on_dead_letter(self, dead: DeadLetter) -> None:
         """Ein Handler ist trotz Wiederholung gescheitert (ein Bug): Der Lauf ist gescheitert."""
         if self._failed:

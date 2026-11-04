@@ -66,7 +66,12 @@ class SnapshotCompletedHandler:
             frame = pd.DataFrame([f.to_flat() for f in snap.fundamentals], columns=_FLAT_COLUMNS)
             scored = score(frame, cfg) if snap.fundamentals else frame.iloc[0:0]
             scoring_run_id = self._store.record_scoring(
-                snap.fetch_run_id, frame, scored, cfg, profile=active.ref
+                snap.fetch_run_id,
+                frame,
+                scored,
+                cfg,
+                profile=active.ref,
+                instrument_ids=snap.instrument_ids or None,  # P5.3, sonst liest der Speicher
             )
             if scored.empty or int(scored["composite_score"].notna().sum()) == 0:
                 log.error("Keine bewertbaren Datenpunkte - Abbruch.")

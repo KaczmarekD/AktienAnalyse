@@ -9,7 +9,8 @@ from sqlalchemy import BigInteger, Date, DateTime, Double, MetaData, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase
 
-APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting")
+# web: Projektionen des web-api (P4.4)
+APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting", "web")
 
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",

@@ -1343,6 +1343,46 @@
         "title": "RunDetail",
         "type": "object"
       },
+      "RunStart": {
+        "additionalProperties": false,
+        "description": "Ein Run aus dem UI (P4.7); die Optionen wie ``RunOptionsV1`` im Event.",
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "description": "Mail rendern und speichern, nicht senden",
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "force_refresh": {
+            "default": false,
+            "description": "Snapshot vom selben Tag nicht wiederverwenden",
+            "title": "Force Refresh",
+            "type": "boolean"
+          },
+          "notify": {
+            "default": true,
+            "description": "Mail verschicken; aus fuer Test-Runs",
+            "title": "Notify",
+            "type": "boolean"
+          }
+        },
+        "title": "RunStart",
+        "type": "object"
+      },
+      "RunStarted": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "RunStarted",
+        "type": "object"
+      },
       "RunSummary": {
         "additionalProperties": false,
         "properties": {
@@ -1864,7 +1904,7 @@
   },
   "info": {
     "title": "Value-Analyzer web-api",
-    "version": "0.1.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2146,6 +2186,52 @@
           }
         },
         "summary": "List Runs",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Startet einen Run. Ausgefuehrt wird er vom Worker ueber NATS; Fortschritt und Ergebnis\nmeldet der WebSocket.",
+        "operationId": "start_run",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Es laeuft schon ein Run"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Runs lassen sich hier nicht starten (ohne NATS)"
+          }
+        },
+        "summary": "Start Run",
         "tags": [
           "runs"
         ]

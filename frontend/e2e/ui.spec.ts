@@ -136,3 +136,12 @@ test('Profil-Editor: Vorschau, Speichern, neue Version in der Liste', async ({ p
   await expect(page.getByText(`Version ${next} gespeichert`)).toBeVisible();
   await expect(page.locator(`[data-version="${next}"]`)).toContainText('Browser-Test');
 });
+
+test('WebSocket verbindet über nginx, die Toolbar zeigt keinen Offline-Hinweis', async ({
+  page,
+}) => {
+  // P4.6: Der RealtimeService verbindet beim Start; die Konsole bleibt leer (afterEach)
+  await page.goto('/runs');
+  await expect(page.locator('[data-realtime="online"]')).toBeAttached({ timeout: 15_000 });
+  await expect(page.getByText('offline', { exact: true })).toHaveCount(0);
+});

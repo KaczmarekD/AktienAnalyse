@@ -168,3 +168,22 @@ def test_dead_letter_fails_the_run():
     assert (outcome.status, outcome.exit_code) == ("failed", 1)
     assert "market-data" in (outcome.error or "")
     assert "Bug" in (outcome.error or "")
+
+
+def test_wait_reports_whether_the_outcome_is_known():
+    """P4.3: Ueber NATS kehrt ``publish`` sofort zurueck, der Batch wartet auf das Ergebnis."""
+    assert _tracked(_snapshot()).wait(timeout=0.05) is False
+    sent = ReportSentV1(run_id=1, report_id=30, subject="[ok 3/3]", dry_run=False)
+    assert _tracked(_snapshot(), _completed((0.9, 0.5, 0.2)), sent).wait(timeout=0) is True
+
+
+def test_wait_wakes_up_when_another_thread_decides():
+    import threading
+
+    tracker = _tracked(_snapshot())
+    sent = ReportSentV1(run_id=1, report_id=30, subject="[ok 1/1]", dry_run=False)
+    envelope = new_envelope(REPORT_SENT, sent, source="va/test")
+    threading.Timer(0.1, tracker._on_report_sent, args=(envelope,)).start()
+    assert tracker.wait(timeout=5) is True
+    assert tracker.outcome is not None
+    assert tracker.outcome.exit_code == 0

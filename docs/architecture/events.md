@@ -1,10 +1,13 @@
 # Event-Architektur
 
-> **Status:** Plan (30.09.2026). Ab Phase 1 mit einem Bus im Prozess, ab Phase 4 über NATS, siehe
-> [Roadmap](roadmap.md). Entscheidung: [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
+> **Status:** Umgesetzt: ab Phase 1 mit einem Bus im Prozess, seit Phase 4 über NATS, seit P5.4
+> der Standard auf der NAS, siehe [Roadmap](roadmap.md). Entscheidung:
+> [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
 > Seit P4.1 (01.11.2026) gibt es den NATS-Dienst und die Provisionierung von Stream und Consumern
-> (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Die Events laufen
-> ab P4.3 darüber.
+> (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Seit P4.3 kann der
+> Batch die Kette über NATS laufen lassen (`EVENT_BUS=nats`, `va_platform.nats.NatsBus`).
+> Standard bleibt der Bus im Prozess. Seit P4.3b hängt jeder Service über einen `ReliableBus` mit
+> Inbox und Outbox am Bus (siehe unten).
 
 ## Grundprinzipien
 
@@ -78,15 +81,22 @@ bewertbaren Daten sind kein leeres Ranking, sondern `screening.run.failed` mit
 Feldnamen sind snake_case wie in Python und den Tabellen. Das WebSocket-Protokoll zum Browser
 (P4.5) hat eigene Nachrichtenmodelle und bildet dort auf camelCase ab.
 
-Request/Reply über Core-NATS:
+Request/Reply über Core-NATS. Seit P4.8 umgesetzt sind die vier Befehle für scoring, seit P4.9
+die zum Lesen von Profilen und Reports
+(`va_contracts.rpc.v1`, Golden-Schemas unter `tests/golden/contracts/rpc/v1/`). Jede Antwort hat
+ein optionales `error` (`no_data`, `unknown_profile`, `unknown_version`, `conflict` mit `newest`,
+`invalid`, `internal`). Es antwortet der Worker in der Queue-Gruppe des Service (`scoring`,
+`notification`).
 
 | Subject | Anfrage → Antwort |
 |---|---|
-| `rpc.va.scoring.preview` | Profil-Parameter → Ranking plus Vergleich zum aktiven Profil |
-| `rpc.va.scoring.profiles.list` / `.get` | – → Profile bzw. eine Version |
-| `rpc.va.scoring.profiles.save` | Parameter + Basisversion → neue Version oder Konflikt |
-| `rpc.va.scoring.profiles.activate` | profile_id + version → ok |
-| `rpc.va.marketdata.instrument` | Symbol → Stammdaten und Kennzahlen-Verlauf |
+| `rpc.va.scoring.factors` (P4.8) | – → Faktor-Katalog mit Richtung und Methodik-Hinweis |
+| `rpc.va.scoring.preview` (P4.8) | Profil-Parameter → Ranking plus Vergleich zum aktiven Profil |
+| `rpc.va.scoring.profiles.list` / `.get` (P4.9) | – → Profile bzw. ein Profil mit seinen Versionen (leer: unbekannt) |
+| `rpc.va.scoring.profiles.save` (P4.8) | Parameter + Basisversion → neue Version oder Konflikt |
+| `rpc.va.scoring.profiles.activate` (P4.8) | profile_id + version → ok |
+| `rpc.va.notification.report` / `.report.csv` (P4.9) | report_id → Mail bzw. CSV als Base64 (leer: unbekannt) |
+| `rpc.va.marketdata.instrument` | Symbol → Stammdaten und Kennzahlen-Verlauf (nicht nötig: die Titelseite kommt seit P4.9 aus den Projektionen) |
 
 ## Envelope
 
@@ -105,8 +115,14 @@ class Envelope[T](Contract):
     dataschema: str                # z. B. "urn:va-contracts:scoring.run.completed:v1"
     correlationid: str | None      # run_id (batch.run.id) als Text
     causationid: UUID | None       # id des ausloesenden Events
+    traceparent: str | None        # W3C Trace Context (P5.5), leer ohne Tracing
     data: T
 ```
+
+`traceparent` (seit P5.5) ist die CloudEvents-Erweiterung für verteiltes Tracing. Busse und
+Outbox setzen es beim Senden aus dem aktuellen Span (`va_platform.tracing.stamp`), Empfänger
+öffnen damit ihren Span. So ergibt ein Run einen Trace über alle Services. Ohne Tracing
+(`OTEL_TRACES_EXPORTER=none`, Standard) bleibt das Feld leer.
 
 `dataschema` ist eine URN, weil CloudEvents dort eine absolute URI verlangt. Die Hülle prüft,
 dass `type` und `dataschema` laut Katalog zur Payload gehören. Sender erzeugen sie mit
@@ -120,8 +136,9 @@ Regeln zur Weiterentwicklung:
 - Additive Änderungen (neue optionale Felder) sind jederzeit erlaubt.
 - Inkompatible Änderungen bekommen ein neues `dataschema` (`…:v2`). Während der Umstellung
   verstehen Empfänger beide Versionen (beide Einträge in `BY_DATASCHEMA`).
-- Aus denselben Modellen entstehen die JSON-Schemas für die TypeScript-Typen im Frontend und
-  die AsyncAPI-Doku. FastStream erzeugt Letztere automatisch.
+- Aus denselben Modellen entstehen die JSON-Schemas (Golden-Files) und über OpenAPI die
+  TypeScript-Typen im Frontend. Eine AsyncAPI-Doku gibt es ohne FastStream nicht, die Tabellen
+  hier ersetzen sie.
 
 ## Zuverlässigkeit: Outbox und Inbox
 
@@ -179,6 +196,21 @@ Schreibschutz ([datenhaltung.md](datenhaltung.md)).
   - Der Trigger `va_guard_outbox` lässt nur ein UPDATE zu, das `published_at` einmal setzt.
   - `va_app` hat dafür nur das Spaltenrecht `UPDATE (published_at)`.
 
+**`ReliableBus` (P4.3b, pragmatisch):** So nutzen die Handler Outbox und Inbox, im Prozess wie über
+NATS. Er umhüllt den Bus je Service, mit Inbox und Outbox aus dessen Schema.
+
+- **Zustellung:**
+  - Ein Event älter als `RUN_TIMEOUT_MINUTES` wird übersprungen, ebenso eines, das der Consumer
+    schon verarbeitet hat.
+  - Sonst läuft der Handler, und was er veröffentlicht, sammelt der Wrapper.
+  - Inbox-Eintrag und Folge-Events kommen dann in einer Transaktion in die Outbox.
+  - `drain_outbox` gibt die offenen Einträge danach an den Bus weiter.
+- **Fachdaten:** Die schreibt der Handler selbst kurz davor. Stürzt der Prozess genau dazwischen
+  ab, läuft er bei erneuter Zustellung noch einmal. Dagegen stehen fachliche Sperren:
+  - market-data nutzt den Abruf des Tages wieder.
+  - notification verschickt für einen Bewertungslauf höchstens eine Report-Mail.
+  - Ein zweiter Bewertungslauf ist harmlos, die Tabellen sind nur zum Anfügen.
+
 ## Consumer
 
 | Consumer (durable) | Filter | Besonderheit |
@@ -187,9 +219,27 @@ Schreibschutz ([datenhaltung.md](datenhaltung.md)).
 | `scoring` | `va.marketdata.snapshot.completed` | speichert den Snapshot zusätzlich lokal, für Vorschau und Rescore |
 | `notification` | `va.scoring.run.completed`, `va.screening.run.failed` | ignoriert `trigger=rescore`, bei `dry_run` nur rendern und speichern |
 | `web-api` | `va.>` | Projektionen und WebSocket, siehe [web-api-realtime.md](web-api-realtime.md) |
+| `batch` | `va.marketdata.snapshot.completed`, `va.scoring.run.completed`, `va.notification.report.sent`, `va.screening.run.failed` | seit P4.3: der `RunTracker` des Batches, Vorläufer der Run-Projektion im web-api |
 
 Alle Consumer begrenzen die Wiederholungen (`max_deliver`, z. B. 5). Danach wird die Nachricht
 mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.failed`.
+
+**`NatsBus` (P4.3):**
+
+- **Consumer:**
+  - Einen provisionierten Consumer nutzt der Bus so, wie er ist. Sein Filter muss die
+    abonnierten Subjects abdecken.
+  - Einen unbekannten Namen (Tests) legt er mit genau diesen Subjects an, nur für neue
+    Nachrichten.
+  - Je Consumer holt eine Schleife die Nachrichten einzeln ab und verteilt sie nach Event-Typ.
+- **Wiederholungen:**
+  - Es gilt die Grenze des Busses. Der Batch bleibt bei 1, wie im Prozess.
+  - Danach kommt der Dead-Letter-Callback, dann `term()`.
+  - Die Grenze des Busses darf höchstens die des Consumers sein.
+- **Laufende Handler:** Der Bus sendet In-Progress-Acks alle `ack_wait / 3`.
+- **Senden:** Folge-Events stehen im Stream, bevor das auslösende Event bestätigt wird.
+- **Batch:** Über NATS wartet `src/main.py`, bis der `RunTracker` ein Ergebnis hat (höchstens
+  `RUN_TIMEOUT_MINUTES`). Dann wartet es, bis nichts mehr offen ist, und schließt den Bus geordnet.
 
 ## Run-Optionen und Sonderfälle
 
@@ -205,10 +255,27 @@ mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.fail
 
 ## Scheduler und Watchdog (im web-api)
 
-- Der Cron-Ausdruck (heute `CRON_SCHEDULE`, Standard Samstag 07:30) wird mit expliziter Zeitzone
-  `Europe/Berlin` ausgewertet, unabhängig von der Zeitzone des Containers.
-- **Idempotenz:** Jeder geplante Run wird mit seinem Termin als eindeutigem Schlüssel angelegt.
-  Feuert der Scheduler doppelt, entsteht kein zweiter Run.
-- **Watchdog:** Hängt ein Run länger als das Zeitlimit seiner Stufe, veröffentlicht das web-api
-  `va.screening.run.failed` mit `reason=timeout`. Richtwerte, konfigurierbar: Abruf 45 min,
-  Scoring 5 min, Mail 5 min.
+Seit P4.7 in `va_web_api.runs`. Beides läuft nur mit NATS und Projektions-Datenbank, in einer
+Hintergrund-Aufgabe des web-api (Takt 60 s). Ausgeführt werden die Runs vom Dienste-Prozess
+den drei Services (seit P5.1 je ein Container, seit P5.4 ohne Profil; `python -m src.worker` startet
+alle drei in einem Prozess).
+
+- **Anlegen:** Ein Run des web-api entsteht in einer Transaktion: `batch.run`, `web.run_request`
+  und `screening.run.requested` in `web.outbox`. Danach leert das web-api die Outbox an NATS.
+  Ein Start aus dem UI (`POST /api/v1/runs`) wird abgelehnt (409), solange ein Run läuft.
+- **Scheduler:** Der Cron-Ausdruck `WEB_API_SCHEDULE` wird mit expliziter Zeitzone ausgewertet
+  (`WEB_API_SCHEDULE_TIMEZONE`, Standard `Europe/Berlin`), unabhängig von der Zeitzone des
+  Containers. Fällig ist der jüngste Termin, höchstens eine Stunde alt. Leer heißt aus. Auf der NAS
+  kommt der Ausdruck seit P5.4 aus `CRON_SCHEDULE` (Standard Samstag 07:30), den Cron im
+  Batch-Container gibt es nicht mehr.
+- **Idempotenz:** Jeder geplante Run wird mit seinem Termin als eindeutigem Schlüssel angelegt
+  (`web.run_request.slot`). Feuert der Scheduler doppelt, entsteht kein zweiter Run.
+- **Watchdog:** Hängt ein Run des web-api länger als das Zeitlimit seiner Stufe, veröffentlicht
+  das web-api `va.screening.run.failed` mit `stage=watchdog` und `reason=timeout`. Die Grenzen
+  sind einstellbar: Abruf 45 min ab der Anfrage (`WEB_API_WATCHDOG_FETCH_MINUTES`), Scoring
+  5 min ab `fetched` (`…_SCORING_MINUTES`), Mail 5 min ab `scored` (`…_REPORT_MINUTES`). In
+  derselben Transaktion schließt es den Run ab, der nächste Takt meldet ihn nicht noch einmal.
+  Abbrechen kann es die Stufe nicht: Liefert sie später doch, kann trotzdem eine Mail rausgehen.
+- **Abschluss:** Eine Projektion des Eventmanagers schließt `batch.run` beim ersten Ergebnis ab
+  (`notification.report.sent` oder `screening.run.failed`), mit den Regeln des `RunTracker`.
+  Runs des Batches schließt weiter der Batch selbst ab.

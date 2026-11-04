@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from sqlalchemy import BigInteger, Text, column, func, insert, or_, select, table
+from sqlalchemy import BigInteger, Text, column, func, insert, or_, select, table, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from va_platform.serialization import json_safe, to_python
@@ -18,6 +18,7 @@ from va_platform.serialization import json_safe, to_python
 from ...domain.profile import ProfileVersionRef
 from .models import (
     FactorScore,
+    InputSnapshot,
     Profile,
     ProfileActivation,
     ProfileVersion,
@@ -339,6 +340,59 @@ class ScoringRepository:
         )
         return _frame(self.session, stmt, ["scoring_run_id", "created_at", "origin", *columns])
 
+    # --- Eingangsdaten (P5.1a) ---------------------------------------------------------
+
+    def write_input_snapshot(self, fetch_run_id: int, rows: Sequence[Mapping[str, Any]]) -> None:
+        """Die flachen Zeilen eines Abrufs; schon gespeicherte Titel bleiben unveraendert."""
+        values = [
+            {"fetch_run_id": fetch_run_id, "symbol": str(row["symbol"]), "row": dict(row)}
+            for row in rows
+        ]
+        if values:
+            self.session.execute(pg_insert(InputSnapshot).values(values).on_conflict_do_nothing())
+
+    def get_input_frame(self, fetch_run_id: int) -> pd.DataFrame:
+        """Die Eingangsdaten eines Abrufs wie fuer ``score()``, sortiert nach Symbol."""
+        rows = self.session.scalars(
+            select(InputSnapshot.row)
+            .where(InputSnapshot.fetch_run_id == fetch_run_id)
+            .order_by(InputSnapshot.symbol)
+        ).all()
+        return pd.DataFrame(list(rows))
+
+    # --- Profile lesen (P5.1a, vorher va_web_api.read) ---------------------------------
+
+    def list_profiles(self) -> list[dict[str, Any]]:
+        rows = self.session.execute(
+            text(f"SELECT {_PROFILE_COLUMNS} FROM scoring.profile p ORDER BY p.name, p.id")
+        ).mappings()
+        return [dict(row) for row in rows]
+
+    def get_profile_detail(self, profile_id: int) -> dict[str, Any] | None:
+        """Ein Profil mit allen Versionen, neueste zuerst; ``active`` je Version."""
+        head = (
+            self.session.execute(
+                text(f"SELECT {_PROFILE_COLUMNS} FROM scoring.profile p WHERE p.id = :id"),
+                {"id": profile_id},
+            )
+            .mappings()
+            .first()
+        )
+        if head is None:
+            return None
+        versions = self.session.execute(
+            text("""
+                SELECT version, params, parent_version, comment, created_at
+                FROM scoring.profile_version WHERE profile_id = :id ORDER BY version DESC
+            """),
+            {"id": profile_id},
+        ).mappings()
+        active = head["active_version"]
+        return {
+            **dict(head),
+            "versions": [{**dict(v), "active": v["version"] == active} for v in versions],
+        }
+
 
 def _profile_versions() -> Any:
     return select(
@@ -361,3 +415,16 @@ def _clean(row: dict[str, Any]) -> dict[str, Any]:
 
 def _frame(session: Session, stmt: Any, columns: list[str]) -> pd.DataFrame:
     return pd.DataFrame([tuple(r) for r in session.execute(stmt).all()], columns=columns)
+
+
+_ACTIVE = """
+    SELECT profile_id, version FROM scoring.profile_activation
+    ORDER BY activated_at DESC, id DESC LIMIT 1
+"""
+
+_PROFILE_COLUMNS = f"""
+    p.id, p.name, p.created_at,
+    (SELECT max(v.version) FROM scoring.profile_version v WHERE v.profile_id = p.id)
+        AS latest_version,
+    (SELECT a.version FROM ({_ACTIVE}) a WHERE a.profile_id = p.id) AS active_version
+"""

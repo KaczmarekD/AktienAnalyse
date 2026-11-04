@@ -84,6 +84,22 @@ class ReportingRepository:
         )
         return self.session.scalars(stmt).first()
 
+    def get_delivered_report(self, scoring_run_id: int) -> Report | None:
+        """Der Report eines Bewertungslaufs, dessen Mail erfolgreich verschickt ist (P4.3b)."""
+        stmt = (
+            select(Report)
+            .join(Delivery, Delivery.report_id == Report.id)
+            .where(
+                Report.scoring_run_id == scoring_run_id,
+                Delivery.channel == "mail",
+                Delivery.kind == "report",
+                Delivery.success.is_(True),
+            )
+            .order_by(Report.id)
+            .limit(1)
+        )
+        return self.session.scalars(stmt).first()
+
     def get_deliveries(self, run_id: int) -> list[Delivery]:
         stmt = (
             select(Delivery)

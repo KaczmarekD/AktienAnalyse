@@ -1567,6 +1567,175 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Die Bus-Vertragstests aus P1.8 laufen zusätzlich gegen NATS und sind dort zunächst rot.
 - **Implementierung:** NATS-Implementierung der Bus-Schnittstelle, Umschaltung per Konfiguration.
+- **Entwurf (03.11.2026):**
+  - **Entscheidung (User, 03.11.2026):** ein eigener Adapter mit nats-py statt FastStream.
+    - Die Schnittstelle `EventBus` aus P1.8 bleibt, Handler und Contracts ändern sich nicht.
+    - nats-py ist seit P4.1 da, es kommt keine Abhängigkeit dazu.
+    - [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md) bekommt einen Nachtrag: FastStream
+      frühestens, wenn die Services in Phase 5 eigene Prozesse werden.
+  - **`va_platform.nats.NatsBus`:**
+    - `EventBus` über JetStream, synchron nach außen. Intern läuft eine Event-Loop in einem
+      eigenen Thread. Die Handler laufen in einem Thread-Pool und dürfen selbst `publish`
+      aufrufen.
+    - Beim Start ruft er `provision()` aus P4.1. Der Stream entsteht also nie anders als
+      vorgegeben (Dateispeicher, 30 Tage, Deduplizierung).
+    - **Consumer:**
+      - Ein Consumer, den die Provisionierung kennt, wird so benutzt, wie er ist. Deckt sein
+        Filter ein abonniertes Subject nicht ab, ist das ein Fehler beim `subscribe`.
+      - Einen unbekannten Namen (in den Tests) legt der Bus selbst an, mit genau den
+        abonnierten Subjects. Er bekommt nur neue Nachrichten, alte im Stream nicht.
+      - Je Consumer läuft eine Abholschleife. Er verarbeitet nacheinander und verteilt nach
+        Event-Typ an die Handler. Ein Typ ohne Handler wird bestätigt und übersprungen.
+    - **Senden:**
+      - `Nats-Msg-Id` ist die Event-ID, das übernimmt der `JetStreamPublisher` aus P4.2.
+      - `publish` kehrt erst nach dem Ack von JetStream zurück. Folge-Events liegen also im
+        Stream, bevor das auslösende Event bestätigt wird.
+      - Flüchtige Events (`live.va.…`) gehen über Core-NATS. Sie zu abonnieren kommt mit P4.5.
+    - **Wiederholungen:**
+      - Es gilt die Grenze des Busses, wie im Prozess. Der Batch bleibt bei `max_deliver=1`,
+        eine Mail geht also nicht durch eine Wiederholung doppelt raus.
+      - Ist die Grenze erreicht: Dead-Letter-Callback, danach `term()`. Darunter `nak()` mit
+        kurzer Pause.
+      - Die Grenze des Busses darf höchstens die des Consumers sein (5), sonst verwürfe NATS
+        das Event still.
+    - **In-Progress-Acks:** Solange ein Handler läuft, meldet der Bus alle `ack_wait / 3`
+      Sekunden, dass er noch arbeitet. Der Abruf von market-data dauert Minuten, ohne das
+      stellte JetStream nach 60 s erneut zu.
+    - **Nicht lesbar:** Ist schon die Hülle unlesbar, wird die Nachricht geloggt und mit
+      `term()` verworfen. Eine unbekannte Payload behandelt der Bus wie einen gescheiterten
+      Handler: erst Wiederholung, dann Dead Letter mit der Hülle.
+    - **`settle(timeout)`:** wartet, bis die eigenen Consumer nichts mehr offen haben und kein
+      Handler mehr läuft (zweimal hintereinander geprüft).
+    - **`close()`:** holt nichts Neues mehr ab, lässt laufende Handler zu Ende laufen und
+      bestätigen, dann trennt er die Verbindung.
+  - **Umschaltung im Batch:**
+    - In `Settings` kommen dazu:
+      - `EVENT_BUS` (`in_process` oder `nats`, Standard `in_process`)
+      - `NATS_URL`, Pflicht bei `nats`
+      - `RUN_TIMEOUT_MINUTES` (Standard 120)
+    - Der Bus im Prozess ist fertig, wenn `publish` zurückkehrt. Über NATS wartet `src/main.py`:
+      - bis der `RunTracker` ein Ergebnis hat, höchstens `RUN_TIMEOUT_MINUTES`;
+      - dann bis `settle`, damit ein spätes `screening.run.failed` noch zählt;
+      - dann `close`.
+      - Ohne Ergebnis endet der Lauf wie bisher als „Lauf ohne Ergebnis“ mit Alarm.
+    - Der `RunTracker` meldet sein Ergebnis über ein `threading.Event` und ist gegen parallele
+      Aufrufe geschützt.
+    - Er bekommt einen eigenen provisionierten Consumer `batch` mit seinen vier Subjects. Er ist
+      der Vorläufer der Run-Projektion im web-api.
+    - Mit `EVENT_BUS=nats` warnt der Batch im Log: Die Handler sind erst ab P4.3b idempotent.
+      Auf der NAS bleibt der Standard `in_process`.
+  - **Nicht in P4.3** (eigenes Paket P4.3b, User-Entscheidung 03.11.2026):
+    - Handler über Inbox und Outbox
+    - Umgang mit veralteten Events aus einem abgebrochenen Lauf
+  - **Test (rot):**
+    - Die Vertragstests aus `test_bus.py` laufen unverändert zusätzlich gegen NATS (Fixture
+      `nats`, mit `TEST_NATS_URL`, jeder Test mit frischem Stream).
+    - Zusätzlich gegen NATS:
+      - Eine unlesbare Payload wird nach der Grenze zum Dead Letter.
+      - Ein Handler, der länger als `ack_wait` läuft, wird nur einmal aufgerufen
+        (In-Progress-Acks).
+      - `close` während eines laufenden Handlers: Er läuft zu Ende, die Nachricht ist danach
+        bestätigt und kommt nicht wieder.
+      - Der Stream des Busses hat Dateispeicher, ein provisionierter Consumer bleibt
+        unverändert.
+      - Ein provisionierter Consumer, dessen Filter das Subject nicht abdeckt, lehnt das Abo
+        ab.
+      - Die Grenze des Busses darf nicht über der des Consumers liegen.
+      - Flüchtige Events gehen nicht in den Stream.
+    - Die Kette aus `tests/test_pipeline_bus.py` (Golden-Datensatz ergibt die Golden-Mail) läuft
+      auch über NATS.
+    - Der Batch mit `EVENT_BUS=nats`:
+      - Er wartet auf das Ergebnis, schließt den Lauf mit Erfolg ab und schickt genau eine Mail.
+      - Ein Dead Letter beendet den Lauf als gescheitert mit Alarm.
+      - Ein Timeout endet als „Lauf ohne Ergebnis“.
+    - Settings: `EVENT_BUS=nats` ohne `NATS_URL` ist ein Konfigurationsfehler.
+    - Provisionierung: Der Consumer `batch` existiert mit seinen Subjects.
+- **Umgesetzt (03.11.2026):** wie im Entwurf, dazu:
+  - **Schließen ohne `drain()`:** `drain()` von nats-py lief mit Pull-Abos in sein Timeout
+    von 30 s. Der Bus wartet stattdessen auf seine Abholschleifen, schickt mit `flush()` die
+    letzten Acks und trennt dann.
+  - `NATS_URL` steht bei den Settings, die nie in `batch.run` landen (Verbindungs-URL).
+  - `make test-nats` führt jetzt alle NATS-Integrationstests aus, nicht nur die
+    Provisionierung.
+  - Lokal setzt `docker-compose.local.yml` für den Batch `NATS_URL`. Mit `EVENT_BUS=nats` in
+    der `.env` läuft `make local-run` über NATS.
+  - **Bekannte Grenze, gilt nur für `EVENT_BUS=nats`:**
+    - Hängt ein Handler über `RUN_TIMEOUT_MINUTES` hinaus, endet der Lauf als „Lauf ohne
+      Ergebnis“, der Handler-Thread läuft aber weiter.
+    - Python wartet beim Beenden auf ihn.
+    - Der Watchdog (P4.7) und P4.3b gehen das an.
+
+#### P4.3b Idempotente Handler
+
+- **Test:**
+  - Eine erneute Zustellung desselben Events ändert nichts mehr: kein zweiter Abruf, kein
+    zweiter Bewertungslauf, keine zweite Mail.
+  - Folge-Events entstehen in derselben Transaktion wie die Fachdaten.
+  - Ein veraltetes Event aus einem abgebrochenen Lauf startet keinen neuen Abruf.
+- **Implementierung:** Die Stores von market-data, scoring und notification schreiben
+  Inbox-Eintrag, Fachdaten und Folge-Event über die Outbox in einer Transaktion (P4.2). Das
+  Relay läuft im Batch mit. Erst danach wird NATS auf der NAS eingeschaltet.
+- **Entwurf (04.11.2026):**
+  - **Entscheidung (User, 04.11.2026): pragmatisch.** Gewählt ist ein gemeinsamer Wrapper je
+    Service statt eines Umbaus aller Store-Ports.
+    - Inbox-Eintrag und Folge-Events kommen in eine Transaktion. Die Fachdaten schreibt der
+      Handler wie bisher kurz davor.
+    - **Rest-Risiko:** Ein Absturz genau zwischen Fachdaten und Abschluss lässt den Handler bei
+      erneuter Zustellung noch einmal laufen.
+    - Dagegen stehen fachliche Sperren: market-data nutzt den Abruf des Tages wieder, und
+      notification verschickt keine zweite Mail.
+    - Ein zweiter Bewertungslauf schadet nicht, die Tabellen sind nur zum Anfügen.
+  - **`va_platform.messaging.ReliableBus`:** Er umhüllt den Bus für die Handler eines Service,
+    mit Inbox und Outbox aus dessen Schema.
+    - **Zustellung:**
+      1. Ist das Event älter als `max_age`, wird es übersprungen. Das ist ein veraltetes Event
+         aus einem abgebrochenen Lauf.
+      2. Hat dieser Consumer das Event schon verarbeitet, wird es übersprungen.
+      3. Sonst läuft der Handler. Was er dabei veröffentlicht, sammelt der Wrapper.
+      4. Danach kommen Inbox-Eintrag und gesammelte Events in einer Transaktion in die Outbox.
+      5. Dann gibt der Wrapper die offenen Einträge an den Bus weiter.
+    - Wirft der Handler, gibt es weder Inbox-Eintrag noch Folge-Events. Der Bus entscheidet
+      dann wie bisher über Wiederholung oder Dead Letter.
+    - Flüchtige Events und alles, was außerhalb einer Zustellung veröffentlicht wird (Start des
+      Laufs, Dead Letter in `src/main.py`), gehen direkt an den Bus.
+    - **Weitergeben:** `drain_outbox` ist die synchrone Schwester des `OutboxRelay` aus P4.2,
+      ohne eigene Event-Loop. Auch bei einem schon verarbeiteten Event gibt der Wrapper
+      Liegengebliebenes weiter, etwa nach einem Fehler beim letzten Versand.
+  - **Verdrahtung:**
+    - `Adapters.messaging` liefert in `build_adapters` je Service den `ReliableBus` mit der
+      Engine. `max_age` ist `RUN_TIMEOUT_MINUTES`.
+    - Tests mit Fakes lassen es leer, dann hängen die Handler wie bisher direkt am Bus.
+    - Der Wrapper gilt auch im Prozess, damit der Weg auf der NAS und im E2E-Test derselbe ist.
+  - **Sperre in notification:** Hat ein Bewertungslauf schon eine erfolgreich verschickte
+    Report-Mail, geht keine zweite raus.
+    - Es entsteht kein zweiter Report und kein Ping. Der Handler meldet `report.sent` mit dem
+      vorhandenen Report.
+    - Dafür gibt es den Port `ReportStore.delivered_report(scoring_run_id)`.
+  - **NATS:** Die Warnung „erst ab P4.3b idempotent“ entfällt. Der Standard bleibt der Bus im
+    Prozess. NATS auf der NAS ist eine eigene Entscheidung beim Deployment.
+  - **Test (rot):**
+    - DB-Tests für den `ReliableBus` (Bus im Prozess, Schema `scoring`):
+      - Folge-Events gehen über die Outbox und sind danach veröffentlicht.
+      - Eine doppelte Zustellung ruft den Handler nur einmal auf.
+      - Ein werfender Handler hinterlässt weder Inbox- noch Outbox-Eintrag.
+      - Ein veraltetes Event wird übersprungen.
+      - Flüchtige Events und Events außerhalb einer Zustellung gehen direkt an den Bus.
+      - Ein liegengebliebener Outbox-Eintrag geht mit der nächsten Zustellung raus.
+    - `drain_outbox`: in Reihenfolge, markiert, bricht bei einem Fehler ab.
+    - Batch mit echter Datenbank: Dasselbe `screening.run.requested` zweimal zugestellt ergibt
+      einen Abruf, einen Bewertungslauf und eine Mail.
+    - Ein `screening.run.requested` älter als `RUN_TIMEOUT_MINUTES` startet keinen Abruf.
+    - notification: Bei schon verschickter Mail keine zweite, aber `report.sent`.
+    - Repository: `delivered_report` findet nur erfolgreich verschickte Reports.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - `drain_outbox` und `OutboxRelay` teilen sich die Abfragen (offene Einträge, Markieren).
+  - **Fehler beim Weitergeben:** Scheitert `drain_outbox` nach dem Abschluss, wirft der
+    Wrapper. Der Bus entscheidet dann über Wiederholung. Die erneute Zustellung trifft auf
+    den Inbox-Eintrag und gibt das Liegengebliebene weiter.
+  - **Folge für die NAS:** Auch im Prozess schreibt jeder Lauf je Stufe einen Inbox- und einen
+    Outbox-Eintrag (Migration `0009`, Rolle `va_app`). Der E2E-Test läuft diesen Weg mit
+    echter Datenbank.
+  - Das Replay-Werkzeug hängt die Handler weiter direkt an den Bus und schreibt nichts.
 
 #### P4.4 Eventmanager und Projektionen
 
@@ -1576,6 +1745,88 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Eine Wiederholung ist idempotent.
 - **Implementierung:** Eventmanager, Schema `web` (Migration) und die Projektionen
   ([web-api-realtime.md](web-api-realtime.md)).
+- **Entwurf (04.11.2026):**
+  - **Woher die Events kommen:**
+    - Das web-api liest über den provisionierten Consumer `web-api` (`va.>`) mit dem `NatsBus`
+      aus P4.3.
+    - Läuft die Kette im Prozess (Standard, auch auf der NAS), kommt beim web-api nichts an,
+      und die Projektionen bleiben leer.
+    - Die REST-Endpunkte lesen deshalb weiter aus den Tabellen des Batches (`va_read`). Auf die
+      Projektionen wechseln sie, wenn NATS der Standard ist. Das ist ein eigener Schritt beim
+      Deployment, die REST-API bleibt dabei gleich.
+  - **Schema `web`** (Migration `0010`, Besitzer `va_web_api.adapters.postgres`), in
+    `APP_SCHEMAS`:
+    - `inbox` und `outbox` wie in jedem Service-Schema (P4.2). Die Outbox nutzt erst P4.7.
+    - `run_status`: eine Zeile je Run.
+      - Spalten: Status (`requested`, `fetched`, `scored`, `reported`, `failed`, `no_data`),
+        Trigger, IDs von Abruf, Bewertung und Report, Größe des Universums, Zahl bewerteter
+        Titel, Fehler, zuletzt verarbeitetes Event und dessen Zeit.
+      - Ein Fehlschlag gewinnt, wie im `RunTracker`.
+      - Als Projektion ist `run_status` die bewusst gekennzeichnete veränderliche Tabelle
+        ([datenhaltung.md](datenhaltung.md)): `UPDATE` erlaubt, `DELETE` und `TRUNCATE` nicht.
+    - `ranking_row`: je Bewertungslauf und Titel Rang, die drei Scores, Value-Trap-Flag, Name,
+      Index und Run.
+      - Nur zum Anfügen, auch bei einem Rescore.
+      - Daraus ergeben sich das aktuelle Ranking und der Score-Verlauf je Titel.
+  - **Rolle `va_web`:** Sie darf im Schema `web` lesen und anfügen und `run_status` ändern,
+    sonst nichts. `va_read` darf `web` lesen.
+    - Angelegt wird sie wie `va_profiles`: von `db/init/01_roles.sh` bei einer neuen
+      Datenbank, von `python -m src.db.migrate` mit `VA_WEB_PASSWORD` bei einer bestehenden.
+    - Das web-api bekommt sie über `WEB_API_PROJECTIONS_DATABASE_URL`, nie die Zugangsdaten des
+      Batches.
+  - **`va_web_api.events.EventManager`** (synchron, läuft in den Handler-Threads des
+    `NatsBus`):
+    - `dispatch(envelope, seq)`:
+      1. Inbox-Eintrag und alle Projektionen des Event-Typs laufen in einer Transaktion.
+      2. Nach dem Commit gehen die Meldungen an den `Broadcaster`, je Topic aus
+         [web-api-realtime.md](web-api-realtime.md): `runs`, `ranking`, `profiles`.
+    - Wirft eine Projektion, wird zurückgerollt, nichts gesendet, und die Exception geht an
+      den Bus. JetStream stellt dann erneut zu.
+    - Eine erneute Zustellung ändert nichts und sendet nichts.
+    - Ein Fehler des `Broadcaster` kostet nur die Meldung, nicht das Event.
+    - Der `Broadcaster` ist ein Port. Bis P4.5 (WebSocket-Hub) protokolliert er nur.
+  - **`seq`:** Der `NatsBus` legt die Stream-Sequenz der gerade verarbeiteten Nachricht in einen
+    Kontext (`current_sequence()`). Über NATS reicht das web-api sie mit, im Prozess gibt es
+    keine.
+  - **Start im web-api:** Mit `WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` öffnet der
+    Lifespan einen `NatsBus` (Consumer `web-api`, alle dauerhaften Events) und schließt ihn am
+    Ende.
+    - Fehlt eins davon, gibt es keine Projektionen, die App läuft trotzdem.
+    - Ist NATS beim Start nicht erreichbar, wird das geloggt, und die App startet ohne
+      Projektionen.
+  - **Compose:**
+    - Lokal bekommt das web-api beide Variablen.
+    - Auf der NAS bleibt es vorerst ohne. Dort läuft die Kette im Prozess, also gäbe es nichts
+      zu projizieren.
+  - **Test (rot):**
+    - DB-Tests für den `EventManager` (Schema `web`, echte Datenbank, Fake-`Broadcaster`):
+      - Beim Broadcast ist die Projektion schon committet (eine zweite Verbindung sieht sie).
+      - Wirft eine Projektion, gibt es keinen Broadcast und weder Inbox-Eintrag noch
+        Projektion. Die Exception kommt beim Aufrufer an.
+      - Dasselbe Event zweimal: nur einmal projiziert und gesendet.
+      - Der Run-Status folgt der Kette (`requested` bis `reported`), ein Fehlschlag gewinnt
+        gegen ein späteres `report.sent`.
+      - `scoring.run.completed` legt die Ranking-Zeilen an, ein Rescore ohne Run ebenso, aber
+        ohne Run-Status.
+      - Topics: `runs`, `ranking` und `profiles` je nach Event.
+    - Schutz und Rollen:
+      - `ranking_row` und `inbox` sind nur zum Anfügen.
+      - `run_status` lässt sich ändern, aber nicht löschen.
+      - `va_web` schreibt nur in `web`, `va_read` liest `web`.
+      - Die Migration legt `va_web` an.
+    - Schema-Grenzen: `web` hat einen Besitzer, `outbox` und `inbox`.
+    - NATS und DB: Ein über NATS veröffentlichtes Event landet in der Projektion, mit der
+      Stream-Sequenz.
+    - web-api: Ohne NATS-Einstellungen startet die App ohne Consumer.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Dead Letter:** Ein Event, das der Eventmanager auch nach `max_deliver` (5) nicht
+    verarbeitet, vermerkt er mit Fehler in `web.inbox` (`record_dead_letter` aus P4.2).
+  - **Stream-Sequenz:** `current_sequence()` setzt der `NatsBus` im Handler-Thread selbst.
+    Ein `run_in_executor` reicht den Kontext nicht weiter.
+  - **Rechte:** `va_app` (Batch) bekommt im Schema `web` keine Rechte.
+  - **Modelle und Migration** stimmen überein, Alembic findet beim Vergleich keine Abweichung.
+  - **Für P4.5:** Die Meldung zu `scoring.run.completed` trägt die ganze Rangliste. Für den
+    WebSocket sollte sie schlanker werden (Kopf des Laufs, Rangliste per REST).
 
 #### P4.5 WebSocket-Hub und Protokoll v1 🔒
 
@@ -1585,6 +1836,74 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Eine volle Queue führt zum Schließen mit Code 1013.
   - `resumeFrom` spielt verpasste Events nach bzw. löst `resync` aus.
 - **Implementierung:** Hub, Protokoll und Endpunkt `/ws`.
+- **Entwurf (04.11.2026):**
+  - **Endpunkt `/ws`** im web-api, nginx reicht ihn weiter: `location = /ws` mit Upgrade-Headern,
+    `Host $http_host` und `proxy_read_timeout` 3600 s. Uvicorn pingt alle 20 s.
+  - **Handshake (🔒), abgelehnt wird vor dem `accept` (HTTP 403):**
+    - wenn der Client das Subprotokoll `va.v1` nicht anbietet;
+    - wenn `Origin` fehlt oder fremd ist.
+    - Erlaubt ist ohne Einstellung nur dieselbe Herkunft: Host und Port von `Origin` gleich dem
+      `Host`-Header, den nginx mit Port weiterreicht. Mit `WEB_API_ALLOWED_ORIGINS` (durch Komma
+      getrennt, kein JSON) gelten genau diese.
+  - **Protokoll v1** (`va_web_api.realtime.protocol`), Pydantic-Modelle mit camelCase:
+    - Client: `subscribe` (`topics`, optional `resumeFrom` ≥ 0), `unsubscribe`, `ping`.
+    - Server: `hello` (`serverTime`, `lastSeq`), `event`, `resync`, `pong`, `error`.
+    - Topics: `runs`, `ranking`, `profiles` und `instrument:<SYMBOL>` (Muster geprüft), höchstens
+      20 je Nachricht.
+    - Fehlerhafte Eingaben beenden die Verbindung nicht, der Server antwortet mit `error`:
+      ungültiges JSON, Binärdaten, unbekanntes `op`, unbekanntes Topic, falsche Typen.
+    - Eine Nachricht über 4 KiB schließt die Verbindung mit 1009.
+    - Die Event-Daten bildet der Server auf camelCase ab. `scoring.run.completed` kommt ohne die
+      Rangliste, stattdessen mit `rankingSize`. Die Rangliste holt das UI per REST.
+  - **Hub** (`va_web_api.realtime.hub`, in der Event-Loop von Uvicorn):
+    - Je Client eine Warteschlange (256) und ein eigener Schreib-Task. Ist sie voll, wird der
+      Client mit 1013 getrennt, die anderen merken nichts.
+    - Abos filtern nach Topic. Ein Event geht genau an die Clients, die sein Topic abonniert
+      haben.
+    - Der `HubBroadcaster` reicht die Meldungen des Eventmanagers (Threads des `NatsBus`) per
+      `call_soon_threadsafe` an die Event-Loop. Er ersetzt den `LoggingBroadcaster` aus P4.4.
+  - **Nachspielen** (`resumeFrom`):
+    - Ein `NatsReplayer` liest den Stream `VA_EVENTS` ab der Sequenz, gefiltert auf die
+      Topics, höchstens 500 Events. Ist die Lücke größer, älter als der Stream oder NATS nicht
+      da, schickt er je Topic `resync`.
+    - Live-Events eines Clients hält der Hub zurück, solange sein Nachspielen läuft. Danach
+      verschickt er sie, ohne Sequenzen, die schon nachgespielt sind. So kommt nichts doppelt
+      und nichts vertauscht an.
+  - **Fortschritt:** Der `NatsBus` kann jetzt flüchtige Events abonnieren (Core-NATS, ohne
+    Wiederholung). Das web-api leitet `marketdata.fetch.progressed` direkt an das Topic `runs`
+    weiter, ohne `seq` und ohne Projektion.
+  - **Abhängigkeit:** `websockets` (16) steht künftig selbst beim web-api. Bisher kam es nur über
+    yfinance ins Image, und Uvicorn braucht es für WebSockets.
+  - **Ohne NATS** (NAS, E2E): Der Endpunkt funktioniert, `lastSeq` ist leer, `resumeFrom` führt
+    zu `resync`.
+  - **Test (rot):**
+    - web-api mit TestClient:
+      - Handshake ohne `va.v1`, mit fremdem oder fehlendem `Origin` wird abgelehnt. Dieselbe
+        Herkunft und eine erlaubte Herkunft gehen durch.
+      - `hello` nach dem Verbindungsaufbau.
+      - Abos filtern nach Topic, `unsubscribe` beendet sie, `ping` ergibt `pong`.
+      - Fehlerhafte Eingaben ergeben `error`, und die Verbindung bleibt. Eine zu große Nachricht
+        schließt sie mit 1009.
+      - `resumeFrom`: Nachgespieltes kommt vor Live-Events, nichts doppelt. Bei zu großer Lücke
+        kommt `resync`.
+      - `scoring.run.completed` kommt ohne Rangliste, in camelCase.
+    - Hub: Eine volle Warteschlange schließt mit 1013, andere Clients bekommen weiter.
+      `HubBroadcaster` aus einem anderen Thread erreicht den Client.
+    - NATS: Der `NatsReplayer` liefert die Events nach einer Sequenz mit Topic und `seq` und
+      meldet eine zu große oder zu alte Lücke. Der `NatsBus` liefert flüchtige Events an ein
+      Abo.
+    - E2E (über nginx): Handshake mit eigener Herkunft ergibt `hello`, eine fremde Herkunft
+      wird abgelehnt.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **`NatsBus._call`:** Bei einer Zeitüberschreitung bricht der Bus die Koroutine in seiner
+    Loop jetzt ab, statt sie weiterlaufen zu lassen.
+  - **nginx:** Die statische Prüfung (`tests/test_nginx_conf.py`) hält `location = /ws` fest:
+    Upgrade-Header, Host mit Port, Timeout über 60 s.
+  - **`uv.lock`:** ändert sich nur um die Kante zu `websockets` 16.0. Das Paket war schon im
+    Image, die J4125-Prüfung lief also bereits damit.
+  - **Grenze:** Ist `WEB_API_NATS_URL` gesetzt, NATS aber nicht erreichbar, kommt `hello` erst
+    nach dem gescheiterten Verbindungsversuch des Replayers (einige Sekunden). Ohne die Variable
+    (NAS, E2E) gibt es keinen Replayer.
 
 #### P4.6 Echtzeit im Frontend
 
@@ -1593,6 +1912,61 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - `resumeFrom` beim Wiederverbinden
   - Events landen im Store
 - **Implementierung:** Service, NgRx-Events und Reducer.
+- **Entwurf (04.11.2026):**
+  - **Abhängigkeit:** `@ngrx/signals` 22.0.1 (passt zu Angular 22), daraus SignalStore und das
+    Events-Plugin (`@ngrx/signals/events`), wie in [frontend.md](frontend.md) vorgesehen.
+  - **`RealtimeService`** (`frontend/src/app/shared/realtime/`):
+    - Kapselt `rxjs/webSocket` mit dem Subprotokoll `va.v1`. Die Adresse ist relativ zur Seite
+      (`ws://<host>/ws`, unter HTTPS `wss`).
+    - Status als Signal: `connecting`, `online`, `offline`.
+    - Abonniert beim Öffnen die Topics `runs`, `ranking` und `profiles`. Beim Wiederverbinden
+      schickt er dazu `resumeFrom` mit der letzten gesehenen `seq`. Vor dem ersten Event gilt
+      die `lastSeq` aus `hello`.
+    - Bricht die Verbindung ab, verbindet er neu: 1 s, 2 s, 4 s … bis 30 s, je mit Zufallsanteil
+      (50–100 %). Nach einer erfolgreichen Verbindung beginnt die Folge von vorn.
+    - Servernachrichten gehen als NgRx-Events weiter (`eventGroup({ source: 'Server' })`):
+      `event` und `resync`. `pong` und `error` schluckt er, damit die Konsole leer bleibt
+      (Regel der Browser-Tests).
+    - Für Tests ist die WebSocket-Klasse austauschbar (`WebSocketCtor` von `rxjs/webSocket`),
+      ebenso Wartezeiten und Zufall.
+  - **`LiveStore`** (SignalStore, `withReducer`):
+    - Je Topic ein Zähler `version`. Er steigt bei jedem dauerhaften Event und bei `resync`
+      dieses Topics.
+    - Fortschritt je Run aus `marketdata.fetch.progressed` (`done`, `total`, `symbol`). Mit dem
+      Abschluss des Runs fällt er weg.
+  - **Ansichten:**
+    - Die Liste der Runs lädt neu, wenn `version('runs')` steigt, und zeigt den Fortschritt
+      laufender Runs.
+    - Das Ranking lädt neu bei `version('ranking')`.
+    - Die Toolbar zeigt „offline“, solange keine Verbindung besteht.
+  - **Protokoll-Typen** (`protocol.ts`): von Hand, gespiegelt aus `va_web_api.realtime.protocol`.
+    Damit eine Änderung auffällt, hält ein Python-Golden-Test das JSON-Schema der
+    Protokoll-Modelle fest (`tests/golden/realtime/v1.json`). Generiert wird erst, wenn das
+    Protokoll wächst.
+  - **Entwicklung:** `proxy.conf.json` reicht `/ws` (mit `ws: true`) an das web-api weiter.
+  - **Test (rot):**
+    - `RealtimeService` mit Fake-WebSocket:
+      - Verbindet mit `va.v1` und abonniert die Topics.
+      - Status `online`, nach Abbruch `offline`.
+      - Wiederverbinden mit wachsender, gedeckelter Wartezeit und Zufallsanteil, nach Erfolg
+        wieder ab 1 s.
+      - `resumeFrom` mit der letzten `seq`, ohne Events mit der `lastSeq` aus `hello`.
+      - Events und `resync` landen im `LiveStore`.
+    - `LiveStore`: Versionen je Topic, Fortschritt kommt und geht.
+    - Ansichten:
+      - Runs laden bei einem Run-Event neu und zeigen den Fortschritt.
+      - Das Ranking lädt bei einem Ranking-Event neu.
+      - Die Toolbar zeigt „offline“.
+    - Python: Golden-Schema des Protokolls.
+    - E2E (Playwright): Die Toolbar steht nach dem Laden auf „online“, die Konsole bleibt leer.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Status `idle`:** Er gilt, solange der Service nicht gestartet ist. Nur die App startet
+    ihn (`provideAppInitializer`). Komponententests ohne App bauen also keine Verbindung auf.
+  - **Senden:** Das Abo geht im `openObserver` raus. `rxjs/webSocket` puffert es und sendet es
+    nach dem Öffnen.
+  - **Budget:** Der Build warnt weiter wegen des initialen Budgets (500 kB). Das Bundle liegt
+    bei 753 kB, NgRx trägt einige kB bei. Das war schon vorher über der Grenze und ist keine
+    neue Warnung.
 
 #### P4.7 Runs aus dem UI, Watchdog, Scheduler
 
@@ -1601,46 +1975,581 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Derselbe Cron-Termin erzeugt nur einen Run.
   - Ein Start aus dem UI legt einen Run an.
 - **Implementierung:** Run-Verwaltung im web-api und Anzeige des Fortschritts im UI.
+- **Entwurf (04.11.2026):**
+  - **Wer einen Run ausführt:** Bisher hängen die Handler nur im kurzlebigen Batch-Prozess am
+    Bus. Ein Start aus dem UI braucht einen Prozess, der dauerhaft lauscht.
+    - Neu ist der Dienste-Prozess `python -m src.worker`. Er hängt market-data, scoring und
+      notification wie der Batch an den `NatsBus` (`wire`, je Service ein `ReliableBus`) und läuft,
+      bis er SIGTERM bekommt.
+    - Er legt keine Runs an und schließt keine ab, das macht das web-api.
+    - Scheitert ein Handler endgültig (Dead Letter), meldet der Worker `screening.run.failed`.
+      `trigger` und `options` nimmt er aus dem Event. Dieselbe Funktion nutzt auch der Batch.
+    - P5.1 teilt ihn in ein Image je Service auf.
+    - Compose: Dienst `worker` aus dem App-Image, eigener Einstieg ohne Migration (wie das
+      web-api), nur mit dem Profil `nats`. Auf der NAS läuft er also erst nach dem Umstieg,
+      lokal startet `make local-up` ihn mit.
+  - **Run-Verwaltung im web-api** (`va_web_api.runs`):
+    - `RunManager.start(trigger, options, slot=None)` legt den Run in einer Transaktion an:
+      - eine Zeile in `batch.run` (Art `batch`, Status `running`);
+      - eine Zeile in `web.run_request` (Trigger, Optionen, Termin);
+      - eine Zeile `requested` in `web.run_status`;
+      - `screening.run.requested` in die Outbox `web.outbox`.
+
+      Danach leert er die Outbox an NATS. Ist NATS gerade weg, holt das der nächste Takt nach.
+    - Die ID muss aus `batch.run` kommen, alle Services verweisen darauf. Das web-api schreibt
+      deshalb in `batch.run`, wie es die Zielarchitektur vorsieht (`batch` gehört dem web-api,
+      [datenhaltung.md](datenhaltung.md)).
+    - **Abschluss:** Eine Projektion schließt `batch.run` ab, wenn `notification.report.sent` oder
+      `screening.run.failed` ankommt. Das geschieht in der Transaktion des Eventmanagers und nur
+      für Runs des web-api (Zeile in `web.run_request`).
+      - Die Regeln sind die des `RunTracker`: `success` oder `partial` nach den Zählern,
+        `no_data` mit Exit 3, sonst `failed` mit Exit 1.
+      - Abgeschlossen wird beim ersten Ergebnis. Ein späterer Fehlschlag steht nur in
+        `web.run_status`, weil `batch.run` nur einmal abgeschlossen werden darf.
+      - Runs des Batches (Cron, `make run`) schließt weiter der Batch selbst ab.
+    - **Nur ein manueller Run zur Zeit:** Läuft schon ein Run des web-api, antwortet ein Start
+      aus dem UI mit 409. Zwei Abrufe zugleich verdoppelten die Last auf Yahoo. Eine Sperre
+      (`pg_advisory_xact_lock`) verhindert, dass zwei Klicks gleichzeitig durchkommen. Der
+      Scheduler startet trotzdem: Ein hängender manueller Run blockiert den Wochenlauf nicht,
+      der Watchdog räumt ihn ab.
+  - **Scheduler:**
+    - `WEB_API_SCHEDULE` ist ein Cron-Ausdruck, ausgewertet in `WEB_API_SCHEDULE_TIMEZONE`
+      (Standard `Europe/Berlin`), unabhängig von der Zeitzone des Containers. Die Bibliothek ist
+      `cronsim`: klein, ohne Abhängigkeiten, Sommerzeit wie cron.
+    - Leer (Standard) heißt aus. Liefen Cron im Container und Scheduler zugleich, gäbe es zwei
+      Wochenläufe. Den Umstieg macht P5.4: Standard wird der Scheduler, der Cron entfällt.
+    - Jeder Takt (60 s) nimmt den jüngsten Termin. Liegt er höchstens eine Stunde zurück,
+      legt der Takt ihn als Run mit `trigger=scheduled` an. Ein Neustart kurz nach dem Termin
+      holt ihn also nach.
+    - Idempotent über einen eindeutigen Index auf `web.run_request.slot`. Derselbe Termin ergibt
+      nur einen Run, auch bei mehreren Takten, einem Neustart oder zwei Instanzen.
+  - **Watchdog:** Er prüft im selben Takt die offenen Runs des web-api, also Runs ohne Ergebnis in
+    `web.run_status`. Die Grenzen sind einstellbar:
+    - Abruf: `WEB_API_WATCHDOG_FETCH_MINUTES`, Standard 45, ab der Anfrage.
+    - Bewertung: `…_SCORING_MINUTES`, Standard 5, ab `fetched`.
+    - Mail: `…_REPORT_MINUTES`, Standard 5, ab `scored`.
+
+    Ist eine Grenze überschritten, kommt in einer Transaktion zusammen:
+    - `screening.run.failed` (`stage=watchdog`, `reason=timeout`, im `detail` die Stufe) in die
+      Outbox;
+    - `failed` in `web.run_status`;
+    - der Abschluss von `batch.run`.
+
+    Der nächste Takt sieht den Run nicht mehr als offen und meldet ihn kein zweites Mal.
+    notification schickt die Fehlermail, bei `scheduled` auch den Ping auf `/fail`. Liefert eine
+    Stufe danach doch noch, bleibt der Run gescheitert. Eine Mail kann dann trotzdem rausgehen,
+    abbrechen kann das web-api den Abruf nicht.
+  - **Takt:** eine Hintergrund-Aufgabe im Lifespan, gestartet nur mit NATS und
+    Projektions-Datenbank. Sie ruft Scheduler, Watchdog und Outbox im Thread auf. Die Uhr ist
+    ein Parameter, Tests steuern sie.
+  - **Datenbank (Migration `0011`):**
+    - Neue Tabelle `web.run_request`, nur zum Anfügen, mit eindeutigem `slot`.
+    - `va_web` bekommt Rechte im Schema `batch`: `SELECT` und `INSERT` auf `batch.run`,
+      `UPDATE` nur auf die Spalten des Abschlusses, dazu die Sequenz. Der Trigger
+      `va_guard_finished` lässt weiter nur den einmaligen Abschluss zu.
+    - Keine neue Rolle: Aus `va_web` wird in P5.3 die Rolle des web-api.
+  - **REST:** `POST /api/v1/runs` mit `force_refresh`, `dry_run`, `notify`:
+    - Erfolg: 202 mit der ID des Runs.
+    - 409: Es läuft schon ein Run.
+    - 503: Ohne NATS oder Projektions-Datenbank.
+
+    Additiv: neuer OpenAPI-Snapshot und neuer TS-Client.
+  - **UI:** Auf der Seite Runs ein Formular „Lauf starten“ mit den drei Optionen. Nach dem Start
+    erscheint der Run über das Run-Event in der Liste, der Fortschritt kommt aus P4.6. Fehler
+    (409, 503) stehen als Meldung über der Tabelle.
+  - **Nebenbei:** `entrypoint.sh` gibt `EVENT_BUS`, `NATS_URL` und `RUN_TIMEOUT_MINUTES` an den
+    Cron-Lauf weiter. Bisher lief der Cron-Batch immer im Prozess, egal was in der `.env` stand.
+  - **Test (rot):**
+    - Scheduler, rein:
+      - Der jüngste Termin in `Europe/Berlin`, auch über die Sommerzeit.
+      - Kein Termin, wenn der letzte über eine Stunde zurückliegt.
+      - Ein ungültiger Ausdruck scheitert beim Start der Settings.
+    - Datenbank (`tests/db/web_api/test_runs.py`, mit steuerbarer Uhr):
+      - Ein Start legt `batch.run`, `run_request`, `run_status` und das Event in der Outbox an.
+      - Derselbe Termin zweimal ergibt einen Run.
+      - Ein manueller Start bei offenem Run wird abgelehnt.
+      - Der Watchdog meldet einen Timeout:
+        - Vor der Grenze passiert nichts.
+        - Danach stehen `run.failed` in der Outbox, `failed` in `run_status` und der Abschluss
+          von `batch.run`.
+        - Ein zweiter Takt meldet nichts mehr.
+        - Die Grenze gilt je Stufe.
+      - Die Projektion schließt Runs des web-api ab: `success`/`partial`, `no_data`, `failed`.
+        Runs des Batches bleiben unberührt.
+      - Rechte: `va_web` legt Runs an und schließt sie einmal ab. Löschen und ein zweiter
+        Abschluss scheitern.
+    - API: 202 mit ID, 409, 503, nur JSON, unbekannte Felder 422.
+    - NATS und Datenbank (`tests/test_worker_nats.py`): Das web-api startet einen Run, der Worker
+      führt ihn aus, der Eventmanager schließt `batch.run` mit `success` ab, die Mail ist da.
+    - Worker: Ein Dead Letter wird zu `screening.run.failed` mit Trigger und Optionen des
+      Events.
+    - Compose und Entrypoint: Dienst `worker` mit Profil `nats` und ohne Migration, die neuen
+      Variablen im Cron-Lauf.
+    - Frontend: Das Formular schickt die Optionen und zeigt 409 und 503 als Meldung.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Ohne Zeile in `run_status` beim Start:** Sie entsteht wie bei jedem Run erst mit dem Event,
+    das über NATS zurückkommt. Der Watchdog misst den Abruf ab `run_request.requested_at`.
+  - **Stufe geht nie zurück:** `run_status` geht nur vorwärts, `last_event_at` ebenso. Die
+    Handler des `NatsBus` laufen parallel. Ein spätes `requested` hätte sonst ein `fetched`
+    überschrieben, und der Watchdog hätte die Bewertung ab dem früheren Zeitpunkt gemessen.
+  - **`batch.run` aus dem web-api:**
+    - Eine schlanke Tabellenbeschreibung (`va_web_api.adapters.postgres.batch_run`), weil das
+      web-api `src` nicht importieren darf.
+    - `app_version` ist die Version des Batches, `src.web` reicht sie an `create_app` weiter.
+    - `settings` und `universe_mode` bleiben leer, das web-api kennt die Settings des Batches nicht.
+  - **Dead Letter:** `src.dead_letters.run_failure` nutzen Batch und Worker gemeinsam. Run, Trigger
+    und Optionen kommen aus dem Event. Ein Rescore scheitert als Rescore.
+  - **Senden:** Ein Start aus dem UI leert die Outbox sofort über den Bus des Event-Consumers. Sonst
+    tut das der Takt (60 s).
+  - **Cron-Lauf:** `entrypoint.sh` gibt alle Settings des Batches weiter, auch `REPLAY_SOURCE`.
+    `tests/test_entrypoint.py` prüft das künftig für jedes neue Feld.
+  - **Langsamer Test:** Auf dem Windows-Rechner läuft eine Verbindung zu `127.0.0.1:1` erst nach
+    130 s in den Timeout. Der Test mit unerreichbarem NATS gibt der Datenbank-URL deshalb
+    `connect_timeout=2` mit, denn der Takt verbindet sich gleich beim Start.
+  - **Offen:**
+    - Die Log-Zeilen eines Worker-Runs landen nicht in `batch.run_log`, nur im Log des
+      Containers. Das kommt mit dem Tracing (P5.5).
+    - Den Umstieg vom Cron auf den Scheduler macht P5.4.
 
 #### P4.8 Vorschau und Profil-Befehle über NATS
 
 - **Test:** Die API-Tests aus P3.3 laufen unverändert über den RPC-Adapter.
 - **Implementierung:** Request/Reply-Adapter für `ScoringPreview` und die Profil-Befehle.
+- **Entwurf (04.11.2026):**
+  - **Contracts** (`va_contracts.rpc.v1`, neu und additiv):
+    - Je Befehl ein Anfrage- und ein Antwortmodell. `RpcSpec` verbindet Name, Subject
+      (`rpc.va.<name>`) und Modelle, wie `EventSpec` bei den Events. Katalog `RPCS`.
+    - Befehle: `scoring.factors`, `scoring.preview`, `scoring.profiles.save`,
+      `scoring.profiles.activate`.
+    - Jede Antwort hat ein optionales Feld `error` mit `code` und `message`, bei einem Konflikt
+      auch `newest`. Codes: `no_data`, `unknown_profile`, `unknown_version`, `conflict`,
+      `invalid`, `internal`.
+    - Die JSON-Schemas liegen als Golden-Files unter `tests/golden/contracts/rpc/v1/`.
+  - **Transport** (`NatsBus`, Core-NATS ohne Stream):
+    - `call(spec, request)` wartet auf die Antwort. Antwortet niemand oder läuft die Zeit ab,
+      gibt es `RpcUnavailable`.
+    - `serve(spec, handler, queue=…)` beantwortet Anfragen im Thread-Pool. Mehrere Worker teilen
+      sich eine Queue-Gruppe. Eine ungültige Anfrage ergibt den Code `invalid`, eine Exception
+      im Handler `internal`.
+  - **web-api** (`va_web_api.rpc`):
+    - `RemoteScoring` setzt beide Ports (`ScoringPreview`, `ProfileCommands`) über `call` um.
+      Die Fehlercodes werden wieder zu den Exceptions der Ports.
+    - `scoring_handlers(preview, commands)` ist die Gegenseite: Sie macht aus beliebigen
+      Umsetzungen der Ports die Handler für `serve`.
+    - Beide Richtungen liegen beim web-api, weil die Befehle die entfernte Form seiner Ports
+      sind. Das Format steht neutral in `va_contracts`.
+  - **Wer antwortet:** Der Worker (`python -m src.worker`, P4.7) bedient die vier Subjects mit
+    dem Code aus P3.3 und der Rolle `va_app`.
+    - `InProcessPreview` und `InProcessCommands` ziehen dafür von `src/web.py` nach
+      `src/scoring_ops.py`, damit der Worker FastAPI nicht lädt.
+    - Die Vorschau liest weiter die Snapshots aus `market_data`. Das geht nur in der Composition
+      Root und wird erst mit den Rollen je Service (P5.3) zur lokalen Kopie bei scoring.
+  - **Wann über NATS:** mit `WEB_API_NATS_URL`. Ohne sie bleibt alles im Prozess, wie auf der NAS
+    und im E2E-Stack.
+    - Das web-api öffnet dafür eine eigene NATS-Verbindung im Hintergrund, mit Wiederholung wie
+      der Event-Consumer.
+    - Ist NATS oder der Worker nicht erreichbar, antworten die vier Endpunkte mit 503
+      („Scoring nicht erreichbar“).
+    - `WEB_API_PROFILES_DATABASE_URL` braucht es in diesem Fall nicht mehr.
+  - **Profil-Events:** Nach Speichern und Aktivieren meldet der Worker `scoring.profile.saved`
+    bzw. `scoring.profile.activated`. Der Eventmanager reicht sie an die offenen Tabs weiter
+    (Topic `profiles`).
+    - Sie gehen direkt an den Bus, ohne Outbox: Sie ändern keine Projektion.
+    - Ein verlorenes Event heißt nur, dass ein anderer Tab erst beim nächsten Laden die neue
+      Version sieht.
+  - **Test (rot):**
+    - Contracts:
+      - Golden-Schemas je Anfrage und Antwort.
+      - Subjects unter `rpc.va.`.
+      - Fehler mit `newest` kommen unverändert durch JSON.
+    - `NatsBus` mit NATS:
+      - `call`/`serve` hin und zurück.
+      - Ungültige Anfrage und Exception im Handler ergeben `invalid` bzw. `internal`.
+      - Ohne Antwortenden schnell `RpcUnavailable`.
+      - Zwei Server in einer Queue-Gruppe antworten nur einmal.
+    - Die API-Tests aus P3.3 laufen unverändert ein zweites Mal über NATS:
+      - mit den Fakes (`services/web-api/tests/test_scoring_api.py`);
+      - mit echter Datenbank über den Worker (`tests/db/web_api/test_scoring_api.py`).
+
+      Dafür bekommen die Fixtures `client` bzw. `api` einen Parameter.
+    - web-api: Ist NATS nicht erreichbar, antworten die Endpunkte mit 503.
+    - Worker: Nach dem Speichern über NATS kommt `scoring.profile.saved` beim Eventmanager an.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Verbindungen im web-api:** Request/Reply und Event-Consumer haben je eine eigene
+    NATS-Verbindung. Beide startet dieselbe Hintergrund-Aufgabe mit Wiederholung
+    (`_keep_started`, alle 30 s).
+  - **`scoring.factors`** ist ein eigener Befehl. Der Katalog hängt am Code von scoring, nicht an
+    den Profilen.
+  - **Fehler `invalid` und `internal`** sind Bugs und ergeben im web-api eine 500, wie bisher eine
+    Exception im selben Prozess.
+  - **`src/web.py`** enthält nur noch die Fabrik. Die Umsetzung der Ports liegt in
+    `src/scoring_ops.py`, und der Worker importiert sie ohne FastAPI.
+
+#### P4.9 REST aus Projektionen und Request/Reply (nachgetragen 04.11.2026)
+
+- **Ziel:** Mit NATS liest das web-api nur noch, was ihm gehört: das Schema `web` und `batch.run`.
+  Alles andere kommt aus Projektionen oder per Request/Reply. Die REST-Antworten bleiben gleich.
+  Das ist die Voraussetzung für eine Rolle je Service (P5.3).
+- **Test:** Die Lese-Tests aus P3.2 (`tests/db/web_api/test_read_api.py`) laufen unverändert
+  zweimal, einmal aus den Tabellen und einmal aus Projektionen mit Request/Reply.
+- **Entwurf (04.11.2026):**
+  - **Umschalten:** Die Quelle wählt die Konfiguration, wie beim Event-Consumer.
+    - Mit `WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` liest das web-api aus den
+      Projektionen.
+    - Ohne bleibt es bei den Tabellen über `va_read`, so wie heute auf der NAS und im E2E-Stack.
+  - **Port `ReadModel`:** Die Router fragen ein Lesemodell statt eigener Verbindungen.
+    - `TableReadModel` umhüllt die bisherigen Abfragen (`va_web_api.read`).
+    - `ProjectionReadModel` liest aus `web` und `batch.run`.
+  - **Projektionen (Migration `0012`, nur zum Anfügen):**
+    - `web.snapshot_row` aus `marketdata.snapshot.completed`: je Abruf und Titel die Spalten, die
+      Ranking und Titelseite brauchen, mit `fetch_ok` (Marktkapitalisierung vorhanden) und ISIN.
+    - `web.ranking_run` aus `scoring.run.completed`: Kopf eines Bewertungslaufs mit Abruf, Herkunft
+      (`live` oder `rescore`), Tag, Indexquelle, Gewichten und Zeitpunkt.
+    - Am Größenfilter gescheiterte Titel stehen nicht im Event. Sie ergeben sich beim Lesen: Titel
+      des Abrufs ohne Zeile in `ranking_row`.
+  - **Contract, additiv:** `SnapshotCompletedV1.isins` (Symbol → ISIN). market-data füllt es aus
+    dem Universum, die Titelseite zeigt die ISIN weiter.
+  - **Request/Reply, neu:** Der Worker beantwortet die Anfragen mit den Abfragen aus
+    `va_web_api.read`. Sie berühren nur das Schema des jeweiligen Besitzers.
+    - `notification.report` und `notification.report.csv` (die CSV als Base64).
+    - `scoring.profiles.list` und `scoring.profiles.get`.
+    - Nicht gefunden heißt leere Antwort, nicht Fehler. Daraus wird im web-api 404.
+  - **`GET /runs/{id}`:** Die Report-ID eines laufenden Runs kommt aus `web.run_status` statt aus
+    `reporting.report`.
+  - **Nachfüllen aus den Tabellen:** Der Stream hält Events nur 30 Tage, die Historie liegt in
+    den Tabellen.
+    - `src.db.backfill` füllt `snapshot_row`, `ranking_run` und `ranking_row` aus `market_data`
+      und `scoring`, idempotent (`ON CONFLICT DO NOTHING`).
+    - `python -m src.db.migrate` ruft es nach jeder Migration mit der Owner-Rolle auf. So stehen
+      auch Läufe im Prozess, etwa vor dem Umstieg, in den Projektionen.
+  - **Nicht erreichbar:** Antwortet niemand, kommt 503 mit dem Namen des Service, etwa
+    „Notification nicht erreichbar“.
+  - **Test (rot):**
+    - Contracts:
+      - die vier neuen Befehle im Katalog, mit Golden-Schemas;
+      - `isins` im Golden-Schema des Snapshot-Events.
+    - Lese-API: `api` und `empty_api` bekommen den Parameter `tables`/`projections`. Für
+      `projections` gilt:
+      - erst der Lauf, dann das Nachfüllen;
+      - der Worker beantwortet Reports und Profile;
+      - das web-api läuft mit NATS und Projektionen.
+    - Nachfüllen: Zweimal hintereinander ändert nichts. `migrate` ruft es auf.
+    - Projektionen: Das Snapshot-Event füllt `snapshot_row` mit ISIN und `fetch_ok`, das
+      Scoring-Event `ranking_run`.
+    - NATS mit Worker: Ranking und Titelseite aus den Projektionen eines Laufs über NATS sind
+      gleich denen aus den Tabellen, bis auf den Zeitpunkt des Bewertungslaufs.
+    - market-data: Das Snapshot-Event trägt die ISINs des Universums.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Gleiche Antworten nachgewiesen:**
+    - Die Lese-Tests aus P3.2 laufen in beiden Varianten.
+    - Ein Lauf über NATS ergibt aus den Projektionen dasselbe Ranking und dieselben Titelseiten
+      wie aus den Tabellen. Einzige Ausnahme ist der Zeitpunkt des Bewertungslaufs: Mit
+      Projektionen ist es der des Events, Millisekunden nach `scoring_run.created_at`.
+  - **Nachfüllen in Python:** Der Tag eines Abrufs entsteht wie in `va_web_api.read` aus der
+    lokalen Zeit des Containers, nicht mit der Zeitzone der Datenbank. Gezählt wird über
+    `RETURNING`, weil `rowcount` bei mehreren Zeilen −1 ist.
+  - **`run_id` eines Bewertungslaufs** steht nicht in `scoring.scoring_run`. Das Nachfüllen holt
+    sie aus `batch.run.scoring_run_id`.
+  - **Queue-Gruppe je Service:** `queue_of` nimmt den ersten Teil des Namens (`scoring`,
+    `notification`).
+  - **503 je Service:** `RemoteUnavailable` mit `ScoringUnavailable` und
+    `NotificationUnavailable`.
 
 ### Phase 5 – Aufteilen in Services
+
+#### P5.1a Einstiegspunkte je Service (nachgetragen 04.11.2026)
+
+- **Warum vorher:** Für ein schlankes Image je Service (ADR-0004, `uv sync --package`) muss jeder
+  Service allein starten können. Heute baut `src` alle Adapter aus den Settings des Batches.
+  Vorschau, Profile und Reports beantwortet der Worker mit Code, der mehrere Schemas liest
+  (`src/scoring_ops.py`, `va_web_api.read`). Ein Image nur mit `va-scoring` könnte das nicht.
+- **Test:** Jeder Service startet für sich (`python -m va_market_data` usw.) und erledigt seinen
+  Teil der Kette über NATS. Drei getrennte Service-Prozesse ergeben denselben Lauf wie der Worker.
+- **Entwurf (04.11.2026):**
+  - **Gemeinsam** (`va_platform.service`):
+    - `ServiceSettings` mit `DATABASE_URL`, `NATS_URL` (Pflicht), `RUN_TIMEOUT_MINUTES` und
+      `LOGS_DIR`.
+    - `run_service(…)` startet den `NatsBus`, ruft die Verdrahtung des Service auf und läuft bis
+      SIGTERM. Ein Dead Letter wird zu `screening.run.failed` (`run_failure`, aus
+      `src/dead_letters.py` hierher).
+    - `LocalCaller` beantwortet Request/Reply im selben Prozess, mit denselben Handlern wie über
+      NATS.
+  - **Je Service** (`entrypoints/settings.py`, `entrypoints/service.py`, `__main__.py`):
+    - eigene Settings mit nur den eigenen Feldern;
+    - Adapter bauen und den Handler am `ReliableBus` anmelden;
+    - die eigenen Request/Reply-Befehle beantworten.
+    - Der Batch (`src.config.Settings`) erbt die Settings aller drei Services. Es gibt jedes Feld
+      nur einmal, und `src/composition.py` baut die Adapter mit denselben Funktionen.
+  - **Request/Reply beim Besitzer:**
+    - scoring (`va_scoring.entrypoints.rpc`): Faktoren, Vorschau, Speichern, Aktivieren,
+      Profile lesen. Der Code kommt aus `src/scoring_ops.py` und `va_web_api.read`, die Antworten
+      sind die Contracts.
+    - notification (`va_notification.entrypoints.rpc`): Report und CSV.
+    - `va_web_api.rpc.read_handlers` und `src/scoring_ops.py` entfallen.
+    - `scoring_handlers` bleibt als Server für beliebige Umsetzungen der Ports, etwa die Fakes
+      der API-Tests.
+  - **Vorschau ohne `market_data`:** scoring speichert beim Bewerten die Eingangsdaten
+    (`scoring.input_snapshot`, Migration `0013`, je Abruf und Titel die flache Zeile wie für
+    `score()`, nur zum Anfügen). Die Vorschau rechnet daraus. `src.db.backfill` füllt sie für
+    ältere Läufe aus `market_data` nach.
+  - **web-api ohne NATS:** `src.web` verdrahtet `RemoteScoring` mit einem `LocalCaller` auf die
+    Handler von scoring. Lesen geht mit `va_read`, Speichern und Aktivieren mit `va_profiles`. Die
+    Vorschau rechnet also in beiden Fällen mit demselben Code.
+  - **Replay:** Die Fixture liest market-data selbst (`va_market_data.adapters.replay`), ohne
+    `src.regression`.
+  - **Worker:** `python -m src.worker` startet die drei Services in einem Prozess, mit denselben
+    Funktionen wie die einzelnen Einstiege. Er bleibt für einen Container ohne eigene Images.
+  - **Test (rot):**
+    - Settings je Service: Pflichtfelder, Standardwerte. Der Batch erbt sie.
+    - `run_service` startet, meldet Dead Letter und endet mit dem Stopp-Event. `LocalCaller`
+      antwortet wie `serve`, auch mit `internal` bei einer Exception.
+    - Je Service über NATS mit echter Datenbank:
+      - market-data mit Replay: Aus der Anfrage wird das Snapshot-Event.
+      - scoring: Aus dem Snapshot-Event wird das Ranking, `input_snapshot` ist gefüllt, die
+        Vorschau rechnet daraus.
+      - notification: Aus dem Ranking werden Report und Mail. Report und CSV kommen per
+        Request/Reply.
+    - Drei getrennte Services und das web-api: Ein Start aus dem UI endet mit `success` oder
+      `partial`, wie mit dem Worker.
+    - Die P3.3-Tests mit Datenbank laufen weiter in beiden Varianten, jetzt mit den Handlern
+      von scoring.
+    - Nachfüllen: `input_snapshot` für alte Läufe, ein zweiter Aufruf ändert nichts.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Code an seinem Platz:**
+    - `smtp_config` und `alert_channels` stehen jetzt in `va_notification.entrypoints.service`,
+      `scoring_config` in `va_scoring.entrypoints.service`, `load_universe` als `live_universe` in
+      `va_market_data.entrypoints.service`.
+    - `src.composition` reicht sie weiter, alte Importe bleiben gültig.
+    - Die Fallback-CSV des Batches bleibt die im Repo, außer `FALLBACK_CSV` ist gesetzt. Der
+      Cron-Lauf bekommt die Variable mit.
+  - **`LocalCaller` und `serve`** teilen sich `answer_request`: Eine Exception im Handler wird
+    in beiden Fällen zur Antwort mit `internal`.
+  - **Tag des Abrufs in der Vorschau:** Er kommt aus den Zeitpunkten der Titel in den
+    Eingangsdaten (`fetched_at`). Fehlen sie, gilt der Tag des Bewertungslaufs.
+  - **Offen für P5.3:** scoring liest beim Speichern weiter `market_data.instrument`. Dort holt es
+    die IDs der Titel für `score_result`, das ist der letzte Lesezugriff über die Schemagrenze.
 
 #### P5.1 Images je Service
 
 - **Test:** Smoke-Test je Image (Import, Startbefehl) und die J4125-Prüfung aus P0.6.
 - **Implementierung:** Dockerfiles mit `uv sync --package`, CI baut alle Images
   ([betrieb-synology.md](betrieb-synology.md)).
+- **Entwurf (04.11.2026):**
+  - **Dockerfile:** neue Stufen neben `runtime`.
+    - `service-base`: Python und Zeitzone, ohne Cron.
+    - Daraus je Service eine Stufe `market-data`, `scoring`, `notification` und `web-api`.
+    - Jede installiert mit `uv sync --package va-<service>` nur ihr Paket samt `va-platform`
+      und `va-contracts`.
+    - Einstieg ist `python -m va_<service>` bzw. Uvicorn mit `va_web_api.main:create_app`.
+    - market-data bekommt dazu `data/` mit der Fallback-CSV.
+    - Das App-Image (`runtime`) bleibt für Batch, Migration und das web-api ohne NATS.
+  - **CI:** Der Docker-Job baut die vier Images und prüft jedes:
+    - Der Service ist importierbar.
+    - Kein anderer Service ist im Image.
+    - Ohne Konfiguration endet der Start mit Exit 2.
+
+    Auf `main` schiebt die CI sie nach GHCR (`va-market-data`, `va-scoring`, `va-notification`,
+    `va-web-api`), mit denselben Tags wie `value-analyzer`.
+  - **J4125:** Die Service-Images enthalten nur Teilmengen derselben Pakete aus `uv.lock`.
+    Die QEMU-Prüfung des App-Images deckt sie deshalb mit ab. Vier weitere QEMU-Läufe brächten
+    keine neue Aussage.
+  - **Compose:**
+    - Auf der NAS (`docker-compose.yml`) ersetzen die Dienste `market-data`, `scoring` und
+      `notification` mit den neuen Images den Worker, weiter mit dem Profil `nats`.
+    - Jeder bekommt nur seine Variablen. Die Zugangsdaten für SMTP sieht nur notification.
+    - Das web-api bleibt bis P5.4 auf dem App-Image, weil es ohne NATS den Code von scoring im
+      Prozess braucht.
+    - Lokal laufen die drei Dienste aus dem App-Image (`value-analyzer:local`) mit ihrem
+      eigenen Einstieg. So entsteht lokal kein weiteres Image, auf C: ist wenig Platz.
+  - **Test (rot):**
+    - Dockerfile: Stufen je Service mit `uv sync --package`, Einstieg und Fallback-CSV.
+    - CI: baut, prüft und schiebt die vier Images.
+    - Compose:
+      - Die drei Dienste stehen mit Profil `nats` und eigenem Image auf der NAS.
+      - Nur notification sieht SMTP.
+      - Lokal kommen sie aus dem App-Image, mit Mailpit.
+      - Den Worker gibt es im Compose nicht mehr.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Prüfskript:** `docker/service_smoke.sh` prüft die vier Images in der CI. Das web-api
+    startet erst mit Datenbank-URL, für sein Image gilt nur der Import.
+  - **Leere Variablen:** Compose reicht nicht gesetzte Variablen als leeren Text durch
+    (`${MAIL_FROM:-}`). `ServiceSettings` lässt sie deshalb weg (`env_ignore_empty`), es gilt der
+    Standardwert. Das gilt auch für den Batch.
+  - **Größe:** Lokal gebaut ist das Image von scoring 469 MB groß.
+  - **Worker:** `src.worker` bleibt als Modul für einen Prozess mit allen drei Services, etwa beim
+    Entwickeln aus der `.venv`.
 
 #### P5.2 End-to-End-Test des ganzen Stacks
 
 - **Test:** Die CI startet den kompletten Compose-Stack, löst über die API einen Dry-Run aus und
   vergleicht die Mail mit dem Golden-File.
 - **Implementierung:** Compose-Datei für die CI und Warte-Logik auf `notification.report.sent`.
+- **Entwurf (04.11.2026):** Der E2E-Stack aus U5 (`docker-compose.e2e.yml`, `docker/e2e.sh`)
+  wird zum ganzen Stack. Die Prüfungen unter `tests/e2e` und `frontend/e2e` bleiben gleich.
+  - **Stack:**
+    - NATS, die drei Services und das web-api mit NATS und Projektionen (Rolle `va_web`,
+      `VA_WEB_PASSWORD` in `docker/e2e.env`).
+    - market-data liest die Replay-Fixture, notification schickt an Mailpit.
+    - In der CI laufen die vier Service-Images aus P5.1 (`E2E_WEB_API_IMAGE`,
+      `E2E_MARKET_DATA_IMAGE` usw.). Lokal laufen sie aus dem App-Image, wie im lokalen Stack.
+    - Das web-api startet mit `va_web_api.main:create_app`. Das geht mit beiden Images.
+  - **Ablauf von `docker/e2e.sh`:**
+    1. Datenbank, NATS und Mailpit starten.
+    2. Mit dem App-Image migrieren (`python -m src.db.migrate`).
+    3. Services, web-api und frontend starten.
+    4. `docker/e2e_run.py` startet den Lauf über `POST /api/v1/runs`, über nginx wie das UI.
+       Vorher wartet es, bis scoring antwortet.
+    5. Warten, bis `batch.run` abgeschlossen ist. Das geschieht mit
+       `notification.report.sent` (P4.7).
+    6. Die Prüfungen laufen.
+  - **Kein Dry-Run:** Ein Dry-Run verschickt keine Mail. Verglichen wird aber die Mail in Mailpit
+    mit der Fixture, wie bisher. Der Lauf startet deshalb mit Versand.
+  - **Test (rot):**
+    - Compose:
+      - Der E2E-Stack hat NATS, die Services und das web-api mit Projektionen.
+      - market-data spielt die Fixture ab, notification schickt nur an Mailpit.
+      - Die CI setzt die Images unter Test, lokal kommt alles aus dem App-Image.
+    - Skript und CI:
+      - Erst die Migration, dann der Start über die API, kein Batch-Lauf mehr.
+      - Die CI reicht die Service-Images durch.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Eine Version für alle Pakete:** Seit P5.1 kennt jeder Service nur seine Paketversion. Die
+    stand bei 0.1.0 und wäre in die Fußzeile der Mail und in `scoring_run.app_version`
+    gelangt. Alle Workspace-Pakete tragen jetzt die Version des Projekts (0.3.0). Das prüft
+    `tests/test_versions.py`. Im OpenAPI-Snapshot ändert sich nur `info.version`.
+  - **Migration im E2E-Stack:** `docker compose run --entrypoint python value-analyzer -m
+    src.db.migrate`, ohne den Cron des Entrypoints.
 
 #### P5.3 Eine DB-Rolle je Service 🔒
 
 - **Test:** Rechte-Tests, z. B. die Rolle `va_scoring` kann das Schema `market_data` nicht lesen.
 - **Implementierung:** Migration mit den Service-Rollen, `va_app` entfällt.
+- **Entwurf (04.11.2026):**
+  - **Rollen:** `va_market_data`, `va_scoring` und `va_notification`.
+    - Jede liest und fügt nur im eigenen Schema an, auch in künftigen Tabellen (Default
+      Privileges).
+    - `UPDATE` gibt es nur, wo `va_app` es auch darf: Abschluss eines Abrufs, ISIN,
+      `published_at` der Outbox. `DELETE` nie.
+    - Migration `0014` vergibt die Rechte (`service_grant_statements`).
+    - Die Rollen legen `db/init` (neue Datenbank) bzw. `python -m src.db.migrate` an, mit
+      `VA_<SERVICE>_PASSWORD`.
+  - **Letzter Zugriff über die Grenze:** scoring las die IDs der Titel aus
+    `market_data.instrument`. Jetzt schickt market-data sie im Snapshot-Event mit
+    (`SnapshotCompletedV1.instrument_ids`, additiv, Port `SnapshotStore.instrument_ids`).
+    Ohne IDs, etwa im Batch, liest der Speicher sie wie bisher.
+  - **Compose:** Die drei Dienste verbinden sich mit ihrer Rolle, die Datenbank bekommt die
+    drei Passwörter für `db/init`.
+  - **`va_app` bleibt vorerst:** Der Batch im Prozess (`make run`, Cron bis P5.4) verbindet alle
+    drei Services über eine Verbindung und braucht sie. Sie entfällt, wenn der Batch nicht mehr
+    gebraucht wird (P5.6).
+  - **Test (rot):**
+    - Für jede Tabelle der App-Schemas gilt: `SELECT` und `INSERT` nur im eigenen Schema,
+      `DELETE` und `TRUNCATE` nirgends, `UPDATE` nur auf den freigegebenen Tabellen.
+    - scoring liest `market_data` nicht, notification liest `scoring` nicht.
+    - Die drei Services erledigen die Kette mit ihren Rollen (`tests/db/test_services_nats.py`).
+    - Das Snapshot-Event trägt die IDs, scoring gibt sie an den Speicher weiter.
+    - Compose: Rollen in den Verbindungen, Passwörter bei der Datenbank.
+- **Umgesetzt (04.11.2026):** wie im Entwurf.
 
 #### P5.4 Scheduler im web-api
 
 - **Test:** Cron-Termin mit Zeitzone `Europe/Berlin`, derselbe Termin erzeugt nur einen Run.
 - **Implementierung:** Scheduler im web-api, der Cron im Container entfällt.
+- **Entwurf (04.11.2026):** Der Umstieg. Den Scheduler gibt es seit P4.7; jetzt ist er Standard,
+  und NATS mit den drei Services ist es auch.
+  - **Kein Cron:**
+    - Das App-Image enthält keinen Cron mehr.
+    - `entrypoint.sh` migriert und führt den übergebenen Befehl aus. Ohne Befehl endet es nach
+      der Migration.
+    - Das web-api plant den Wochenlauf: `WEB_API_SCHEDULE` kommt auf der NAS aus `CRON_SCHEDULE`
+      der `.env`, in `Europe/Berlin`, ein Run je Termin (P4.7).
+  - **Compose auf der NAS:**
+    - Neuer Dienst `migrate` (App-Image, `python -m src.db.migrate`, läuft einmal).
+      Services und web-api warten auf ihn (`service_completed_successfully`).
+    - market-data, scoring und notification laufen ohne Profil.
+    - Das web-api läuft mit eigenem Image (`va-web-api`), NATS, Projektionen (`va_web`) und dem
+      Wochenplan. `va_profiles` braucht es nicht mehr, scoring speichert die Profile selbst.
+    - Der Batch (`value-analyzer`) bekommt das Profil `run`. Er läuft nur auf Wunsch:
+      `make docker-run`, Regression, Import.
+  - **Neue Pflichtvariablen auf der NAS:** `VA_WEB_PASSWORD`, `VA_MARKET_DATA_PASSWORD`,
+    `VA_SCORING_PASSWORD` und `VA_NOTIFICATION_PASSWORD`. `.env.example` führt sie.
+  - **Lokal:**
+    - Dieselbe Aufteilung aus dem App-Image.
+    - Das web-api startet mit `va_web_api.main:create_app` und ohne Wochenplan.
+  - **E2E:** Die Migration übernimmt der Dienst `migrate`. Das web-api plant dort nichts.
+  - **Test (rot):**
+    - Compose:
+      - Dienste der NAS ohne Profil.
+      - `migrate` vor allen anderen.
+      - Das web-api mit NATS, Projektionen und dem Termin aus `CRON_SCHEDULE`.
+      - Der Batch nur mit dem Profil `run`.
+      - Lokal ohne Wochenplan.
+    - Image: kein Cron im App-Image und im Entrypoint.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Pflicht in der `.env` der NAS:** Compose bricht mit einer Meldung ab, solange
+    `VA_WEB_PASSWORD` oder ein `VA_<SERVICE>_PASSWORD` fehlt. In `.env.example` stehen sie nicht
+    mehr auskommentiert.
+  - **`make pull`** lädt alle Images, auch die des Batches (`--profile run`).
+    **`make db-migrate`** startet den Dienst `migrate`.
+  - **`tests/test_entrypoint.py` entfällt:** Ohne Cron gibt es kein `ENV_PATTERN` mehr.
 
 #### P5.5 Tracing
 
 - **Test:** Mit einem In-Memory-Exporter erzeugt ein Run zusammenhängende Spans über Publish und
   Consume hinweg.
 - **Implementierung:** OpenTelemetry in FastAPI und FastStream, Weitergabe der run_id.
+- **Entwurf (04.11.2026):** Ein Trace je Run, vom Anlegen bis zur Mail, über alle Services.
+  - **Abweichung:** Ohne FastStream (eigener `NatsBus` seit P4.3) und ohne die
+    Auto-Instrumentierung von FastAPI. Gemessen wird der Run, nicht jeder HTTP-Aufruf. Die Spans
+    entstehen an wenigen Stellen von Hand, in `va_platform.tracing` (OpenTelemetry API und SDK).
+  - **Weitergabe:** Der Trace-Kontext reist als `traceparent` (W3C Trace Context) in der Hülle.
+    Das Feld ist die CloudEvents-Erweiterung für verteiltes Tracing, optional, also additiv.
+    Busse und Outbox setzen es beim Senden (`stamp`), ein gesetztes bleibt.
+  - **Spans:**
+    - `run`: die Wurzel, wo der Run entsteht (`RunManager` im web-api, `src/main.py` im Batch).
+      Attribut `va.run_id`.
+    - Je verarbeitetem Event `<consumer> <type>` (Art CONSUMER) mit Consumer, Event-Typ,
+      Event-ID und `va.run_id`. Vorgänger ist der Span, in dem das Event entstand.
+  - **Einschalten:** `OTEL_TRACES_EXPORTER` (Settings der Services und des Batches,
+    `WEB_API_OTEL_TRACES_EXPORTER` im web-api). Standard `none`: kein Provider, die Hülle bleibt
+    unverändert. `console` schreibt die Spans als JSON ins Log jedes Containers. Ein Collector
+    (OTLP) ist auf der NAS nicht vorgesehen.
+  - **Test (rot):**
+    - Im Prozess und über NATS ergibt ein Run einen Trace (In-Memory-Exporter).
+      Die Kette market-data → scoring → notification hängt an der Wurzel.
+    - Der `traceparent` übersteht das Serialisieren.
+    - Ohne Provider bleibt die Hülle gleich.
+    - Ein Start im web-api öffnet den Trace, das Event in der Outbox trägt ihn.
+- **Umgesetzt (04.11.2026):** wie im Entwurf. Das Golden-File der Hülle hat das neue Feld
+  `traceparent`.
 
 #### P5.6 Abschluss-Doku
 
 - **Test:** Der Link-Check der Doku läuft durch.
 - **Implementierung:** CLAUDE.md auf die Zielarchitektur umschreiben, dazu ein Runbook für die NAS.
+- **Entwurf (04.11.2026):** Die Doku beschreibt den Stack, wie er jetzt läuft.
+  - **CLAUDE.md:**
+    - Statt „Architektur in einem Satz“ mit der Historie der Pakete eine Übersicht: Dienste,
+      Ablauf eines Runs, Aufbau eines Service, web-api, Batch nur auf Wunsch, Umgebungen.
+    - Veraltete Verweise richten: Verdrahtung in `entrypoints/service.py` statt
+      `src/composition.py`, kein `ENV_PATTERN`, kein FastStream, kein `src/scoring_ops.py`.
+    - „Zielarchitektur (in Umsetzung)“ wird „Entscheidungen und Arbeitsweise“.
+  - **Runbook** (`betrieb-synology.md`): statt der Skizzen von Compose und Dockerfile:
+    - die echten Dienste mit Startreihenfolge;
+    - Erstinstallation;
+    - die einmalige Umstellung vom Batch mit Cron, mit `docker compose --profile run down`,
+      damit der alte Batch-Container mit Cron nicht weiterläuft;
+    - Update, Läufe, Störungen, Secrets, Backup und Überwachung.
+  - **README:** Quick Start, Update, Pipeline, Konfiguration (neue Passwörter, Wochenplan,
+    Tracing), Projektstruktur und CI auf den Stack.
+  - **Status-Zeilen** in `architecture/` (README, events, frontend, code-struktur, umgebungen,
+    web-api-realtime, datenhaltung): umgesetzt statt Plan, kein FastStream und kein Cron mehr.
+    ADRs bleiben, wie sie sind (Pflegeregel).
+  - **Test:** `tests/test_doc_links.py` prüft jeden relativen Link in den Markdown-Dateien des
+    Repos: Die Datei existiert, ein Anker trifft eine Überschrift (Regeln von GitHub). Externe
+    Links prüft er nicht, er läuft ohne Netz.
+- **Umgesetzt (04.11.2026):** wie im Entwurf. Der Link-Check war schon vor den Änderungen grün und
+  hält die Umbauten der Doku seitdem zusammen.
 
 ### Track F – Fundamentaldaten und Anker (ADR-0010, ADR-0011)
 

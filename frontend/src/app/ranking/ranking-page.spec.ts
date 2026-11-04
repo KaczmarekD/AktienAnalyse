@@ -1,8 +1,10 @@
 // Ranking-Ansicht (P3.7): Darstellung, Filter, Sortierung, leere und fehlerhafte Antworten.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Dispatcher } from '@ngrx/signals/events';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { RANKING } from '../testing/fixtures';
+import { serverEvents } from '../shared/realtime/realtime.events';
 import { RankingPage } from './ranking-page';
 
 const LATEST = '/api/v1/ranking/latest';
@@ -132,5 +134,22 @@ describe('RankingPage', () => {
     const fixture = await render();
     await respond(fixture, LATEST, { detail: 'Datenbank nicht erreichbar' }, 503);
     expect(text(fixture)).toContain('nicht erreichbar');
+  });
+
+  // P4.6: neues Ranking per WebSocket -> neu laden
+  it('reloads the latest ranking when a ranking event arrives', async () => {
+    const fixture = await render();
+    await respond(fixture, LATEST, RANKING);
+    TestBed.inject(Dispatcher).dispatch(
+      serverEvents.event({
+        op: 'event',
+        topic: 'ranking',
+        type: 'scoring.run.completed',
+        seq: 12,
+        data: { scoringRunId: 21, rankingSize: 90 },
+      }),
+    );
+    await respond(fixture, LATEST, RANKING);
+    expect(symbols(fixture).length).toBeGreaterThan(0);
   });
 });

@@ -3,7 +3,8 @@
 # Lokal: make build.
 #
 # Stufen: base (alles fuer den Lauf) -> j4125-check (base + QEMU, nur zum Pruefen)
-#         base -> runtime (Standard-Ziel, das Image in GHCR)
+#         base -> runtime (Standard-Ziel, das App-Image in GHCR)
+#         service-base -> market-data, scoring, notification, web-api (P5.1, je ein Image)
 FROM python:3.14-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -11,7 +12,7 @@ ENV PYTHONUNBUFFERED=1 \
     TZ=Europe/Berlin
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        cron tzdata ca-certificates \
+        tzdata ca-certificates \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
@@ -19,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Abhaengigkeiten exakt aus uv.lock (ohne Dev-Tools) direkt ins System-Python
-# (/usr/local): entrypoint.sh und Cron rufen /usr/local/bin/python auf.
+# (/usr/local): entrypoint.sh ruft /usr/local/bin/python auf.
 # --locked: Abbruch, wenn uv.lock nicht zu pyproject.toml passt.
 # --inexact: Pakete des Basis-Images (z. B. pip) bleiben erhalten.
 # uv selbst und seine Variablen gibt es nur in diesem Schritt, nicht im Image.
@@ -60,11 +61,127 @@ COPY migrations/ ./migrations/
 COPY alembic.ini ./
 COPY data/ ./data/
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && touch /var/log/cron.log
+RUN chmod +x /entrypoint.sh
 
 VOLUME ["/app/data", "/app/logs"]
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+# ---------- Images je Service (P5.1, ADR-0004) ----------------------------------
+# Jedes installiert mit uv sync --package nur sein Paket samt va-platform und va-contracts,
+# ohne src/ und ohne Cron. Dieselben Pakete aus uv.lock wie im App-Image: Dessen
+# J4125-Pruefung deckt sie mit ab. Das App-Image (runtime) bleibt fuer Batch und Migration.
+FROM python:3.14-slim AS service-base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TZ=Europe/Berlin
+
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata ca-certificates \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+FROM service-base AS market-data
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages/va-contracts/pyproject.toml,target=packages/va-contracts/pyproject.toml \
+    --mount=type=bind,source=packages/va-platform/pyproject.toml,target=packages/va-platform/pyproject.toml \
+    --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
+    --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
+    --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-market-data --no-install-workspace
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-market-data --no-editable \
+        --refresh-package va-contracts --refresh-package va-platform --refresh-package va-market-data
+# Fallback-CSV des Universums (FALLBACK_CSV, Standard data/dax_mdax_fallback.csv)
+COPY data/ ./data/
+ENTRYPOINT ["python", "-m", "va_market_data"]
+
+FROM service-base AS scoring
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages/va-contracts/pyproject.toml,target=packages/va-contracts/pyproject.toml \
+    --mount=type=bind,source=packages/va-platform/pyproject.toml,target=packages/va-platform/pyproject.toml \
+    --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
+    --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
+    --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-scoring --no-install-workspace
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-scoring --no-editable \
+        --refresh-package va-contracts --refresh-package va-platform --refresh-package va-scoring
+ENTRYPOINT ["python", "-m", "va_scoring"]
+
+FROM service-base AS notification
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages/va-contracts/pyproject.toml,target=packages/va-contracts/pyproject.toml \
+    --mount=type=bind,source=packages/va-platform/pyproject.toml,target=packages/va-platform/pyproject.toml \
+    --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
+    --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
+    --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-notification --no-install-workspace
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-notification --no-editable \
+        --refresh-package va-contracts --refresh-package va-platform --refresh-package va-notification
+ENTRYPOINT ["python", "-m", "va_notification"]
+
+FROM service-base AS web-api
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages/va-contracts/pyproject.toml,target=packages/va-contracts/pyproject.toml \
+    --mount=type=bind,source=packages/va-platform/pyproject.toml,target=packages/va-platform/pyproject.toml \
+    --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
+    --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
+    --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-web-api --no-install-workspace
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-web-api --no-editable \
+        --refresh-package va-contracts --refresh-package va-platform --refresh-package va-web-api
+# Ohne src: Vorschau und Profile nur ueber NATS (WEB_API_NATS_URL), ab P5.4 Standard
+ENTRYPOINT ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app", "--host", "0.0.0.0", "--port", "8000"]
 
 # ---------- J4125-Pruefung (ADR-0008) ------------------------------------------
 # Dasselbe Image plus QEMU: Python laeuft unter dem CPU-Modell Denverton (Goldmont,

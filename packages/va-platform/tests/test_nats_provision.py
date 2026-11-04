@@ -28,6 +28,13 @@ CONSUMERS = {
     "scoring": ["va.marketdata.snapshot.completed"],
     "notification": ["va.scoring.run.completed", "va.screening.run.failed"],
     "web-api": ["va.>"],
+    # P4.3: der RunTracker des Batches, Vorlaeufer der Run-Projektion im web-api
+    "batch": [
+        "va.marketdata.snapshot.completed",
+        "va.scoring.run.completed",
+        "va.notification.report.sent",
+        "va.screening.run.failed",
+    ],
 }
 
 

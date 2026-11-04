@@ -241,6 +241,24 @@ export const zRunDetail = z.object({
 });
 
 /**
+ * RunStart
+ *
+ * Ein Run aus dem UI (P4.7); die Optionen wie ``RunOptionsV1`` im Event.
+ */
+export const zRunStart = z.object({
+  dry_run: z.boolean().optional().default(false),
+  force_refresh: z.boolean().optional().default(false),
+  notify: z.boolean().optional().default(true),
+});
+
+/**
+ * RunStarted
+ */
+export const zRunStarted = z.object({
+  id: z.int(),
+});
+
+/**
  * RunSummary
  */
 export const zRunSummary = z.object({
@@ -400,6 +418,13 @@ export const zListRunsQuery = z.object({
  * Successful Response
  */
 export const zListRunsResponse = z.array(zRunSummary);
+
+export const zStartRunBody = zRunStart;
+
+/**
+ * Successful Response
+ */
+export const zStartRunResponse = zRunStarted;
 
 export const zGetRunPath = z.object({
   run_id: z.int(),

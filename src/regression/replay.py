@@ -42,6 +42,8 @@ from .compare import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from va_contracts import Envelope
     from va_contracts.events.v1 import RunFailedV1
     from va_notification.domain.report import ReportArtifacts
@@ -201,6 +203,7 @@ class _ScoringCapture:
         scored: pd.DataFrame,
         cfg: ScoringConfig,
         profile: ProfileVersionRef | None = None,  # noqa: ARG002 - Signatur des Ports
+        instrument_ids: Mapping[str, int] | None = None,  # noqa: ARG002 - wie der Port
     ) -> int:
         # Kuenstliche IDs je Titel, damit dieselben Funktionen wie im Speicher greifen
         ids = {symbol: i for i, symbol in enumerate(scoring_symbols(df_all, scored), start=1)}
@@ -231,6 +234,9 @@ class _ReportCapture:
 
     def record_delivery(self, **kwargs: Any) -> None:  # noqa: ARG002 - Signatur des Ports
         return None
+
+    def delivered_report(self, scoring_run_id: int) -> tuple[int, str] | None:  # noqa: ARG002
+        return None  # Der Replay verschickt nichts (dry_run), die Sperre greift ohnehin nicht
 
 
 class _NoSender:

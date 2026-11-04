@@ -16,6 +16,7 @@ export {
   type Options,
   previewProfile,
   saveProfileVersion,
+  startRun,
 } from './sdk.gen';
 export type {
   ActivatedProfile,
@@ -95,6 +96,8 @@ export type {
   RankingRow,
   Report,
   RunDetail,
+  RunStart,
+  RunStarted,
   RunSummary,
   SavedProfileVersion,
   SaveProfileVersion,
@@ -105,5 +108,10 @@ export type {
   SaveProfileVersionResponses,
   ScorePoint,
   Snapshot,
+  StartRunData,
+  StartRunError,
+  StartRunErrors,
+  StartRunResponse,
+  StartRunResponses,
   ValidationError,
 } from './types.gen';

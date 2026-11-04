@@ -1,11 +1,14 @@
 """Router ``scoring`` (P3.3) ohne Datenbank: Profil-Befehle und Vorschau ueber Fake-Ports.
 
 Speichern und Vorschau rechnet in Phase 3 der Code von scoring im selben Prozess (``src.web``),
-ab Phase 4 per Request/Reply (P4.8). Die API bleibt dabei gleich.
+ab Phase 4 per Request/Reply (P4.8). Die API bleibt dabei gleich: Jeder Test mit ``client`` laeuft
+zweimal, im Prozess und ueber NATS (``RemoteScoring`` gegen ``scoring_handlers`` mit denselben
+Fakes). Die NATS-Variante braucht ``TEST_NATS_URL``.
 """
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -15,6 +18,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from va_contracts.profile import ProfileParamsV1
+from va_platform.nats import NatsBus
 from va_web_api.main import create_app
 from va_web_api.models import Factor
 from va_web_api.ports import (
@@ -24,6 +28,7 @@ from va_web_api.ports import (
     UnknownProfile,
     UnknownVersion,
 )
+from va_web_api.rpc import scoring_handlers
 from va_web_api.settings import WebApiSettings
 
 # Port 1: Diese Tests brauchen keine Verbindung
@@ -111,11 +116,33 @@ def commands() -> FakeCommands:
     return FakeCommands()
 
 
-@pytest.fixture
-def client(preview, commands):
-    app = create_app(SETTINGS, preview=lambda engine: preview, commands=lambda engine: commands)
-    with TestClient(app) as c:
-        yield c
+@pytest.fixture(params=["in_process", "nats"])
+def client(request, preview, commands):
+    if request.param == "in_process":
+        app = create_app(SETTINGS, preview=lambda engine: preview, commands=lambda engine: commands)
+        with TestClient(app) as c:
+            yield c
+        return
+    # P4.8: ueber NATS, der Server beantwortet die Anfragen mit denselben Fakes
+    url = request.getfixturevalue("nats_url")
+    server = NatsBus(url)
+    server.start()
+    try:
+        for spec, handler in scoring_handlers(preview, commands).items():
+            server.serve(spec, handler, queue="scoring")
+        with TestClient(create_app(SETTINGS.model_copy(update={"nats_url": url}))) as c:
+            _wait_for_rpc(c)
+            yield c
+    finally:
+        server.close()
+
+
+def _wait_for_rpc(client: TestClient) -> None:
+    """Die NATS-Verbindung fuer Request/Reply entsteht im Hintergrund des Lifespans."""
+    deadline = time.monotonic() + 20
+    while client.app.state.rpc is None:  # type: ignore[attr-defined]
+        assert time.monotonic() < deadline, "keine NATS-Verbindung"
+        time.sleep(0.05)
 
 
 def _put(client: TestClient, if_match: str | None, params: dict[str, Any] | None = None):
@@ -241,3 +268,17 @@ class TestWithoutBackend:
             assert c.post("/api/v1/scoring/preview", json=PARAMS).status_code == 503
             assert c.get("/api/v1/scoring/factors").status_code == 503
             assert _put(c, '"1"').status_code == 503
+
+    def test_unreachable_scoring_is_503(self):
+        """P4.8: Mit NATS, aber ohne Verbindung oder ohne Worker, ist scoring nicht erreichbar."""
+        settings = SETTINGS.model_copy(update={"nats_url": "nats://127.0.0.1:1"})
+        with TestClient(create_app(settings)) as c:
+            response = c.post("/api/v1/scoring/preview", json=PARAMS)
+            assert response.status_code == 503
+            assert response.json()["detail"] == "Scoring nicht erreichbar"
+            assert c.get("/api/v1/scoring/factors").status_code == 503
+            assert _put(c, '"1"').status_code == 503
+            assert (
+                c.post("/api/v1/scoring/profiles/1/activate", json={"version": 1}).status_code
+                == 503
+            )

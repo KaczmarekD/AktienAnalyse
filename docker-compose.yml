@@ -12,8 +12,15 @@ services:
       VA_APP_PASSWORD: ${VA_APP_PASSWORD:?VA_APP_PASSWORD in .env setzen}
       VA_READ_PASSWORD: ${VA_READ_PASSWORD:?VA_READ_PASSWORD in .env setzen}
       # P3.3: Rolle fuer die Profil-Befehle des web-api. In einer bestehenden Datenbank legt
-      # sie die Migration beim Start des Batches an (python -m src.db.migrate)
+      # sie der Dienst migrate an (python -m src.db.migrate)
       VA_PROFILES_PASSWORD: ${VA_PROFILES_PASSWORD:?VA_PROFILES_PASSWORD in .env setzen}
+      # P4.4: Rolle fuer die Projektionen und Runs des web-api (Schema web, batch.run)
+      VA_WEB_PASSWORD: ${VA_WEB_PASSWORD:-}
+      # P5.3: je Service eine Rolle nur fuers eigene Schema. In einer bestehenden Datenbank legt
+      # der Dienst migrate sie an
+      VA_MARKET_DATA_PASSWORD: ${VA_MARKET_DATA_PASSWORD:-}
+      VA_SCORING_PASSWORD: ${VA_SCORING_PASSWORD:-}
+      VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:-}
     volumes:
       # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
       # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,
@@ -32,8 +39,8 @@ services:
 
   nats:
     # Event-Bus (Phase 4, ADR-0002): JetStream mit Daten in ./natsdata (wie pgdata: Bind-Mount,
-    # Hyper Backup sichert ihn mit). Nur im Docker-Netz erreichbar. Bis P4.3 nutzt ihn noch
-    # niemand; Stream und Consumer legt python -m va_platform.nats an (P4.1).
+    # Hyper Backup sichert ihn mit). Nur im Docker-Netz erreichbar. Stream und Consumer legt jeder
+    # Teilnehmer beim Start an (provision, P4.1); seit P5.4 der Standard.
     image: nats:2.15.1-alpine
     container_name: value-analyzer-nats
     restart: unless-stopped
@@ -46,13 +53,35 @@ services:
       timeout: 5s
       retries: 6
 
+  migrate:
+    # P5.4: Schema migrieren und Rollen anlegen, einmal vor allen anderen; endet danach
+    image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
+    container_name: value-analyzer-migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["python", "-m", "src.db.migrate"]
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_OWNER_URL: postgresql+psycopg://va_owner:${POSTGRES_PASSWORD}@db:5432/value_analyzer
+      # Rollen, die nach dem ersten Start dazukommen, legt die Migration mit diesen Passwoertern an
+      VA_PROFILES_PASSWORD: ${VA_PROFILES_PASSWORD:-}
+      VA_WEB_PASSWORD: ${VA_WEB_PASSWORD:?VA_WEB_PASSWORD in .env setzen}
+      VA_MARKET_DATA_PASSWORD: ${VA_MARKET_DATA_PASSWORD:?VA_MARKET_DATA_PASSWORD in .env setzen}
+      VA_SCORING_PASSWORD: ${VA_SCORING_PASSWORD:?VA_SCORING_PASSWORD in .env setzen}
+      VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:?VA_NOTIFICATION_PASSWORD in .env setzen}
+
   value-analyzer:
     # Fertiges Image aus der CI (P0.6b, ADR-0008) - die NAS baut nicht selbst.
     # VERSION in der .env: latest folgt main, sha-<commit> oder eine Version pinnt.
     # Lokal statt aus GHCR: make build (baut und taggt unter demselben Namen).
+    # P5.4: kein Cron mehr, den Wochenlauf plant das web-api. Der Batch laeuft nur auf Wunsch
+    # (Profil run): Lauf im Prozess, Dry-Run, Regression, Import.
     image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
     container_name: value-analyzer
-    restart: unless-stopped
+    profiles: ["run"]
+    restart: "no"
     depends_on:
       db:
         condition: service_healthy
@@ -66,33 +95,106 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    # Manueller Run:
+    # Manueller Run im Prozess (sonst ueber das UI, Seite Runs):
     #   docker compose run --rm value-analyzer python -m src.main
     # Dry-Run:
     #   docker compose run --rm value-analyzer python -m src.main --dry-run
     # Altdaten importieren (einmalig, mehrfach ausfuehrbar):
     #   docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
 
+  # P5.1: ein Container je Service aus seinem eigenen Image (uv sync --package). Sie fuehren
+  # die Runs ueber NATS aus und beantworten Request/Reply des web-api; seit P5.4 der Standard.
+  # Jeder sieht nur seine Variablen, SMTP nur notification, und seit P5.3 seine eigene Rolle
+  # (nur das eigene Schema). Leer heisst Standardwert. Zuerst laeuft die Migration (migrate).
+  market-data:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-market-data:${VERSION:-latest}
+    container_name: value-analyzer-market-data
+    restart: unless-stopped
+    depends_on: &service-depends-on
+      db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_market_data:${VA_MARKET_DATA_PASSWORD:?VA_MARKET_DATA_PASSWORD in .env setzen}@db:5432/value_analyzer
+      NATS_URL: nats://nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
+      UNIVERSE: ${UNIVERSE:-}
+      DEFAULT_TAX_RATE: ${DEFAULT_TAX_RATE:-}
+    volumes:
+      # Fallback-CSV wie beim Batch aus ./data (von Hand gepflegt)
+      - ./data:/app/data:ro
+
+  scoring:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-scoring:${VERSION:-latest}
+    container_name: value-analyzer-scoring
+    restart: unless-stopped
+    depends_on: *service-depends-on
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_scoring:${VA_SCORING_PASSWORD:?VA_SCORING_PASSWORD in .env setzen}@db:5432/value_analyzer
+      NATS_URL: nats://nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
+      # Nur Startwerte fuer das Profil "Standard" (ADR-0009)
+      MIN_MARKET_CAP: ${MIN_MARKET_CAP:-}
+      VALUE_WEIGHT: ${VALUE_WEIGHT:-}
+      QUALITY_WEIGHT: ${QUALITY_WEIGHT:-}
+
+  notification:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-notification:${VERSION:-latest}
+    container_name: value-analyzer-notification
+    restart: unless-stopped
+    depends_on: *service-depends-on
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_notification:${VA_NOTIFICATION_PASSWORD:?VA_NOTIFICATION_PASSWORD in .env setzen}@db:5432/value_analyzer
+      NATS_URL: nats://nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_TO: ${MAIL_TO:-}
+      MAIL_SUBJECT_PREFIX: ${MAIL_SUBJECT_PREFIX:-}
+      TOP_N: ${TOP_N:-}
+      BOTTOM_N: ${BOTTOM_N:-}
+      HEALTHCHECK_URL: ${HEALTHCHECK_URL:-}
+    volumes:
+      # Vorschau eines Dry-Runs (HTML und CSV), wie beim Batch
+      - ./data:/app/data
+
   web-api:
-    # REST fuer das UI (P3.1-P3.6). Dasselbe Image wie der Batch, aber ohne Port: Nur das
-    # frontend (nginx) erreicht es im internen Docker-Netz.
-    image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
+    # REST und WebSocket fuer das UI, ohne Port: Nur das frontend (nginx) erreicht es im internen
+    # Docker-Netz. Seit P5.4 das eigene Image (P5.1) mit NATS: Projektionen (va_web), Request/Reply
+    # an die Services, Run-Verwaltung mit Watchdog und der Scheduler fuer den Wochenlauf
+    # (CRON_SCHEDULE aus der .env, Europe/Berlin), der den Cron im Container ersetzt.
+    image: ${REG:-ghcr.io/kaczmarekd}/va-web-api:${VERSION:-latest}
     container_name: value-analyzer-web-api
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. src.web verdrahtet
-    # Vorschau und Profil-Befehle aus scoring im selben Prozess (P3.3, ab Phase 4 per NATS)
-    entrypoint:
-      ["python", "-m", "uvicorn", "--factory", "src.web:create_app",
-       "--host", "0.0.0.0", "--port", "8000"]
-    # Bewusst ohne env_file: keine Zugangsdaten des Batches. Lesen mit va_read, Profile
-    # speichern mit va_profiles (darf nur in die Profil-Tabellen anfuegen)
+      nats:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Bewusst ohne env_file: keine Zugangsdaten des Batches. Lesen mit va_read (schreibgeschuetzt),
+    # Projektionen und Runs mit va_web
     environment:
       TZ: Europe/Berlin
       WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
-      WEB_API_PROFILES_DATABASE_URL: postgresql+psycopg://va_profiles:${VA_PROFILES_PASSWORD}@db:5432/value_analyzer
+      WEB_API_NATS_URL: nats://nats:4222
+      WEB_API_PROJECTIONS_DATABASE_URL: postgresql+psycopg://va_web:${VA_WEB_PASSWORD:?VA_WEB_PASSWORD in .env setzen}@db:5432/value_analyzer
+      WEB_API_SCHEDULE: ${CRON_SCHEDULE:-30 7 * * 6}
+      WEB_API_OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
 
   frontend:
     # Einziger Einstieg im LAN (P3.6, ADR-0005/0007): Angular-Build und /api/ an das web-api.

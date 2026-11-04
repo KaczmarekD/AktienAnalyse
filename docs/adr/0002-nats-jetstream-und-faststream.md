@@ -34,6 +34,24 @@ Event-Bus. Anforderungen:
 
 Details: [events.md](../architecture/events.md).
 
+## Nachtrag (03.11.2026, P4.3): eigener Adapter statt FastStream
+
+Entschieden mit dem User bei P4.3:
+
+- Der Bus über NATS ist `va_platform.nats.NatsBus`, ein schlanker Adapter mit nats-py hinter der
+  Schnittstelle `EventBus` aus P1.8. FastStream wird dafür nicht genutzt.
+- **Gründe:**
+  - Die Handler und ihre Tests bleiben unverändert. Die Vertragstests laufen gegen beide Busse.
+  - Es kommt keine Abhängigkeit vor Version 1.0 dazu, nats-py ist seit P4.1 ohnehin da.
+  - Der Batch ist synchron. Mit FastStream bräuchte es trotzdem eine Brücke über einen Thread.
+- **Was wegfällt:** die automatische AsyncAPI-Doku.
+- **FastStream** kommt frühestens wieder in Frage, wenn die Services in Phase 5 eigene Prozesse
+  werden.
+- Der Rest gilt unverändert:
+  - JetStream mit den Subject-Konventionen
+  - Outbox und Inbox mit `Nats-Msg-Id` gleich der Event-ID (P4.2)
+  - Start des Brokers im FastAPI-Lifespan
+
 ## Konsequenzen
 
 - ✅ Ein Werkzeug deckt dauerhafte Events, flüchtige Meldungen, Request/Reply und Replay ab.

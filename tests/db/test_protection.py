@@ -20,6 +20,8 @@ T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 
 # Die Outbox (P4.2) darf published_at einmal setzen, wie ein Lauf seinen Abschluss
 GUARDED_UPDATE = {*UPDATABLE_TABLES, *(f"{s}.outbox" for s in APP_SCHEMAS)}
+# Projektionen (P4.4) sind Read-Models: UPDATE erlaubt, Loeschen nicht
+MUTABLE = {"web.run_status"}
 
 
 def _fetch_run(repo: MarketDataRepository) -> int:
@@ -75,9 +77,14 @@ def _unguarded(engine: Engine) -> list[str]:
                 ).scalars()
             )
             update_guard = "va_guard_update" if table in GUARDED_UPDATE else "va_no_update"
-            for guard in ("va_no_delete", "va_no_truncate", update_guard):
+            guards = ("va_no_delete", "va_no_truncate")
+            if table not in MUTABLE:
+                guards = (*guards, update_guard)
+            for guard in guards:
                 if guard not in names:
                     gaps.append(f"{table} ohne {guard}")
+            if table in MUTABLE and names & {"va_no_update", "va_guard_update"}:
+                gaps.append(f"{table} ist eine Projektion, hat aber einen UPDATE-Schutz")
             if table in GUARDED_UPDATE and "va_no_update" in names:
                 gaps.append(f"{table} darf abgeschlossen werden, hat aber va_no_update")
     return gaps

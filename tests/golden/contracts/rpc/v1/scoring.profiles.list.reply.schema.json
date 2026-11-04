@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "ProfileSummaryV1": {
+      "properties": {
+        "active_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Version"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "minimum": 1,
+          "title": "Id",
+          "type": "integer"
+        },
+        "latest_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Version"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "created_at",
+        "latest_version",
+        "active_version"
+      ],
+      "title": "ProfileSummaryV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "profiles": {
+      "items": {
+        "$ref": "#/$defs/ProfileSummaryV1"
+      },
+      "title": "Profiles",
+      "type": "array"
+    }
+  },
+  "title": "ProfilesReplyV1",
+  "type": "object"
+}

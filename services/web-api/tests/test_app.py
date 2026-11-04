@@ -92,3 +92,28 @@ class TestSettings:
         with TestClient(app):
             assert app.state.engine.url.username == "va_read"
         assert calls == [True]
+
+
+class TestEventConsumer:
+    """P4.4: Projektionen nur mit NATS und eigener Rolle; sonst startet die App ohne."""
+
+    def test_without_nats_there_is_no_consumer(self, client):
+        assert client.app.state.events is None  # type: ignore[attr-defined]
+
+    def test_unreachable_nats_does_not_stop_the_app(self):
+        settings = SETTINGS.model_copy(
+            update={
+                "nats_url": "nats://127.0.0.1:1",
+                "projections_database_url": SecretStr(
+                    # Kurzer Timeout: Der Takt der Runs (P4.7) verbindet sich beim Start
+                    "postgresql+psycopg://va_web:x@127.0.0.1:1/none?connect_timeout=2"
+                ),
+            }
+        )
+        with TestClient(create_app(settings)) as c:
+            assert c.get("/api/v1/health").status_code == 200
+            assert c.app.state.events is None  # type: ignore[attr-defined]
+
+    def test_settings_know_nats_and_the_projection_role(self):
+        assert SETTINGS.nats_url is None
+        assert SETTINGS.projections_database_url is None

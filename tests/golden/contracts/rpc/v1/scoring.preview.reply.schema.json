@@ -1,0 +1,257 @@
+{
+  "$defs": {
+    "PreviewBasisV1": {
+      "description": "Dieselben Daten zweimal bewertet: mit dem aktiven Profil und mit den neuen Parametern.",
+      "properties": {
+        "active_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Name"
+        },
+        "active_profile_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Profile Id"
+        },
+        "active_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Version"
+        },
+        "current": {
+          "items": {
+            "$ref": "#/$defs/RankedTitleV1"
+          },
+          "title": "Current",
+          "type": "array"
+        },
+        "fetch_run_id": {
+          "minimum": 1,
+          "title": "Fetch Run Id",
+          "type": "integer"
+        },
+        "fetched_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fetched On"
+        },
+        "preview": {
+          "items": {
+            "$ref": "#/$defs/RankedTitleV1"
+          },
+          "title": "Preview",
+          "type": "array"
+        },
+        "scoring_run_id": {
+          "minimum": 1,
+          "title": "Scoring Run Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scoring_run_id",
+        "fetch_run_id",
+        "fetched_on",
+        "active_profile_id",
+        "active_name",
+        "active_version",
+        "current",
+        "preview"
+      ],
+      "title": "PreviewBasisV1",
+      "type": "object"
+    },
+    "RankedTitleV1": {
+      "description": "Ein Titel im Ranking der Vorschau; ohne Rang am Groessenfilter gescheitert oder ohne\nComposite.",
+      "properties": {
+        "composite_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Composite Score"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Index"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "passed_filter": {
+          "title": "Passed Filter",
+          "type": "boolean"
+        },
+        "quality_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Quality Score"
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rank"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "value_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value Score"
+        },
+        "value_trap_flag": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value Trap Flag"
+        }
+      },
+      "required": [
+        "symbol",
+        "name",
+        "index",
+        "passed_filter",
+        "rank",
+        "composite_score",
+        "value_score",
+        "quality_score",
+        "value_trap_flag"
+      ],
+      "title": "RankedTitleV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "basis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PreviewBasisV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "PreviewReplyV1",
+  "type": "object"
+}

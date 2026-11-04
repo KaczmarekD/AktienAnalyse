@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "FactorV1": {
+      "properties": {
+        "better": {
+          "enum": [
+            "low",
+            "high"
+          ],
+          "title": "Better",
+          "type": "string"
+        },
+        "group": {
+          "enum": [
+            "value",
+            "quality"
+          ],
+          "title": "Group",
+          "type": "string"
+        },
+        "hint": {
+          "title": "Hint",
+          "type": "string"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "group",
+        "label",
+        "better",
+        "hint"
+      ],
+      "title": "FactorV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "factors": {
+      "items": {
+        "$ref": "#/$defs/FactorV1"
+      },
+      "title": "Factors",
+      "type": "array"
+    }
+  },
+  "title": "FactorsReplyV1",
+  "type": "object"
+}

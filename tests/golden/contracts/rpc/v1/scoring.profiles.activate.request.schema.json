@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "profile_id": {
+      "minimum": 1,
+      "title": "Profile Id",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "profile_id",
+    "version"
+  ],
+  "title": "ActivateRequestV1",
+  "type": "object"
+}

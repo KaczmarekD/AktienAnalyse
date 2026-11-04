@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Mapping
 from dataclasses import asdict
@@ -38,11 +39,21 @@ class PostgresScoringStore:
         scored: pd.DataFrame,
         cfg: ScoringConfig,
         profile: ProfileVersionRef | None = None,
+        instrument_ids: Mapping[str, int] | None = None,
     ) -> int:
-        """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``."""
+        """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``.
+
+        ``instrument_ids`` kommen seit P5.3 mit dem Snapshot-Event; ohne sie (Batch, alte Events)
+        liest der Speicher sie aus ``market_data.instrument``, was die Rolle von scoring nicht darf.
+        """
         with session_scope(self._engine) as s:
             repo = ScoringRepository(s)
-            ids = repo.get_instrument_ids(scoring_symbols(df_all, scored))
+            symbols = scoring_symbols(df_all, scored)
+            ids = (
+                _known_ids(instrument_ids, symbols)
+                if instrument_ids
+                else repo.get_instrument_ids(symbols)
+            )
             scoring_run_id = repo.write_scoring_run(
                 fetch_run_id=fetch_run_id,
                 config=asdict(cfg),
@@ -52,6 +63,8 @@ class PostgresScoringStore:
             )
             repo.write_score_results(scoring_run_id, score_rows(df_all, scored, ids))
             repo.write_factor_scores(scoring_run_id, factor_rows(scored, ids, cfg))
+            # P5.1a: eigene Kopie der Eingangsdaten fuer die Vorschau
+            repo.write_input_snapshot(fetch_run_id, input_rows(df_all))
             return scoring_run_id
 
     def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
@@ -70,6 +83,21 @@ class PostgresScoringStore:
         else:
             log.debug("Aktives Scoring-Profil: %s", active.label)
         return active
+
+
+def _known_ids(instrument_ids: Mapping[str, int], symbols: list[str]) -> dict[str, int]:
+    missing = [s for s in symbols if s not in instrument_ids]
+    if missing:
+        msg = f"IDs fehlen im Snapshot-Event: {', '.join(missing)}"
+        raise LookupError(msg)
+    return {s: instrument_ids[s] for s in symbols}
+
+
+def input_rows(df_all: pd.DataFrame) -> list[dict[str, Any]]:
+    """Die flachen Zeilen als JSON: NaN wird null, Zeitpunkte ISO-Text (P5.1a)."""
+    if df_all.empty:
+        return []
+    return json.loads(df_all.to_json(orient="records", date_format="iso"))
 
 
 def scoring_symbols(df_all: pd.DataFrame, scored: pd.DataFrame) -> list[str]:

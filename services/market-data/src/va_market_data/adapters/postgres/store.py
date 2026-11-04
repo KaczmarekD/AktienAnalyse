@@ -183,6 +183,10 @@ class PostgresSnapshotStore:
             if reporting_ccy and trading_ccy and reporting_ccy != trading_ccy and fx is not None:
                 repo.write_fx_rate(fetch_run_id, reporting_ccy, trading_ccy, fx, fetched_at)
 
+    def instrument_ids(self, symbols: Collection[str]) -> dict[str, int]:
+        with session_scope(self._engine) as s:
+            return MarketDataRepository(s).get_or_create_instruments(symbols)
+
     def finish_fetch(self, fetch_run_id: int, df: pd.DataFrame) -> None:
         ok_count = int(df["market_cap"].notna().sum()) if "market_cap" in df.columns else 0
         with session_scope(self._engine) as s:

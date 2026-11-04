@@ -2,10 +2,16 @@
 
 Ein Replay-Lauf (echte Woche, 90 Titel) legt Abruf, Ranking und das Profil "Standard" v1 an.
 Das web-api liest mit ``va_read`` und speichert Profile mit ``va_profiles``.
+
+Seit P4.8 laeuft jeder Test zweimal: im Prozess und ueber NATS. Dort beantwortet der Worker
+(``src.worker``) Vorschau und Profil-Befehle mit der Rolle ``va_app``. Die NATS-Variante braucht
+``TEST_NATS_URL``.
 """
 
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any
 
 import pytest
@@ -15,18 +21,29 @@ from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
 from src.web import create_app
+from src.worker import serve
 from tests.db.conftest import ROLE_PASSWORDS, _url_for
 from tests.db.test_replay_run_db import FIXTURE, _replay_run
 from va_web_api.settings import WebApiSettings
 
 
-def _client(db_url: str) -> TestClient:
+def _client(db_url: str, nats_url: str | None = None) -> TestClient:
     database = make_url(db_url).database
     assert database
     read = _url_for(database, "va_read", ROLE_PASSWORDS["va_read"])
     write = _url_for(database, "va_profiles", ROLE_PASSWORDS["va_profiles"])
-    settings = WebApiSettings(database_url=SecretStr(read), profiles_database_url=SecretStr(write))
+    settings = WebApiSettings(
+        database_url=SecretStr(read), profiles_database_url=SecretStr(write), nats_url=nats_url
+    )
     return TestClient(create_app(settings))
+
+
+def _wait_for_the_worker(client: TestClient) -> None:
+    """Verbindung des web-api und Abo des Workers entstehen im Hintergrund."""
+    deadline = time.monotonic() + 60
+    while client.get("/api/v1/scoring/factors").status_code == 503:
+        assert time.monotonic() < deadline, "scoring antwortet nicht ueber NATS"
+        time.sleep(0.2)
 
 
 @pytest.fixture
@@ -34,12 +51,27 @@ def replay_settings(db_settings):
     return db_settings.model_copy(update={"replay_source": FIXTURE, "smtp_plain": True})
 
 
-@pytest.fixture
-def api(replay_settings, db_url):
+@pytest.fixture(params=["in_process", "nats"])
+def api(request, replay_settings, db_url):
     rc, _ = _replay_run(replay_settings)
     assert rc == 0
-    with _client(db_url) as client:
-        yield client
+    if request.param == "in_process":
+        with _client(db_url) as client:
+            yield client
+        return
+    # P4.8: dieselben Endpunkte, beantwortet vom Worker ueber NATS
+    url = request.getfixturevalue("nats_url")
+    settings = replay_settings.model_copy(update={"event_bus": "nats", "nats_url": url})
+    stop = threading.Event()
+    worker = threading.Thread(target=serve, args=(settings, stop), daemon=True)
+    worker.start()
+    try:
+        with _client(db_url, nats_url=url) as client:
+            _wait_for_the_worker(client)
+            yield client
+    finally:
+        stop.set()
+        worker.join(timeout=60)
 
 
 def _standard(api: TestClient) -> dict[str, Any]:

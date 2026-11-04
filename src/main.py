@@ -6,6 +6,10 @@ market-data -> scoring -> notification. Dieses Modul verdrahtet nur, startet die
 ``batch.run``. Ist die Datenbank nicht erreichbar, bricht der Lauf ab (Exit 4): ohne
 Speicherung kein Report, ein manueller Nachlauf reicht.
 
+Der Bus ist ``EVENT_BUS`` (P4.3): im Prozess (Standard) ist die Kette fertig, wenn ``publish``
+zurueckkehrt. Ueber NATS wartet der Batch auf das Ergebnis des ``RunTracker``, hoechstens
+``RUN_TIMEOUT_MINUTES``.
+
 Exit-Codes: 0 ok, 1 Fehler im Lauf, 2 Konfiguration, 3 keine bewertbaren
 Daten, 4 Datenbank nicht erreichbar.
 """
@@ -18,21 +22,17 @@ import sys
 import traceback
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
 from va_contracts import new_envelope
-from va_contracts.events.v1 import (
-    RUN_FAILED,
-    RUN_REQUESTED,
-    RunFailedV1,
-    RunOptionsV1,
-    ScreeningRunRequestedV1,
-    Stage,
-)
+from va_contracts.events.v1 import RUN_REQUESTED, RunOptionsV1, ScreeningRunRequestedV1
 from va_notification.entrypoints.handlers import notify_failure_without_run
-from va_platform.bus import InProcessBus, follow_up
+from va_platform import tracing
+from va_platform.bus import InProcessBus
+from va_platform.nats import NatsBus
+from va_platform.service import run_failure
 
 from . import __version__
 from .composition import alert_channels, build_adapters, wire
@@ -42,7 +42,7 @@ from .logging_setup import setup_logging
 from .run_tracker import EXIT_FAILED, EXIT_NO_DATA, EXIT_OK, RunOutcome, RunTracker
 
 if TYPE_CHECKING:
-    from va_platform.bus import DeadLetter
+    from va_platform.bus import DeadLetter, EventBus
 
     from .composition import Adapters
 
@@ -56,9 +56,18 @@ SOURCE = "va/batch"
 # screening.run.failed. Was trotzdem durchschlaegt, ist ein Bug - den Abruf deshalb
 # nochmal zu starten, kostete nur Minuten und erzeugte einen zweiten fetch_run.
 MAX_DELIVER = 1
+# Ueber NATS: So lange darf nach dem Ergebnis noch ein spaetes Event (etwa ein Fehlschlag
+# nach der Mail) eintreffen, bevor der Bus schliesst
+SETTLE_SECONDS = 60.0
 
 # Nie in die Datenbank: Passwoerter, Verbindungs-URLs, Healthcheck-UUID
-_SECRET_SETTINGS = {"smtp_password", "database_url", "database_owner_url", "healthcheck_url"}
+_SECRET_SETTINGS = {
+    "smtp_password",
+    "database_url",
+    "database_owner_url",
+    "healthcheck_url",
+    "nats_url",
+}
 
 log = logging.getLogger("main")
 
@@ -149,40 +158,66 @@ def _run(
 def _execute(
     settings: Settings, adapters: Adapters, run_id: int, options: RunOptionsV1
 ) -> RunOutcome:
-    """Startet die Kette und wartet ihr Ende ab (im Prozess: bis ``publish`` zurueckkehrt)."""
+    """Startet die Kette und wartet ihr Ende ab (im Prozess: bis ``publish`` zurueckkehrt,
+    ueber NATS: bis der ``RunTracker`` ein Ergebnis hat)."""
     tracker = RunTracker(run_id)
 
     def dead_letter(dead: DeadLetter) -> None:
         # Ein Handler ist an einem Bug gescheitert: Der Lauf endet wie jeder Fehlschlag,
         # also mit Ping und Fehlermail. Ein gescheitertes Fehler-Event loest keines mehr aus.
         tracker.on_dead_letter(dead)
-        if dead.envelope.type != RUN_FAILED.type:
-            failed = RunFailedV1(
-                run_id=run_id,
-                trigger="scheduled",
-                options=options,
-                stage=_stage(dead.consumer),
-                reason=f"{dead.consumer}: {dead.error}",
-                detail="".join(traceback.format_exception(dead.error)),
-            )
-            bus.publish(follow_up(dead.envelope, RUN_FAILED, failed, source=SOURCE))
+        failure = run_failure(dead, source=SOURCE)
+        if failure is not None:
+            bus.publish(failure)
 
-    bus = InProcessBus(max_deliver=MAX_DELIVER, on_dead_letter=dead_letter)
-    wire(bus, adapters, settings, version=__version__)
-    tracker.subscribe(bus)
-    bus.publish(
-        new_envelope(
-            RUN_REQUESTED,
-            ScreeningRunRequestedV1(run_id=run_id, trigger="scheduled", options=options),
-            source=SOURCE,
-            correlationid=str(run_id),
-        )
-    )
+    with _open_bus(settings, dead_letter) as bus:
+        wire(bus, adapters, settings, version=__version__)
+        tracker.subscribe(bus)
+        with tracing.run_span(run_id):  # P5.5: ein Trace je Run, er beginnt hier
+            bus.publish(
+                new_envelope(
+                    RUN_REQUESTED,
+                    ScreeningRunRequestedV1(run_id=run_id, trigger="scheduled", options=options),
+                    source=SOURCE,
+                    correlationid=str(run_id),
+                )
+            )
+        _await_end(bus, tracker, settings)
     if tracker.outcome is None:
         log.error("Die Event-Kette endete ohne Ergebnis - Lauf gilt als gescheitert")
         _alarm(adapters, "run without outcome", "Lauf ohne Ergebnis", dry_run=options.dry_run)
         return RunOutcome(status="failed", exit_code=EXIT_FAILED, error="Lauf ohne Ergebnis")
     return tracker.outcome
+
+
+@contextmanager
+def _open_bus(
+    settings: Settings, on_dead_letter: Callable[[DeadLetter], None]
+) -> Iterator[EventBus]:
+    """Der Bus nach ``EVENT_BUS``; ueber NATS geoeffnet und am Ende geordnet geschlossen."""
+    if settings.event_bus == "in_process":
+        yield InProcessBus(max_deliver=MAX_DELIVER, on_dead_letter=on_dead_letter)
+        return
+    assert settings.nats_url  # prueft Settings
+    bus = NatsBus(settings.nats_url, max_deliver=MAX_DELIVER, on_dead_letter=on_dead_letter)
+    bus.start()
+    try:
+        yield bus
+    finally:
+        bus.close()
+
+
+def _await_end(bus: EventBus, tracker: RunTracker, settings: Settings) -> None:
+    """Ueber NATS auf das Ergebnis warten; im Prozess steht es schon fest."""
+    if not isinstance(bus, NatsBus):
+        return
+    if not tracker.wait(settings.run_timeout_minutes * 60):
+        log.error("Kein Ergebnis nach %s Minuten", settings.run_timeout_minutes)
+        return
+    try:
+        bus.settle(timeout=SETTLE_SECONDS)
+    except TimeoutError:
+        log.warning("Nach dem Ergebnis sind noch Events offen; der Bus schliesst trotzdem")
 
 
 def _alarm(adapters: Adapters, message: str, detail: str, *, dry_run: bool) -> None:
@@ -195,11 +230,6 @@ def _alarm(adapters: Adapters, message: str, detail: str, *, dry_run: bool) -> N
         log.exception("Alarm konnte nicht verschickt werden")
 
 
-def _stage(consumer: str) -> Stage:
-    """Stufe fuer screening.run.failed; was keinem Modul gehoert, meldet der Watchdog."""
-    return consumer if consumer in get_args(Stage) else "watchdog"  # type: ignore[return-value]
-
-
 def run(force_refresh: bool = False, dry_run: bool = False) -> int:
     try:
         settings = load_settings()
@@ -210,6 +240,7 @@ def run(force_refresh: bool = False, dry_run: bool = False) -> int:
         return EXIT_CONFIG
 
     setup_logging(settings.logs_dir)
+    tracing.configure("va-batch", settings.otel_traces_exporter)
     return _run(settings, force_refresh=force_refresh, dry_run=dry_run)
 
 

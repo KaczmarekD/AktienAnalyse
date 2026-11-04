@@ -131,3 +131,28 @@ class TestReplaySource:
         monkeypatch.setenv("HEALTHCHECK_URL", "https://hc-ping.com/abc")
         with pytest.raises(ValidationError, match="HEALTHCHECK_URL"):
             Settings()  # type: ignore[call-arg]
+
+
+class TestEventBus:
+    """P4.3: Der Batch laeuft im Prozess, ueber NATS nur auf ausdruecklichen Wunsch."""
+
+    def test_in_process_is_the_default(self, minimal_env):
+        settings = Settings()  # type: ignore[call-arg]
+        assert settings.event_bus == "in_process"
+        assert settings.nats_url is None
+        assert settings.run_timeout_minutes == 120
+
+    def test_nats_needs_a_url(self, monkeypatch, minimal_env):
+        monkeypatch.setenv("EVENT_BUS", "nats")
+        with pytest.raises(ValidationError, match="NATS_URL"):
+            Settings()  # type: ignore[call-arg]
+
+    def test_nats_with_url(self, monkeypatch, minimal_env):
+        monkeypatch.setenv("EVENT_BUS", "nats")
+        monkeypatch.setenv("NATS_URL", "nats://nats:4222")
+        assert Settings().nats_url == "nats://nats:4222"  # type: ignore[call-arg]
+
+    def test_unknown_bus_is_rejected(self, monkeypatch, minimal_env):
+        monkeypatch.setenv("EVENT_BUS", "kafka")
+        with pytest.raises(ValidationError):
+            Settings()  # type: ignore[call-arg]

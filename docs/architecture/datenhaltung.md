@@ -41,6 +41,8 @@ Stand `261dc8f` (Migration `0001_initial_schema`):
 | `va_app` | `SELECT`/`INSERT`, `UPDATE` nur für freigegebene Tabellen und in der Outbox nur für die Spalte `published_at`, kein `DELETE` | der Batch |
 | `va_read` | nur `SELECT` | Auswertungen aus dem LAN; in Phase 3 auch das web-api |
 | `va_profiles` | `SELECT` auf den drei Profil-Tabellen, `INSERT` in `profile_version` und `profile_activation` | das web-api für die Profil-Befehle (P3.3), bis scoring sie ab Phase 4 selbst ausführt |
+| `va_market_data`, `va_scoring`, `va_notification` (seit P5.3) | nur im eigenen Schema (`market_data`, `scoring`, `reporting`): `SELECT`, `INSERT`, `UPDATE` nur wie bei `va_app`, kein `DELETE` | die Services in ihren Containern (`VA_<SERVICE>_PASSWORD`) |
+| `va_web` | im Schema `web` `SELECT` und `INSERT`, `UPDATE` nur auf `run_status` und `published_at` der Outbox; seit P4.7 auf `batch.run` `SELECT`, `INSERT` und `UPDATE` nur auf die Spalten des Abschlusses | das web-api für die Projektionen (P4.4) und die Runs aus UI und Scheduler (P4.7); `va_read` liest `web` mit |
 
 Der Treiber ist psycopg 3 (`postgresql+psycopg://`) mit synchronem SQLAlchemy. Das passt für den
 Batch.
@@ -50,10 +52,10 @@ Batch.
 | Schema | Besitzer-Service (Phase 5) | Ergänzungen |
 |---|---|---|
 | `market_data` | `market-data` | `outbox`, `inbox` |
-| `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie des letzten Snapshots, `outbox`, `inbox` |
+| `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie der Eingangsdaten (`input_snapshot`, seit P5.1a, Migration `0013`, nur zum Anfügen; daraus rechnet die Vorschau), `outbox`, `inbox` |
 | `reporting` | `notification` | `outbox`, `inbox` |
 | `batch` | `web-api` | Runs werden vom web-api angelegt (Scheduler/UI); `outbox` (`screening.run.requested`), `inbox` |
-| `web` (neu) | `web-api` | Read-Models für das UI: aktuelles Ranking, Score-Verlauf je Titel |
+| `web` (seit P4.4, Migration `0010`) | `web-api` | Read-Models für das UI: `run_status` (veränderlich, nie gelöscht) und `ranking_row` (aktuelles Ranking, Score-Verlauf je Titel); `run_request` (seit P4.7, Migration `0011`, nur zum Anfügen): die Runs, die das web-api angelegt hat, mit eindeutigem Cron-Termin; `snapshot_row` und `ranking_run` (seit P4.9, Migration `0012`, nur zum Anfügen): Abrufe und Köpfe der Bewertungsläufe für die REST-Antworten, nachgefüllt aus den Tabellen von `src.db.backfill`; `outbox`, `inbox` |
 
 `outbox` und `inbox` gibt es seit P4.2 in allen vier Schemas (Migration `0009`). Die Modelle
 liegen beim Besitzer des Schemas, die Logik in `va_platform.messaging`
@@ -73,7 +75,7 @@ Regeln für den Übergang:
   aufbaubar) brauchen `UPDATE`. Historien-Tabellen bleiben reine Anfüge-Tabellen.
 - **Anfügen statt Ändern, wo immer möglich.** Beispiel: Welches Scoring-Profil aktiv ist, steht
   nicht in einem Flag, sondern ergibt sich aus der jüngsten Zeile einer Aktivierungs-Tabelle.
-- **Async erst mit Bedarf.** FastStream und FastAPI laufen asynchron. Ein Service, der beim
+- **Async erst mit Bedarf.** FastAPI und der `NatsBus` laufen asynchron. Ein Service, der beim
   synchronen SQLAlchemy bleibt, kapselt DB-Zugriffe per `asyncio.to_thread`. Die Umstellung auf
   die async-Engine (SQLAlchemy 2.1, `sqlalchemy[asyncio]`) geschieht pro Service, wenn es sich lohnt.
 

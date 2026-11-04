@@ -2,8 +2,9 @@
 # wird nur ueber die make-Targets local-* genutzt, die beide Dateien angeben. Die NAS kennt
 # diese Datei nicht.
 #
-#   make local-up    Datenbank, Mailpit (http://localhost:8025), pgweb (http://localhost:8081),
-#                    web-api (http://localhost:8000/api/docs)
+#   make local-up    Datenbank, NATS, Mailpit (http://localhost:8025), pgweb
+#                    (http://localhost:8081), web-api (http://localhost:8000/api/docs) und der
+#                    die drei Services, die die Runs aus dem UI ausfuehren (P4.7, P5.1)
 #   make local-run   ein Lauf mit dem Arbeitsstand, die Mail landet in Mailpit
 #
 # Alle Ports nur auf 127.0.0.1. Lokal geht keine Mail nach aussen und kein Healthcheck-Ping
@@ -48,11 +49,44 @@ services:
       SMTP_PORT: "1025"
       SMTP_PLAIN: "true"
       HEALTHCHECK_URL: ""
+      # Fuer EVENT_BUS=nats aus der .env (P4.3); ohne den Schalter ungenutzt
+      NATS_URL: nats://nats:4222
       # Pfade im Container, auch wenn die .env sie fuer make run/dry aus der .venv setzt
       DATA_DIR: /app/data
       LOGS_DIR: /app/logs
     volumes:
       - ./.local/logs:/app/logs
+
+  # P5.1: die drei Services wie auf der NAS, aber aus dem App-Image des Arbeitsstands mit ihrem
+  # eigenen Einstieg (kein weiteres Image auf der knappen Platte). make local-up startet sie
+  # mit dem Profil nats.
+  market-data:
+    container_name: value-analyzer-local-market-data
+    image: value-analyzer:local
+    pull_policy: never
+    restart: "no"
+    entrypoint: ["python", "-m", "va_market_data"]
+
+  scoring:
+    container_name: value-analyzer-local-scoring
+    image: value-analyzer:local
+    pull_policy: never
+    restart: "no"
+    entrypoint: ["python", "-m", "va_scoring"]
+
+  notification:
+    container_name: value-analyzer-local-notification
+    image: value-analyzer:local
+    pull_policy: never
+    restart: "no"
+    entrypoint: ["python", "-m", "va_notification"]
+    environment:
+      # Wie beim Batch: kein Versand nach aussen, kein Ping auf den Healthcheck der NAS
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_PLAIN: "true"
+      HEALTHCHECK_URL: ""
+      DATA_DIR: /app/data
 
   mailpit:
     # Postfach im Browser; nimmt jede Mail an und verschickt nichts
@@ -62,14 +96,25 @@ services:
       - "127.0.0.1:8025:8025"  # Weboberflaeche
       - "127.0.0.1:1025:1025"  # SMTP, auch fuer make run/dry aus der .venv
 
+  migrate:
+    container_name: value-analyzer-local-migrate
+    image: value-analyzer:local
+    pull_policy: never
+
   web-api:
-    # Wie auf der NAS (docker-compose.yml), aber aus dem Arbeitsstand (gebaut von make local-up)
-    # und lokal direkt erreichbar, mit Swagger unter /api/docs
+    # Wie auf der NAS (docker-compose.yml), aber aus dem App-Image des Arbeitsstands (gebaut von
+    # make local-up) und lokal direkt erreichbar, mit Swagger unter /api/docs
     container_name: value-analyzer-local-web-api
     image: value-analyzer:local
     pull_policy: never
+    entrypoint:
+      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
+       "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "127.0.0.1:8000:8000"
+    environment:
+      # Lokal keine Wochenlaeufe von selbst (Runs startet das UI oder make local-run)
+      WEB_API_SCHEDULE: ""
 
   frontend:
     # nginx mit dem Build aus dem Arbeitsstand (make local-ui). Nur auf Wunsch: Der Node-Build

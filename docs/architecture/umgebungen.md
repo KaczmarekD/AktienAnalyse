@@ -11,14 +11,14 @@ Zeitplan:
 - **Lokal** (Entwicklungsrechner, `localhost`): jede neue Implementierung mit echten Daten
   ausprobieren, Ergebnisse im Browser ansehen, Tests ausführen. Es geht keine Mail nach außen
   und kein Healthcheck-Ping raus.
-- **NAS** (live): wöchentlicher Lauf per Cron, echte Mail. Die NAS baut nichts und zieht
+- **NAS** (live): wöchentlicher Lauf nach dem Wochenplan des web-api, echte Mail. Die NAS baut nichts und zieht
   fertige Images aus GHCR ([betrieb-synology.md](betrieb-synology.md)).
 
 | | Lokal | NAS |
 |---|---|---|
 | Compose | `docker-compose.yml` + `docker-compose.local.yml` (`make local-*`) | `docker-compose.yml` |
 | Image | aus dem Arbeitsstand gebaut (`value-analyzer:local`) | aus GHCR (`latest`, `sha-…`, Version) |
-| Läufe | auf Knopfdruck (`make local-run`), kein Cron | Cron (Samstag 07:30) |
+| Läufe | auf Knopfdruck (`make local-run`, UI), kein Wochenplan | Wochenplan des web-api (Samstag 07:30) |
 | Mail | Mailpit, Postfach unter <http://localhost:8025> | Gmail |
 | Healthcheck | aus | Healthchecks.io, falls eingerichtet |
 | Datenbank | eigene, Daten in `./.local/pgdata` | `./pgdata`, nie gelöscht |
@@ -39,8 +39,17 @@ Zeitplan:
 - **`SMTP_PLAIN`:** ohne TLS und ohne Login, nur für einen lokalen Mail-Catcher. Es wird dabei
   kein Passwort gesendet. Der Versand bleibt sonst unverändert: STARTTLS oder SSL, jeweils mit
   Zertifikatsprüfung.
-- **Der Batch läuft lokal nicht dauerhaft.** `value-analyzer` hat dort das Profil `run`.
-  `make local-up` startet nur Datenbank, Mailpit und pgweb, `make local-run` startet einen Lauf.
+- **Der Batch läuft nirgends dauerhaft.** `value-analyzer` hat das Profil `run`, seit P5.4 auch
+  auf der NAS; den Wochenlauf plant dort das web-api. Lokal plant es nichts (`WEB_API_SCHEDULE`
+  leer).
+  `make local-up` startet Datenbank, NATS, Mailpit, pgweb und das web-api, `make local-run`
+  startet einen Lauf.
+- **Runs aus dem UI (P4.7, seit P5.1 drei Container):** `make local-up` startet mit dem Profil
+  `nats` auch market-data, scoring und notification, lokal aus dem App-Image mit ihrem eigenen
+  Einstieg (`python -m va_market_data` usw.). notification schickt Mails wie der Batch nur an
+  Mailpit. Damit lassen sich Runs auf der Seite Runs starten. Auf der NAS haben die Dienste
+  dasselbe Profil und eigene Images aus GHCR (`va-market-data` usw.). Sie laufen erst
+  nach dem Umstieg auf NATS.
 - **pgweb liest mit der Rolle `va_read`** und zusätzlich im Modus `--readonly`.
 - **Eigene Namen:** Der lokale Stack heißt `value-analyzer-local`, seine Container auch. Er
   kollidiert so nicht mit einem Stack aus `docker-compose.yml` auf demselben Rechner. Ist Port
@@ -70,6 +79,9 @@ Zeitplan:
   Batch, Mail in Mailpit, web-api hinter nginx und das UI im Browser (Playwright). Die Daten
   kommen aus einer Replay-Fixture statt von Yahoo, damit das Ergebnis feststeht. Umgesetzt am
   31.10.2026, vor P2b.1 ([Implementierungsplan](implementierungsplan.md#u5-lokaler-end-to-end-test)).
+  Seit P5.2 läuft er über den ganzen Stack: NATS, die drei Services, das web-api mit
+  Projektionen. Den Lauf startet `docker/e2e_run.py` über die API, wie ein Klick im UI. Lokal
+  laufen alle Dienste aus dem App-Image, die CI nimmt die Images je Service.
 
 ## Neue Implementierung lokal prüfen (ab U5)
 

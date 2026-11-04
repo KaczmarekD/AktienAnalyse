@@ -1,8 +1,9 @@
-"""Vertragstests fuer die Bus-Schnittstelle ``EventBus`` (P1.8).
+"""Vertragstests fuer die Bus-Schnittstelle ``EventBus`` (P1.8, NATS seit P4.3).
 
 Die Tests kennen nur die Schnittstelle: ``subscribe``, ``publish`` und das Ende der
-Zustellung. Die Fixture ``bus`` ist parametrisiert; mit Phase 4 kommt dort NATS dazu, die
-Tests bleiben unveraendert. ``settle`` wartet, bis alles zugestellt ist (im Prozess sofort).
+Zustellung. Die Fixture ``harness`` ist parametrisiert: im Prozess und ueber NATS JetStream
+(nur mit ``TEST_NATS_URL``). Die Tests sind fuer beide gleich. ``settle`` wartet, bis alles
+zugestellt ist (im Prozess sofort).
 """
 
 from __future__ import annotations
@@ -34,12 +35,22 @@ class Harness:
     dead: list[DeadLetter] = field(default_factory=list)
 
 
-@pytest.fixture(params=["in_process"])
+@pytest.fixture(params=["in_process", "nats"])
 def harness(request) -> Iterator[Harness]:
     dead: list[DeadLetter] = []
     if request.param == "in_process":
         bus = InProcessBus(max_deliver=MAX_DELIVER, on_dead_letter=dead.append)
         yield Harness(bus=bus, settle=lambda: None, dead=dead)
+        return
+    from va_platform.nats import NatsBus
+
+    url = request.getfixturevalue("nats_url")
+    nats_bus = NatsBus(url, max_deliver=MAX_DELIVER, on_dead_letter=dead.append, retry_delay=0.05)
+    nats_bus.start()
+    try:
+        yield Harness(bus=nats_bus, settle=lambda: nats_bus.settle(timeout=20), dead=dead)
+    finally:
+        nats_bus.close()
 
 
 def _requested(run_id: int = 1) -> Envelope[ScreeningRunRequestedV1]:

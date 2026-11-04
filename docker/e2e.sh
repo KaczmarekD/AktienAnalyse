@@ -3,10 +3,13 @@
 #   docker/e2e.sh        (make local-e2e baut vorher die Images; die CI nutzt ihre eigenen)
 #
 # Wegwerf-Stack aus docker-compose.e2e.yml: Datenbank auf tmpfs, UI unter 127.0.0.1:18080,
-# Mailpit unter 127.0.0.1:18025. Ablauf: Stack starten, ein Batch-Lauf, die Pruefungen unter
+# Mailpit unter 127.0.0.1:18025. Seit P5.2 der ganze Stack: NATS, die drei Services, das web-api
+# mit Projektionen. Ablauf: Datenbank, NATS und Mailpit starten, migrieren, Services und UI
+# starten, den Lauf ueber die API ausloesen (docker/e2e_run.py), dann die Pruefungen unter
 # tests/e2e/ (uv) und der Browser-Test unter frontend/e2e/ (Playwright, Chromium aus
-# make ui-e2e-install), danach wird der Stack entfernt, auch bei einem Fehler.
-# Images: E2E_APP_IMAGE und E2E_FRONTEND_IMAGE (Standard: value-analyzer:local, va-frontend:e2e).
+# make ui-e2e-install). Danach wird der Stack entfernt, auch bei einem Fehler.
+# Images: E2E_APP_IMAGE, E2E_FRONTEND_IMAGE, E2E_WEB_API_IMAGE und E2E_<SERVICE>_IMAGE
+# (Standard: value-analyzer:local fuer alles ausser va-frontend:e2e).
 # E2E_KEEP=1 laesst den Stack nach dem Test stehen, zum Ansehen im Browser.
 set -euo pipefail
 
@@ -36,13 +39,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "=== E2E: Stack starten"
+echo "=== E2E: Datenbank, NATS und Mailpit starten"
 "${COMPOSE[@]}" down --remove-orphans >/dev/null 2>&1 || true
-"${COMPOSE[@]}" up -d --no-build --wait db mailpit web-api frontend
+"${COMPOSE[@]}" up -d --no-build --wait db nats mailpit
+
+# Der Dienst migrate laeuft vor den Services (depends_on, P5.4)
+echo "=== E2E: migrate, Services, web-api und frontend starten"
+"${COMPOSE[@]}" up -d --no-build --wait market-data scoring notification web-api frontend
 "${COMPOSE[@]}" exec -T frontend nginx -t
 
-echo "=== E2E: Batch mit tests/fixtures/replay/$E2E_FIXTURE"
-"${COMPOSE[@]}" run --rm --no-deps value-analyzer python -m src.main
+echo "=== E2E: Lauf ueber die API mit tests/fixtures/replay/$E2E_FIXTURE"
+uv run --no-project python -I docker/e2e_run.py "$E2E_BASE_URL"
 
 echo "=== E2E: Pruefungen (tests/e2e)"
 uv run --locked pytest tests/e2e -p no:cacheprovider

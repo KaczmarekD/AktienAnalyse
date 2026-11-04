@@ -153,7 +153,7 @@ class TestLoadUniverse:
         with (
             patch("va_market_data.adapters.ishares.fetch_ishares_json", side_effect=ishares),
             patch("va_market_data.adapters.deka.fetch_deka_xlsx", side_effect=deka),
-            patch("src.composition.resolve_isins_openfigi", return_value=figi),
+            patch("va_market_data.entrypoints.service.resolve_isins_openfigi", return_value=figi),
         ):
             return load_universe(cfg=CFG, fallback_csv=fallback_csv, today=TODAY)
 

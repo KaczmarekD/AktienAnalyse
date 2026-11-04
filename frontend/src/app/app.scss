@@ -18,3 +18,10 @@ nav {
 main {
   padding: var(--va-space-lg);
 }
+
+// P4.6: Verbindungsstatus des WebSockets, sichtbar nur offline
+.realtime {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
