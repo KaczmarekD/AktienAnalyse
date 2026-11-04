@@ -185,8 +185,9 @@ Details: [Implementierungsplan, Phase 5](implementierungsplan.md#phase-5--auftei
 - [x] P5.3 Eine DB-Rolle je Service 🔒 (`5db3abe`)
 - [x] P5.4 Scheduler im web-api, NATS als Standard (`da90237`)
 - [x] P5.5 Tracing, ein Trace je Run (`4afd3af`)
-- [ ] P5.6 Abschluss-Doku
-- [ ] NAS (du): Umstellung auf den kompletten Stack
+- [x] P5.6 Abschluss-Doku, Runbook der NAS, Link-Check (`c9771e0`)
+- [ ] NAS (du): Umstellung auf den kompletten Stack, Schritte im
+  [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig)
 
 **Fertig, wenn:** die Zielarchitektur aus [README.md](README.md) läuft.
 
