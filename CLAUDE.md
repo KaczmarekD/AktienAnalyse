@@ -35,7 +35,9 @@ Verbindung) und speichert Scoring-Profile mit `WEB_API_PROFILES_DATABASE_URL` (R
 `va_profiles`, darf nur in `profile_version` und `profile_activation` anfügen, seit P3.3). Die
 Zugangsdaten des Batches bekommt es nie. Gestartet wird es über `src.web:create_app`: Diese
 Composition Root verdrahtet Vorschau und Profil-Befehle mit dem Code von scoring im selben
-Prozess, denn `va_web_api` darf `va_scoring` nicht importieren (ab Phase 4 per NATS). Seit P3.6
+Prozess (`src/scoring_ops.py`), denn `va_web_api` darf `va_scoring` nicht importieren. Mit
+`WEB_API_NATS_URL` beantwortet sie seit P4.8 der Worker über Request/Reply (`va_contracts.rpc.v1`,
+`va_web_api.rpc`), ohne Worker antworten sie mit 503. Seit P3.6
 laufen auf der NAS
 web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
 nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.

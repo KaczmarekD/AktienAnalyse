@@ -67,6 +67,13 @@ web-api-Prozesses. Geschrieben wird mit der Rolle `va_profiles`, die nur in die
 Profil-Tabellen anfügen darf, nicht mit der Rolle des Batches. Fehlt
 `WEB_API_PROFILES_DATABASE_URL`, antworten die schreibenden Endpunkte mit 503.
 
+**Request/Reply (seit P4.8):** Mit `WEB_API_NATS_URL` gehen Faktor-Katalog, Vorschau, Speichern und
+Aktivieren als Request/Reply an den Worker (`rpc.va.scoring.*`, Contracts in `va_contracts.rpc.v1`).
+`va_web_api.rpc.RemoteScoring` setzt dafür die Ports um, `scoring_handlers` ist die Gegenseite im
+Worker. Die REST-API bleibt gleich, die API-Tests aus P3.3 laufen in beiden Varianten. Antwortet
+niemand, kommt 503 („Scoring nicht erreichbar“). Nach Speichern und Aktivieren meldet der Worker
+`scoring.profile.saved` bzw. `.activated`, die offenen Tabs bekommen das über das Topic `profiles`.
+
 **Runs aus dem UI (seit P4.7):** `POST /api/v1/runs` antwortet mit 202 und der ID des Runs.
 `va_web_api.runs.RunManager` legt ihn mit der Rolle `va_web` in `batch.run` an, dazu
 `web.run_request` und das Event in `web.outbox`. Läuft schon ein Run, kommt 409. Ohne

@@ -63,6 +63,10 @@ class UnknownVersion(LookupError):
     pass
 
 
+class ScoringUnavailable(Exception):
+    """scoring antwortet nicht: keine NATS-Verbindung oder kein Worker (P4.8, 503)."""
+
+
 class ProfileConflict(Exception):
     """Die Version, auf der die Aenderung beruht, ist nicht mehr die neueste."""
 

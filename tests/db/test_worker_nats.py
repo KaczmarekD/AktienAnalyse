@@ -1,8 +1,11 @@
-"""Ein Run aus dem web-api, ausgefuehrt vom Worker (P4.7): NATS und Datenbank sind echt.
+"""Der Worker mit dem web-api (P4.7, P4.8): NATS und Datenbank sind echt.
 
-Das web-api legt den Run an und schickt ``screening.run.requested`` aus seiner Outbox. Der
-Worker fuehrt die Kette mit der Replay-Fixture aus, der Eventmanager des web-api schliesst
-``batch.run`` ab. Ohne ``TEST_DATABASE_URL`` oder ``TEST_NATS_URL`` uebersprungen.
+- Das web-api legt einen Run an und schickt ``screening.run.requested`` aus seiner Outbox. Der
+  Worker fuehrt die Kette mit der Replay-Fixture aus, der Eventmanager schliesst ``batch.run`` ab.
+- Profil-Befehle ueber NATS: Der Worker speichert und meldet ``scoring.profile.saved`` bzw.
+  ``.activated``, der Eventmanager reicht sie an die offenen Tabs weiter (Topic ``profiles``).
+
+Ohne ``TEST_DATABASE_URL`` oder ``TEST_NATS_URL`` uebersprungen.
 """
 
 from __future__ import annotations
@@ -18,8 +21,13 @@ from sqlalchemy import Engine, text
 
 from src.composition import build_adapters
 from src.worker import serve
+from tests.db.test_replay_run_db import _replay_run
 from va_contracts.events.v1 import RunOptionsV1
+from va_contracts.profile import ProfileParamsV1
+from va_platform.nats import NatsBus
 from va_web_api.events import open_event_consumer
+from va_web_api.ports import ScoringUnavailable
+from va_web_api.rpc import RemoteScoring
 from va_web_api.runs import RunManager, WatchdogLimits
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "replay" / "2026-10-30_scoring-run-1.json"
@@ -81,3 +89,65 @@ def test_a_run_from_the_web_api_runs_through_the_worker(db_settings, engine, web
     send.assert_called_once()
     # Healthcheck nur fuer geplante Runs: Ein Start aus dem UI pingt nicht
     adapters.heartbeat.ping.assert_not_called()  # type: ignore[attr-defined]
+
+
+class Recorder:
+    def __init__(self) -> None:
+        self.messages: list[Any] = []
+
+    def publish(self, message: Any) -> None:
+        self.messages.append(message)
+
+
+def _answers(scoring: RemoteScoring) -> bool:
+    try:
+        scoring.factors()
+    except ScoringUnavailable:
+        return False
+    return True
+
+
+def test_profile_commands_over_nats_reach_the_open_tabs(db_settings, engine, web_engine, nats_url):
+    settings = db_settings.model_copy(update={"replay_source": FIXTURE, "smtp_plain": True})
+    rc, _ = _replay_run(settings)  # legt das Profil "Standard" v1 an
+    assert rc == 0
+    with engine.connect() as conn:
+        profile_id = conn.execute(text("SELECT id FROM scoring.profile")).scalar_one()
+
+    stop = threading.Event()
+    nats_settings = settings.model_copy(update={"event_bus": "nats", "nats_url": nats_url})
+    worker = threading.Thread(target=serve, args=(nats_settings, stop), daemon=True)
+    worker.start()
+    recorder = Recorder()
+    consumer = open_event_consumer(nats_url, web_engine, recorder)
+    client = NatsBus(nats_url)
+    client.start()
+    try:
+        scoring = RemoteScoring(lambda: client)
+        deadline = time.monotonic() + 60
+        while not _answers(scoring):
+            assert time.monotonic() < deadline, "Worker antwortet nicht"
+            time.sleep(0.2)
+
+        params = ProfileParamsV1(value_weight=0.5)
+        version = scoring.save_version(profile_id, params, based_on=1, comment="P4.8")
+        scoring.activate(profile_id, version)
+
+        deadline = time.monotonic() + 30
+        while len([m for m in recorder.messages if m.topic == "profiles"]) < 2:
+            assert time.monotonic() < deadline, "Profil-Events nicht angekommen"
+            time.sleep(0.1)
+    finally:
+        client.close()
+        consumer.close()
+        stop.set()
+        worker.join(timeout=60)
+
+    assert version == 2
+    with engine.connect() as conn:
+        active = conn.execute(
+            text("SELECT version FROM scoring.profile_activation ORDER BY id DESC LIMIT 1")
+        ).scalar_one()
+    assert active == 2
+    profiles = sorted(m.type for m in recorder.messages if m.topic == "profiles")
+    assert profiles == ["scoring.profile.activated", "scoring.profile.saved"]

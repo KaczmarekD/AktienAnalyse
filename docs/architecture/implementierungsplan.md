@@ -2115,6 +2115,75 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Die API-Tests aus P3.3 laufen unverändert über den RPC-Adapter.
 - **Implementierung:** Request/Reply-Adapter für `ScoringPreview` und die Profil-Befehle.
+- **Entwurf (04.11.2026):**
+  - **Contracts** (`va_contracts.rpc.v1`, neu und additiv):
+    - Je Befehl ein Anfrage- und ein Antwortmodell. `RpcSpec` verbindet Name, Subject
+      (`rpc.va.<name>`) und Modelle, wie `EventSpec` bei den Events. Katalog `RPCS`.
+    - Befehle: `scoring.factors`, `scoring.preview`, `scoring.profiles.save`,
+      `scoring.profiles.activate`.
+    - Jede Antwort hat ein optionales Feld `error` mit `code` und `message`, bei einem Konflikt
+      auch `newest`. Codes: `no_data`, `unknown_profile`, `unknown_version`, `conflict`,
+      `invalid`, `internal`.
+    - Die JSON-Schemas liegen als Golden-Files unter `tests/golden/contracts/rpc/v1/`.
+  - **Transport** (`NatsBus`, Core-NATS ohne Stream):
+    - `call(spec, request)` wartet auf die Antwort. Antwortet niemand oder läuft die Zeit ab,
+      gibt es `RpcUnavailable`.
+    - `serve(spec, handler, queue=…)` beantwortet Anfragen im Thread-Pool. Mehrere Worker teilen
+      sich eine Queue-Gruppe. Eine ungültige Anfrage ergibt den Code `invalid`, eine Exception
+      im Handler `internal`.
+  - **web-api** (`va_web_api.rpc`):
+    - `RemoteScoring` setzt beide Ports (`ScoringPreview`, `ProfileCommands`) über `call` um.
+      Die Fehlercodes werden wieder zu den Exceptions der Ports.
+    - `scoring_handlers(preview, commands)` ist die Gegenseite: Sie macht aus beliebigen
+      Umsetzungen der Ports die Handler für `serve`.
+    - Beide Richtungen liegen beim web-api, weil die Befehle die entfernte Form seiner Ports
+      sind. Das Format steht neutral in `va_contracts`.
+  - **Wer antwortet:** Der Worker (`python -m src.worker`, P4.7) bedient die vier Subjects mit
+    dem Code aus P3.3 und der Rolle `va_app`.
+    - `InProcessPreview` und `InProcessCommands` ziehen dafür von `src/web.py` nach
+      `src/scoring_ops.py`, damit der Worker FastAPI nicht lädt.
+    - Die Vorschau liest weiter die Snapshots aus `market_data`. Das geht nur in der Composition
+      Root und wird erst mit den Rollen je Service (P5.3) zur lokalen Kopie bei scoring.
+  - **Wann über NATS:** mit `WEB_API_NATS_URL`. Ohne sie bleibt alles im Prozess, wie auf der NAS
+    und im E2E-Stack.
+    - Das web-api öffnet dafür eine eigene NATS-Verbindung im Hintergrund, mit Wiederholung wie
+      der Event-Consumer.
+    - Ist NATS oder der Worker nicht erreichbar, antworten die vier Endpunkte mit 503
+      („Scoring nicht erreichbar“).
+    - `WEB_API_PROFILES_DATABASE_URL` braucht es in diesem Fall nicht mehr.
+  - **Profil-Events:** Nach Speichern und Aktivieren meldet der Worker `scoring.profile.saved`
+    bzw. `scoring.profile.activated`. Der Eventmanager reicht sie an die offenen Tabs weiter
+    (Topic `profiles`).
+    - Sie gehen direkt an den Bus, ohne Outbox: Sie ändern keine Projektion.
+    - Ein verlorenes Event heißt nur, dass ein anderer Tab erst beim nächsten Laden die neue
+      Version sieht.
+  - **Test (rot):**
+    - Contracts:
+      - Golden-Schemas je Anfrage und Antwort.
+      - Subjects unter `rpc.va.`.
+      - Fehler mit `newest` kommen unverändert durch JSON.
+    - `NatsBus` mit NATS:
+      - `call`/`serve` hin und zurück.
+      - Ungültige Anfrage und Exception im Handler ergeben `invalid` bzw. `internal`.
+      - Ohne Antwortenden schnell `RpcUnavailable`.
+      - Zwei Server in einer Queue-Gruppe antworten nur einmal.
+    - Die API-Tests aus P3.3 laufen unverändert ein zweites Mal über NATS:
+      - mit den Fakes (`services/web-api/tests/test_scoring_api.py`);
+      - mit echter Datenbank über den Worker (`tests/db/web_api/test_scoring_api.py`).
+
+      Dafür bekommen die Fixtures `client` bzw. `api` einen Parameter.
+    - web-api: Ist NATS nicht erreichbar, antworten die Endpunkte mit 503.
+    - Worker: Nach dem Speichern über NATS kommt `scoring.profile.saved` beim Eventmanager an.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Verbindungen im web-api:** Request/Reply und Event-Consumer haben je eine eigene
+    NATS-Verbindung. Beide startet dieselbe Hintergrund-Aufgabe mit Wiederholung
+    (`_keep_started`, alle 30 s).
+  - **`scoring.factors`** ist ein eigener Befehl. Der Katalog hängt am Code von scoring, nicht an
+    den Profilen.
+  - **Fehler `invalid` und `internal`** sind Bugs und ergeben im web-api eine 500, wie bisher eine
+    Exception im selben Prozess.
+  - **`src/web.py`** enthält nur noch die Fabrik. Die Umsetzung der Ports liegt in
+    `src/scoring_ops.py`, und der Worker importiert sie ohne FastAPI.
 
 ### Phase 5 – Aufteilen in Services
 

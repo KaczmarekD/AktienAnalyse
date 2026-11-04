@@ -6,6 +6,9 @@ allein bietet alles ausser diesen. Der Lifespan oeffnet die Datenbank: Rolle ``v
 schreibgeschuetzten Transaktionen, dazu fuer die Profil-Befehle ``va_profiles``. Die Engines
 verbinden sich erst beim ersten Zugriff, Health und Doku kommen ohne Datenbank aus.
 
+Mit ``WEB_API_NATS_URL`` beantwortet der Worker Vorschau und Profil-Befehle ueber NATS (P4.8);
+ohne rechnet der Code von scoring im selben Prozess (``src.web``).
+
 Mit ``WEB_API_NATS_URL`` und ``WEB_API_PROJECTIONS_DATABASE_URL`` startet der Lifespan ausserdem
 im Hintergrund den Event-Consumer (P4.4): Die Events aus NATS fuellen die Projektionen im Schema
 ``web``. Ist NATS nicht erreichbar, laeuft die App ohne und versucht es spaeter erneut.
@@ -26,6 +29,7 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
@@ -34,12 +38,15 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
 from va_platform.db import create_db_engine
+from va_platform.nats import NatsBus
 
 from .api import health, instruments, ranking, reports, runs, scoring
-from .events import Broadcaster, open_event_consumer
+from .events import open_event_consumer
+from .ports import ScoringUnavailable
 from .realtime import endpoint
 from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
+from .rpc import RemoteScoring
 from .runs import RunManager
 from .security import JsonOnlyMiddleware
 from .settings import WebApiSettings
@@ -49,7 +56,6 @@ if TYPE_CHECKING:
     from sqlalchemy import Engine
 
     from va_contracts import Envelope
-    from va_platform.nats import NatsBus
 
     from .ports import ProfileCommands, ScoringPreview
     from .runs import Schedule
@@ -63,31 +69,39 @@ def _operation_id(route: APIRoute) -> str:
     return route.name
 
 
-EVENTS_RETRY_SECONDS = 30.0  # so oft versucht das web-api, den Event-Consumer zu starten
+NATS_RETRY_SECONDS = 30.0  # so oft versucht das web-api, eine NATS-Verbindung aufzubauen
 RUNS_TICK_SECONDS = 60.0  # Takt von Scheduler, Watchdog und Outbox (P4.7)
 
 
-async def _keep_events(app: FastAPI, url: str, engine: Engine, broadcaster: Broadcaster) -> None:
-    """Startet den Event-Consumer (P4.4) im Hintergrund, bis er laeuft.
+async def _keep_started(app: FastAPI, attr: str, start: Callable[[], NatsBus], what: str) -> None:
+    """Baut eine NATS-Verbindung im Hintergrund auf, bis sie steht, und legt sie unter
+    ``app.state.<attr>`` ab: den Event-Consumer (P4.4) und die fuer Request/Reply (P4.8).
 
     Der Start der App wartet nicht darauf: Ist NATS (noch) nicht da, laeuft das web-api ohne
-    Projektionen weiter und versucht es alle ``EVENTS_RETRY_SECONDS`` erneut.
+    weiter und versucht es alle ``NATS_RETRY_SECONDS`` erneut.
     """
     while True:
         try:
             # Im Thread: Der Start wartet auf NATS und darf die Event-Loop nicht blockieren
-            bus: NatsBus = await asyncio.to_thread(open_event_consumer, url, engine, broadcaster)
+            bus = await asyncio.to_thread(start)
         except Exception:
             log.warning(
-                "Event-Consumer nicht gestartet, neuer Versuch in %.0f s",
-                EVENTS_RETRY_SECONDS,
+                "%s nicht gestartet, neuer Versuch in %.0f s",
+                what,
+                NATS_RETRY_SECONDS,
                 exc_info=True,
             )
-            await asyncio.sleep(EVENTS_RETRY_SECONDS)
+            await asyncio.sleep(NATS_RETRY_SECONDS)
         else:
-            app.state.events = bus
-            log.info("Event-Consumer laeuft, Projektionen werden gefuellt")
+            setattr(app.state, attr, bus)
+            log.info("%s laeuft", what)
             return
+
+
+def _rpc_bus(url: str) -> NatsBus:
+    bus = NatsBus(url)
+    bus.start()
+    return bus
 
 
 async def _keep_runs(manager: RunManager, schedule: Schedule | None) -> None:
@@ -131,12 +145,17 @@ def create_app(
         app.state.profiles_engine = (
             None if profiles_url is None else create_db_engine(profiles_url.get_secret_value())
         )
-        app.state.preview = None if preview is None else preview(app.state.engine)
-        app.state.commands = (
-            None
-            if commands is None or app.state.profiles_engine is None
-            else commands(app.state.profiles_engine)
-        )
+        app.state.rpc = None
+        if settings.nats_url:
+            # P4.8: Vorschau und Profil-Befehle beantwortet der Worker ueber NATS
+            app.state.preview = app.state.commands = RemoteScoring(lambda: app.state.rpc)
+        else:
+            app.state.preview = None if preview is None else preview(app.state.engine)
+            app.state.commands = (
+                None
+                if commands is None or app.state.profiles_engine is None
+                else commands(app.state.profiles_engine)
+            )
         # P4.5: WebSocket-Hub; der Eventmanager meldet ueber den Broadcaster aus seinen Threads
         app.state.settings = settings
         app.state.hub = WebSocketHub()
@@ -147,12 +166,17 @@ def create_app(
         tasks: list[asyncio.Task[None]] = []
         nats_url, projections = settings.nats_url, settings.projections_database_url
         app.state.replayer = NatsReplayer(nats_url) if nats_url else None
-        if nats_url and projections is not None:
-            app.state.projections_engine = create_db_engine(projections.get_secret_value())
+        if nats_url:
             tasks.append(
                 asyncio.create_task(
-                    _keep_events(app, nats_url, app.state.projections_engine, app.state.broadcaster)
+                    _keep_started(app, "rpc", partial(_rpc_bus, nats_url), "Verbindung zu scoring")
                 )
+            )
+        if nats_url and projections is not None:
+            engine = app.state.projections_engine = create_db_engine(projections.get_secret_value())
+            consumer = partial(open_event_consumer, nats_url, engine, app.state.broadcaster)
+            tasks.append(
+                asyncio.create_task(_keep_started(app, "events", consumer, "Event-Consumer"))
             )
             # P4.7: Runs anlegen, ueberwachen und ihre Events senden
             app.state.runs = RunManager(
@@ -169,8 +193,9 @@ def create_app(
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
-            if app.state.events is not None:
-                await asyncio.to_thread(app.state.events.close)
+            for bus in (app.state.events, app.state.rpc):
+                if bus is not None:
+                    await asyncio.to_thread(bus.close)
             if app.state.replayer is not None:
                 with contextlib.suppress(Exception):
                     await app.state.replayer.close()
@@ -197,6 +222,10 @@ def create_app(
         app.include_router(module.router, prefix=API_PREFIX)
     # P4.5: WebSocket unter /ws, nginx reicht ihn neben /api/ weiter
     app.include_router(endpoint.router)
+
+    @app.exception_handler(ScoringUnavailable)
+    async def scoring_down(request: Request, exc: ScoringUnavailable) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI
+        return JSONResponse(status_code=503, content={"detail": "Scoring nicht erreichbar"})
 
     @app.exception_handler(OperationalError)
     async def database_down(request: Request, exc: OperationalError) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI

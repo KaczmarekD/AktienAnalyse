@@ -17,6 +17,9 @@ selbst ``publish`` aufrufen.
 - **Wiederholung:** Es gilt die Grenze des Busses (``max_deliver``), wie im Prozess. Danach
   Dead-Letter-Callback und ``term()``, vorher ``nak()``. Solange ein Handler laeuft, sendet der
   Bus In-Progress-Acks, sonst stellte JetStream nach ``ack_wait`` erneut zu.
+- **Request/Reply (P4.8):** ``call`` und ``serve`` auf ``rpc.va.…`` ueber Core-NATS. Ein Server
+  antwortet je Queue-Gruppe; Fehler kommen als ``error`` in der Antwort zurueck. Antwortet
+  niemand, wirft ``call`` ``RpcUnavailable``.
 """
 
 from __future__ import annotations
@@ -34,9 +37,11 @@ import nats
 import nats.errors
 from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
 from nats.js.errors import NotFoundError
+from pydantic import ValidationError
 
 from va_contracts import Envelope, parse_envelope
 from va_contracts.events.v1 import BY_DATASCHEMA
+from va_contracts.rpc.v1 import RpcErrorV1
 
 from ..bus import DeadLetter, _readable
 from ..messaging import OutboxMessage
@@ -51,6 +56,7 @@ if TYPE_CHECKING:
 
     from va_contracts import Contract
     from va_contracts.events.v1 import EventSpec
+    from va_contracts.rpc.v1 import RpcReplyV1, RpcSpec
 
     from ..bus import Handler
 
@@ -61,6 +67,13 @@ FETCH_TIMEOUT = 1.0  # so lange wartet eine Abholung; danach prueft die Schleife
 # lange neu verbinden, etwa wenn NATS neu startet. nats-py wartet 2 s zwischen den Versuchen.
 CONNECT_ATTEMPTS = 3
 RECONNECT_ATTEMPTS = 60
+
+RPC_TIMEOUT = 30.0  # P4.8: so lange wartet ``call``; die Vorschau rechnet auf dem J4125 Sekunden
+
+
+class RpcUnavailable(Exception):
+    """Request/Reply ohne Antwort: niemand abonniert (NATS meldet das sofort) oder Zeit abgelaufen."""
+
 
 # Stream-Sequenz der Nachricht, die der Handler gerade verarbeitet (P4.4); je Handler-Thread
 _SEQUENCE: ContextVar[int | None] = ContextVar("va-nats-sequence", default=None)
@@ -214,6 +227,46 @@ class NatsBus:
         assert self._publisher is not None, "start() fehlt"
         message = OutboxMessage(envelope.id, spec.subject, payload)
         self._call(self._publisher.publish(message))
+
+    # -- Request/Reply (P4.8) --------------------------------------------------------------
+
+    def call[Q: Contract, R: RpcReplyV1](
+        self, spec: RpcSpec[Q, R], request: Q, *, timeout: float = RPC_TIMEOUT
+    ) -> R:
+        """Schickt die Anfrage und wartet auf die Antwort; ``RpcUnavailable`` ohne Antwort."""
+        payload = request.model_dump_json().encode()
+        try:
+            message = self._call(
+                self._client().request(spec.subject, payload, timeout=timeout),
+                timeout=timeout + self._timeout,
+            )
+        except (nats.errors.NoRespondersError, nats.errors.TimeoutError, TimeoutError) as e:
+            raise RpcUnavailable(spec.name) from e
+        return spec.reply.model_validate_json(message.data)
+
+    def serve[Q: Contract, R: RpcReplyV1](
+        self, spec: RpcSpec[Q, R], handler: Callable[[Q], R], *, queue: str
+    ) -> None:
+        """Beantwortet Anfragen auf ``spec.subject`` im Thread-Pool, nacheinander.
+
+        Mehrere Server derselben ``queue`` teilen sich die Anfragen. Passt eine Anfrage nicht zum
+        Modell, antwortet der Bus mit ``invalid``, wirft der Handler, mit ``internal``.
+        """
+        self._call(self._serve(spec, handler, queue))
+
+    async def _serve(
+        self, spec: RpcSpec[Any, Any], handler: Callable[[Any], Any], queue: str
+    ) -> None:
+        loop = asyncio.get_running_loop()
+
+        async def on_message(message: Msg) -> None:
+            reply = await loop.run_in_executor(self._pool, _answer, spec, handler, message.data)
+            try:
+                await message.respond(reply)
+            except Exception:
+                log.warning("Antwort auf %s nicht gesendet", spec.subject, exc_info=True)
+
+        await self._client().subscribe(spec.subject, queue=queue, cb=on_message)
 
     def settle(self, timeout: float = 30.0) -> None:
         """Wartet, bis die eigenen Consumer nichts mehr offen haben und kein Handler laeuft.
@@ -423,6 +476,23 @@ class NatsBus:
 
 
 BY_TYPE_SUBJECT = {spec.type: spec.subject for spec in BY_DATASCHEMA.values()}
+
+
+def _answer(spec: RpcSpec[Any, Any], handler: Callable[[Any], Any], raw: bytes) -> bytes:
+    """Eine Anfrage beantworten; Fehler werden zur Antwort mit ``error``."""
+    try:
+        request = spec.request.model_validate_json(raw)
+    except ValidationError as e:
+        reply = spec.reply(error=RpcErrorV1(code="invalid", message=str(e)))
+    else:
+        try:
+            reply = handler(request)
+        except Exception as e:
+            log.exception("%s: Anfrage nicht beantwortet", spec.name)
+            reply = spec.reply(
+                error=RpcErrorV1(code="internal", message=f"{type(e).__name__}: {e}")
+            )
+    return reply.model_dump_json().encode()
 
 
 def _deliver_volatile(handler: Handler[Any], raw: bytes) -> None:
