@@ -112,6 +112,9 @@ class FakeRecorder:
     def record_delivery(self, **kwargs):
         self.calls.append(("record_delivery", kwargs))
 
+    def delivered_report(self, scoring_run_id):
+        return None
+
     def finish_run(self, run_id, **kwargs):
         self.calls.append(("finish_run", kwargs))
         if self.fail_finish:

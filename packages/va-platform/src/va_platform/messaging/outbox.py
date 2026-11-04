@@ -20,6 +20,7 @@ from sqlalchemy import Text, cast, func, insert, select, update
 from va_contracts.events.v1 import BY_DATASCHEMA
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from uuid import UUID
 
     from sqlalchemy import Engine
@@ -99,10 +100,10 @@ class OutboxRelay:
         """
         published = 0
         while True:
-            batch = await asyncio.to_thread(self._pending)
+            batch = await asyncio.to_thread(_pending, self._engine, self._model, self._batch_size)
             for message in batch:
                 await self._publisher.publish(message)
-                await asyncio.to_thread(self._mark_published, message.id)
+                await asyncio.to_thread(_mark_published, self._engine, self._model, message.id)
                 published += 1
             if len(batch) < self._batch_size:
                 return published
@@ -140,25 +141,49 @@ class OutboxRelay:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=delay)
 
-    def _pending(self) -> list[OutboxMessage]:
-        model = self._model
-        query = (
-            select(model.id, model.subject, cast(model.payload, Text))
-            .where(model.published_at.is_(None))
-            .order_by(model.created_at, model.id)  # UUIDv7: gleiche Transaktion, gleiche Folge
-            .limit(self._batch_size)
-        )
-        with self._engine.connect() as conn:
-            return [
-                OutboxMessage(event_id, subject, payload.encode())
-                for event_id, subject, payload in conn.execute(query)
-            ]
 
-    def _mark_published(self, event_id: UUID) -> None:
-        model = self._model
-        with self._engine.begin() as conn:
-            conn.execute(
-                update(model)
-                .where(model.id == event_id, model.published_at.is_(None))
-                .values(published_at=func.now())
-            )
+def drain_outbox(
+    engine: Engine,
+    outbox: Outbox,
+    publish: Callable[[OutboxMessage], None],
+    *,
+    batch_size: int = 100,
+) -> int:
+    """Die synchrone Schwester von ``OutboxRelay.publish_pending``, ohne Event-Loop (P4.3b).
+
+    Fuer Aufrufer, die selbst synchron sind, etwa den ``ReliableBus`` im Batch. Gleiche Regeln:
+    Reihenfolge nach ``created_at`` und Event-ID, jeder Eintrag nach dem Senden markiert, beim
+    ersten Fehler Abbruch mit allem Spaeteren offen. Gibt die Anzahl zurueck.
+    """
+    published = 0
+    while True:
+        batch = _pending(engine, outbox.model, batch_size)
+        for message in batch:
+            publish(message)
+            _mark_published(engine, outbox.model, message.id)
+            published += 1
+        if len(batch) < batch_size:
+            return published
+
+
+def _pending(engine: Engine, model: type[OutboxMixin], limit: int) -> list[OutboxMessage]:
+    query = (
+        select(model.id, model.subject, cast(model.payload, Text))
+        .where(model.published_at.is_(None))
+        .order_by(model.created_at, model.id)  # UUIDv7: gleiche Transaktion, gleiche Folge
+        .limit(limit)
+    )
+    with engine.connect() as conn:
+        return [
+            OutboxMessage(event_id, subject, payload.encode())
+            for event_id, subject, payload in conn.execute(query)
+        ]
+
+
+def _mark_published(engine: Engine, model: type[OutboxMixin], event_id: UUID) -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            update(model)
+            .where(model.id == event_id, model.published_at.is_(None))
+            .values(published_at=func.now())
+        )

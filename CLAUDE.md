@@ -45,7 +45,9 @@ im Docker-Netz). `python -m va_platform.nats` legt Stream `VA_EVENTS` und die Co
 über NATS laufen lassen: `EVENT_BUS=nats` mit `NATS_URL`, `va_platform.nats.NatsBus` (eigener
 Adapter mit nats-py statt FastStream, Nachtrag in ADR-0002). Dann wartet `src/main.py` höchstens
 `RUN_TIMEOUT_MINUTES` auf das Ergebnis des `RunTracker`. Standard, auch auf der NAS, bleibt der
-Bus im Prozess, bis die Handler idempotent sind (P4.3b).
+Bus im Prozess. Seit P4.3b hängt jeder Service über einen `ReliableBus` am Bus, in beiden Modi:
+Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
+`RUN_TIMEOUT_MINUTES`) und schickt Folge-Events über seine Outbox.
 `make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
 tmpfs, in dem der Batch eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, nur mit
 `SMTP_PLAIN` und ohne Healthcheck erlaubt).
@@ -202,8 +204,12 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Outbox und Inbox (P4.2, Migration `0009`): Jedes Schema hat `outbox` und `inbox`. Die Modelle
   legt der Besitzer mit `OutboxMixin`/`InboxMixin` an (`ScoringOutbox` usw.), die Logik steht in
   `va_platform.messaging` (`Outbox`, `OutboxRelay`, `Inbox`). Events gehen mit den Fachdaten in
-  einer Transaktion in die Outbox, empfangene Events über `Inbox.process_once`. Bis P4.3b nutzt
-  sie noch niemand.
+  einer Transaktion in die Outbox, empfangene Events über `Inbox.process_once`. Seit P4.3b nutzt
+  sie der `ReliableBus` je Service (`src/composition.py`, `Adapters.messaging`):
+  - Inbox-Eintrag und Folge-Events kommen in einer Transaktion in die Outbox.
+  - Die Fachdaten schreibt der Handler kurz davor selbst, das ist die pragmatische Variante.
+  - Dazu kommen fachliche Sperren: Der Abruf des Tages wird wiederverwendet, und für einen
+    Bewertungslauf geht höchstens eine Report-Mail raus (`ReportStore.delivered_report`).
 - Zugriffe nur über die Repositories der Module (`get_*`/`write_*`,
   bewusst ohne delete). Jeder Titel wird sofort nach dem Abruf gespeichert.
 - Migrationen (Alembic, `migrations/`) sind nur additiv; jede neue Tabelle

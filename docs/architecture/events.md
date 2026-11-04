@@ -5,7 +5,8 @@
 > Seit P4.1 (01.11.2026) gibt es den NATS-Dienst und die Provisionierung von Stream und Consumern
 > (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Seit P4.3 kann der
 > Batch die Kette über NATS laufen lassen (`EVENT_BUS=nats`, `va_platform.nats.NatsBus`).
-> Standard bleibt der Bus im Prozess, bis die Handler idempotent sind (P4.3b).
+> Standard bleibt der Bus im Prozess. Seit P4.3b hängt jeder Service über einen `ReliableBus` mit
+> Inbox und Outbox am Bus (siehe unten).
 
 ## Grundprinzipien
 
@@ -179,6 +180,21 @@ Schreibschutz ([datenhaltung.md](datenhaltung.md)).
 - **Schreibschutz:**
   - Der Trigger `va_guard_outbox` lässt nur ein UPDATE zu, das `published_at` einmal setzt.
   - `va_app` hat dafür nur das Spaltenrecht `UPDATE (published_at)`.
+
+**`ReliableBus` (P4.3b, pragmatisch):** So nutzen die Handler Outbox und Inbox, im Prozess wie über
+NATS. Er umhüllt den Bus je Service, mit Inbox und Outbox aus dessen Schema.
+
+- **Zustellung:**
+  - Ein Event älter als `RUN_TIMEOUT_MINUTES` wird übersprungen, ebenso eines, das der Consumer
+    schon verarbeitet hat.
+  - Sonst läuft der Handler, und was er veröffentlicht, sammelt der Wrapper.
+  - Inbox-Eintrag und Folge-Events kommen dann in einer Transaktion in die Outbox.
+  - `drain_outbox` gibt die offenen Einträge danach an den Bus weiter.
+- **Fachdaten:** Die schreibt der Handler selbst kurz davor. Stürzt der Prozess genau dazwischen
+  ab, läuft er bei erneuter Zustellung noch einmal. Dagegen stehen fachliche Sperren:
+  - market-data nutzt den Abruf des Tages wieder.
+  - notification verschickt für einen Bewertungslauf höchstens eine Report-Mail.
+  - Ein zweiter Bewertungslauf ist harmlos, die Tabellen sind nur zum Anfügen.
 
 ## Consumer
 

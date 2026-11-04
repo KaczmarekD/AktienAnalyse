@@ -209,7 +209,6 @@ def _open_bus(
     if settings.event_bus == "in_process":
         yield InProcessBus(max_deliver=MAX_DELIVER, on_dead_letter=on_dead_letter)
         return
-    log.warning("EVENT_BUS=nats: Die Handler sind erst ab P4.3b idempotent, nur zum Testen")
     assert settings.nats_url  # prueft Settings
     bus = NatsBus(settings.nats_url, max_deliver=MAX_DELIVER, on_dead_letter=on_dead_letter)
     bus.start()

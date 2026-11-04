@@ -55,12 +55,6 @@ def test_same_result_as_in_process(settings, nats_settings, mock_universe_df):
     assert base._pings(remote_adapters)[-1].args[0] is True
 
 
-def test_warns_that_handlers_are_not_idempotent_yet(nats_settings, mock_universe_df):
-    _, recorder, _ = _run(nats_settings, mock_universe_df)
-    messages = [entry.message for entry in recorder.get("record_logs")[0]]
-    assert any("P4.3b" in message for message in messages)
-
-
 def test_dead_letter_fails_the_run_with_alarm(nats_settings, mock_universe_df):
     with patch(
         "va_scoring.entrypoints.handlers.SnapshotCompletedHandler.__call__",

@@ -72,6 +72,9 @@ class Store:
     def record_delivery(self, **kwargs):
         pass
 
+    def delivered_report(self, scoring_run_id):
+        return None
+
     def start_run(self, **kwargs):
         return 1
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from ..db import session_scope
@@ -38,6 +39,14 @@ class Inbox:
         Commit der Session. Eine parallele Zustellung desselben Events wartet so lange: Nach
         dem Commit bekommt sie ``False``, nach einem Rollback ist sie selbst dran."""
         return self._insert(session, message_id, consumer, error=None)
+
+    def seen(self, session: Session, message_id: UUID, consumer: str) -> bool:
+        """Hat dieser Consumer das Event schon verarbeitet oder aufgegeben (P4.3b)?"""
+        model = self.model
+        query = select(model.message_id).where(
+            model.message_id == message_id, model.consumer == consumer
+        )
+        return session.execute(query).first() is not None
 
     def record_dead_letter(
         self, session: Session, message_id: UUID, consumer: str, error: str

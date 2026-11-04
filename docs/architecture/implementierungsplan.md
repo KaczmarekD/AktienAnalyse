@@ -1675,6 +1675,67 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Implementierung:** Die Stores von market-data, scoring und notification schreiben
   Inbox-Eintrag, Fachdaten und Folge-Event über die Outbox in einer Transaktion (P4.2). Das
   Relay läuft im Batch mit. Erst danach wird NATS auf der NAS eingeschaltet.
+- **Entwurf (04.11.2026):**
+  - **Entscheidung (User, 04.11.2026): pragmatisch.** Gewählt ist ein gemeinsamer Wrapper je
+    Service statt eines Umbaus aller Store-Ports.
+    - Inbox-Eintrag und Folge-Events kommen in eine Transaktion. Die Fachdaten schreibt der
+      Handler wie bisher kurz davor.
+    - **Rest-Risiko:** Ein Absturz genau zwischen Fachdaten und Abschluss lässt den Handler bei
+      erneuter Zustellung noch einmal laufen.
+    - Dagegen stehen fachliche Sperren: market-data nutzt den Abruf des Tages wieder, und
+      notification verschickt keine zweite Mail.
+    - Ein zweiter Bewertungslauf schadet nicht, die Tabellen sind nur zum Anfügen.
+  - **`va_platform.messaging.ReliableBus`:** Er umhüllt den Bus für die Handler eines Service,
+    mit Inbox und Outbox aus dessen Schema.
+    - **Zustellung:**
+      1. Ist das Event älter als `max_age`, wird es übersprungen. Das ist ein veraltetes Event
+         aus einem abgebrochenen Lauf.
+      2. Hat dieser Consumer das Event schon verarbeitet, wird es übersprungen.
+      3. Sonst läuft der Handler. Was er dabei veröffentlicht, sammelt der Wrapper.
+      4. Danach kommen Inbox-Eintrag und gesammelte Events in einer Transaktion in die Outbox.
+      5. Dann gibt der Wrapper die offenen Einträge an den Bus weiter.
+    - Wirft der Handler, gibt es weder Inbox-Eintrag noch Folge-Events. Der Bus entscheidet
+      dann wie bisher über Wiederholung oder Dead Letter.
+    - Flüchtige Events und alles, was außerhalb einer Zustellung veröffentlicht wird (Start des
+      Laufs, Dead Letter in `src/main.py`), gehen direkt an den Bus.
+    - **Weitergeben:** `drain_outbox` ist die synchrone Schwester des `OutboxRelay` aus P4.2,
+      ohne eigene Event-Loop. Auch bei einem schon verarbeiteten Event gibt der Wrapper
+      Liegengebliebenes weiter, etwa nach einem Fehler beim letzten Versand.
+  - **Verdrahtung:**
+    - `Adapters.messaging` liefert in `build_adapters` je Service den `ReliableBus` mit der
+      Engine. `max_age` ist `RUN_TIMEOUT_MINUTES`.
+    - Tests mit Fakes lassen es leer, dann hängen die Handler wie bisher direkt am Bus.
+    - Der Wrapper gilt auch im Prozess, damit der Weg auf der NAS und im E2E-Test derselbe ist.
+  - **Sperre in notification:** Hat ein Bewertungslauf schon eine erfolgreich verschickte
+    Report-Mail, geht keine zweite raus.
+    - Es entsteht kein zweiter Report und kein Ping. Der Handler meldet `report.sent` mit dem
+      vorhandenen Report.
+    - Dafür gibt es den Port `ReportStore.delivered_report(scoring_run_id)`.
+  - **NATS:** Die Warnung „erst ab P4.3b idempotent“ entfällt. Der Standard bleibt der Bus im
+    Prozess. NATS auf der NAS ist eine eigene Entscheidung beim Deployment.
+  - **Test (rot):**
+    - DB-Tests für den `ReliableBus` (Bus im Prozess, Schema `scoring`):
+      - Folge-Events gehen über die Outbox und sind danach veröffentlicht.
+      - Eine doppelte Zustellung ruft den Handler nur einmal auf.
+      - Ein werfender Handler hinterlässt weder Inbox- noch Outbox-Eintrag.
+      - Ein veraltetes Event wird übersprungen.
+      - Flüchtige Events und Events außerhalb einer Zustellung gehen direkt an den Bus.
+      - Ein liegengebliebener Outbox-Eintrag geht mit der nächsten Zustellung raus.
+    - `drain_outbox`: in Reihenfolge, markiert, bricht bei einem Fehler ab.
+    - Batch mit echter Datenbank: Dasselbe `screening.run.requested` zweimal zugestellt ergibt
+      einen Abruf, einen Bewertungslauf und eine Mail.
+    - Ein `screening.run.requested` älter als `RUN_TIMEOUT_MINUTES` startet keinen Abruf.
+    - notification: Bei schon verschickter Mail keine zweite, aber `report.sent`.
+    - Repository: `delivered_report` findet nur erfolgreich verschickte Reports.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - `drain_outbox` und `OutboxRelay` teilen sich die Abfragen (offene Einträge, Markieren).
+  - **Fehler beim Weitergeben:** Scheitert `drain_outbox` nach dem Abschluss, wirft der
+    Wrapper. Der Bus entscheidet dann über Wiederholung. Die erneute Zustellung trifft auf
+    den Inbox-Eintrag und gibt das Liegengebliebene weiter.
+  - **Folge für die NAS:** Auch im Prozess schreibt jeder Lauf je Stufe einen Inbox- und einen
+    Outbox-Eintrag (Migration `0009`, Rolle `va_app`). Der E2E-Test läuft diesen Weg mit
+    echter Datenbank.
+  - Das Replay-Werkzeug hängt die Handler weiter direkt an den Bus und schreibt nichts.
 
 #### P4.4 Eventmanager und Projektionen
 

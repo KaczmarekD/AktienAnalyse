@@ -33,6 +33,11 @@ class PostgresReportStore:
                 bottom_n=report.bottom_count,
             )
 
+    def delivered_report(self, scoring_run_id: int) -> tuple[int, str] | None:
+        with session_scope(self._engine) as s:
+            report = ReportingRepository(s).get_delivered_report(scoring_run_id)
+            return None if report is None else (report.id, report.subject)
+
     def record_delivery(
         self,
         *,

@@ -232,6 +232,9 @@ class _ReportCapture:
     def record_delivery(self, **kwargs: Any) -> None:  # noqa: ARG002 - Signatur des Ports
         return None
 
+    def delivered_report(self, scoring_run_id: int) -> tuple[int, str] | None:  # noqa: ARG002
+        return None  # Der Replay verschickt nichts (dry_run), die Sperre greift ohnehin nicht
+
 
 class _NoSender:
     def send(

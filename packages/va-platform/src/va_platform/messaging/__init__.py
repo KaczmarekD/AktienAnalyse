@@ -9,11 +9,20 @@ Mindestens einmal zugestellt, einmal verarbeitet:
   Transaktion wie seine Fachdaten und Folge-Events.
 
 Die Tabellen legt jeder Besitzer eines Schemas mit ``OutboxMixin`` und ``InboxMixin`` an.
+Der ``ReliableBus`` (P4.3b) bringt beides fuer die Handler eines Service zusammen.
 """
 
 from .inbox import Inbox
 from .models import InboxMixin, OutboxMixin, outbox_table_args
-from .outbox import Outbox, OutboxMessage, OutboxRelay, Publisher, VolatileEventError
+from .outbox import (
+    Outbox,
+    OutboxMessage,
+    OutboxRelay,
+    Publisher,
+    VolatileEventError,
+    drain_outbox,
+)
+from .reliable import ReliableBus
 
 __all__ = [
     "Inbox",
@@ -23,6 +32,8 @@ __all__ = [
     "OutboxMixin",
     "OutboxRelay",
     "Publisher",
+    "ReliableBus",
     "VolatileEventError",
+    "drain_outbox",
     "outbox_table_args",
 ]
