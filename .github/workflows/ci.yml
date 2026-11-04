@@ -289,10 +289,9 @@ jobs:
           echo "$images"
           grep -qx "ghcr.io/kaczmarekd/value-analyzer:latest" <<< "$images"
           grep -qx "ghcr.io/kaczmarekd/va-frontend:latest" <<< "$images"
-          # P5.1: die Services mit dem Profil nats
-          services=$(docker compose --profile nats config --images)
-          for image in va-market-data va-scoring va-notification; do
-            grep -qx "ghcr.io/kaczmarekd/$image:latest" <<< "$services"
+          # P5.1/P5.4: die Services und das web-api mit ihren eigenen Images, ohne Profil
+          for image in va-market-data va-scoring va-notification va-web-api; do
+            grep -qx "ghcr.io/kaczmarekd/$image:latest" <<< "$images"
           done
 
       # ADR-0008: dieselben Pakete wie im Laufzeit-Image, unter QEMU mit einem

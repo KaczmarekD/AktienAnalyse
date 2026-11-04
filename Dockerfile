@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1 \
     TZ=Europe/Berlin
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        cron tzdata ca-certificates \
+        tzdata ca-certificates \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Abhaengigkeiten exakt aus uv.lock (ohne Dev-Tools) direkt ins System-Python
-# (/usr/local): entrypoint.sh und Cron rufen /usr/local/bin/python auf.
+# (/usr/local): entrypoint.sh ruft /usr/local/bin/python auf.
 # --locked: Abbruch, wenn uv.lock nicht zu pyproject.toml passt.
 # --inexact: Pakete des Basis-Images (z. B. pip) bleiben erhalten.
 # uv selbst und seine Variablen gibt es nur in diesem Schritt, nicht im Image.
@@ -61,7 +61,7 @@ COPY migrations/ ./migrations/
 COPY alembic.ini ./
 COPY data/ ./data/
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && touch /var/log/cron.log
+RUN chmod +x /entrypoint.sh
 
 VOLUME ["/app/data", "/app/logs"]
 

@@ -44,6 +44,10 @@ services:
     volumes: !override
       - ./tests/fixtures/replay:/app/e2e:ro
 
+  migrate:
+    container_name: value-analyzer-e2e-migrate
+    image: ${E2E_APP_IMAGE:-value-analyzer:local}
+
   web-api:
     container_name: value-analyzer-e2e-web-api
     # CI: das Image des web-api (P5.1, E2E_WEB_API_IMAGE=va-web-api:ci); lokal das App-Image
@@ -55,6 +59,8 @@ services:
     entrypoint:
       ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
        "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      WEB_API_SCHEDULE: ""  # der Test startet den Lauf selbst
 
   # P5.2: die drei Services; CI mit ihren Images aus P5.1, lokal aus dem App-Image
   market-data:

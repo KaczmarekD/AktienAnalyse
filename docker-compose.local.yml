@@ -96,19 +96,25 @@ services:
       - "127.0.0.1:8025:8025"  # Weboberflaeche
       - "127.0.0.1:1025:1025"  # SMTP, auch fuer make run/dry aus der .venv
 
+  migrate:
+    container_name: value-analyzer-local-migrate
+    image: value-analyzer:local
+    pull_policy: never
+
   web-api:
-    # Wie auf der NAS (docker-compose.yml), aber aus dem Arbeitsstand (gebaut von make local-up)
-    # und lokal direkt erreichbar, mit Swagger unter /api/docs
+    # Wie auf der NAS (docker-compose.yml), aber aus dem App-Image des Arbeitsstands (gebaut von
+    # make local-up) und lokal direkt erreichbar, mit Swagger unter /api/docs
     container_name: value-analyzer-local-web-api
     image: value-analyzer:local
     pull_policy: never
+    entrypoint:
+      ["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app",
+       "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "127.0.0.1:8000:8000"
-    # P4.4: Projektionen aus NATS (Consumer web-api). Gefuellt werden sie, wenn der Batch mit
-    # EVENT_BUS=nats laeuft. Ohne VA_WEB_PASSWORD in der .env scheitert das Schreiben (Log)
     environment:
-      WEB_API_NATS_URL: nats://nats:4222
-      WEB_API_PROJECTIONS_DATABASE_URL: postgresql+psycopg://va_web:${VA_WEB_PASSWORD:-}@db:5432/value_analyzer
+      # Lokal keine Wochenlaeufe von selbst (Runs startet das UI oder make local-run)
+      WEB_API_SCHEDULE: ""
 
   frontend:
     # nginx mit dem Build aus dem Arbeitsstand (make local-ui). Nur auf Wunsch: Der Node-Build

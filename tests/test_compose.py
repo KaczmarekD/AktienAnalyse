@@ -209,27 +209,26 @@ class TestLocalWebApi:
     def test_runs_from_the_local_image_with_uvicorn(self, local):
         api = local["services"]["web-api"]
         assert api["image"] == "value-analyzer:local"
-        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. P3.3: die Composition
-        # Root src.web, die Vorschau und Profil-Befehle aus scoring im selben Prozess verdrahtet
+        # Eigener Einstiegspunkt: kein Migrationslauf mit der Owner-Rolle. Seit P5.4 wie auf der
+        # NAS ohne src: Vorschau, Profile und Reports beantworten die Services ueber NATS
         assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
-        assert "src.web:create_app" in api["entrypoint"]
+        assert "va_web_api.main:create_app" in api["entrypoint"]
 
     def test_gets_only_its_own_roles(self, local):
         env = local["services"]["web-api"]["environment"]
-        # keine Zugangsdaten des Batches: lesen (va_read), Profile (va_profiles, P3.3) und
-        # Projektionen (va_web, P4.4), dazu NATS fuer den Event-Consumer
+        # keine Zugangsdaten des Batches: lesen (va_read) und Projektionen (va_web, P4.4), dazu
+        # NATS. Seit P5.4 speichert scoring die Profile selbst, va_profiles braucht es nicht mehr
         assert set(env) == {
             "TZ",
             "WEB_API_DATABASE_URL",
-            "WEB_API_PROFILES_DATABASE_URL",
             "WEB_API_NATS_URL",
             "WEB_API_PROJECTIONS_DATABASE_URL",
+            "WEB_API_SCHEDULE",
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
-        assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
-        assert "@db:5432/value_analyzer" in env["WEB_API_PROFILES_DATABASE_URL"]
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
         assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert env["WEB_API_SCHEDULE"] == ""  # lokal keine Wochenlaeufe von selbst
 
     def test_e2e_web_api_runs_the_full_stack(self, e2e):
         """P5.2: Der E2E-Stack prueft die Zielarchitektur: NATS, Projektionen, Services."""
@@ -240,11 +239,12 @@ class TestLocalWebApi:
         # Ohne src: laeuft mit dem App-Image wie mit dem Image des web-api (P5.1)
         assert "va_web_api.main:create_app" in api["entrypoint"]
 
-    def test_nas_web_api_stays_without_projections(self, nas):
-        """Auf der NAS laeuft die Kette im Prozess: Es gaebe nichts zu projizieren (P4.4)."""
+    def test_nas_web_api_runs_with_nats_and_plans_the_week(self, nas):
+        """P5.4: Auf der NAS ist NATS Standard; das web-api plant den Wochenlauf statt Cron."""
         env = nas["services"]["web-api"]["environment"]
-        assert "WEB_API_NATS_URL" not in env
-        assert "WEB_API_PROJECTIONS_DATABASE_URL" not in env
+        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_SCHEDULE"] == "30 7 * * 6"  # CRON_SCHEDULE aus der .env
 
 
 class TestLocalFrontend:
@@ -287,11 +287,42 @@ class TestNasDefinition:
         batch = nas["services"]["value-analyzer"]
         assert batch["image"] == "ghcr.io/kaczmarekd/value-analyzer:latest"
         assert "build" not in batch
-        assert "profiles" not in batch
+        # P5.4: kein Cron mehr, der Batch laeuft nur auf Wunsch (make docker-run, Regression)
+        assert batch["profiles"] == ["run"]
 
-    def test_services_on_the_nas(self, nas):
-        # Batch, Datenbank, seit P3.6 das UI (frontend vor dem web-api), seit P4.1 NATS
-        assert set(nas["services"]) == {"db", "value-analyzer", "web-api", "frontend", "nats"}
+    def test_services_on_the_nas(self, tmp_path):
+        # P5.4: die Zielarchitektur ohne Profil: Migration, NATS, drei Services, web-api, UI
+        nas = _config(tmp_path, NAS, profiles=())
+        assert set(nas["services"]) == {
+            "db",
+            "migrate",
+            "nats",
+            "market-data",
+            "scoring",
+            "notification",
+            "web-api",
+            "frontend",
+        }
+
+    def test_migration_runs_once_before_everything(self, nas):
+        migrate = nas["services"]["migrate"]
+        assert migrate["image"] == nas["services"]["value-analyzer"]["image"]
+        assert migrate["entrypoint"] == ["python", "-m", "src.db.migrate"]
+        assert migrate["restart"] == "no"
+        env = migrate["environment"]
+        assert env["DATABASE_OWNER_URL"].startswith("postgresql+psycopg://va_owner:")
+        for variable in (
+            "VA_PROFILES_PASSWORD",
+            "VA_WEB_PASSWORD",
+            "VA_MARKET_DATA_PASSWORD",
+            "VA_SCORING_PASSWORD",
+            "VA_NOTIFICATION_PASSWORD",
+        ):
+            assert variable in env
+        for name in ("market-data", "scoring", "notification", "web-api"):
+            assert nas["services"][name]["depends_on"]["migrate"]["condition"] == (
+                "service_completed_successfully"
+            )
 
     def test_nats_with_jetstream_and_its_own_data(self, nas):
         # P4.1: fester Stand, Daten unter ./natsdata, nur im Docker-Netz erreichbar
@@ -313,13 +344,19 @@ class TestNasDefinition:
     def test_web_api_has_no_port_and_only_its_two_roles(self, nas):
         api = nas["services"]["web-api"]
         assert "ports" not in api  # nur hinter nginx erreichbar
-        assert api["image"] == nas["services"]["value-analyzer"]["image"]
-        assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
-        assert "src.web:create_app" in api["entrypoint"]
+        # P5.4: das eigene Image (P5.1), der Einstieg steht darin
+        assert api["image"] == "ghcr.io/kaczmarekd/va-web-api:latest"
+        assert api.get("entrypoint") is None
         env = api["environment"]
-        assert set(env) == {"TZ", "WEB_API_DATABASE_URL", "WEB_API_PROFILES_DATABASE_URL"}
+        assert set(env) == {
+            "TZ",
+            "WEB_API_DATABASE_URL",
+            "WEB_API_NATS_URL",
+            "WEB_API_PROJECTIONS_DATABASE_URL",
+            "WEB_API_SCHEDULE",
+        }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
-        assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
 
     def test_db_creates_the_profiles_role_on_first_start(self, nas):
         env = nas["services"]["db"]["environment"]
@@ -375,6 +412,7 @@ class TestE2eStack:
             "market-data",
             "scoring",
             "notification",
+            "migrate",
         }
 
     def test_market_data_replays_the_fixture(self, e2e):
@@ -489,11 +527,12 @@ SERVICES = {
 class TestServices:
     """P5.1: Ein Container je Service aus seinem eigenen Image, nur mit dem Profil nats."""
 
-    def test_the_nas_starts_them_only_with_the_nats_profile(self, nas, nas_nats):
+    def test_the_nas_starts_them_without_a_profile(self, nas):
+        # P5.4: NATS und die Services sind Standard, kein Profil nats mehr
         for name in SERVICES:
-            assert name not in nas["services"]
-            assert name in nas_nats["services"]
-        assert "worker" not in nas_nats["services"]  # bis P5.1 ein Prozess fuer alle drei
+            assert name in nas["services"]
+            assert "profiles" not in nas["services"][name]
+        assert "worker" not in nas["services"]
 
     def test_each_runs_its_own_image(self, nas_nats):
         for name in SERVICES:
@@ -501,7 +540,7 @@ class TestServices:
             assert service["image"] == f"ghcr.io/kaczmarekd/va-{name}:latest"
             assert service.get("entrypoint") is None  # der Einstieg steht im Image
             assert "ports" not in service
-            assert set(service["depends_on"]) == {"db", "nats"}
+            assert set(service["depends_on"]) == {"db", "nats", "migrate"}
 
     def test_each_gets_only_its_variables(self, nas_nats):
         for name in SERVICES:

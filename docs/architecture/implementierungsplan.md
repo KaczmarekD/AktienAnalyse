@@ -2455,6 +2455,43 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Cron-Termin mit Zeitzone `Europe/Berlin`, derselbe Termin erzeugt nur einen Run.
 - **Implementierung:** Scheduler im web-api, der Cron im Container entfällt.
+- **Entwurf (04.11.2026):** Der Umstieg. Den Scheduler gibt es seit P4.7; jetzt ist er Standard,
+  und NATS mit den drei Services ist es auch.
+  - **Kein Cron:**
+    - Das App-Image enthält keinen Cron mehr.
+    - `entrypoint.sh` migriert und führt den übergebenen Befehl aus. Ohne Befehl endet es nach
+      der Migration.
+    - Das web-api plant den Wochenlauf: `WEB_API_SCHEDULE` kommt auf der NAS aus `CRON_SCHEDULE`
+      der `.env`, in `Europe/Berlin`, ein Run je Termin (P4.7).
+  - **Compose auf der NAS:**
+    - Neuer Dienst `migrate` (App-Image, `python -m src.db.migrate`, läuft einmal).
+      Services und web-api warten auf ihn (`service_completed_successfully`).
+    - market-data, scoring und notification laufen ohne Profil.
+    - Das web-api läuft mit eigenem Image (`va-web-api`), NATS, Projektionen (`va_web`) und dem
+      Wochenplan. `va_profiles` braucht es nicht mehr, scoring speichert die Profile selbst.
+    - Der Batch (`value-analyzer`) bekommt das Profil `run`. Er läuft nur auf Wunsch:
+      `make docker-run`, Regression, Import.
+  - **Neue Pflichtvariablen auf der NAS:** `VA_WEB_PASSWORD`, `VA_MARKET_DATA_PASSWORD`,
+    `VA_SCORING_PASSWORD` und `VA_NOTIFICATION_PASSWORD`. `.env.example` führt sie.
+  - **Lokal:**
+    - Dieselbe Aufteilung aus dem App-Image.
+    - Das web-api startet mit `va_web_api.main:create_app` und ohne Wochenplan.
+  - **E2E:** Die Migration übernimmt der Dienst `migrate`. Das web-api plant dort nichts.
+  - **Test (rot):**
+    - Compose:
+      - Dienste der NAS ohne Profil.
+      - `migrate` vor allen anderen.
+      - Das web-api mit NATS, Projektionen und dem Termin aus `CRON_SCHEDULE`.
+      - Der Batch nur mit dem Profil `run`.
+      - Lokal ohne Wochenplan.
+    - Image: kein Cron im App-Image und im Entrypoint.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Pflicht in der `.env` der NAS:** Compose bricht mit einer Meldung ab, solange
+    `VA_WEB_PASSWORD` oder ein `VA_<SERVICE>_PASSWORD` fehlt. In `.env.example` stehen sie nicht
+    mehr auskommentiert.
+  - **`make pull`** lädt alle Images, auch die des Batches (`--profile run`).
+    **`make db-migrate`** startet den Dienst `migrate`.
+  - **`tests/test_entrypoint.py` entfällt:** Ohne Cron gibt es kein `ENV_PATTERN` mehr.
 
 #### P5.5 Tracing
 

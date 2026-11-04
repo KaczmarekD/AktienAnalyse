@@ -39,7 +39,9 @@ Zeitplan:
 - **`SMTP_PLAIN`:** ohne TLS und ohne Login, nur für einen lokalen Mail-Catcher. Es wird dabei
   kein Passwort gesendet. Der Versand bleibt sonst unverändert: STARTTLS oder SSL, jeweils mit
   Zertifikatsprüfung.
-- **Der Batch läuft lokal nicht dauerhaft.** `value-analyzer` hat dort das Profil `run`.
+- **Der Batch läuft nirgends dauerhaft.** `value-analyzer` hat das Profil `run`, seit P5.4 auch
+  auf der NAS; den Wochenlauf plant dort das web-api. Lokal plant es nichts (`WEB_API_SCHEDULE`
+  leer).
   `make local-up` startet Datenbank, NATS, Mailpit, pgweb und das web-api, `make local-run`
   startet einen Lauf.
 - **Runs aus dem UI (P4.7, seit P5.1 drei Container):** `make local-up` startet mit dem Profil

@@ -62,6 +62,15 @@ class TestDockerfile:
     def test_the_app_image_stays(self):
         assert re.search(r"^FROM base AS runtime$", DOCKERFILE, re.M)
 
+    def test_no_cron_anymore(self):
+        """P5.4: Den Wochenlauf plant das web-api, im App-Image gibt es keinen Cron mehr."""
+        assert "cron" not in _stage("base")
+        entrypoint = (ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+        assert "/etc/cron.d" not in entrypoint  # kein Crontab
+        assert not re.search(r"^\s*cron\b", entrypoint, re.M)  # kein Start des Daemons
+        assert "python -m src.db.migrate" in entrypoint
+        assert 'exec "$@"' in entrypoint
+
 
 class TestWorkflow:
     @pytest.mark.parametrize("stage", sorted(SERVICES))
@@ -97,10 +106,9 @@ class TestFullStackE2e:
         assert "python -m src.main" not in self.SCRIPT  # kein Batch-Lauf mehr
 
     def test_the_schema_is_migrated_first(self):
-        assert "--entrypoint python value-analyzer -m src.db.migrate" in self.SCRIPT
-        assert self.SCRIPT.index("-m src.db.migrate") < self.SCRIPT.index(
-            "python -I docker/e2e_run.py"
-        )
+        """P5.4: Der Dienst migrate laeuft vor den Services (depends_on in Compose)."""
+        assert "migrate" in self.SCRIPT
+        assert "--entrypoint python value-analyzer" not in self.SCRIPT
 
     def test_the_services_are_started(self):
         for name in ("nats", "market-data", "scoring", "notification", "web-api"):

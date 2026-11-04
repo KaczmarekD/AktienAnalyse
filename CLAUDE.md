@@ -15,14 +15,17 @@ Titel, die den Größenfilter passieren, auch die ohne Score. Titel unter
 
 ## Architektur in einem Satz
 
-`src/main.py` legt den Lauf an und startet die Event-Kette auf dem Bus im Prozess
-(`va_platform.bus.InProcessBus`): market-data (Universum, yfinance) →
-`marketdata.snapshot.completed` → scoring (Cross-Sektional-Ranking) →
-`scoring.run.completed` → notification (HTML+CSV, SMTP, Healthcheck). Die Handler
-liegen unter `entrypoints/handlers.py` der Module, `src/composition.py` verdrahtet
-sie, `src/run_tracker.py` leitet aus den Events den Abschluss von `batch.run` ab.
-Jedes Modul speichert selbst in PostgreSQL 18 (`adapters/postgres/store.py`).
-Geplant via Cron im Container.
+Seit P5.4 plant das web-api den Wochenlauf (`WEB_API_SCHEDULE` aus `CRON_SCHEDULE`,
+`Europe/Berlin`) und legt den Run an. Die drei Services führen ihn über NATS aus, je in einem
+eigenen Container: market-data (Universum, yfinance) → `marketdata.snapshot.completed` →
+scoring (Cross-Sektional-Ranking) → `scoring.run.completed` → notification (HTML+CSV, SMTP,
+Healthcheck). Die Handler liegen unter `entrypoints/handlers.py` der Module. Jedes Modul speichert
+selbst in PostgreSQL 18 (`adapters/postgres/store.py`). Einen Cron gibt es nicht mehr.
+
+Der Batch `src/main.py` gibt es weiter, aber nur auf Wunsch (Profil `run`, `make docker-run`). Er
+startet dieselbe Kette im Prozess (`va_platform.bus.InProcessBus`). `src/composition.py`
+verdrahtet sie mit denselben Funktionen wie die Services, `src/run_tracker.py` schließt dann
+`batch.run` ab.
 
 **Umgebungen** ([docs/architecture/umgebungen.md](docs/architecture/umgebungen.md)):
 `docker-compose.yml` beschreibt den Live-Betrieb auf der NAS. Lokal legt
@@ -53,8 +56,8 @@ im Docker-Netz). `python -m va_platform.nats` legt Stream `VA_EVENTS` und die Co
 [docs/architecture/events.md](docs/architecture/events.md) an. Seit P4.3 kann der Batch die Kette
 über NATS laufen lassen: `EVENT_BUS=nats` mit `NATS_URL`, `va_platform.nats.NatsBus` (eigener
 Adapter mit nats-py statt FastStream, Nachtrag in ADR-0002). Dann wartet `src/main.py` höchstens
-`RUN_TIMEOUT_MINUTES` auf das Ergebnis des `RunTracker`. Standard, auch auf der NAS, bleibt der
-Bus im Prozess. Seit P4.4 füllt das web-api mit `WEB_API_NATS_URL` und
+`RUN_TIMEOUT_MINUTES` auf das Ergebnis des `RunTracker`. Seit P5.4 ist NATS auf der NAS der
+Standard; der Dienst `migrate` migriert vor allen anderen. Seit P4.4 füllt das web-api mit `WEB_API_NATS_URL` und
 `WEB_API_PROJECTIONS_DATABASE_URL` (Rolle `va_web`) die Projektionen im Schema `web` aus dem
 Consumer `web-api` (`va_web_api.events.EventManager`). Seit P4.5 meldet der WebSocket `/ws`
 (Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) die Änderungen an die

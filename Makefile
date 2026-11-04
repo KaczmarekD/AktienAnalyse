@@ -110,13 +110,13 @@ REG ?= ghcr.io/kaczmarekd
 VERSION ?= latest
 IMAGE ?= $(REG)/value-analyzer:$(VERSION)
 
-pull: ## Images aus GHCR laden: Batch/web-api und frontend (NAS: danach make up)
-	docker compose pull value-analyzer frontend
+pull: ## Images aus GHCR laden: App-Image, Services, web-api und frontend (NAS: danach make up)
+	docker compose --profile run pull
 
 build: ## Image lokal bauen, unter dem Namen aus docker-compose.yml (nicht auf der NAS)
 	docker build --target runtime -t $(IMAGE) .
 
-up: ## Container starten (Cron-Mode)
+up: ## Stack starten: Migration, NATS, Services, web-api mit Wochenplan, frontend
 	docker compose up -d
 
 down: ## Container stoppen
@@ -140,8 +140,8 @@ docker-run: ## Einmaliger echter Lauf im Container
 db-up: ## Nur die Datenbank starten
 	docker compose up -d db
 
-db-migrate: ## Schema-Migrationen ausfuehren (passiert auch bei jedem App-Start)
-	docker compose run --rm value-analyzer true
+db-migrate: ## Schema-Migrationen ausfuehren (passiert auch bei jedem make up)
+	docker compose run --rm migrate
 
 db-import: ## Altdateien aus data/ importieren (mehrfach ausfuehrbar)
 	docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
@@ -168,7 +168,7 @@ LOCAL = docker compose -f docker-compose.yml -f docker-compose.local.yml
 
 local-up: ## Lokal: DB, NATS, Mailpit (:8025), pgweb (:8081), web-api (:8000) und Worker starten
 	$(LOCAL) build value-analyzer
-	$(LOCAL) --profile nats up -d
+	$(LOCAL) up -d
 
 local-run: ## Lokal: ein Lauf mit dem Arbeitsstand, die Mail landet in Mailpit
 	$(LOCAL) run --rm --build value-analyzer python -m src.main
@@ -186,7 +186,7 @@ local-ui: ## Lokal: frontend (nginx) aus dem Arbeitsstand unter http://localhost
 	$(LOCAL) --profile ui up -d --build frontend
 
 local-down: ## Lokal: alles stoppen (die Daten in .local/ bleiben)
-	$(LOCAL) --profile run --profile ui --profile nats down
+	$(LOCAL) --profile run --profile ui down
 
 # ---------- E2E-Test (U5, docs/architecture/umgebungen.md) ------------------
 # Wegwerf-Stack mit Replay-Daten statt Yahoo: Datenbank auf tmpfs, UI unter :18080, Mailpit

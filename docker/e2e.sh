@@ -43,10 +43,8 @@ echo "=== E2E: Datenbank, NATS und Mailpit starten"
 "${COMPOSE[@]}" down --remove-orphans >/dev/null 2>&1 || true
 "${COMPOSE[@]}" up -d --no-build --wait db nats mailpit
 
-echo "=== E2E: Migration (App-Image)"
-"${COMPOSE[@]}" run --rm --no-deps --entrypoint python value-analyzer -m src.db.migrate
-
-echo "=== E2E: Services, web-api und frontend starten"
+# Der Dienst migrate laeuft vor den Services (depends_on, P5.4)
+echo "=== E2E: migrate, Services, web-api und frontend starten"
 "${COMPOSE[@]}" up -d --no-build --wait market-data scoring notification web-api frontend
 "${COMPOSE[@]}" exec -T frontend nginx -t
 
