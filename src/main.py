@@ -29,6 +29,7 @@ from pydantic import ValidationError
 from va_contracts import new_envelope
 from va_contracts.events.v1 import RUN_REQUESTED, RunOptionsV1, ScreeningRunRequestedV1
 from va_notification.entrypoints.handlers import notify_failure_without_run
+from va_platform import tracing
 from va_platform.bus import InProcessBus
 from va_platform.nats import NatsBus
 from va_platform.service import run_failure
@@ -172,14 +173,15 @@ def _execute(
     with _open_bus(settings, dead_letter) as bus:
         wire(bus, adapters, settings, version=__version__)
         tracker.subscribe(bus)
-        bus.publish(
-            new_envelope(
-                RUN_REQUESTED,
-                ScreeningRunRequestedV1(run_id=run_id, trigger="scheduled", options=options),
-                source=SOURCE,
-                correlationid=str(run_id),
+        with tracing.run_span(run_id):  # P5.5: ein Trace je Run, er beginnt hier
+            bus.publish(
+                new_envelope(
+                    RUN_REQUESTED,
+                    ScreeningRunRequestedV1(run_id=run_id, trigger="scheduled", options=options),
+                    source=SOURCE,
+                    correlationid=str(run_id),
+                )
             )
-        )
         _await_end(bus, tracker, settings)
     if tracker.outcome is None:
         log.error("Die Event-Kette endete ohne Ergebnis - Lauf gilt als gescheitert")
@@ -238,6 +240,7 @@ def run(force_refresh: bool = False, dry_run: bool = False) -> int:
         return EXIT_CONFIG
 
     setup_logging(settings.logs_dir)
+    tracing.configure("va-batch", settings.otel_traces_exporter)
     return _run(settings, force_refresh=force_refresh, dry_run=dry_run)
 
 

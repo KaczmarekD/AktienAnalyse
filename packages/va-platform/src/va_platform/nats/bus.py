@@ -43,6 +43,7 @@ from va_contracts import Envelope, parse_envelope
 from va_contracts.events.v1 import BY_DATASCHEMA
 from va_contracts.rpc.v1 import RpcErrorV1
 
+from .. import tracing
 from ..bus import DeadLetter, _readable
 from ..messaging import OutboxMessage
 from . import ACK_WAIT, MAX_DELIVER, STREAM_NAME, JetStreamPublisher, provision
@@ -201,24 +202,27 @@ class NatsBus:
             raise ValueError(msg)
         handlers[spec.type] = handler
         try:
-            self._call(self._listen(spec.subject, handler))
+            self._call(self._listen(spec.subject, consumer, handler))
         except BaseException:
             del handlers[spec.type]
             raise
 
-    async def _listen(self, subject: str, handler: Handler[Any]) -> None:
+    async def _listen(self, subject: str, consumer: str, handler: Handler[Any]) -> None:
         loop = asyncio.get_running_loop()
 
         async def on_message(message: Msg) -> None:
             # nats-py ruft das je Abo nacheinander auf: Die Reihenfolge bleibt erhalten
             try:
-                await loop.run_in_executor(self._pool, _deliver_volatile, handler, message.data)
+                await loop.run_in_executor(
+                    self._pool, _deliver_volatile, handler, message.data, consumer
+                )
             except Exception:
                 log.warning("Fluechtiges Event auf %s nicht verarbeitet", subject, exc_info=True)
 
         await self._client().subscribe(subject, cb=on_message)
 
     def publish(self, envelope: Envelope[Any]) -> None:
+        envelope = tracing.stamp(envelope)  # P5.5: Trace-Kontext reist mit
         spec = BY_DATASCHEMA[envelope.dataschema]
         payload = envelope.model_dump_json().encode()
         if spec.volatile:
@@ -439,7 +443,7 @@ class NatsBus:
         try:
             async with _keep_alive(message, ack_wait):
                 await loop.run_in_executor(
-                    self._pool, _deliver, handler, raw, message.metadata.sequence.stream
+                    self._pool, _deliver, handler, raw, message.metadata.sequence.stream, consumer
                 )
         except Exception as error:
             log.warning(
@@ -500,15 +504,19 @@ def answer_request[R: RpcReplyV1](
         return spec.reply(error=RpcErrorV1(code="internal", message=f"{type(e).__name__}: {e}"))
 
 
-def _deliver_volatile(handler: Handler[Any], raw: bytes) -> None:
-    handler(parse_envelope(raw))  # ohne Stream-Sequenz: current_sequence() bleibt None
+def _deliver_volatile(handler: Handler[Any], raw: bytes, consumer: str) -> None:
+    envelope = parse_envelope(raw)  # ohne Stream-Sequenz: current_sequence() bleibt None
+    with tracing.consuming(envelope, consumer):
+        handler(envelope)
 
 
-def _deliver(handler: Handler[Any], raw: bytes, sequence: int) -> None:
+def _deliver(handler: Handler[Any], raw: bytes, sequence: int, consumer: str) -> None:
     # Im Versuch geparst: Eine unbekannte Payload zaehlt wie ein gescheiterter Handler
     token = _SEQUENCE.set(sequence)
     try:
-        handler(parse_envelope(raw))
+        envelope = parse_envelope(raw)
+        with tracing.consuming(envelope, consumer):  # P5.5: ein Span je Zustellung
+            handler(envelope)
     finally:
         _SEQUENCE.reset(token)
 

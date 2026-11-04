@@ -31,6 +31,7 @@ from va_contracts.events.v1 import (
     RunOptionsV1,
     ScreeningRunRequestedV1,
 )
+from va_platform import tracing
 from va_platform.db import session_scope
 from va_platform.messaging import Outbox, drain_outbox
 
@@ -218,10 +219,12 @@ class RunManager:
             )
         )
         request = ScreeningRunRequestedV1(run_id=run_id, trigger=trigger, options=options)
-        self._outbox.add(
-            session,
-            new_envelope(RUN_REQUESTED, request, source=SOURCE, correlationid=str(run_id)),
-        )
+        with tracing.run_span(run_id) as span:  # P5.5: ein Trace je Run, er beginnt hier
+            span.set_attribute("va.trigger", trigger)
+            self._outbox.add(
+                session,
+                new_envelope(RUN_REQUESTED, request, source=SOURCE, correlationid=str(run_id)),
+            )
         return run_id
 
     def _overdue(

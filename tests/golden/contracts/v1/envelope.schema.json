@@ -54,6 +54,18 @@
       "title": "Time",
       "type": "string"
     },
+    "traceparent": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traceparent"
+    },
     "type": {
       "title": "Type",
       "type": "string"

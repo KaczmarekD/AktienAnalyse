@@ -15,6 +15,8 @@ from typing import Self
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from va_platform.tracing import Exporter
+
 from .runs import Schedule, WatchdogLimits
 
 
@@ -47,6 +49,8 @@ class WebApiSettings(BaseSettings):
     watchdog_fetch_minutes: float = Field(default=45, gt=0)
     watchdog_scoring_minutes: float = Field(default=5, gt=0)
     watchdog_report_minutes: float = Field(default=5, gt=0)
+    # P5.5: "console" schreibt die Spans der Runs ins Log; die Services haben dasselbe Feld
+    otel_traces_exporter: Exporter = "none"
 
     @model_validator(mode="after")
     def _schedule_is_valid(self) -> Self:

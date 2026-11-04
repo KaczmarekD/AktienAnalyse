@@ -29,6 +29,8 @@ from typing import Any, Protocol
 from va_contracts import Contract, Envelope, new_envelope, parse_envelope
 from va_contracts.events.v1 import EventSpec
 
+from . import tracing
+
 log = logging.getLogger(__name__)
 
 type Handler[T: Contract] = Callable[[Envelope[T]], None]
@@ -97,6 +99,7 @@ class InProcessBus:
         subscriptions.append(_Subscription(consumer, handler))
 
     def publish(self, envelope: Envelope[Any]) -> None:
+        envelope = tracing.stamp(envelope)  # P5.5: Trace-Kontext reist mit
         self._queue.append((envelope.type, envelope.model_dump_json()))
         if self._dispatching:
             return  # der aeussere publish-Aufruf stellt es zu
@@ -114,7 +117,8 @@ class InProcessBus:
         head = Envelope[dict[str, Any]].model_validate_json(raw)
         for attempt in range(1, self._max_deliver + 1):
             try:
-                subscription.handler(parse_envelope(raw))
+                with tracing.consuming(head, subscription.consumer):  # P5.5
+                    subscription.handler(parse_envelope(raw))
             except Exception as error:
                 log.warning(
                     "%s: %s (%s) fehlgeschlagen, Versuch %d/%d",

@@ -224,6 +224,7 @@ class TestLocalWebApi:
             "WEB_API_NATS_URL",
             "WEB_API_PROJECTIONS_DATABASE_URL",
             "WEB_API_SCHEDULE",
+            "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
@@ -354,9 +355,16 @@ class TestNasDefinition:
             "WEB_API_NATS_URL",
             "WEB_API_PROJECTIONS_DATABASE_URL",
             "WEB_API_SCHEDULE",
+            "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_OTEL_TRACES_EXPORTER"] == "none"
+
+    def test_tracing_is_one_switch_for_all_services(self, nas):
+        """P5.5: OTEL_TRACES_EXPORTER aus der .env gilt fuer jeden Dienst, der einen Run sieht."""
+        for name in ("market-data", "scoring", "notification"):
+            assert nas["services"][name]["environment"]["OTEL_TRACES_EXPORTER"] == ""
 
     def test_db_creates_the_profiles_role_on_first_start(self, nas):
         env = nas["services"]["db"]["environment"]

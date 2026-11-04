@@ -23,6 +23,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from va_contracts.events.v1 import RUN_FAILED, RunFailedV1, Stage
 
+from . import tracing
 from .bus import follow_up
 from .db import create_db_engine
 from .nats import MAX_DELIVER, NatsBus, RpcUnavailable, answer_request
@@ -63,6 +64,8 @@ class ServiceSettings(BaseSettings):
     # Aeltere Events sind Reste abgebrochener Laeufe (P4.3b); so lange wartet auch der Batch
     run_timeout_minutes: float = Field(default=120, gt=0)
     logs_dir: Path = Path("/app/logs")
+    # P5.5: "console" schreibt die Spans eines Runs ins Log (Name wie bei OpenTelemetry)
+    otel_traces_exporter: tracing.Exporter = "none"
 
 
 def stage_of(consumer: str) -> Stage:
@@ -145,6 +148,7 @@ def service_main(
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(name)-22s | %(message)s"
     )
+    tracing.configure(f"va-{name}", settings.otel_traces_exporter)
     stop = threading.Event()
 
     def on_signal(signum: int, frame: Any) -> None:  # noqa: ARG001 - Signatur von signal

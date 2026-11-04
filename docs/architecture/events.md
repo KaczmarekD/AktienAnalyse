@@ -114,8 +114,14 @@ class Envelope[T](Contract):
     dataschema: str                # z. B. "urn:va-contracts:scoring.run.completed:v1"
     correlationid: str | None      # run_id (batch.run.id) als Text
     causationid: UUID | None       # id des ausloesenden Events
+    traceparent: str | None        # W3C Trace Context (P5.5), leer ohne Tracing
     data: T
 ```
+
+`traceparent` (seit P5.5) ist die CloudEvents-Erweiterung für verteiltes Tracing. Busse und
+Outbox setzen es beim Senden aus dem aktuellen Span (`va_platform.tracing.stamp`), Empfänger
+öffnen damit ihren Span. So ergibt ein Run einen Trace über alle Services. Ohne Tracing
+(`OTEL_TRACES_EXPORTER=none`, Standard) bleibt das Feld leer.
 
 `dataschema` ist eine URN, weil CloudEvents dort eine absolute URI verlangt. Die Hülle prüft,
 dass `type` und `dataschema` laut Katalog zur Payload gehören. Sender erzeugen sie mit

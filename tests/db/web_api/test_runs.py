@@ -12,6 +12,9 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
@@ -34,6 +37,7 @@ from va_contracts.events.v1 import (
     SnapshotCompletedV1,
     UniverseInfoV1,
 )
+from va_platform import tracing
 from va_web_api.events import EventManager
 from va_web_api.ports import RunActive
 from va_web_api.projections import register
@@ -189,6 +193,24 @@ class TestStart:
         assert event.data.run_id == run_id
         assert event.data.trigger == "manual"
         assert event.data.options == RunOptionsV1(dry_run=True, notify=False)
+
+    def test_a_start_opens_the_trace_of_the_run(self, manager, engine):
+        """P5.5: Der Run beginnt hier; sein Event traegt den Trace-Kontext durch die Outbox."""
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracing.set_provider(provider)
+        try:
+            run_id = manager.start(RunOptionsV1())
+        finally:
+            tracing.set_provider(None)
+        [root] = exporter.get_finished_spans()
+        assert root.name == "run"
+        assert root.attributes == {"va.run_id": str(run_id), "va.trigger": "manual"}
+        [event] = _outbox(engine)
+        assert event.traceparent is not None
+        assert root.context is not None
+        assert event.traceparent.split("-")[1] == f"{root.context.trace_id:032x}"
 
     def test_pending_events_go_out_once(self, manager, engine):
         run_id = manager.start(RunOptionsV1())

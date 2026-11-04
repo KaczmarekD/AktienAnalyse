@@ -2498,6 +2498,30 @@ prüft dieses Paket, für jede gespeicherte Woche.
 - **Test:** Mit einem In-Memory-Exporter erzeugt ein Run zusammenhängende Spans über Publish und
   Consume hinweg.
 - **Implementierung:** OpenTelemetry in FastAPI und FastStream, Weitergabe der run_id.
+- **Entwurf (04.11.2026):** Ein Trace je Run, vom Anlegen bis zur Mail, über alle Services.
+  - **Abweichung:** Ohne FastStream (eigener `NatsBus` seit P4.3) und ohne die
+    Auto-Instrumentierung von FastAPI. Gemessen wird der Run, nicht jeder HTTP-Aufruf. Die Spans
+    entstehen an wenigen Stellen von Hand, in `va_platform.tracing` (OpenTelemetry API und SDK).
+  - **Weitergabe:** Der Trace-Kontext reist als `traceparent` (W3C Trace Context) in der Hülle.
+    Das Feld ist die CloudEvents-Erweiterung für verteiltes Tracing, optional, also additiv.
+    Busse und Outbox setzen es beim Senden (`stamp`), ein gesetztes bleibt.
+  - **Spans:**
+    - `run`: die Wurzel, wo der Run entsteht (`RunManager` im web-api, `src/main.py` im Batch).
+      Attribut `va.run_id`.
+    - Je verarbeitetem Event `<consumer> <type>` (Art CONSUMER) mit Consumer, Event-Typ,
+      Event-ID und `va.run_id`. Vorgänger ist der Span, in dem das Event entstand.
+  - **Einschalten:** `OTEL_TRACES_EXPORTER` (Settings der Services und des Batches,
+    `WEB_API_OTEL_TRACES_EXPORTER` im web-api). Standard `none`: kein Provider, die Hülle bleibt
+    unverändert. `console` schreibt die Spans als JSON ins Log jedes Containers. Ein Collector
+    (OTLP) ist auf der NAS nicht vorgesehen.
+  - **Test (rot):**
+    - Im Prozess und über NATS ergibt ein Run einen Trace (In-Memory-Exporter).
+      Die Kette market-data → scoring → notification hängt an der Wurzel.
+    - Der `traceparent` übersteht das Serialisieren.
+    - Ohne Provider bleibt die Hülle gleich.
+    - Ein Start im web-api öffnet den Trace, das Event in der Outbox trägt ihn.
+- **Umgesetzt (04.11.2026):** wie im Entwurf. Das Golden-File der Hülle hat das neue Feld
+  `traceparent`.
 
 #### P5.6 Abschluss-Doku
 

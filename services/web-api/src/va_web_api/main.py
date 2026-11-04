@@ -37,6 +37,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
+from va_platform import tracing
 from va_platform.db import create_db_engine
 from va_platform.nats import NatsBus
 
@@ -139,6 +140,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        tracing.configure("va-web-api", settings.otel_traces_exporter)  # Runs beginnen hier
         app.state.engine = create_db_engine(
             settings.database_url.get_secret_value(), read_only=True
         )

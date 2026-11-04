@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from va_notification.entrypoints import service as notification_service
+from va_platform import tracing
 from va_platform.service import run_service
 from va_scoring.entrypoints import service as scoring_service
 
@@ -71,6 +72,7 @@ def main() -> int:
         return EXIT_CONFIG
 
     setup_logging(settings.logs_dir)
+    tracing.configure("va-worker", settings.otel_traces_exporter)
     stop = threading.Event()
 
     def on_signal(signum: int, frame: Any) -> None:  # noqa: ARG001 - Signatur von signal

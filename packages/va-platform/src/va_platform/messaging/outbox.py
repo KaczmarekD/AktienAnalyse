@@ -19,6 +19,8 @@ from sqlalchemy import Text, cast, func, insert, select, update
 
 from va_contracts.events.v1 import BY_DATASCHEMA
 
+from .. import tracing
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from uuid import UUID
@@ -60,6 +62,7 @@ class Outbox:
 
     def add(self, session: Session, envelope: Envelope[Any]) -> None:
         """Merkt das Event in der laufenden Transaktion vor. Ohne Commit gibt es kein Event."""
+        envelope = tracing.stamp(envelope)  # P5.5: der Span, in dem es entsteht
         spec = BY_DATASCHEMA[envelope.dataschema]
         if spec.volatile:
             msg = f"{spec.subject} ist fluechtig und geht nicht ueber die Outbox"

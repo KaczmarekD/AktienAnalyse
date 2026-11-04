@@ -37,6 +37,9 @@ class Envelope[T](Contract):
     dataschema: str  # z. B. "urn:va-contracts:scoring.run.completed:v1"
     correlationid: str | None = None
     causationid: UUID | None = None
+    # P5.5: W3C Trace Context des Spans, in dem das Event entstand (CloudEvents-Erweiterung
+    # fuer verteiltes Tracing); leer ohne Tracing
+    traceparent: str | None = None
     data: T
 
     @model_validator(mode="after")
