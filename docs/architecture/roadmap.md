@@ -184,7 +184,7 @@ Details: [Implementierungsplan, Phase 5](implementierungsplan.md#phase-5--auftei
 - [x] P5.2 End-to-End-Test des ganzen Stacks (`5833bc2`)
 - [x] P5.3 Eine DB-Rolle je Service 🔒 (`5db3abe`)
 - [x] P5.4 Scheduler im web-api, NATS als Standard (`da90237`)
-- [ ] P5.5 Tracing
+- [x] P5.5 Tracing, ein Trace je Run (`4afd3af`)
 - [ ] P5.6 Abschluss-Doku
 - [ ] NAS (du): Umstellung auf den kompletten Stack
 
