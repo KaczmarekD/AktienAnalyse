@@ -180,7 +180,7 @@ Details: [Implementierungsplan, Phase 4](implementierungsplan.md#phase-4--events
 Details: [Implementierungsplan, Phase 5](implementierungsplan.md#phase-5--aufteilen-in-services)
 
 - [x] P5.1a Einstiegspunkte je Service (nachgetragen 04.11.2026: eigene Settings, Request/Reply beim Besitzer, `f5d80e0`)
-- [ ] P5.1 Images je Service
+- [x] P5.1 Images je Service (`f7819fe`)
 - [ ] P5.2 End-to-End-Test des ganzen Stacks
 - [ ] P5.3 Eine DB-Rolle je Service 🔒
 - [ ] P5.4 Scheduler im web-api
