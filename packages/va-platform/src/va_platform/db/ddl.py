@@ -8,6 +8,8 @@ Rollen (legt ``db/init/01_roles.sh`` an, bzw. der DBA bei fremdem Postgres):
 - ``va_app``: SELECT/INSERT, UPDATE nur fuer Laufabschluss, ISIN und ``published_at`` der
   Outbox - kein DELETE.
 - ``va_read``: nur SELECT, fuer Auswertungen aus dem LAN.
+- ``va_market_data``, ``va_scoring``, ``va_notification`` (P5.3): je Service, nur im eigenen
+  Schema (``SERVICE_ROLES``).
 - ``va_profiles`` (P3.3) und ``va_web`` (P4.4): Rollen des web-api, siehe unten. ``va_web``
   legt seit P4.7 auch Runs in ``batch.run`` an und schliesst sie ab.
 """
@@ -243,6 +245,40 @@ BEGIN
         GRANT UPDATE ({columns}) ON batch.run TO {WEB_ROLE};
         EXECUTE format('GRANT USAGE ON SEQUENCE %s TO {WEB_ROLE}',
                        pg_get_serial_sequence('batch.run', 'id'));
+    END IF;
+END
+$$;
+"""
+
+
+# P5.3: eine Rolle je Service, nur im eigenen Schema (docs/architecture/datenhaltung.md)
+SERVICE_ROLES = {
+    "va_market_data": "market_data",
+    "va_scoring": "scoring",
+    "va_notification": "reporting",
+}
+
+
+def service_grant_statements(role: str) -> str:
+    """Rechte einer Service-Rolle: lesen und anfuegen nur im eigenen Schema, auch in kuenftigen
+    Tabellen. ``UPDATE`` nur, wo ``va_app`` es auch darf (Abschluss, ISIN), in der Outbox nur
+    ``published_at``. Nie ``DELETE``; die Trigger aus ``protect_table`` gelten ohnehin.
+    Nur, wenn es die Rolle gibt (idempotent).
+    """
+    schema = SERVICE_ROLES[role]
+    updatable = [t for t in UPDATABLE_TABLES if t.startswith(f"{schema}.")]
+    update = f"GRANT UPDATE ON {', '.join(updatable)} TO {role};" if updatable else ""
+    return f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+        GRANT USAGE ON SCHEMA {schema} TO {role};
+        GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA {schema} TO {role};
+        GRANT USAGE ON ALL SEQUENCES IN SCHEMA {schema} TO {role};
+        ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT SELECT, INSERT ON TABLES TO {role};
+        ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT USAGE ON SEQUENCES TO {role};
+        {update}
+        GRANT UPDATE (published_at) ON {schema}.outbox TO {role};
     END IF;
 END
 $$;

@@ -39,11 +39,21 @@ class PostgresScoringStore:
         scored: pd.DataFrame,
         cfg: ScoringConfig,
         profile: ProfileVersionRef | None = None,
+        instrument_ids: Mapping[str, int] | None = None,
     ) -> int:
-        """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``."""
+        """Speichert Scores fuer *alle* Titel - gefilterte mit ``passed_filter=False``.
+
+        ``instrument_ids`` kommen seit P5.3 mit dem Snapshot-Event; ohne sie (Batch, alte Events)
+        liest der Speicher sie aus ``market_data.instrument``, was die Rolle von scoring nicht darf.
+        """
         with session_scope(self._engine) as s:
             repo = ScoringRepository(s)
-            ids = repo.get_instrument_ids(scoring_symbols(df_all, scored))
+            symbols = scoring_symbols(df_all, scored)
+            ids = (
+                _known_ids(instrument_ids, symbols)
+                if instrument_ids
+                else repo.get_instrument_ids(symbols)
+            )
             scoring_run_id = repo.write_scoring_run(
                 fetch_run_id=fetch_run_id,
                 config=asdict(cfg),
@@ -73,6 +83,14 @@ class PostgresScoringStore:
         else:
             log.debug("Aktives Scoring-Profil: %s", active.label)
         return active
+
+
+def _known_ids(instrument_ids: Mapping[str, int], symbols: list[str]) -> dict[str, int]:
+    missing = [s for s in symbols if s not in instrument_ids]
+    if missing:
+        msg = f"IDs fehlen im Snapshot-Event: {', '.join(missing)}"
+        raise LookupError(msg)
+    return {s: instrument_ids[s] for s in symbols}
 
 
 def input_rows(df_all: pd.DataFrame) -> list[dict[str, Any]]:

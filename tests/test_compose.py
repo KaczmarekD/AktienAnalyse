@@ -506,12 +506,23 @@ class TestServices:
     def test_each_gets_only_its_variables(self, nas_nats):
         for name in SERVICES:
             env = nas_nats["services"][name]["environment"]
-            assert env["DATABASE_URL"].startswith("postgresql+psycopg://va_app:")
+            # P5.3: eine Rolle je Service, nur im eigenen Schema
+            role = "va_" + name.replace("-", "_")
+            assert env["DATABASE_URL"].startswith(f"postgresql+psycopg://{role}:")
             assert env["NATS_URL"] == "nats://nats:4222"
             assert "DATABASE_OWNER_URL" not in env
             assert "POSTGRES_PASSWORD" not in env
             has_smtp = any(key.startswith("SMTP_") for key in env)
             assert has_smtp == (name == "notification"), name
+
+    def test_the_database_creates_the_service_roles(self, nas_nats):
+        env = nas_nats["services"]["db"]["environment"]
+        for variable in (
+            "VA_MARKET_DATA_PASSWORD",
+            "VA_SCORING_PASSWORD",
+            "VA_NOTIFICATION_PASSWORD",
+        ):
+            assert variable in env
 
     def test_notification_mails_and_pings_like_the_batch(self, nas_nats):
         env = nas_nats["services"]["notification"]["environment"]

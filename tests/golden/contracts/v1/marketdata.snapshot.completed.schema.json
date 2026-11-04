@@ -580,6 +580,13 @@
       "title": "Fundamentals",
       "type": "array"
     },
+    "instrument_ids": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Instrument Ids",
+      "type": "object"
+    },
     "isins": {
       "additionalProperties": {
         "type": "string"

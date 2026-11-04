@@ -219,7 +219,9 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   (`MUTABLE_TABLES`, heute `web.run_status`). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
   nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3), `va_web` nur im Schema
   `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`), seit P4.7 dazu
-  Runs in `batch.run` anlegen und einmal abschließen. Eine Rolle, die nach
+  Runs in `batch.run` anlegen und einmal abschließen. Seit P5.3 je Service eine Rolle nur fürs
+  eigene Schema (`va_market_data`, `va_scoring`, `va_notification`, `SERVICE_ROLES`,
+  `VA_<SERVICE>_PASSWORD`); `va_app` bleibt für den Batch im Prozess. Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert

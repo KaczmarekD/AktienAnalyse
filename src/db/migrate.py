@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from functools import partial
 from pathlib import Path
 
 from alembic import command
@@ -26,8 +27,10 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from va_platform.db import normalize_url
 from va_platform.db.ddl import (
     PROFILES_ROLE,
+    SERVICE_ROLES,
     WEB_ROLE,
     profiles_grant_statements,
+    service_grant_statements,
     web_grant_statements,
     web_run_grant_statements,
 )
@@ -110,6 +113,17 @@ def ensure_web_role(url: str, password: str) -> None:
         engine.dispose()
 
 
+def ensure_service_role(url: str, password: str, *, role: str) -> None:
+    """Eine Service-Rolle (P5.3) samt Rechten im eigenen Schema."""
+    ensure_login_role(url, role, password)
+    engine = create_engine(normalize_url(url))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(service_grant_statements(role)))
+    finally:
+        engine.dispose()
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s")
     settings = DatabaseSettings()
@@ -126,6 +140,11 @@ def main() -> int:
     roles = (
         (PROFILES_ROLE, settings.va_profiles_password, ensure_profiles_role),
         (WEB_ROLE, settings.va_web_password, ensure_web_role),
+        # P5.3: eine Rolle je Service
+        *(
+            (role, getattr(settings, f"{role}_password"), partial(ensure_service_role, role=role))
+            for role in SERVICE_ROLES
+        ),
     )
     for role, password, ensure in roles:
         if password is None:

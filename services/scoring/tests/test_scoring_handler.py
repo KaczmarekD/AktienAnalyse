@@ -41,7 +41,7 @@ class FakeStore:
         self.error = error
         self.calls: list[dict[str, Any]] = []
 
-    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None):
+    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None, instrument_ids=None):
         if self.error:
             raise self.error
         self.calls.append(
@@ -51,6 +51,7 @@ class FakeStore:
                 "scored": scored,
                 "cfg": cfg,
                 "profile": profile,
+                "instrument_ids": instrument_ids,
             }
         )
         return 20
@@ -82,6 +83,7 @@ def _snapshot(
             success_share=1.0,
             universe=UNIVERSE,
             fundamentals=[FundamentalsV1.from_flat(r) for r in frame.to_dict("records")],
+            instrument_ids={str(s): i for i, s in enumerate(frame["symbol"], start=1)},
         ),
         source="va/test",
         correlationid="1",
@@ -124,6 +126,8 @@ def test_scores_stores_and_publishes_the_ranking(bus, mock_universe_df):
 
     call = store.calls[0]
     assert call["fetch_run_id"] == 10
+    # P5.3: die IDs aus dem Event, scoring liest market_data.instrument nicht
+    assert call["instrument_ids"] == snapshot.data.instrument_ids
     assert set(call["df_all"]["symbol"]) == set(mock_universe_df["symbol"])
     assert list(call["scored"]["symbol"]) == list(expected["symbol"])
 

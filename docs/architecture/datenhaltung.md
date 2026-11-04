@@ -41,6 +41,7 @@ Stand `261dc8f` (Migration `0001_initial_schema`):
 | `va_app` | `SELECT`/`INSERT`, `UPDATE` nur für freigegebene Tabellen und in der Outbox nur für die Spalte `published_at`, kein `DELETE` | der Batch |
 | `va_read` | nur `SELECT` | Auswertungen aus dem LAN; in Phase 3 auch das web-api |
 | `va_profiles` | `SELECT` auf den drei Profil-Tabellen, `INSERT` in `profile_version` und `profile_activation` | das web-api für die Profil-Befehle (P3.3), bis scoring sie ab Phase 4 selbst ausführt |
+| `va_market_data`, `va_scoring`, `va_notification` (seit P5.3) | nur im eigenen Schema (`market_data`, `scoring`, `reporting`): `SELECT`, `INSERT`, `UPDATE` nur wie bei `va_app`, kein `DELETE` | die Services in ihren Containern (`VA_<SERVICE>_PASSWORD`) |
 | `va_web` | im Schema `web` `SELECT` und `INSERT`, `UPDATE` nur auf `run_status` und `published_at` der Outbox; seit P4.7 auf `batch.run` `SELECT`, `INSERT` und `UPDATE` nur auf die Spalten des Abschlusses | das web-api für die Projektionen (P4.4) und die Runs aus UI und Scheduler (P4.7); `va_read` liest `web` mit |
 
 Der Treiber ist psycopg 3 (`postgresql+psycopg://`) mit synchronem SQLAlchemy. Das passt für den

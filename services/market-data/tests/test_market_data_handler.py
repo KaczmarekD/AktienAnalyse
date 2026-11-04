@@ -72,6 +72,9 @@ class FakeStore:
     def finish_fetch(self, fetch_run_id, df):
         self.calls.append(("finish_fetch", (fetch_run_id, list(df["symbol"]))))
 
+    def instrument_ids(self, symbols):
+        return {s: i for i, s in enumerate(sorted(symbols), start=101)}
+
     def names(self) -> list[str]:
         return [name for name, _ in self.calls]
 
@@ -165,6 +168,8 @@ class TestSnapshot:
         assert [m.symbol for m in data.universe.removed] == ["ALT.DE"]
         # P4.9: ISINs des Universums fuer die Titelseite im web-api, nur wo bekannt
         assert data.isins == {"AAA.DE": "DE000A"}
+        # P5.3: IDs der Titel, damit scoring market_data.instrument nicht lesen muss
+        assert data.instrument_ids == {"AAA.DE": 101, "BBB.DE": 102, "CCC.DE": 103}
         assert store.names() == [
             "find_reusable_fetch",
             "start_fetch",

@@ -42,6 +42,10 @@ RECORDS = json.loads((GOLDEN_DIR / "input_fundamentals.json").read_text(encoding
 class Store:
     """Alle Speicher-Ports zugleich, ohne Datenbank."""
 
+    def instrument_ids(self, symbols):
+        """P5.3: IDs der Titel fuer das Snapshot-Event."""
+        return {s: i for i, s in enumerate(sorted(symbols), start=1)}
+
     def find_reusable_fetch(self, day, symbols):
         return None
 
@@ -63,7 +67,7 @@ class Store:
     def ensure_default_profile(self, params):
         return ProfileVersionRef(1, "Standard", 1, dict(params))
 
-    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None):
+    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None, instrument_ids=None):
         return 20
 
     def record_report(self, run_id, scoring_run_id, report):

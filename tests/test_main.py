@@ -67,6 +67,10 @@ class FakeRecorder:
         self.calls.append(("start_run", kwargs))
         return 1
 
+    def instrument_ids(self, symbols):
+        """P5.3: IDs der Titel fuer das Snapshot-Event."""
+        return {s: i for i, s in enumerate(sorted(symbols), start=1)}
+
     def find_reusable_fetch(self, day, symbols):
         self.calls.append(("find_reusable_fetch", (day, list(symbols))))
         return self.reusable
@@ -99,7 +103,7 @@ class FakeRecorder:
             raise ConnectionError("db hiccup")
         return ProfileVersionRef(1, "Standard", 1, dict(params))
 
-    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None):
+    def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None, instrument_ids=None):
         self.calls.append(("record_scoring", fetch_run_id))
         self.scoring_profile = profile
         self.scored_symbols = set(df_all["symbol"])

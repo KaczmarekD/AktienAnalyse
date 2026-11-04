@@ -2424,6 +2424,32 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Rechte-Tests, z. B. die Rolle `va_scoring` kann das Schema `market_data` nicht lesen.
 - **Implementierung:** Migration mit den Service-Rollen, `va_app` entfällt.
+- **Entwurf (04.11.2026):**
+  - **Rollen:** `va_market_data`, `va_scoring` und `va_notification`.
+    - Jede liest und fügt nur im eigenen Schema an, auch in künftigen Tabellen (Default
+      Privileges).
+    - `UPDATE` gibt es nur, wo `va_app` es auch darf: Abschluss eines Abrufs, ISIN,
+      `published_at` der Outbox. `DELETE` nie.
+    - Migration `0014` vergibt die Rechte (`service_grant_statements`).
+    - Die Rollen legen `db/init` (neue Datenbank) bzw. `python -m src.db.migrate` an, mit
+      `VA_<SERVICE>_PASSWORD`.
+  - **Letzter Zugriff über die Grenze:** scoring las die IDs der Titel aus
+    `market_data.instrument`. Jetzt schickt market-data sie im Snapshot-Event mit
+    (`SnapshotCompletedV1.instrument_ids`, additiv, Port `SnapshotStore.instrument_ids`).
+    Ohne IDs, etwa im Batch, liest der Speicher sie wie bisher.
+  - **Compose:** Die drei Dienste verbinden sich mit ihrer Rolle, die Datenbank bekommt die
+    drei Passwörter für `db/init`.
+  - **`va_app` bleibt vorerst:** Der Batch im Prozess (`make run`, Cron bis P5.4) verbindet alle
+    drei Services über eine Verbindung und braucht sie. Sie entfällt, wenn der Batch nicht mehr
+    gebraucht wird (P5.6).
+  - **Test (rot):**
+    - Für jede Tabelle der App-Schemas gilt: `SELECT` und `INSERT` nur im eigenen Schema,
+      `DELETE` und `TRUNCATE` nirgends, `UPDATE` nur auf den freigegebenen Tabellen.
+    - scoring liest `market_data` nicht, notification liest `scoring` nicht.
+    - Die drei Services erledigen die Kette mit ihren Rollen (`tests/db/test_services_nats.py`).
+    - Das Snapshot-Event trägt die IDs, scoring gibt sie an den Speicher weiter.
+    - Compose: Rollen in den Verbindungen, Passwörter bei der Datenbank.
+- **Umgesetzt (04.11.2026):** wie im Entwurf.
 
 #### P5.4 Scheduler im web-api
 

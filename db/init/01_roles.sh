@@ -7,6 +7,7 @@
 #   va_read     - Auswertungen aus dem LAN (DBeaver, Jupyter, Excel): nur SELECT
 #   va_profiles - web-api: Profile lesen, Versionen und Aktivierungen anfuegen (P3.3)
 #   va_web      - web-api: Projektionen im Schema web schreiben (P4.4)
+#   va_market_data, va_scoring, va_notification - je Service nur das eigene Schema (P5.3)
 set -euo pipefail
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
@@ -31,3 +32,14 @@ if [ -n "${VA_WEB_PASSWORD:-}" ]; then
 CREATE ROLE va_web LOGIN PASSWORD :'web_pw';
 SQL
 fi
+
+# P5.3: eine Rolle je Service; ohne Passwort keine Rolle (die Services laufen erst mit NATS)
+for pair in "va_market_data:${VA_MARKET_DATA_PASSWORD:-}"             "va_scoring:${VA_SCORING_PASSWORD:-}"             "va_notification:${VA_NOTIFICATION_PASSWORD:-}"; do
+    role="${pair%%:*}"
+    password="${pair#*:}"
+    if [ -n "$password" ]; then
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB"             -v pw="$password" <<SQL
+CREATE ROLE $role LOGIN PASSWORD :'pw';
+SQL
+    fi
+done

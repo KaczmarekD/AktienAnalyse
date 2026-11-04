@@ -103,6 +103,10 @@ class RunRequestedHandler:
                 ],
                 # P4.9: fuer die Titelseite im web-api, das keine Tabellen von market-data liest
                 isins={t.symbol: t.isin for t in tickers if t.isin},
+                # P5.3: scoring liest market_data.instrument nicht mehr
+                instrument_ids=dict(
+                    self._store.instrument_ids([str(s) for s in snapshot.frame.get("symbol", [])])
+                ),
             )
         except Exception as e:
             log.exception("Abruf fehlgeschlagen")

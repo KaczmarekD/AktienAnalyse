@@ -28,6 +28,10 @@ ROLE_PASSWORDS = {
     "va_read": "va_read_test",
     "va_profiles": "va_profiles_test",  # P3.3: Profil-Befehle des web-api
     "va_web": "va_web_test",  # P4.4: Projektionen des web-api im Schema web
+    # P5.3: eine Rolle je Service, nur im eigenen Schema
+    "va_market_data": "va_market_data_test",
+    "va_scoring": "va_scoring_test",
+    "va_notification": "va_notification_test",
 }
 
 

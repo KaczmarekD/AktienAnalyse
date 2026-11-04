@@ -28,6 +28,7 @@ class ScoringStore(Protocol):
         scored: pd.DataFrame,
         cfg: ScoringConfig,
         profile: ProfileVersionRef | None = None,
+        instrument_ids: Mapping[str, int] | None = None,
     ) -> int: ...
 
 

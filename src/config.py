@@ -40,6 +40,10 @@ class DatabaseSettings(_OwnerUrl):
     va_profiles_password: SecretStr | None = None
     # P4.4: Passwort der Rolle va_web (Projektionen des web-api im Schema web), ebenso
     va_web_password: SecretStr | None = None
+    # P5.3: Passwoerter der Rollen je Service (nur im eigenen Schema), ebenso
+    va_market_data_password: SecretStr | None = None
+    va_scoring_password: SecretStr | None = None
+    va_notification_password: SecretStr | None = None
 
 
 class Settings(MarketDataSettings, ScoringSettings, NotificationSettings, _OwnerUrl):

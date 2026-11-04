@@ -100,6 +100,9 @@ class SnapshotCompletedV1(Contract):
     fundamentals: list[FundamentalsV1]
     # Symbol -> ISIN aus dem Universum, wo bekannt (additiv seit P4.9, fuer die Titelseite)
     isins: dict[str, str] = Field(default_factory=dict)
+    # Symbol -> market_data.instrument.id (additiv seit P5.3): scoring speichert seine Ergebnisse
+    # je Titel unter dieser ID, ohne market_data zu lesen
+    instrument_ids: dict[str, int] = Field(default_factory=dict)
 
 
 class ProfileRefV1(Contract):

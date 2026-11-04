@@ -17,6 +17,11 @@ services:
       # P4.4: Rolle fuer die Projektionen des web-api (Schema web), optional. Gebraucht erst,
       # wenn die Kette ueber NATS laeuft; dann auch die beiden WEB_API_*-Zeilen beim web-api
       VA_WEB_PASSWORD: ${VA_WEB_PASSWORD:-}
+      # P5.3: je Service eine Rolle nur fuers eigene Schema, gebraucht erst mit dem Profil nats.
+      # In einer bestehenden Datenbank legt der Start des Batches sie an (python -m src.db.migrate)
+      VA_MARKET_DATA_PASSWORD: ${VA_MARKET_DATA_PASSWORD:-}
+      VA_SCORING_PASSWORD: ${VA_SCORING_PASSWORD:-}
+      VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:-}
     volumes:
       # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
       # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,
@@ -80,8 +85,8 @@ services:
   # die Runs ueber NATS aus und beantworten Request/Reply des web-api. Nur mit dem Profil nats
   # (docker compose --profile nats up -d), bis die Kette ueber NATS Standard ist (P5.4); dann
   # braucht das web-api auch WEB_API_NATS_URL und WEB_API_PROJECTIONS_DATABASE_URL. Jeder sieht
-  # nur seine Variablen, SMTP nur notification. Leer heisst Standardwert. Die Migration macht
-  # der Batch-Container beim Start.
+  # nur seine Variablen, SMTP nur notification, und seit P5.3 seine eigene Rolle (nur das eigene
+  # Schema). Leer heisst Standardwert. Die Migration macht der Batch-Container beim Start.
   market-data:
     image: ${REG:-ghcr.io/kaczmarekd}/va-market-data:${VERSION:-latest}
     container_name: value-analyzer-market-data
@@ -94,7 +99,7 @@ services:
         condition: service_healthy
     environment:
       TZ: Europe/Berlin
-      DATABASE_URL: postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      DATABASE_URL: postgresql+psycopg://va_market_data:${VA_MARKET_DATA_PASSWORD:-}@db:5432/value_analyzer
       NATS_URL: nats://nats:4222
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
       UNIVERSE: ${UNIVERSE:-}
@@ -111,7 +116,7 @@ services:
     depends_on: *service-depends-on
     environment:
       TZ: Europe/Berlin
-      DATABASE_URL: postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      DATABASE_URL: postgresql+psycopg://va_scoring:${VA_SCORING_PASSWORD:-}@db:5432/value_analyzer
       NATS_URL: nats://nats:4222
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
       # Nur Startwerte fuer das Profil "Standard" (ADR-0009)
@@ -127,7 +132,7 @@ services:
     depends_on: *service-depends-on
     environment:
       TZ: Europe/Berlin
-      DATABASE_URL: postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      DATABASE_URL: postgresql+psycopg://va_notification:${VA_NOTIFICATION_PASSWORD:-}@db:5432/value_analyzer
       NATS_URL: nats://nats:4222
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
       SMTP_HOST: ${SMTP_HOST:-}

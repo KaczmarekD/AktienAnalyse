@@ -82,6 +82,23 @@ class TestMigrateMain:
             assert migrate.main() == 0
         ensure.assert_called_once_with("postgresql://va_owner:pw@db/va", "projektionen")
 
+    def test_service_roles_are_ensured_with_their_passwords(self, no_db_env, monkeypatch):
+        # P5.3: je Service eine Rolle nur fuers eigene Schema
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.delenv("VA_PROFILES_PASSWORD", raising=False)
+        monkeypatch.delenv("VA_WEB_PASSWORD", raising=False)
+        monkeypatch.setenv("VA_SCORING_PASSWORD", "bewerten")
+        monkeypatch.delenv("VA_MARKET_DATA_PASSWORD", raising=False)
+        monkeypatch.delenv("VA_NOTIFICATION_PASSWORD", raising=False)
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_service_role") as ensure,
+        ):
+            assert migrate.main() == 0
+        ensure.assert_called_once_with(
+            "postgresql://va_owner:pw@db/va", "bewerten", role="va_scoring"
+        )
+
     def test_web_role_failure_does_not_stop_the_batch(self, no_db_env, monkeypatch):
         monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
         monkeypatch.setenv("VA_WEB_PASSWORD", "projektionen")
