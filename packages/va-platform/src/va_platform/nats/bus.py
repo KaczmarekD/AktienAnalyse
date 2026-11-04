@@ -27,6 +27,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 import nats
@@ -56,6 +57,22 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 FETCH_TIMEOUT = 1.0  # so lange wartet eine Abholung; danach prueft die Schleife ``close``
+# Beim Start schnell aufgeben (der Aufrufer meldet oder versucht es spaeter), im Lauf dagegen
+# lange neu verbinden, etwa wenn NATS neu startet. nats-py wartet 2 s zwischen den Versuchen.
+CONNECT_ATTEMPTS = 3
+RECONNECT_ATTEMPTS = 60
+
+# Stream-Sequenz der Nachricht, die der Handler gerade verarbeitet (P4.4); je Handler-Thread
+_SEQUENCE: ContextVar[int | None] = ContextVar("va-nats-sequence", default=None)
+
+
+def current_sequence() -> int | None:
+    """Stream-Sequenz des Events, das der aufrufende Handler gerade verarbeitet.
+
+    ``None`` ausserhalb einer Zustellung ueber NATS. Das web-api reicht sie an den WebSocket
+    weiter, damit ein Client nach einem Abbruch mit ``resumeFrom`` aufholen kann (P4.5).
+    """
+    return _SEQUENCE.get()
 
 
 def covers(pattern: str, subject: str) -> bool:
@@ -214,7 +231,15 @@ class NatsBus:
         return self._nc
 
     async def _connect(self) -> None:
-        self._nc = await nats.connect(self._url, connect_timeout=self._timeout, name="va-bus")
+        self._nc = await nats.connect(
+            self._url,
+            connect_timeout=self._timeout,
+            name="va-bus",
+            max_reconnect_attempts=CONNECT_ATTEMPTS,
+        )
+        # Dieselbe Grenze gilt bei nats-py fuer den Start und spaetere Abbrueche; erst nach dem
+        # Start auf die lange Grenze stellen
+        self._nc.options["max_reconnect_attempts"] = RECONNECT_ATTEMPTS
         self._js = self._nc.jetstream()
         self._publisher = JetStreamPublisher(self._js, timeout=self._timeout)
         await provision(self._nc.jsm())
@@ -328,7 +353,9 @@ class NatsBus:
         loop = asyncio.get_running_loop()
         try:
             async with _keep_alive(message, ack_wait):
-                await loop.run_in_executor(self._pool, _deliver, handler, raw)
+                await loop.run_in_executor(
+                    self._pool, _deliver, handler, raw, message.metadata.sequence.stream
+                )
         except Exception as error:
             log.warning(
                 "%s: %s (%s) fehlgeschlagen, Versuch %d/%d",
@@ -366,9 +393,13 @@ class NatsBus:
 BY_TYPE_SUBJECT = {spec.type: spec.subject for spec in BY_DATASCHEMA.values()}
 
 
-def _deliver(handler: Handler[Any], raw: bytes) -> None:
+def _deliver(handler: Handler[Any], raw: bytes, sequence: int) -> None:
     # Im Versuch geparst: Eine unbekannte Payload zaehlt wie ein gescheiterter Handler
-    handler(parse_envelope(raw))
+    token = _SEQUENCE.set(sequence)
+    try:
+        handler(parse_envelope(raw))
+    finally:
+        _SEQUENCE.reset(token)
 
 
 @contextlib.asynccontextmanager

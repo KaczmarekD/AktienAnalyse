@@ -1745,6 +1745,88 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Eine Wiederholung ist idempotent.
 - **Implementierung:** Eventmanager, Schema `web` (Migration) und die Projektionen
   ([web-api-realtime.md](web-api-realtime.md)).
+- **Entwurf (04.11.2026):**
+  - **Woher die Events kommen:**
+    - Das web-api liest über den provisionierten Consumer `web-api` (`va.>`) mit dem `NatsBus`
+      aus P4.3.
+    - Läuft die Kette im Prozess (Standard, auch auf der NAS), kommt beim web-api nichts an,
+      und die Projektionen bleiben leer.
+    - Die REST-Endpunkte lesen deshalb weiter aus den Tabellen des Batches (`va_read`). Auf die
+      Projektionen wechseln sie, wenn NATS der Standard ist. Das ist ein eigener Schritt beim
+      Deployment, die REST-API bleibt dabei gleich.
+  - **Schema `web`** (Migration `0010`, Besitzer `va_web_api.adapters.postgres`), in
+    `APP_SCHEMAS`:
+    - `inbox` und `outbox` wie in jedem Service-Schema (P4.2). Die Outbox nutzt erst P4.7.
+    - `run_status`: eine Zeile je Run.
+      - Spalten: Status (`requested`, `fetched`, `scored`, `reported`, `failed`, `no_data`),
+        Trigger, IDs von Abruf, Bewertung und Report, Größe des Universums, Zahl bewerteter
+        Titel, Fehler, zuletzt verarbeitetes Event und dessen Zeit.
+      - Ein Fehlschlag gewinnt, wie im `RunTracker`.
+      - Als Projektion ist `run_status` die bewusst gekennzeichnete veränderliche Tabelle
+        ([datenhaltung.md](datenhaltung.md)): `UPDATE` erlaubt, `DELETE` und `TRUNCATE` nicht.
+    - `ranking_row`: je Bewertungslauf und Titel Rang, die drei Scores, Value-Trap-Flag, Name,
+      Index und Run.
+      - Nur zum Anfügen, auch bei einem Rescore.
+      - Daraus ergeben sich das aktuelle Ranking und der Score-Verlauf je Titel.
+  - **Rolle `va_web`:** Sie darf im Schema `web` lesen und anfügen und `run_status` ändern,
+    sonst nichts. `va_read` darf `web` lesen.
+    - Angelegt wird sie wie `va_profiles`: von `db/init/01_roles.sh` bei einer neuen
+      Datenbank, von `python -m src.db.migrate` mit `VA_WEB_PASSWORD` bei einer bestehenden.
+    - Das web-api bekommt sie über `WEB_API_PROJECTIONS_DATABASE_URL`, nie die Zugangsdaten des
+      Batches.
+  - **`va_web_api.events.EventManager`** (synchron, läuft in den Handler-Threads des
+    `NatsBus`):
+    - `dispatch(envelope, seq)`:
+      1. Inbox-Eintrag und alle Projektionen des Event-Typs laufen in einer Transaktion.
+      2. Nach dem Commit gehen die Meldungen an den `Broadcaster`, je Topic aus
+         [web-api-realtime.md](web-api-realtime.md): `runs`, `ranking`, `profiles`.
+    - Wirft eine Projektion, wird zurückgerollt, nichts gesendet, und die Exception geht an
+      den Bus. JetStream stellt dann erneut zu.
+    - Eine erneute Zustellung ändert nichts und sendet nichts.
+    - Ein Fehler des `Broadcaster` kostet nur die Meldung, nicht das Event.
+    - Der `Broadcaster` ist ein Port. Bis P4.5 (WebSocket-Hub) protokolliert er nur.
+  - **`seq`:** Der `NatsBus` legt die Stream-Sequenz der gerade verarbeiteten Nachricht in einen
+    Kontext (`current_sequence()`). Über NATS reicht das web-api sie mit, im Prozess gibt es
+    keine.
+  - **Start im web-api:** Mit `WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` öffnet der
+    Lifespan einen `NatsBus` (Consumer `web-api`, alle dauerhaften Events) und schließt ihn am
+    Ende.
+    - Fehlt eins davon, gibt es keine Projektionen, die App läuft trotzdem.
+    - Ist NATS beim Start nicht erreichbar, wird das geloggt, und die App startet ohne
+      Projektionen.
+  - **Compose:**
+    - Lokal bekommt das web-api beide Variablen.
+    - Auf der NAS bleibt es vorerst ohne. Dort läuft die Kette im Prozess, also gäbe es nichts
+      zu projizieren.
+  - **Test (rot):**
+    - DB-Tests für den `EventManager` (Schema `web`, echte Datenbank, Fake-`Broadcaster`):
+      - Beim Broadcast ist die Projektion schon committet (eine zweite Verbindung sieht sie).
+      - Wirft eine Projektion, gibt es keinen Broadcast und weder Inbox-Eintrag noch
+        Projektion. Die Exception kommt beim Aufrufer an.
+      - Dasselbe Event zweimal: nur einmal projiziert und gesendet.
+      - Der Run-Status folgt der Kette (`requested` bis `reported`), ein Fehlschlag gewinnt
+        gegen ein späteres `report.sent`.
+      - `scoring.run.completed` legt die Ranking-Zeilen an, ein Rescore ohne Run ebenso, aber
+        ohne Run-Status.
+      - Topics: `runs`, `ranking` und `profiles` je nach Event.
+    - Schutz und Rollen:
+      - `ranking_row` und `inbox` sind nur zum Anfügen.
+      - `run_status` lässt sich ändern, aber nicht löschen.
+      - `va_web` schreibt nur in `web`, `va_read` liest `web`.
+      - Die Migration legt `va_web` an.
+    - Schema-Grenzen: `web` hat einen Besitzer, `outbox` und `inbox`.
+    - NATS und DB: Ein über NATS veröffentlichtes Event landet in der Projektion, mit der
+      Stream-Sequenz.
+    - web-api: Ohne NATS-Einstellungen startet die App ohne Consumer.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Dead Letter:** Ein Event, das der Eventmanager auch nach `max_deliver` (5) nicht
+    verarbeitet, vermerkt er mit Fehler in `web.inbox` (`record_dead_letter` aus P4.2).
+  - **Stream-Sequenz:** `current_sequence()` setzt der `NatsBus` im Handler-Thread selbst.
+    Ein `run_in_executor` reicht den Kontext nicht weiter.
+  - **Rechte:** `va_app` (Batch) bekommt im Schema `web` keine Rechte.
+  - **Modelle und Migration** stimmen überein, Alembic findet beim Vergleich keine Abweichung.
+  - **Für P4.5:** Die Meldung zu `scoring.run.completed` trägt die ganze Rangliste. Für den
+    WebSocket sollte sie schlanker werden (Kopf des Laufs, Rangliste per REST).
 
 #### P4.5 WebSocket-Hub und Protokoll v1 🔒
 

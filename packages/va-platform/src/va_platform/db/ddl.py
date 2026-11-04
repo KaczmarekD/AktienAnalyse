@@ -8,6 +8,7 @@ Rollen (legt ``db/init/01_roles.sh`` an, bzw. der DBA bei fremdem Postgres):
 - ``va_app``: SELECT/INSERT, UPDATE nur fuer Laufabschluss, ISIN und ``published_at`` der
   Outbox - kein DELETE.
 - ``va_read``: nur SELECT, fuer Auswertungen aus dem LAN.
+- ``va_profiles`` (P3.3) und ``va_web`` (P4.4): Rollen des web-api, siehe unten.
 """
 
 from __future__ import annotations
@@ -18,6 +19,10 @@ SCHEMAS = ("batch", "market_data", "scoring", "reporting")
 
 # Tabellen, die genau einmal aktualisiert werden duerfen (Abschluss bzw. ISIN)
 UPDATABLE_TABLES = ("batch.run", "market_data.fetch_run", "market_data.instrument")
+
+# Projektionen (P4.4): Read-Models, jederzeit aus Events neu aufbaubar. UPDATE erlaubt,
+# Loeschen und Leeren nicht (docs/architecture/datenhaltung.md)
+MUTABLE_TABLES = ("web.run_status",)
 
 CREATE_FUNCTIONS = r"""
 CREATE OR REPLACE FUNCTION public.va_forbid_change() RETURNS trigger
@@ -76,7 +81,9 @@ def protect_table(table: str) -> list[str]:
         f"CREATE TRIGGER va_no_truncate BEFORE TRUNCATE ON {table} "
         "FOR EACH STATEMENT EXECUTE FUNCTION public.va_forbid_change()",
     ]
-    if table.endswith(".outbox"):
+    if table in MUTABLE_TABLES:
+        pass  # Projektion: kein UPDATE-Schutz
+    elif table.endswith(".outbox"):
         # va_guard_outbox legt Migration 0009 an: published_at einmal setzen, sonst nichts
         statements.append(
             f"CREATE TRIGGER va_guard_update BEFORE UPDATE ON {table} "
@@ -171,6 +178,32 @@ BEGIN
         GRANT INSERT ON scoring.profile_version, scoring.profile_activation TO {PROFILES_ROLE};
         EXECUTE format('GRANT USAGE ON SEQUENCE %s TO {PROFILES_ROLE}',
                        pg_get_serial_sequence('scoring.profile_activation', 'id'));
+    END IF;
+END
+$$;
+"""
+
+
+# P4.4: Die Projektionen des web-api schreibt eine eigene Rolle, nie die des Batches
+WEB_ROLE = "va_web"
+
+
+def web_grant_statements() -> str:
+    """Rechte im Schema ``web``: ``va_web`` liest und fuegt an, aendert nur ``run_status``;
+    ``va_read`` liest. Nur fuer Rollen, die es gibt (idempotent)."""
+    mutable = ", ".join(MUTABLE_TABLES)
+    return f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{WEB_ROLE}') THEN
+        GRANT USAGE ON SCHEMA web TO {WEB_ROLE};
+        GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA web TO {WEB_ROLE};
+        GRANT UPDATE ON {mutable} TO {WEB_ROLE};
+        GRANT UPDATE (published_at) ON web.outbox TO {WEB_ROLE};
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'va_read') THEN
+        GRANT USAGE ON SCHEMA web TO va_read;
+        GRANT SELECT ON ALL TABLES IN SCHEMA web TO va_read;
     END IF;
 END
 $$;

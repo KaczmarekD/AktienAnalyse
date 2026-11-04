@@ -6,11 +6,18 @@ allein bietet alles ausser diesen. Der Lifespan oeffnet die Datenbank: Rolle ``v
 schreibgeschuetzten Transaktionen, dazu fuer die Profil-Befehle ``va_profiles``. Die Engines
 verbinden sich erst beim ersten Zugriff, Health und Doku kommen ohne Datenbank aus.
 
+Mit ``WEB_API_NATS_URL`` und ``WEB_API_PROJECTIONS_DATABASE_URL`` startet der Lifespan ausserdem
+im Hintergrund den Event-Consumer (P4.4): Die Events aus NATS fuellen die Projektionen im Schema
+``web``. Ist NATS nicht erreichbar, laeuft die App ohne und versucht es spaeter erneut.
+
 Swagger und OpenAPI liegen unter ``/api``, damit nginx (P3.6) sie mit ``/api/*`` weiterreicht.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -23,6 +30,7 @@ from sqlalchemy.exc import OperationalError
 from va_platform.db import create_db_engine
 
 from .api import health, instruments, ranking, reports, runs, scoring
+from .events import LoggingBroadcaster, open_event_consumer
 from .security import JsonOnlyMiddleware
 from .settings import WebApiSettings
 
@@ -30,13 +38,45 @@ if TYPE_CHECKING:
     from fastapi.routing import APIRoute
     from sqlalchemy import Engine
 
+    from va_platform.nats import NatsBus
+
     from .ports import ProfileCommands, ScoringPreview
 
 API_PREFIX = "/api/v1"
 
+log = logging.getLogger(__name__)
+
 
 def _operation_id(route: APIRoute) -> str:
     return route.name
+
+
+EVENTS_RETRY_SECONDS = 30.0  # so oft versucht das web-api, den Event-Consumer zu starten
+
+
+async def _keep_events(app: FastAPI, url: str, engine: Engine) -> None:
+    """Startet den Event-Consumer (P4.4) im Hintergrund, bis er laeuft.
+
+    Der Start der App wartet nicht darauf: Ist NATS (noch) nicht da, laeuft das web-api ohne
+    Projektionen weiter und versucht es alle ``EVENTS_RETRY_SECONDS`` erneut.
+    """
+    while True:
+        try:
+            # Im Thread: Der Start wartet auf NATS und darf die Event-Loop nicht blockieren
+            bus: NatsBus = await asyncio.to_thread(
+                open_event_consumer, url, engine, LoggingBroadcaster()
+            )
+        except Exception:
+            log.warning(
+                "Event-Consumer nicht gestartet, neuer Versuch in %.0f s",
+                EVENTS_RETRY_SECONDS,
+                exc_info=True,
+            )
+            await asyncio.sleep(EVENTS_RETRY_SECONDS)
+        else:
+            app.state.events = bus
+            log.info("Event-Consumer laeuft, Projektionen werden gefuellt")
+            return
 
 
 def create_app(
@@ -63,12 +103,27 @@ def create_app(
             if commands is None or app.state.profiles_engine is None
             else commands(app.state.profiles_engine)
         )
+        app.state.events = None
+        app.state.projections_engine = None
+        starter: asyncio.Task[None] | None = None
+        nats_url, projections = settings.nats_url, settings.projections_database_url
+        if nats_url and projections is not None:
+            app.state.projections_engine = create_db_engine(projections.get_secret_value())
+            starter = asyncio.create_task(_keep_events(app, nats_url, app.state.projections_engine))
         try:
             yield
         finally:
+            if starter is not None:
+                starter.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await starter
+            if app.state.events is not None:
+                await asyncio.to_thread(app.state.events.close)
             app.state.engine.dispose()
             if app.state.profiles_engine is not None:
                 app.state.profiles_engine.dispose()
+            if app.state.projections_engine is not None:
+                app.state.projections_engine.dispose()
 
     app = FastAPI(
         title="Value-Analyzer web-api",

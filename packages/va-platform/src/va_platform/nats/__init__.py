@@ -157,7 +157,7 @@ class JetStreamPublisher:
 
 
 # Am Ende: bus.py nutzt die Namen oben (Stream, Grenzen, Provisionierung, Publisher)
-from .bus import NatsBus  # noqa: E402
+from .bus import NatsBus, current_sequence  # noqa: E402
 
 __all__ = [
     "ACK_WAIT",
@@ -167,6 +167,7 @@ __all__ = [
     "ConsumerSpec",
     "JetStreamPublisher",
     "NatsBus",
+    "current_sequence",
     "provision",
     "stream_config",
 ]

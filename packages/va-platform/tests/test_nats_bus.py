@@ -191,3 +191,28 @@ class TestVolatileEvents:
     def test_subscribing_to_volatile_events_comes_later(self, bus):
         with pytest.raises(ValueError, match=r"P4\.5"):
             bus.subscribe(FETCH_PROGRESSED, "web-api", lambda env: None)
+
+
+class TestSequence:
+    def test_handler_sees_the_stream_sequence(self, bus):
+        """P4.4: Das web-api reicht sie an den WebSocket weiter (resumeFrom, P4.5)."""
+        from va_platform.nats import current_sequence
+
+        seen: list[int | None] = []
+        bus.subscribe(RUN_REQUESTED, "market-data", lambda env: seen.append(current_sequence()))
+        bus.publish(_requested(1))
+        bus.publish(_requested(2))
+        bus.settle(timeout=20)
+        assert seen == [1, 2]
+        assert current_sequence() is None  # ausserhalb einer Zustellung
+
+
+def test_unreachable_server_fails_fast():
+    """P4.4: Beim Start nicht minutenlang haengen (nats-py versucht es sonst 60-mal)."""
+    from va_platform.nats import NatsBus
+
+    bus = NatsBus("nats://127.0.0.1:1", timeout=2)
+    started = time.monotonic()
+    with pytest.raises(Exception):  # noqa: B017, PT011 - nats-py meldet NoServersError o. Ae.
+        bus.start()
+    assert time.monotonic() - started < 30

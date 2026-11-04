@@ -35,6 +35,8 @@ class DatabaseSettings(_OwnerUrl):
     database_url: SecretStr | None = None
     # P3.3: Passwort der Rolle va_profiles; gesetzt legt die Migration sie an und gleicht es an
     va_profiles_password: SecretStr | None = None
+    # P4.4: Passwort der Rolle va_web (Projektionen des web-api im Schema web), ebenso
+    va_web_password: SecretStr | None = None
 
 
 class Settings(_OwnerUrl):

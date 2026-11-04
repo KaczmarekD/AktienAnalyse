@@ -199,13 +199,34 @@ class TestLocalWebApi:
         assert api["entrypoint"][:3] == ["python", "-m", "uvicorn"]
         assert "src.web:create_app" in api["entrypoint"]
 
-    def test_gets_only_the_read_and_the_profiles_role(self, local):
+    def test_gets_only_its_own_roles(self, local):
         env = local["services"]["web-api"]["environment"]
-        # keine Zugangsdaten des Batches
-        assert set(env) == {"TZ", "WEB_API_DATABASE_URL", "WEB_API_PROFILES_DATABASE_URL"}
+        # keine Zugangsdaten des Batches: lesen (va_read), Profile (va_profiles, P3.3) und
+        # Projektionen (va_web, P4.4), dazu NATS fuer den Event-Consumer
+        assert set(env) == {
+            "TZ",
+            "WEB_API_DATABASE_URL",
+            "WEB_API_PROFILES_DATABASE_URL",
+            "WEB_API_NATS_URL",
+            "WEB_API_PROJECTIONS_DATABASE_URL",
+        }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROFILES_DATABASE_URL"].startswith("postgresql+psycopg://va_profiles:")
         assert "@db:5432/value_analyzer" in env["WEB_API_PROFILES_DATABASE_URL"]
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+
+    def test_e2e_web_api_stays_without_projections(self, e2e):
+        """Der E2E-Stack bildet die NAS nach; NATS startet dort nicht (P4.4)."""
+        env = e2e["services"]["web-api"]["environment"]
+        assert env["WEB_API_NATS_URL"] == ""
+        assert env["WEB_API_PROJECTIONS_DATABASE_URL"] == ""
+
+    def test_nas_web_api_stays_without_projections(self, nas):
+        """Auf der NAS laeuft die Kette im Prozess: Es gaebe nichts zu projizieren (P4.4)."""
+        env = nas["services"]["web-api"]["environment"]
+        assert "WEB_API_NATS_URL" not in env
+        assert "WEB_API_PROJECTIONS_DATABASE_URL" not in env
 
 
 class TestLocalFrontend:

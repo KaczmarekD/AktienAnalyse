@@ -45,7 +45,11 @@ im Docker-Netz). `python -m va_platform.nats` legt Stream `VA_EVENTS` und die Co
 über NATS laufen lassen: `EVENT_BUS=nats` mit `NATS_URL`, `va_platform.nats.NatsBus` (eigener
 Adapter mit nats-py statt FastStream, Nachtrag in ADR-0002). Dann wartet `src/main.py` höchstens
 `RUN_TIMEOUT_MINUTES` auf das Ergebnis des `RunTracker`. Standard, auch auf der NAS, bleibt der
-Bus im Prozess. Seit P4.3b hängt jeder Service über einen `ReliableBus` am Bus, in beiden Modi:
+Bus im Prozess. Seit P4.4 füllt das web-api mit `WEB_API_NATS_URL` und
+`WEB_API_PROJECTIONS_DATABASE_URL` (Rolle `va_web`) die Projektionen im Schema `web` aus dem
+Consumer `web-api` (`va_web_api.events.EventManager`). Die REST-Endpunkte lesen weiter aus den
+Tabellen des Batches, bis NATS der Standard ist. Seit P4.3b hängt jeder Service über einen
+`ReliableBus` am Bus, in beiden Modi:
 Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
 `RUN_TIMEOUT_MINUTES`) und schickt Folge-Events über seine Outbox.
 `make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
@@ -176,12 +180,13 @@ Live-Quelle ab (Indexreview), zeigt der Mail-Report „Fallback-CSV pflegen“.
 einzige Quelle der Wahrheit (keine Parquet-Caches, kein Housekeeping mehr).
 Warum: Snapshots sind nicht rekonstruierbar – yfinance liefert nur den
 aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
-- Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`.
+- Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`, dazu seit P4.4
+  `web` (Projektionen des web-api).
   Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID
   (`tests/db/test_schema_boundaries.py` prüft Modelle und migrierte DB).
 - Jedes Schema gehört einem Modul, Modelle und Repository liegen dort unter
   `adapters/postgres/`: `market_data` → `va_market_data`, `scoring` → `va_scoring`,
-  `reporting` → `va_notification`, `batch` → `src/db` (Ablaufsteuerung). Basis,
+  `reporting` → `va_notification`, `web` → `va_web_api`, `batch` → `src/db` (Ablaufsteuerung). Basis,
   Engine/Session und DDL-Helfer stehen in `va_platform.db`. Die Alembic-Historie
   ist eine; `src/db/models/__init__.py` sammelt alle Modelle für sie.
 - Die DB erzwingt „niemals löschen“ selbst (`va_platform.db.ddl`): Trigger gegen
@@ -189,8 +194,10 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   Einzige UPDATEs: einmaliger Abschluss von `batch.run`/`market_data.fetch_run`
   (das UPDATE muss `finished_at` setzen, Migration `0005`), das Nachtragen einer
   ISIN und das einmalige Setzen von `published_at` in der Outbox (Trigger `va_guard_outbox`,
-  `va_app` hat nur dieses Spaltenrecht). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
-  nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3). Eine Rolle, die nach
+  `va_app` hat nur dieses Spaltenrecht). Projektionen sind veränderlich, aber nie löschbar
+  (`MUTABLE_TABLES`, heute `web.run_status`). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
+  nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3), `va_web` nur im Schema
+  `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`). Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert

@@ -14,6 +14,9 @@ services:
       # P3.3: Rolle fuer die Profil-Befehle des web-api. In einer bestehenden Datenbank legt
       # sie die Migration beim Start des Batches an (python -m src.db.migrate)
       VA_PROFILES_PASSWORD: ${VA_PROFILES_PASSWORD:?VA_PROFILES_PASSWORD in .env setzen}
+      # P4.4: Rolle fuer die Projektionen des web-api (Schema web), optional. Gebraucht erst,
+      # wenn die Kette ueber NATS laeuft; dann auch die beiden WEB_API_*-Zeilen beim web-api
+      VA_WEB_PASSWORD: ${VA_WEB_PASSWORD:-}
     volumes:
       # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
       # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,

@@ -5,9 +5,10 @@
 Nutzt ``DATABASE_OWNER_URL`` (Fallback ``DATABASE_URL``). Migrationen sind
 ausschliesslich additiv: keine Tabelle und keine Spalte mit Daten wird entfernt.
 
-Danach die Login-Rolle ``va_profiles`` (P3.3), wenn ``VA_PROFILES_PASSWORD`` gesetzt ist: Das
-Init-Skript ``db/init/01_roles.sh`` laeuft nur in einer leeren Datenbank, eine bestehende
-bekommt die Rolle hier. Ihr Passwort folgt der ``.env``.
+Danach die Login-Rollen des web-api, wenn ihr Passwort gesetzt ist: ``va_profiles`` (P3.3,
+``VA_PROFILES_PASSWORD``) und ``va_web`` (P4.4, ``VA_WEB_PASSWORD``). Das Init-Skript
+``db/init/01_roles.sh`` laeuft nur in einer leeren Datenbank, eine bestehende bekommt die Rollen
+hier. Ihr Passwort folgt der ``.env``.
 """
 
 from __future__ import annotations
@@ -23,7 +24,12 @@ from sqlalchemy import create_engine, text
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from va_platform.db import normalize_url
-from va_platform.db.ddl import PROFILES_ROLE, profiles_grant_statements
+from va_platform.db.ddl import (
+    PROFILES_ROLE,
+    WEB_ROLE,
+    profiles_grant_statements,
+    web_grant_statements,
+)
 
 from ..config import DatabaseSettings
 
@@ -90,6 +96,17 @@ def ensure_profiles_role(url: str, password: str) -> None:
         engine.dispose()
 
 
+def ensure_web_role(url: str, password: str) -> None:
+    """Die Rolle der Projektionen (P4.4) samt Rechten im Schema ``web``."""
+    ensure_login_role(url, WEB_ROLE, password)
+    engine = create_engine(normalize_url(url))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(web_grant_statements()))
+    finally:
+        engine.dispose()
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s")
     settings = DatabaseSettings()
@@ -103,14 +120,18 @@ def main() -> int:
         log.exception("Migration fehlgeschlagen")
         return 1
     log.info("Datenbankschema ist aktuell")
-    if settings.va_profiles_password is not None:
+    roles = (
+        (PROFILES_ROLE, settings.va_profiles_password, ensure_profiles_role),
+        (WEB_ROLE, settings.va_web_password, ensure_web_role),
+    )
+    for role, password, ensure in roles:
+        if password is None:
+            continue
         try:
-            ensure_profiles_role(
-                secret.get_secret_value(), settings.va_profiles_password.get_secret_value()
-            )
+            ensure(secret.get_secret_value(), password.get_secret_value())
         except Exception:
-            # Der Batch braucht die Rolle nicht; nur das Speichern im UI faellt dann aus
-            log.warning("Rolle %s nicht eingerichtet", PROFILES_ROLE, exc_info=True)
+            # Der Batch braucht die Rollen nicht; nur Teile des web-api fallen dann aus
+            log.warning("Rolle %s nicht eingerichtet", role, exc_info=True)
     return 0
 
 

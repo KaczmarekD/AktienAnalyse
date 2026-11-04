@@ -70,6 +70,27 @@ class TestMigrateMain:
         ):
             assert migrate.main() == 0
 
+    def test_web_role_is_ensured_with_the_password_from_the_env(self, no_db_env, monkeypatch):
+        # P4.4: va_web schreibt die Projektionen des web-api im Schema web
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.setenv("VA_WEB_PASSWORD", "projektionen")
+        monkeypatch.delenv("VA_PROFILES_PASSWORD", raising=False)
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_web_role") as ensure,
+        ):
+            assert migrate.main() == 0
+        ensure.assert_called_once_with("postgresql://va_owner:pw@db/va", "projektionen")
+
+    def test_web_role_failure_does_not_stop_the_batch(self, no_db_env, monkeypatch):
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.setenv("VA_WEB_PASSWORD", "projektionen")
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_web_role", side_effect=RuntimeError("kein Recht")),
+        ):
+            assert migrate.main() == 0
+
     def test_without_any_url_fails_cleanly(self, no_db_env):
         with patch("src.db.migrate.upgrade") as upgrade:
             assert migrate.main() == 1

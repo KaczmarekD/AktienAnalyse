@@ -41,6 +41,7 @@ Stand `261dc8f` (Migration `0001_initial_schema`):
 | `va_app` | `SELECT`/`INSERT`, `UPDATE` nur für freigegebene Tabellen und in der Outbox nur für die Spalte `published_at`, kein `DELETE` | der Batch |
 | `va_read` | nur `SELECT` | Auswertungen aus dem LAN; in Phase 3 auch das web-api |
 | `va_profiles` | `SELECT` auf den drei Profil-Tabellen, `INSERT` in `profile_version` und `profile_activation` | das web-api für die Profil-Befehle (P3.3), bis scoring sie ab Phase 4 selbst ausführt |
+| `va_web` | im Schema `web` `SELECT` und `INSERT`, `UPDATE` nur auf `run_status` und `published_at` der Outbox | das web-api für die Projektionen (P4.4); `va_read` liest `web` mit |
 
 Der Treiber ist psycopg 3 (`postgresql+psycopg://`) mit synchronem SQLAlchemy. Das passt für den
 Batch.
@@ -53,7 +54,7 @@ Batch.
 | `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie des letzten Snapshots, `outbox`, `inbox` |
 | `reporting` | `notification` | `outbox`, `inbox` |
 | `batch` | `web-api` | Runs werden vom web-api angelegt (Scheduler/UI); `outbox` (`screening.run.requested`), `inbox` |
-| `web` (neu) | `web-api` | Read-Models für das UI: aktuelles Ranking, Score-Verlauf je Titel |
+| `web` (seit P4.4, Migration `0010`) | `web-api` | Read-Models für das UI: `run_status` (veränderlich, nie gelöscht) und `ranking_row` (aktuelles Ranking, Score-Verlauf je Titel); `outbox`, `inbox` |
 
 `outbox` und `inbox` gibt es seit P4.2 in allen vier Schemas (Migration `0009`). Die Modelle
 liegen beim Besitzer des Schemas, die Logik in `va_platform.messaging`

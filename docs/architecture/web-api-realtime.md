@@ -1,6 +1,10 @@
 # web-api, Eventmanager und WebSocket
 
-> **Status:** Plan (30.09.2026). REST ab Phase 3, Eventmanager und WebSocket ab Phase 4, siehe
+> **Status:** REST seit Phase 3. Seit P4.4 (04.11.2026) gibt es den Eventmanager
+> (`va_web_api.events`) mit den Projektionen `web.run_status` und `web.ranking_row`, gespeist aus
+> NATS. Bis zum WebSocket-Hub (P4.5) protokolliert der `Broadcaster` nur. Die REST-Endpunkte
+> lesen weiter aus den Tabellen des Batches, bis NATS der Standard ist. Plan (30.09.2026): REST
+> ab Phase 3, Eventmanager und WebSocket ab Phase 4, siehe
 > [Roadmap](roadmap.md). Entscheidungen:
 > [ADR-0006](../adr/0006-websocket-und-eventmanager.md), [ADR-0007](../adr/0007-lan-only-ohne-login.md).
 

@@ -34,6 +34,7 @@ from va_scoring.adapters.postgres.models import (
     ScoringOutbox,
     ScoringRun,
 )
+from va_web_api.adapters.postgres.models import RankingRow, RunStatus, WebInbox, WebOutbox
 
 from .batch import BatchInbox, BatchOutbox, ImportFile, Run, RunLog
 
@@ -56,12 +57,14 @@ __all__ = [
     "Profile",
     "ProfileActivation",
     "ProfileVersion",
+    "RankingRow",
     "RawInfo",
     "Report",
     "ReportingInbox",
     "ReportingOutbox",
     "Run",
     "RunLog",
+    "RunStatus",
     "ScoreResult",
     "ScoringInbox",
     "ScoringOutbox",
@@ -69,4 +72,6 @@ __all__ = [
     "ShareCount",
     "StatementValue",
     "UniverseMember",
+    "WebInbox",
+    "WebOutbox",
 ]

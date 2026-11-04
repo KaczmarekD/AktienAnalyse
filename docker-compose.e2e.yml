@@ -48,6 +48,11 @@ services:
     image: ${E2E_APP_IMAGE:-value-analyzer:local}
     # Wie auf der NAS nur hinter nginx erreichbar
     ports: !reset []
+    # Wie auf der NAS ohne Projektionen (P4.4): Die Kette laeuft im Prozess, NATS startet hier
+    # nicht mit. Leer heisst: kein Event-Consumer
+    environment:
+      WEB_API_NATS_URL: ""
+      WEB_API_PROJECTIONS_DATABASE_URL: ""
 
   frontend:
     container_name: value-analyzer-e2e-frontend
