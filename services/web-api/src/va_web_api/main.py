@@ -10,6 +10,8 @@ Mit ``WEB_API_NATS_URL`` und ``WEB_API_PROJECTIONS_DATABASE_URL`` startet der Li
 im Hintergrund den Event-Consumer (P4.4): Die Events aus NATS fuellen die Projektionen im Schema
 ``web``. Ist NATS nicht erreichbar, laeuft die App ohne und versucht es spaeter erneut.
 
+Der WebSocket ``/ws`` (P4.5) meldet die Events des Eventmanagers an die offenen Tabs.
+
 Swagger und OpenAPI liegen unter ``/api``, damit nginx (P3.6) sie mit ``/api/*`` weiterreicht.
 """
 
@@ -30,7 +32,10 @@ from sqlalchemy.exc import OperationalError
 from va_platform.db import create_db_engine
 
 from .api import health, instruments, ranking, reports, runs, scoring
-from .events import LoggingBroadcaster, open_event_consumer
+from .events import Broadcaster, open_event_consumer
+from .realtime import endpoint
+from .realtime.hub import HubBroadcaster, WebSocketHub
+from .realtime.replay import NatsReplayer
 from .security import JsonOnlyMiddleware
 from .settings import WebApiSettings
 
@@ -54,7 +59,7 @@ def _operation_id(route: APIRoute) -> str:
 EVENTS_RETRY_SECONDS = 30.0  # so oft versucht das web-api, den Event-Consumer zu starten
 
 
-async def _keep_events(app: FastAPI, url: str, engine: Engine) -> None:
+async def _keep_events(app: FastAPI, url: str, engine: Engine, broadcaster: Broadcaster) -> None:
     """Startet den Event-Consumer (P4.4) im Hintergrund, bis er laeuft.
 
     Der Start der App wartet nicht darauf: Ist NATS (noch) nicht da, laeuft das web-api ohne
@@ -63,9 +68,7 @@ async def _keep_events(app: FastAPI, url: str, engine: Engine) -> None:
     while True:
         try:
             # Im Thread: Der Start wartet auf NATS und darf die Event-Loop nicht blockieren
-            bus: NatsBus = await asyncio.to_thread(
-                open_event_consumer, url, engine, LoggingBroadcaster()
-            )
+            bus: NatsBus = await asyncio.to_thread(open_event_consumer, url, engine, broadcaster)
         except Exception:
             log.warning(
                 "Event-Consumer nicht gestartet, neuer Versuch in %.0f s",
@@ -103,13 +106,20 @@ def create_app(
             if commands is None or app.state.profiles_engine is None
             else commands(app.state.profiles_engine)
         )
+        # P4.5: WebSocket-Hub; der Eventmanager meldet ueber den Broadcaster aus seinen Threads
+        app.state.settings = settings
+        app.state.hub = WebSocketHub()
+        app.state.broadcaster = HubBroadcaster(app.state.hub, asyncio.get_running_loop())
         app.state.events = None
         app.state.projections_engine = None
         starter: asyncio.Task[None] | None = None
         nats_url, projections = settings.nats_url, settings.projections_database_url
+        app.state.replayer = NatsReplayer(nats_url) if nats_url else None
         if nats_url and projections is not None:
             app.state.projections_engine = create_db_engine(projections.get_secret_value())
-            starter = asyncio.create_task(_keep_events(app, nats_url, app.state.projections_engine))
+            starter = asyncio.create_task(
+                _keep_events(app, nats_url, app.state.projections_engine, app.state.broadcaster)
+            )
         try:
             yield
         finally:
@@ -119,6 +129,9 @@ def create_app(
                     await starter
             if app.state.events is not None:
                 await asyncio.to_thread(app.state.events.close)
+            if app.state.replayer is not None:
+                with contextlib.suppress(Exception):
+                    await app.state.replayer.close()
             app.state.engine.dispose()
             if app.state.profiles_engine is not None:
                 app.state.profiles_engine.dispose()
@@ -140,6 +153,8 @@ def create_app(
     app.add_middleware(JsonOnlyMiddleware)
     for module in (health, runs, ranking, instruments, reports, scoring):
         app.include_router(module.router, prefix=API_PREFIX)
+    # P4.5: WebSocket unter /ws, nginx reicht ihn neben /api/ weiter
+    app.include_router(endpoint.router)
 
     @app.exception_handler(OperationalError)
     async def database_down(request: Request, exc: OperationalError) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI

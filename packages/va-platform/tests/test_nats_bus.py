@@ -188,9 +188,23 @@ class TestVolatileEvents:
 
         assert _with_nats(nats_url, messages) == 0
 
-    def test_subscribing_to_volatile_events_comes_later(self, bus):
-        with pytest.raises(ValueError, match=r"P4\.5"):
-            bus.subscribe(FETCH_PROGRESSED, "web-api", lambda env: None)
+    def test_volatile_events_reach_a_subscriber(self, bus):
+        """P4.5: Fortschritt fuer den WebSocket, ueber Core-NATS ohne Wiederholung."""
+        from va_platform.nats import current_sequence
+
+        received: list[tuple[int, int | None]] = []
+        bus.subscribe(
+            FETCH_PROGRESSED,
+            "web-api",
+            lambda env: received.append((env.data.done, current_sequence())),
+        )
+        for done in (1, 2):
+            data = FetchProgressedV1(run_id=1, done=done, total=90, symbol="SAP.DE", ok=True)
+            bus.publish(new_envelope(FETCH_PROGRESSED, data, source="va/test"))
+        deadline = time.monotonic() + 10
+        while len(received) < 2 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert received == [(1, None), (2, None)]  # fluechtig: ohne Stream-Sequenz
 
 
 class TestSequence:

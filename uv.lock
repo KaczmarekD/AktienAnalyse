@@ -1332,6 +1332,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "uvicorn" },
     { name = "va-platform" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -1342,6 +1343,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.1,<3" },
     { name = "uvicorn", specifier = ">=0.54,<1" },
     { name = "va-platform", editable = "packages/va-platform" },
+    { name = "websockets", specifier = ">=16,<17" },
 ]
 
 [[package]]

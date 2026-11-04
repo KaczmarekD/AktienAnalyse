@@ -47,7 +47,9 @@ Adapter mit nats-py statt FastStream, Nachtrag in ADR-0002). Dann wartet `src/ma
 `RUN_TIMEOUT_MINUTES` auf das Ergebnis des `RunTracker`. Standard, auch auf der NAS, bleibt der
 Bus im Prozess. Seit P4.4 füllt das web-api mit `WEB_API_NATS_URL` und
 `WEB_API_PROJECTIONS_DATABASE_URL` (Rolle `va_web`) die Projektionen im Schema `web` aus dem
-Consumer `web-api` (`va_web_api.events.EventManager`). Die REST-Endpunkte lesen weiter aus den
+Consumer `web-api` (`va_web_api.events.EventManager`). Seit P4.5 meldet der WebSocket `/ws`
+(Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) die Änderungen an die
+offenen Tabs, nginx reicht `/ws` weiter. Die REST-Endpunkte lesen weiter aus den
 Tabellen des Batches, bis NATS der Standard ist. Seit P4.3b hängt jeder Service über einen
 `ReliableBus` am Bus, in beiden Modi:
 Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als

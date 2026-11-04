@@ -7,6 +7,7 @@ dependencies = [
     "va-platform",
     "fastapi>=0.160,<1",
     "uvicorn>=0.54,<1",  # ohne [standard]: reines Python, nichts Natives fuer den J4125
+    "websockets>=16,<17",  # P4.5: WebSocket in Uvicorn; bisher nur ueber yfinance im Image
     "pydantic>=2.7,<3",  # wie im Root-Projekt
     "pydantic-settings>=2.4,<3",
     "sqlalchemy>=2.1,<3",

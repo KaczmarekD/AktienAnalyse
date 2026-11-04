@@ -49,6 +49,20 @@ def test_api_goes_to_the_web_api_resolved_per_request():
     assert 'set $web_api "web-api:8000";' in conf
 
 
+def test_websocket_goes_to_the_web_api_with_upgrade():
+    """P4.5: Upgrade-Header, Host mit Port fuer die Origin-Pruefung, lange Timeouts."""
+    match = re.search(r"location = /ws \{(.*?)\n    \}", _conf(), re.S)
+    assert match is not None
+    block = match.group(1)
+    assert "proxy_pass http://$web_api;" in block
+    assert "proxy_set_header Upgrade $http_upgrade;" in block
+    assert 'proxy_set_header Connection "upgrade";' in block
+    assert "proxy_set_header Host $http_host;" in block
+    timeout = re.search(r"proxy_read_timeout (\d+)s;", block)
+    assert timeout is not None
+    assert int(timeout.group(1)) > 60  # Uvicorn pingt alle 20 s
+
+
 def test_angular_routes_fall_back_to_index_html():
     assert "try_files $uri $uri/ /index.html;" in _conf()
 

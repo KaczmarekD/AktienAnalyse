@@ -30,3 +30,14 @@ class WebApiSettings(BaseSettings):
     nats_url: str | None = None
     # postgresql+psycopg://va_web:<pw>@db:5432/value_analyzer
     projections_database_url: SecretStr | None = None
+    # P4.5: erlaubte Herkunft fuer den WebSocket, durch Komma getrennt (kein JSON), etwa
+    # "http://nas:8080, http://nas.fritz.box:8080". Leer: nur dieselbe Herkunft wie der Host.
+    allowed_origins: str = ""
+
+    @property
+    def origins(self) -> frozenset[str]:
+        return frozenset(
+            part.strip().rstrip("/").lower()
+            for part in self.allowed_origins.split(",")
+            if part.strip()
+        )

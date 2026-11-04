@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from va_contracts.events.v1 import (
     EVENTS,
+    FETCH_PROGRESSED,
     PROFILE_ACTIVATED,
     PROFILE_SAVED,
     REPORT_SENT,
@@ -125,7 +126,7 @@ class EventManager:
             for project in self._projections.get(envelope.type, ()):
                 project(session, envelope)
         # Erst nach dem Commit: Wer daraufhin per REST nachlaedt, sieht den neuen Stand
-        data = _plain(envelope.data)
+        data = plain(envelope.data)
         for topic in topics_for(envelope):
             try:
                 self._broadcaster.publish(EventMessage(topic, envelope.type, seq, data))
@@ -144,7 +145,8 @@ class EventManager:
             )
 
 
-def _plain(data: Any) -> dict[str, Any]:
+def plain(data: Any) -> dict[str, Any]:
+    """Payload eines Events als einfaches Dict (fuer Meldungen und den WebSocket)."""
     if isinstance(data, BaseModel):
         return data.model_dump(mode="json")
     return dict(data)
@@ -167,12 +169,17 @@ def open_event_consumer(nats_url: str, engine: Engine, broadcaster: Broadcaster)
     def handle(env: Envelope[Any]) -> None:
         manager.dispatch(env, current_sequence())
 
+    def progress(env: Envelope[Any]) -> None:
+        # Fluechtig (P4.5): an den Projektionen vorbei direkt an die Clients, ohne seq
+        broadcaster.publish(EventMessage("runs", env.type, None, plain(env.data)))
+
     bus = NatsBus(nats_url, max_deliver=MAX_DELIVER, on_dead_letter=dead_letter)
     bus.start()
     try:
         for spec in EVENTS.values():
             if not spec.volatile:
                 bus.subscribe(spec, CONSUMER, handle)
+        bus.subscribe(FETCH_PROGRESSED, CONSUMER, progress)
     except BaseException:
         bus.close()
         raise

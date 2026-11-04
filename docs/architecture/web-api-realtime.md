@@ -2,7 +2,8 @@
 
 > **Status:** REST seit Phase 3. Seit P4.4 (04.11.2026) gibt es den Eventmanager
 > (`va_web_api.events`) mit den Projektionen `web.run_status` und `web.ranking_row`, gespeist aus
-> NATS. Bis zum WebSocket-Hub (P4.5) protokolliert der `Broadcaster` nur. Die REST-Endpunkte
+> NATS. Seit P4.5 (04.11.2026) meldet der WebSocket-Hub sie unter `/ws` an die offenen Tabs
+> (`va_web_api.realtime`, Protokoll v1, Nachspielen mit `resumeFrom`). Die REST-Endpunkte
 > lesen weiter aus den Tabellen des Batches, bis NATS der Standard ist. Plan (30.09.2026): REST
 > ab Phase 3, Eventmanager und WebSocket ab Phase 4, siehe
 > [Roadmap](roadmap.md). Entscheidungen:
@@ -122,7 +123,8 @@ Hub, ohne `seq`.
   synchronisiert sich. Ein langsamer Client blockiert nie die anderen.
 - Heartbeat: Uvicorn sendet standardmäßig alle 20 s WebSocket-Pings. Der
   `proxy_read_timeout` in nginx muss deutlich länger sein.
-- Beim Verbindungsaufbau prüft der Hub den `Origin`-Header gegen `WEB_ALLOWED_ORIGINS`.
+- Beim Verbindungsaufbau prüft der Endpunkt den `Origin`-Header: ohne `WEB_API_ALLOWED_ORIGINS`
+  (durch Komma getrennt) nur dieselbe Herkunft wie der `Host`, sonst genau die Liste.
 
 ```python
 class WebSocketHub:

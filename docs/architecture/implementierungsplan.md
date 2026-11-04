@@ -1836,6 +1836,74 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Eine volle Queue führt zum Schließen mit Code 1013.
   - `resumeFrom` spielt verpasste Events nach bzw. löst `resync` aus.
 - **Implementierung:** Hub, Protokoll und Endpunkt `/ws`.
+- **Entwurf (04.11.2026):**
+  - **Endpunkt `/ws`** im web-api, nginx reicht ihn weiter: `location = /ws` mit Upgrade-Headern,
+    `Host $http_host` und `proxy_read_timeout` 3600 s. Uvicorn pingt alle 20 s.
+  - **Handshake (🔒), abgelehnt wird vor dem `accept` (HTTP 403):**
+    - wenn der Client das Subprotokoll `va.v1` nicht anbietet;
+    - wenn `Origin` fehlt oder fremd ist.
+    - Erlaubt ist ohne Einstellung nur dieselbe Herkunft: Host und Port von `Origin` gleich dem
+      `Host`-Header, den nginx mit Port weiterreicht. Mit `WEB_API_ALLOWED_ORIGINS` (durch Komma
+      getrennt, kein JSON) gelten genau diese.
+  - **Protokoll v1** (`va_web_api.realtime.protocol`), Pydantic-Modelle mit camelCase:
+    - Client: `subscribe` (`topics`, optional `resumeFrom` ≥ 0), `unsubscribe`, `ping`.
+    - Server: `hello` (`serverTime`, `lastSeq`), `event`, `resync`, `pong`, `error`.
+    - Topics: `runs`, `ranking`, `profiles` und `instrument:<SYMBOL>` (Muster geprüft), höchstens
+      20 je Nachricht.
+    - Fehlerhafte Eingaben beenden die Verbindung nicht, der Server antwortet mit `error`:
+      ungültiges JSON, Binärdaten, unbekanntes `op`, unbekanntes Topic, falsche Typen.
+    - Eine Nachricht über 4 KiB schließt die Verbindung mit 1009.
+    - Die Event-Daten bildet der Server auf camelCase ab. `scoring.run.completed` kommt ohne die
+      Rangliste, stattdessen mit `rankingSize`. Die Rangliste holt das UI per REST.
+  - **Hub** (`va_web_api.realtime.hub`, in der Event-Loop von Uvicorn):
+    - Je Client eine Warteschlange (256) und ein eigener Schreib-Task. Ist sie voll, wird der
+      Client mit 1013 getrennt, die anderen merken nichts.
+    - Abos filtern nach Topic. Ein Event geht genau an die Clients, die sein Topic abonniert
+      haben.
+    - Der `HubBroadcaster` reicht die Meldungen des Eventmanagers (Threads des `NatsBus`) per
+      `call_soon_threadsafe` an die Event-Loop. Er ersetzt den `LoggingBroadcaster` aus P4.4.
+  - **Nachspielen** (`resumeFrom`):
+    - Ein `NatsReplayer` liest den Stream `VA_EVENTS` ab der Sequenz, gefiltert auf die
+      Topics, höchstens 500 Events. Ist die Lücke größer, älter als der Stream oder NATS nicht
+      da, schickt er je Topic `resync`.
+    - Live-Events eines Clients hält der Hub zurück, solange sein Nachspielen läuft. Danach
+      verschickt er sie, ohne Sequenzen, die schon nachgespielt sind. So kommt nichts doppelt
+      und nichts vertauscht an.
+  - **Fortschritt:** Der `NatsBus` kann jetzt flüchtige Events abonnieren (Core-NATS, ohne
+    Wiederholung). Das web-api leitet `marketdata.fetch.progressed` direkt an das Topic `runs`
+    weiter, ohne `seq` und ohne Projektion.
+  - **Abhängigkeit:** `websockets` (16) steht künftig selbst beim web-api. Bisher kam es nur über
+    yfinance ins Image, und Uvicorn braucht es für WebSockets.
+  - **Ohne NATS** (NAS, E2E): Der Endpunkt funktioniert, `lastSeq` ist leer, `resumeFrom` führt
+    zu `resync`.
+  - **Test (rot):**
+    - web-api mit TestClient:
+      - Handshake ohne `va.v1`, mit fremdem oder fehlendem `Origin` wird abgelehnt. Dieselbe
+        Herkunft und eine erlaubte Herkunft gehen durch.
+      - `hello` nach dem Verbindungsaufbau.
+      - Abos filtern nach Topic, `unsubscribe` beendet sie, `ping` ergibt `pong`.
+      - Fehlerhafte Eingaben ergeben `error`, und die Verbindung bleibt. Eine zu große Nachricht
+        schließt sie mit 1009.
+      - `resumeFrom`: Nachgespieltes kommt vor Live-Events, nichts doppelt. Bei zu großer Lücke
+        kommt `resync`.
+      - `scoring.run.completed` kommt ohne Rangliste, in camelCase.
+    - Hub: Eine volle Warteschlange schließt mit 1013, andere Clients bekommen weiter.
+      `HubBroadcaster` aus einem anderen Thread erreicht den Client.
+    - NATS: Der `NatsReplayer` liefert die Events nach einer Sequenz mit Topic und `seq` und
+      meldet eine zu große oder zu alte Lücke. Der `NatsBus` liefert flüchtige Events an ein
+      Abo.
+    - E2E (über nginx): Handshake mit eigener Herkunft ergibt `hello`, eine fremde Herkunft
+      wird abgelehnt.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **`NatsBus._call`:** Bei einer Zeitüberschreitung bricht der Bus die Koroutine in seiner
+    Loop jetzt ab, statt sie weiterlaufen zu lassen.
+  - **nginx:** Die statische Prüfung (`tests/test_nginx_conf.py`) hält `location = /ws` fest:
+    Upgrade-Header, Host mit Port, Timeout über 60 s.
+  - **`uv.lock`:** ändert sich nur um die Kante zu `websockets` 16.0. Das Paket war schon im
+    Image, die J4125-Prüfung lief also bereits damit.
+  - **Grenze:** Ist `WEB_API_NATS_URL` gesetzt, NATS aber nicht erreichbar, kommt `hello` erst
+    nach dem gescheiterten Verbindungsversuch des Replayers (einige Sekunden). Ohne die Variable
+    (NAS, E2E) gibt es keinen Replayer.
 
 #### P4.6 Echtzeit im Frontend
 

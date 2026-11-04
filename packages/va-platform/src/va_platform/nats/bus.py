@@ -110,6 +110,7 @@ class NatsBus:
         self._ack_wait = ack_wait  # nur fuer Consumer, die der Bus selbst anlegt
         self._timeout = timeout
         self._handlers: dict[str, dict[str, Handler[Any]]] = {}
+        self._volatile: dict[str, dict[str, Handler[Any]]] = {}  # Core-NATS, P4.5
         self._created: set[str] = set()  # Consumer, die der Bus selbst angelegt hat
         self._pullers: dict[str, asyncio.Task[None]] = {}
         self._inflight = 0  # nur in der Event-Loop veraendert
@@ -162,8 +163,8 @@ class NatsBus:
         self, spec: EventSpec[T], consumer: str, handler: Handler[T]
     ) -> None:
         if spec.volatile:
-            msg = f"{spec.subject} ist fluechtig; ueber NATS abonnieren kommt mit P4.5"
-            raise ValueError(msg)
+            self._subscribe_volatile(spec, consumer, handler)
+            return
         handlers = self._handlers.setdefault(consumer, {})
         if spec.type in handlers:
             msg = f"{consumer} hat {spec.type} bereits abonniert"
@@ -176,6 +177,33 @@ class NatsBus:
         except BaseException:
             del handlers[spec.type]
             raise
+
+    def _subscribe_volatile(
+        self, spec: EventSpec[Any], consumer: str, handler: Handler[Any]
+    ) -> None:
+        """Fluechtige Events (``live.va.…``, P4.5): Core-NATS, ohne Stream und Wiederholung."""
+        handlers = self._volatile.setdefault(consumer, {})
+        if spec.type in handlers:
+            msg = f"{consumer} hat {spec.type} bereits abonniert"
+            raise ValueError(msg)
+        handlers[spec.type] = handler
+        try:
+            self._call(self._listen(spec.subject, handler))
+        except BaseException:
+            del handlers[spec.type]
+            raise
+
+    async def _listen(self, subject: str, handler: Handler[Any]) -> None:
+        loop = asyncio.get_running_loop()
+
+        async def on_message(message: Msg) -> None:
+            # nats-py ruft das je Abo nacheinander auf: Die Reihenfolge bleibt erhalten
+            try:
+                await loop.run_in_executor(self._pool, _deliver_volatile, handler, message.data)
+            except Exception:
+                log.warning("Fluechtiges Event auf %s nicht verarbeitet", subject, exc_info=True)
+
+        await self._client().subscribe(subject, cb=on_message)
 
     def publish(self, envelope: Envelope[Any]) -> None:
         spec = BY_DATASCHEMA[envelope.dataschema]
@@ -214,7 +242,11 @@ class NatsBus:
             msg = "NatsBus: synchrone Aufrufe nicht aus der eigenen Event-Loop"
             raise RuntimeError(msg)
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        return future.result(timeout if timeout is not None else self._timeout * 3)
+        try:
+            return future.result(timeout if timeout is not None else self._timeout * 3)
+        except TimeoutError:
+            future.cancel()  # sonst liefe die Koroutine in der Loop weiter
+            raise
 
     def _stop_loop(self) -> None:
         loop, thread = self._loop, self._thread
@@ -391,6 +423,10 @@ class NatsBus:
 
 
 BY_TYPE_SUBJECT = {spec.type: spec.subject for spec in BY_DATASCHEMA.values()}
+
+
+def _deliver_volatile(handler: Handler[Any], raw: bytes) -> None:
+    handler(parse_envelope(raw))  # ohne Stream-Sequenz: current_sequence() bleibt None
 
 
 def _deliver(handler: Handler[Any], raw: bytes, sequence: int) -> None:
