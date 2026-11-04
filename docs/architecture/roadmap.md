@@ -181,7 +181,7 @@ Details: [Implementierungsplan, Phase 5](implementierungsplan.md#phase-5--auftei
 
 - [x] P5.1a Einstiegspunkte je Service (nachgetragen 04.11.2026: eigene Settings, Request/Reply beim Besitzer, `f5d80e0`)
 - [x] P5.1 Images je Service (`f7819fe`)
-- [ ] P5.2 End-to-End-Test des ganzen Stacks
+- [x] P5.2 End-to-End-Test des ganzen Stacks (`5833bc2`)
 - [ ] P5.3 Eine DB-Rolle je Service 🔒
 - [ ] P5.4 Scheduler im web-api
 - [ ] P5.5 Tracing
