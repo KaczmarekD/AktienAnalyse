@@ -15,6 +15,12 @@ from src.db import migrate
 from src.db.backfill import backfill_projections
 from tests.db.test_pipeline_db import _patched_run
 
+WEB = ("snapshot_row", "ranking_run", "ranking_row")
+
+
+def _web(added: dict[str, int]) -> dict[str, int]:
+    return {table: added[table] for table in WEB}
+
 
 def _count(engine: Engine, sql: str) -> int:
     with engine.connect() as conn:
@@ -22,17 +28,14 @@ def _count(engine: Engine, sql: str) -> int:
 
 
 def _counts(engine: Engine) -> dict[str, Any]:
-    return {
-        table: _count(engine, f"SELECT count(*) FROM web.{table}")
-        for table in ("snapshot_row", "ranking_run", "ranking_row")
-    }
+    return {table: _count(engine, f"SELECT count(*) FROM web.{table}") for table in WEB}
 
 
 def test_fills_every_projection_from_the_tables(db_settings, engine):
     rc, _, _ = _patched_run(db_settings)
     assert rc == 0
     added = backfill_projections(engine)
-    assert added == _counts(engine)
+    assert _web(added) == _counts(engine)
     assert added["snapshot_row"] == _count(
         engine, "SELECT count(*) FROM market_data.fundamental_snapshot"
     )
@@ -48,7 +51,7 @@ def test_a_second_call_adds_nothing(db_settings, engine):
     _patched_run(db_settings)
     first = backfill_projections(engine)
     assert backfill_projections(engine) == dict.fromkeys(first, 0)
-    assert _counts(engine) == first
+    assert _counts(engine) == _web(first)
 
 
 def test_isin_and_fetch_day_come_along(db_settings, engine):
@@ -69,3 +72,18 @@ def test_migrate_fills_the_projections(db_settings, engine, db_url, monkeypatch)
     monkeypatch.setenv("DATABASE_OWNER_URL", db_url)
     assert migrate.main() == 0
     assert _counts(engine)["ranking_run"] == 1
+
+
+def test_copies_the_inputs_of_scoring(db_settings, engine):
+    """P5.1a: Die Vorschau rechnet aus scoring.input_snapshot; aeltere Laeufe bekommen sie hier."""
+    _patched_run(db_settings)
+    with engine.begin() as conn:
+        # Wie vor P5.1a: ohne Kopie (nur zum Test, die Tabelle ist sonst nur zum Anfuegen)
+        conn.execute(text("ALTER TABLE scoring.input_snapshot DISABLE TRIGGER USER"))
+        conn.execute(text("DELETE FROM scoring.input_snapshot"))
+        conn.execute(text("ALTER TABLE scoring.input_snapshot ENABLE TRIGGER USER"))
+    added = backfill_projections(engine)
+    assert added["input_snapshot"] == _count(
+        engine, "SELECT count(*) FROM market_data.fundamental_snapshot"
+    )
+    assert backfill_projections(engine)["input_snapshot"] == 0

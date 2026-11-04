@@ -4,7 +4,8 @@ Der Stream haelt Events nur 30 Tage, die Historie liegt in ``market_data`` und `
 Nachfuellen saehe das web-api mit Projektionen nur die Laeufe seit dem Umstieg auf NATS. Gefuellt
 werden ``web.snapshot_row``, ``web.ranking_run`` und ``web.ranking_row``, mit denselben Werten wie
 aus den Events. Nur Anfuegen, was fehlt (``ON CONFLICT DO NOTHING``): Ein zweiter Aufruf aendert
-nichts, und was die Events schon geschrieben haben, bleibt.
+nichts, und was die Events schon geschrieben haben, bleibt. Seit P5.1a auch
+``scoring.input_snapshot``: die Eingangsdaten, aus denen scoring die Vorschau rechnet.
 
 Laeuft mit der Owner-Rolle, denn es liest fremde Schemas und schreibt in ``web``.
 ``python -m src.db.migrate`` ruft es nach jeder Migration auf. So kommen auch Laeufe im Prozess
@@ -19,8 +20,12 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
 
+from va_market_data.adapters.postgres.repository import MarketDataRepository
 from va_platform.db import normalize_url
+from va_scoring.adapters.postgres.models import InputSnapshot
+from va_scoring.adapters.postgres.store import input_rows
 from va_web_api.adapters.postgres.models import RankingRow, RankingRun, SnapshotRow
 
 if TYPE_CHECKING:
@@ -85,6 +90,16 @@ _ROWS = text("""
 """)
 
 
+# P5.1a: Abrufe mit Bewertungslauf, deren Eingangsdaten scoring noch nicht hat
+_INPUT_FETCHES = text("""
+    SELECT DISTINCT sr.fetch_run_id FROM scoring.scoring_run sr
+    WHERE sr.fetch_run_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM scoring.input_snapshot i
+                      WHERE i.fetch_run_id = sr.fetch_run_id)
+    ORDER BY sr.fetch_run_id
+""")
+
+
 def _day(moment: datetime | None) -> date | None:
     """Wie ``va_web_api.read``: Tag in lokaler Zeit (Container: TZ=Europe/Berlin)."""
     return None if moment is None else moment.astimezone().date()
@@ -142,6 +157,23 @@ def _ranking_rows(conn: Connection) -> list[dict[str, Any]]:
     return rows
 
 
+def _input_snapshots(conn: Connection) -> list[dict[str, Any]]:
+    """Die flachen Zeilen alter Abrufe, wie scoring sie seit P5.1a selbst speichert."""
+    rows: list[dict[str, Any]] = []
+    fetches = list(conn.execute(_INPUT_FETCHES).scalars())
+    if not fetches:
+        return rows
+    with Session(bind=conn) as session:
+        market = MarketDataRepository(session)
+        for fetch_run_id in fetches:
+            frame = market.get_snapshots_df(fetch_run_id)
+            rows += [
+                {"fetch_run_id": fetch_run_id, "symbol": str(row["symbol"]), "row": row}
+                for row in input_rows(frame)
+            ]
+    return rows
+
+
 def _insert(conn: Connection, model: Any, rows: list[dict[str, Any]], size: int = 500) -> int:
     key = next(iter(model.__table__.primary_key.columns))
     added = 0
@@ -163,6 +195,8 @@ def backfill_projections(engine: Engine) -> dict[str, int]:
             "snapshot_row": _insert(conn, SnapshotRow, _snapshot_rows(conn)),
             "ranking_run": _insert(conn, RankingRun, _ranking_runs(conn)),
             "ranking_row": _insert(conn, RankingRow, _ranking_rows(conn)),
+            # P5.1a: Eingangsdaten fuer die Vorschau von scoring
+            "input_snapshot": _insert(conn, InputSnapshot, _input_snapshots(conn)),
         }
     if any(added.values()):
         log.info("Projektionen nachgefuellt: %s", added)

@@ -39,7 +39,12 @@ Prozess (`src/scoring_ops.py`), denn `va_web_api` darf `va_scoring` nicht import
 `WEB_API_NATS_URL` beantwortet sie seit P4.8 der Worker über Request/Reply (`va_contracts.rpc.v1`,
 `va_web_api.rpc`), ohne Worker antworten sie mit 503. Seit P4.9 lesen die REST-Endpunkte mit NATS
 aus den Projektionen (Port `ReadModel`, `ProjectionReadModel`), Profile und Reports per
-Request/Reply; die Historie füllt `src.db.backfill` bei jeder Migration nach. Seit P3.6
+Request/Reply; die Historie füllt `src.db.backfill` bei jeder Migration nach. Seit P5.1a startet
+jeder Service auch allein (`python -m va_market_data`, `va_scoring`, `va_notification`): eigene
+Settings (`entrypoints/settings.py`, der Batch erbt sie), eigener Einstieg
+(`entrypoints/service.py`, Laufrahmen `va_platform.service.run_service`). Request/Reply
+beantworten die Besitzer (`entrypoints/rpc.py`), die Vorschau rechnet scoring aus seiner Kopie
+der Eingangsdaten (`scoring.input_snapshot`). Seit P3.6
 laufen auf der NAS
 web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
 nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
@@ -160,7 +165,10 @@ das passiert, ist dort die einzige zu ändernde Stelle.
 
 **Konfiguration kommt aus Pydantic Settings**, niemals aus eingebetteten
 Konstanten. Wenn du eine Konstante brauchst und sie könnte sich je nach
-Deployment unterscheiden, geh durch `Settings`. Ausnahme seit P2b.3 (ADR-0009): Die fachlichen
+Deployment unterscheiden, geh durch `Settings`. Seit P5.1a gehört jedes Feld in die Settings
+seines Service (`va_<service>.entrypoints.settings`). `src.config.Settings` erbt alle drei und
+ergänzt nur, was allein der Batch braucht. Ein neues Feld muss auch in `ENV_PATTERN` von
+`entrypoint.sh` stehen, das prüft `tests/test_entrypoint.py`. Ausnahme seit P2b.3 (ADR-0009): Die fachlichen
 Scoring-Parameter stehen in den Profilen. `VALUE_WEIGHT`, `QUALITY_WEIGHT` und `MIN_MARKET_CAP`
 sind nur die Startwerte für das Profil „Standard“.
 

@@ -31,12 +31,12 @@ from va_contracts.events.v1 import RUN_REQUESTED, RunOptionsV1, ScreeningRunRequ
 from va_notification.entrypoints.handlers import notify_failure_without_run
 from va_platform.bus import InProcessBus
 from va_platform.nats import NatsBus
+from va_platform.service import run_failure
 
 from . import __version__
 from .composition import alert_channels, build_adapters, wire
 from .config import Settings, load_settings
 from .db.log_handler import BufferingLogHandler
-from .dead_letters import run_failure
 from .logging_setup import setup_logging
 from .run_tracker import EXIT_FAILED, EXIT_NO_DATA, EXIT_OK, RunOutcome, RunTracker
 

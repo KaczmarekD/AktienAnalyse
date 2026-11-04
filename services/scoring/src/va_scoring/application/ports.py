@@ -42,6 +42,10 @@ class ProfileStore(Protocol):
         ...
 
 
+class ScoringAdapter(ScoringStore, ProfileStore, Protocol):
+    """Speicher von scoring: Bewertungslaeufe und Profile (P2b.3), wie ``PostgresScoringStore``."""
+
+
 class ProfileSource(Protocol):
     """Woher ein Bewertungslauf seine Parameter nimmt (P2b.3)."""
 

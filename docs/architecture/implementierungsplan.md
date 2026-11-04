@@ -2257,6 +2257,78 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 ### Phase 5 – Aufteilen in Services
 
+#### P5.1a Einstiegspunkte je Service (nachgetragen 04.11.2026)
+
+- **Warum vorher:** Für ein schlankes Image je Service (ADR-0004, `uv sync --package`) muss jeder
+  Service allein starten können. Heute baut `src` alle Adapter aus den Settings des Batches.
+  Vorschau, Profile und Reports beantwortet der Worker mit Code, der mehrere Schemas liest
+  (`src/scoring_ops.py`, `va_web_api.read`). Ein Image nur mit `va-scoring` könnte das nicht.
+- **Test:** Jeder Service startet für sich (`python -m va_market_data` usw.) und erledigt seinen
+  Teil der Kette über NATS. Drei getrennte Service-Prozesse ergeben denselben Lauf wie der Worker.
+- **Entwurf (04.11.2026):**
+  - **Gemeinsam** (`va_platform.service`):
+    - `ServiceSettings` mit `DATABASE_URL`, `NATS_URL` (Pflicht), `RUN_TIMEOUT_MINUTES` und
+      `LOGS_DIR`.
+    - `run_service(…)` startet den `NatsBus`, ruft die Verdrahtung des Service auf und läuft bis
+      SIGTERM. Ein Dead Letter wird zu `screening.run.failed` (`run_failure`, aus
+      `src/dead_letters.py` hierher).
+    - `LocalCaller` beantwortet Request/Reply im selben Prozess, mit denselben Handlern wie über
+      NATS.
+  - **Je Service** (`entrypoints/settings.py`, `entrypoints/service.py`, `__main__.py`):
+    - eigene Settings mit nur den eigenen Feldern;
+    - Adapter bauen und den Handler am `ReliableBus` anmelden;
+    - die eigenen Request/Reply-Befehle beantworten.
+    - Der Batch (`src.config.Settings`) erbt die Settings aller drei Services. Es gibt jedes Feld
+      nur einmal, und `src/composition.py` baut die Adapter mit denselben Funktionen.
+  - **Request/Reply beim Besitzer:**
+    - scoring (`va_scoring.entrypoints.rpc`): Faktoren, Vorschau, Speichern, Aktivieren,
+      Profile lesen. Der Code kommt aus `src/scoring_ops.py` und `va_web_api.read`, die Antworten
+      sind die Contracts.
+    - notification (`va_notification.entrypoints.rpc`): Report und CSV.
+    - `va_web_api.rpc.read_handlers` und `src/scoring_ops.py` entfallen.
+    - `scoring_handlers` bleibt als Server für beliebige Umsetzungen der Ports, etwa die Fakes
+      der API-Tests.
+  - **Vorschau ohne `market_data`:** scoring speichert beim Bewerten die Eingangsdaten
+    (`scoring.input_snapshot`, Migration `0013`, je Abruf und Titel die flache Zeile wie für
+    `score()`, nur zum Anfügen). Die Vorschau rechnet daraus. `src.db.backfill` füllt sie für
+    ältere Läufe aus `market_data` nach.
+  - **web-api ohne NATS:** `src.web` verdrahtet `RemoteScoring` mit einem `LocalCaller` auf die
+    Handler von scoring. Lesen geht mit `va_read`, Speichern und Aktivieren mit `va_profiles`. Die
+    Vorschau rechnet also in beiden Fällen mit demselben Code.
+  - **Replay:** Die Fixture liest market-data selbst (`va_market_data.adapters.replay`), ohne
+    `src.regression`.
+  - **Worker:** `python -m src.worker` startet die drei Services in einem Prozess, mit denselben
+    Funktionen wie die einzelnen Einstiege. Er bleibt für einen Container ohne eigene Images.
+  - **Test (rot):**
+    - Settings je Service: Pflichtfelder, Standardwerte. Der Batch erbt sie.
+    - `run_service` startet, meldet Dead Letter und endet mit dem Stopp-Event. `LocalCaller`
+      antwortet wie `serve`, auch mit `internal` bei einer Exception.
+    - Je Service über NATS mit echter Datenbank:
+      - market-data mit Replay: Aus der Anfrage wird das Snapshot-Event.
+      - scoring: Aus dem Snapshot-Event wird das Ranking, `input_snapshot` ist gefüllt, die
+        Vorschau rechnet daraus.
+      - notification: Aus dem Ranking werden Report und Mail. Report und CSV kommen per
+        Request/Reply.
+    - Drei getrennte Services und das web-api: Ein Start aus dem UI endet mit `success` oder
+      `partial`, wie mit dem Worker.
+    - Die P3.3-Tests mit Datenbank laufen weiter in beiden Varianten, jetzt mit den Handlern
+      von scoring.
+    - Nachfüllen: `input_snapshot` für alte Läufe, ein zweiter Aufruf ändert nichts.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Code an seinem Platz:**
+    - `smtp_config` und `alert_channels` stehen jetzt in `va_notification.entrypoints.service`,
+      `scoring_config` in `va_scoring.entrypoints.service`, `load_universe` als `live_universe` in
+      `va_market_data.entrypoints.service`.
+    - `src.composition` reicht sie weiter, alte Importe bleiben gültig.
+    - Die Fallback-CSV des Batches bleibt die im Repo, außer `FALLBACK_CSV` ist gesetzt. Der
+      Cron-Lauf bekommt die Variable mit.
+  - **`LocalCaller` und `serve`** teilen sich `answer_request`: Eine Exception im Handler wird
+    in beiden Fällen zur Antwort mit `internal`.
+  - **Tag des Abrufs in der Vorschau:** Er kommt aus den Zeitpunkten der Titel in den
+    Eingangsdaten (`fetched_at`). Fehlen sie, gilt der Tag des Bewertungslaufs.
+  - **Offen für P5.3:** scoring liest beim Speichern weiter `market_data.instrument`. Dort holt es
+    die IDs der Titel für `score_result`, das ist der letzte Lesezugriff über die Schemagrenze.
+
 #### P5.1 Images je Service
 
 - **Test:** Smoke-Test je Image (Import, Startbefehl) und die J4125-Prüfung aus P0.6.

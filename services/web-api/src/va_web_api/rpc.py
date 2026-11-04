@@ -8,8 +8,11 @@ Richtungen liegen deshalb hier, das Format steht neutral in ``va_contracts.rpc.v
 - ``scoring_handlers`` ist die Gegenseite: Aus beliebigen Umsetzungen der Ports werden die Handler
   fuer ``NatsBus.serve``. Der Worker (``src.worker``) bedient sie mit dem Code aus P3.3, die Tests
   mit ihren Fakes. Nach Speichern und Aktivieren meldet ``notify`` das Profil-Event.
-- ``RemoteReads`` und ``read_handlers`` (P4.9): Profile und Reports fuer das ``ReadModel`` aus den
-  Projektionen. Die Gegenseite nutzt die Abfragen aus ``va_web_api.read``.
+- ``RemoteReads`` (P4.9): Profile und Reports fuer das ``ReadModel`` aus den Projektionen. Die
+  Gegenseite steht seit P5.1a bei ihren Besitzern (``va_scoring``, ``va_notification``).
+- Den Server fuer scoring stellt seit P5.1a scoring selbst (``va_scoring.entrypoints.rpc``).
+  ``scoring_handlers`` bleibt als Server fuer beliebige Umsetzungen der Ports, etwa die Fakes
+  der API-Tests.
 """
 
 from __future__ import annotations
@@ -42,16 +45,9 @@ from va_contracts.rpc.v1 import (
     PreviewBasisV1,
     PreviewReplyV1,
     PreviewRequestV1,
-    ProfileDetailV1,
     ProfileGetRequestV1,
-    ProfileReplyV1,
-    ProfilesReplyV1,
     ProfilesRequestV1,
-    ProfileSummaryV1,
-    ReportCsvReplyV1,
-    ReportReplyV1,
     ReportRequestV1,
-    ReportV1,
     RpcErrorV1,
     RpcReplyV1,
     SaveVersionReplyV1,
@@ -59,7 +55,6 @@ from va_contracts.rpc.v1 import (
 )
 from va_platform.nats import RpcUnavailable
 
-from . import read
 from .models import Factor, ProfileDetail, ProfileSummary, Report
 from .ports import (
     NoPreviewData,
@@ -75,8 +70,6 @@ from .ports import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from sqlalchemy import Engine
 
     from va_contracts import Contract, Envelope
     from va_contracts.profile import ProfileParamsV1
@@ -211,7 +204,7 @@ def scoring_handlers(
     *,
     notify: Callable[[Envelope[Any]], None] | None = None,
 ) -> dict[RpcSpec[Any, Any], Callable[[Any], RpcReplyV1]]:
-    """Die Handler fuer ``NatsBus.serve`` (Queue ``queue_of``), gebaut aus Umsetzungen der Ports.
+    """Die Handler fuer ``NatsBus.serve`` (Queue ``scoring``), gebaut aus Umsetzungen der Ports.
 
     ``notify`` bekommt nach Speichern und Aktivieren das Profil-Event. Es geht ohne Outbox raus:
     Kein Read-Model haengt daran, ein verlorenes Event heisst nur, dass ein anderer Tab die neue
@@ -277,52 +270,3 @@ def scoring_handlers(
         PROFILE_SAVE: save,
         PROFILE_ACTIVATE: activate,
     }
-
-
-def read_handlers(engine: Engine) -> dict[RpcSpec[Any, Any], Callable[[Any], RpcReplyV1]]:
-    """Gegenseite von ``RemoteReads`` (P4.9): die Abfragen aus ``va_web_api.read``.
-
-    Sie lesen nur das Schema ihres Besitzers (Profile: ``scoring``, Reports: ``reporting``). Der
-    Worker bedient sie mit seiner Verbindung, bis die Services eigene Rollen haben (P5.3).
-    """
-
-    def profiles(request: ProfilesRequestV1) -> ProfilesReplyV1:  # noqa: ARG001 - ohne Felder
-        with engine.connect() as conn:
-            found = read.list_profiles(conn)
-        return ProfilesReplyV1(
-            profiles=[ProfileSummaryV1.model_validate(p.model_dump()) for p in found]
-        )
-
-    def profile(request: ProfileGetRequestV1) -> ProfileReplyV1:
-        with engine.connect() as conn:
-            found = read.get_profile(conn, request.profile_id)
-        return ProfileReplyV1(
-            profile=None if found is None else ProfileDetailV1.model_validate(found.model_dump())
-        )
-
-    def report(request: ReportRequestV1) -> ReportReplyV1:
-        with engine.connect() as conn:
-            found = read.get_report(conn, request.report_id)
-        return ReportReplyV1(
-            report=None if found is None else ReportV1.model_validate(found.model_dump())
-        )
-
-    def report_csv(request: ReportRequestV1) -> ReportCsvReplyV1:
-        with engine.connect() as conn:
-            found = read.get_report_csv(conn, request.report_id)
-        if found is None:
-            return ReportCsvReplyV1()
-        filename, content = found
-        return ReportCsvReplyV1(filename=filename, content=content)
-
-    return {
-        PROFILE_LIST: profiles,
-        PROFILE_GET: profile,
-        REPORT_GET: report,
-        REPORT_CSV: report_csv,
-    }
-
-
-def queue_of(spec: RpcSpec[Any, Any]) -> str:
-    """Queue-Gruppe je Service: ``scoring.preview`` -> ``scoring``."""
-    return spec.name.split(".", 1)[0]

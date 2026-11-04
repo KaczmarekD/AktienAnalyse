@@ -26,6 +26,7 @@ from va_notification.adapters.postgres.models import (
 from va_platform.db import APP_SCHEMAS, Base
 from va_scoring.adapters.postgres.models import (
     FactorScore,
+    InputSnapshot,
     Profile,
     ProfileActivation,
     ProfileVersion,
@@ -58,6 +59,7 @@ __all__ = [
     "FundamentalSnapshot",
     "FxRate",
     "ImportFile",
+    "InputSnapshot",
     "Instrument",
     "MarketDataInbox",
     "MarketDataOutbox",

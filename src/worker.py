@@ -4,12 +4,12 @@
 Service ein ``ReliableBus``) und laeuft, bis SIGTERM kommt. Er fuehrt die Runs aus, die das
 web-api anlegt (Start aus dem UI, Scheduler). Er legt selbst keine Runs an und schliesst keine
 ab, das macht die Run-Verwaltung im web-api aus den Events. Scheitert ein Handler endgueltig,
-meldet der Worker ``screening.run.failed`` (``src.dead_letters``).
+meldet der Worker ``screening.run.failed`` (``va_platform.service.run_failure``).
 
-Seit P4.8 beantwortet er ausserdem Vorschau und Profil-Befehle des web-api ueber Request/Reply
-(``va_web_api.rpc.scoring_handlers`` mit ``src/scoring_ops.py``, Rolle ``va_app``) und meldet
-gespeicherte und aktivierte Profile als Event. Seit P4.9 auch Profile und Reports zum Lesen
-(``va_web_api.rpc.read_handlers``).
+Seit P4.8 beantwortet er ausserdem Request/Reply des web-api: Vorschau, Profile und Reports.
+Seit P5.1a mit dem Code der Services (``va_scoring.entrypoints.rpc``,
+``va_notification.entrypoints.rpc``); die drei Services koennen auch einzeln laufen
+(``python -m va_market_data`` usw.). Den Laufrahmen gibt ``va_platform.service.run_service``.
 
 In P5.1 wird daraus ein Image je Service. Exit-Codes: 0 nach SIGTERM, 2 Konfiguration.
 """
@@ -24,73 +24,39 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
-from va_platform.db import create_db_engine
-from va_platform.nats import MAX_DELIVER, NatsBus
-from va_web_api.rpc import queue_of, read_handlers, scoring_handlers
+from va_notification.entrypoints import service as notification_service
+from va_platform.service import run_service
+from va_scoring.entrypoints import service as scoring_service
 
 from . import __version__
 from .composition import build_adapters, wire
 from .config import load_settings
-from .dead_letters import run_failure
 from .logging_setup import setup_logging
-from .scoring_ops import InProcessCommands, InProcessPreview
 
 if TYPE_CHECKING:
-    from va_platform.bus import DeadLetter
+    from sqlalchemy import Engine
+
+    from va_platform.nats import NatsBus
 
     from .composition import Adapters
     from .config import Settings
 
-SOURCE = "va/worker"
 EXIT_CONFIG = 2
 
 log = logging.getLogger("worker")
 
 
 def serve(settings: Settings, stop: threading.Event, *, adapters: Adapters | None = None) -> None:
-    """Haengt die Handler an NATS und kehrt erst zurueck, wenn ``stop`` gesetzt ist."""
-    if not settings.nats_url:
-        msg = "Der Worker braucht NATS_URL"
-        raise ValueError(msg)
+    """Haengt alle drei Services an NATS und kehrt erst zurueck, wenn ``stop`` gesetzt ist."""
     adapters = adapters or build_adapters(settings)
 
-    def dead_letter(dead: DeadLetter) -> None:
-        failure = run_failure(dead, source=SOURCE)
-        log.error(
-            "%s: %s (%s) nach %s Versuchen aufgegeben: %r",
-            dead.consumer,
-            dead.envelope.type,
-            dead.envelope.id,
-            dead.attempts,
-            dead.error,
-        )
-        if failure is None:
-            return
-        try:
-            bus.publish(failure)
-        except Exception:
-            log.exception("Fehlschlag von Run %s nicht gemeldet", failure.data.run_id)
-
-    bus = NatsBus(settings.nats_url, max_deliver=MAX_DELIVER, on_dead_letter=dead_letter)
-    engine = create_db_engine(settings.database_url.get_secret_value())
-    bus.start()
-    try:
+    def setup(bus: NatsBus, engine: Engine) -> None:
         wire(bus, adapters, settings, version=__version__)
-        # P4.8: Vorschau und Profil-Befehle, P4.9: Profile und Reports lesen, fuer das web-api
-        handlers = {
-            **scoring_handlers(
-                InProcessPreview(engine), InProcessCommands(engine), notify=bus.publish
-            ),
-            **read_handlers(engine),
-        }
-        for spec, handler in handlers.items():
-            bus.serve(spec, handler, queue=queue_of(spec))
-        log.info("=== value-analyzer v%s Worker laeuft ===", __version__)
-        stop.wait()
-        log.info("Worker wird beendet")
-    finally:
-        bus.close()
-        engine.dispose()
+        # P4.8/P4.9, beim Besitzer seit P5.1a: Request/Reply fuer das web-api
+        scoring_service.serve(bus, engine)
+        notification_service.serve(bus, engine)
+
+    run_service(name="worker", settings=settings, setup=setup, stop=stop)
 
 
 def main() -> int:

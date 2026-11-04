@@ -13,7 +13,6 @@ from typing import Any
 
 import pytest
 
-from src.dead_letters import run_failure
 from src.worker import main
 from va_contracts import new_envelope
 from va_contracts.events.v1 import (
@@ -32,6 +31,7 @@ from va_contracts.events.v1 import (
     UniverseInfoV1,
 )
 from va_platform.bus import DeadLetter
+from va_platform.service import run_failure
 
 SOURCE = "va/test"
 

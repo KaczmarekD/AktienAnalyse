@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.3.2,<3",  # serialization
     "pandas>=3.0,<4",  # serialization
     "nats-py>=2.16,<3",  # JetStream-Provisionierung (P4.1), reines Python ohne AVX
+    "pydantic-settings>=2.4,<3",
 ]
 
 [build-system]

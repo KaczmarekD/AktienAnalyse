@@ -479,20 +479,25 @@ BY_TYPE_SUBJECT = {spec.type: spec.subject for spec in BY_DATASCHEMA.values()}
 
 
 def _answer(spec: RpcSpec[Any, Any], handler: Callable[[Any], Any], raw: bytes) -> bytes:
-    """Eine Anfrage beantworten; Fehler werden zur Antwort mit ``error``."""
+    """Eine Anfrage von NATS beantworten; eine ungueltige wird zur Antwort mit ``invalid``."""
     try:
         request = spec.request.model_validate_json(raw)
     except ValidationError as e:
         reply = spec.reply(error=RpcErrorV1(code="invalid", message=str(e)))
     else:
-        try:
-            reply = handler(request)
-        except Exception as e:
-            log.exception("%s: Anfrage nicht beantwortet", spec.name)
-            reply = spec.reply(
-                error=RpcErrorV1(code="internal", message=f"{type(e).__name__}: {e}")
-            )
+        reply = answer_request(spec, handler, request)
     return reply.model_dump_json().encode()
+
+
+def answer_request[R: RpcReplyV1](
+    spec: RpcSpec[Any, R], handler: Callable[[Any], R], request: Any
+) -> R:
+    """Den Handler aufrufen; eine Exception wird zur Antwort mit ``internal`` (auch im Prozess)."""
+    try:
+        return handler(request)
+    except Exception as e:
+        log.exception("%s: Anfrage nicht beantwortet", spec.name)
+        return spec.reply(error=RpcErrorV1(code="internal", message=f"{type(e).__name__}: {e}"))
 
 
 def _deliver_volatile(handler: Handler[Any], raw: bytes) -> None:

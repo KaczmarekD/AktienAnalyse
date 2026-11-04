@@ -157,7 +157,13 @@ class JetStreamPublisher:
 
 
 # Am Ende: bus.py nutzt die Namen oben (Stream, Grenzen, Provisionierung, Publisher)
-from .bus import RPC_TIMEOUT, NatsBus, RpcUnavailable, current_sequence  # noqa: E402
+from .bus import (  # noqa: E402
+    RPC_TIMEOUT,
+    NatsBus,
+    RpcUnavailable,
+    answer_request,
+    current_sequence,
+)
 
 __all__ = [
     "ACK_WAIT",
@@ -169,6 +175,7 @@ __all__ = [
     "JetStreamPublisher",
     "NatsBus",
     "RpcUnavailable",
+    "answer_request",
     "current_sequence",
     "provision",
     "stream_config",

@@ -8,11 +8,14 @@ Defaults oder eines spaeten Stacktraces im Mailversand.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Literal
 
-from pydantic import EmailStr, Field, FilePath, SecretStr, model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from va_market_data.entrypoints.settings import MarketDataSettings
+from va_notification.entrypoints.settings import NotificationSettings
+from va_scoring.entrypoints.settings import ScoringSettings
 
 _MODEL_CONFIG = SettingsConfigDict(
     env_file=".env",
@@ -39,61 +42,22 @@ class DatabaseSettings(_OwnerUrl):
     va_web_password: SecretStr | None = None
 
 
-class Settings(_OwnerUrl):
-    """Anwendungs-Settings - alle Felder sind ENV-Variablen."""
+class Settings(MarketDataSettings, ScoringSettings, NotificationSettings, _OwnerUrl):
+    """Anwendungs-Settings - alle Felder sind ENV-Variablen.
 
-    # --- Datenbank (Pflicht: ohne Speicherung kein Lauf) ---
-    # App-Rolle va_app: darf lesen/einfuegen, aber nichts loeschen.
-    # Format: postgresql+psycopg://va_app:<pw>@db:5432/value_analyzer
-    database_url: SecretStr = Field(min_length=1)
-
-    # --- SMTP ---
-    smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = Field(default=587, gt=0, lt=65536)
-    smtp_user: str = Field(min_length=1)
-    smtp_password: SecretStr = Field(min_length=1)
-    smtp_use_tls: bool = True
-    # Ohne TLS und ohne Login, nur fuer den lokalen Mail-Catcher (U1, umgebungen.md)
-    smtp_plain: bool = False
-
-    # --- Mail ---
-    mail_from: EmailStr | None = None  # default: smtp_user
-    mail_to: EmailStr
-    mail_subject_prefix: str = "[Value-Screening DAX/MDAX]"
-
-    # --- Universum & Reporting ---
-    universe: Literal["DAX_MDAX", "DAX_ONLY"] = "DAX_MDAX"
-    top_n: int = Field(default=20, ge=1, le=200)
-    bottom_n: int = Field(default=10, ge=0, le=100)
-    # Nur Startwert fuer das Profil "Standard" (ADR-0009, P2b.3), danach gilt das aktive Profil
-    min_market_cap: float = Field(default=300_000_000.0, ge=0)
-
-    # --- Scoring: Gewichte nur als Startwerte fuer "Standard" (wie min_market_cap) ---
-    value_weight: float = Field(default=0.6, ge=0, le=1)
-    quality_weight: float = Field(default=0.4, ge=0, le=1)
-    default_tax_rate: float = Field(default=0.27, ge=0, le=0.6)
+    Seit P5.1a erbt der Batch die Felder der drei Services (``va_<service>.entrypoints.settings``,
+    gemeinsame in ``va_platform.service.ServiceSettings``: Datenbank, NATS, Zeitlimit, Logs). Hier
+    steht nur, was allein der Batch braucht.
+    """
 
     # --- Operatives ---
-    data_dir: Path = Path("/app/data")  # Fallback-CSV und Dry-Run-Vorschau
-    logs_dir: Path = Path("/app/logs")
-    healthcheck_url: str | None = None  # https://hc-ping.com/<uuid>
     cron_schedule: str = "30 7 * * 6"  # Sa 07:30 Europe/Berlin
     tz: str = "Europe/Berlin"
-
-    # --- Lokaler End-to-End-Test (U5, docs/architecture/umgebungen.md) ---
-    # Pfad zu einer Replay-Fixture (tests/fixtures/replay/): Universum und Fundamentaldaten
-    # kommen dann aus der Datei statt von iShares, Deka, OpenFIGI und Yahoo. Nur lokal.
-    replay_source: FilePath | None = None
 
     # --- Event-Bus (P4.3, docs/architecture/events.md) ---
     # in_process: die Kette laeuft im Batch-Prozess (Standard, auch auf der NAS).
     # nats: ueber NATS JetStream; seit P4.3b verarbeitet jeder Service ein Event nur einmal.
     event_bus: Literal["in_process", "nats"] = "in_process"
-    nats_url: str | None = None  # z. B. nats://nats:4222, Pflicht bei EVENT_BUS=nats
-    # So lange wartet der Batch ueber NATS auf das Ende der Kette (der Abruf allein braucht
-    # mit Wiederholungen bis zu einer Stunde). Aeltere Events gelten als Rest eines
-    # abgebrochenen Laufs und werden uebersprungen (P4.3b).
-    run_timeout_minutes: float = Field(default=120, gt=0)
 
     @model_validator(mode="after")
     def _nats_needs_a_url(self) -> Settings:
@@ -114,22 +78,6 @@ class Settings(_OwnerUrl):
             msg = "REPLAY_SOURCE nur ohne HEALTHCHECK_URL (sonst verdeckt der Ping die NAS)"
             raise ValueError(msg)
         return self
-
-    @property
-    def effective_mail_from(self) -> str:
-        return str(self.mail_from) if self.mail_from else self.smtp_user
-
-    def model_post_init(self, __context: object) -> None:
-        # Summe von value + quality muss ~1 sein - sonst stillschweigend skalieren
-        total = self.value_weight + self.quality_weight
-        if total <= 0:
-            msg = "value_weight + quality_weight muss > 0 sein"
-            raise ValueError(msg)
-        if abs(total - 1.0) > 0.01:
-            # Re-normalisieren ohne Exception (UX-freundlich).
-            # __dict__ ist bei Pydantic v2 ein MappingProxy - object.__setattr__ umgeht das.
-            object.__setattr__(self, "value_weight", self.value_weight / total)
-            object.__setattr__(self, "quality_weight", self.quality_weight / total)
 
 
 def load_settings() -> Settings:
