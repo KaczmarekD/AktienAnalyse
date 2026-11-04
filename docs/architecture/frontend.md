@@ -1,6 +1,6 @@
 # Frontend
 
-> **Status:** Plan (30.09.2026). Umsetzung ab Phase 3, siehe [Roadmap](roadmap.md). Entscheidung:
+> **Status:** Umgesetzt in Phase 3, Echtzeit seit P4.6, siehe [Roadmap](roadmap.md). Entscheidung:
 > [ADR-0005](../adr/0005-angular-frontend-eigener-container.md).
 
 ## Stack

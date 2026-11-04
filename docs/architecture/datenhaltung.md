@@ -75,7 +75,7 @@ Regeln für den Übergang:
   aufbaubar) brauchen `UPDATE`. Historien-Tabellen bleiben reine Anfüge-Tabellen.
 - **Anfügen statt Ändern, wo immer möglich.** Beispiel: Welches Scoring-Profil aktiv ist, steht
   nicht in einem Flag, sondern ergibt sich aus der jüngsten Zeile einer Aktivierungs-Tabelle.
-- **Async erst mit Bedarf.** FastStream und FastAPI laufen asynchron. Ein Service, der beim
+- **Async erst mit Bedarf.** FastAPI und der `NatsBus` laufen asynchron. Ein Service, der beim
   synchronen SQLAlchemy bleibt, kapselt DB-Zugriffe per `asyncio.to_thread`. Die Umstellung auf
   die async-Engine (SQLAlchemy 2.1, `sqlalchemy[asyncio]`) geschieht pro Service, wenn es sich lohnt.
 

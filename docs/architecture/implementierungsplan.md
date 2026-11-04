@@ -2527,6 +2527,29 @@ prüft dieses Paket, für jede gespeicherte Woche.
 
 - **Test:** Der Link-Check der Doku läuft durch.
 - **Implementierung:** CLAUDE.md auf die Zielarchitektur umschreiben, dazu ein Runbook für die NAS.
+- **Entwurf (04.11.2026):** Die Doku beschreibt den Stack, wie er jetzt läuft.
+  - **CLAUDE.md:**
+    - Statt „Architektur in einem Satz“ mit der Historie der Pakete eine Übersicht: Dienste,
+      Ablauf eines Runs, Aufbau eines Service, web-api, Batch nur auf Wunsch, Umgebungen.
+    - Veraltete Verweise richten: Verdrahtung in `entrypoints/service.py` statt
+      `src/composition.py`, kein `ENV_PATTERN`, kein FastStream, kein `src/scoring_ops.py`.
+    - „Zielarchitektur (in Umsetzung)“ wird „Entscheidungen und Arbeitsweise“.
+  - **Runbook** (`betrieb-synology.md`): statt der Skizzen von Compose und Dockerfile:
+    - die echten Dienste mit Startreihenfolge;
+    - Erstinstallation;
+    - die einmalige Umstellung vom Batch mit Cron, mit `docker compose --profile run down`,
+      damit der alte Batch-Container mit Cron nicht weiterläuft;
+    - Update, Läufe, Störungen, Secrets, Backup und Überwachung.
+  - **README:** Quick Start, Update, Pipeline, Konfiguration (neue Passwörter, Wochenplan,
+    Tracing), Projektstruktur und CI auf den Stack.
+  - **Status-Zeilen** in `architecture/` (README, events, frontend, code-struktur, umgebungen,
+    web-api-realtime, datenhaltung): umgesetzt statt Plan, kein FastStream und kein Cron mehr.
+    ADRs bleiben, wie sie sind (Pflegeregel).
+  - **Test:** `tests/test_doc_links.py` prüft jeden relativen Link in den Markdown-Dateien des
+    Repos: Die Datei existiert, ein Anker trifft eine Überschrift (Regeln von GitHub). Externe
+    Links prüft er nicht, er läuft ohne Netz.
+- **Umgesetzt (04.11.2026):** wie im Entwurf. Der Link-Check war schon vor den Änderungen grün und
+  hält die Umbauten der Doku seitdem zusammen.
 
 ### Track F – Fundamentaldaten und Anker (ADR-0010, ADR-0011)
 

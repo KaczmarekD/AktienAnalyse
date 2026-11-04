@@ -11,14 +11,14 @@ Zeitplan:
 - **Lokal** (Entwicklungsrechner, `localhost`): jede neue Implementierung mit echten Daten
   ausprobieren, Ergebnisse im Browser ansehen, Tests ausführen. Es geht keine Mail nach außen
   und kein Healthcheck-Ping raus.
-- **NAS** (live): wöchentlicher Lauf per Cron, echte Mail. Die NAS baut nichts und zieht
+- **NAS** (live): wöchentlicher Lauf nach dem Wochenplan des web-api, echte Mail. Die NAS baut nichts und zieht
   fertige Images aus GHCR ([betrieb-synology.md](betrieb-synology.md)).
 
 | | Lokal | NAS |
 |---|---|---|
 | Compose | `docker-compose.yml` + `docker-compose.local.yml` (`make local-*`) | `docker-compose.yml` |
 | Image | aus dem Arbeitsstand gebaut (`value-analyzer:local`) | aus GHCR (`latest`, `sha-…`, Version) |
-| Läufe | auf Knopfdruck (`make local-run`), kein Cron | Cron (Samstag 07:30) |
+| Läufe | auf Knopfdruck (`make local-run`, UI), kein Wochenplan | Wochenplan des web-api (Samstag 07:30) |
 | Mail | Mailpit, Postfach unter <http://localhost:8025> | Gmail |
 | Healthcheck | aus | Healthchecks.io, falls eingerichtet |
 | Datenbank | eigene, Daten in `./.local/pgdata` | `./pgdata`, nie gelöscht |

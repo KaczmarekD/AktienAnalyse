@@ -1,6 +1,9 @@
 # Zielarchitektur Value-Analyzer
 
-> **Status:** Plan, beschlossen am 30.09.2026. Umsetzung in Phasen, siehe [Roadmap](roadmap.md).
+> **Status:** Beschlossen am 30.09.2026, umgesetzt in den Phasen 0 bis 5 (bis 04.11.2026), siehe
+> [Roadmap](roadmap.md). Abweichung: NATS über einen eigenen Adapter mit nats-py statt
+> FastStream (Nachtrag in [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md)). Betrieb:
+> [betrieb-synology.md](betrieb-synology.md).
 > Im Code erledigt sind:
 > - das Universum aus iShares/Deka (`ca85d93`, `c14fa32`)
 > - Phase 0, das Fundament: Golden-Master, CI, uv, Python 3.14, Images aus der CI (P0.1–P0.8)
@@ -18,7 +21,7 @@
 
 - **Ziel:** ereignisgetriebene Microservices. Drei Fach-Services (`market-data`, `scoring`,
   `notification`) und `web-api` als Backend for Frontend (REST, WebSocket, Eventmanager).
-- **Infrastruktur:** NATS JetStream als Event-Bus (über FastStream), PostgreSQL 18 mit einem
+- **Infrastruktur:** NATS JetStream als Event-Bus (eigener Adapter mit nats-py), PostgreSQL 18 mit einem
   Schema pro Service, Angular 22 im eigenen nginx-Container.
 - **Weg:** kein Big Bang. Zuerst entsteht ein modularer Monolith mit genau den späteren
   Service-Grenzen, danach werden die Services schrittweise herausgelöst. Die Samstags-Mail
@@ -98,7 +101,7 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 | Packaging | uv-Workspace (ersetzt pip-tools) | Ein Lockfile für alle Pakete, `uv sync --package` für schlanke Images ([ADR-0004](../adr/0004-uv-workspace-monorepo.md)) |
 | Web | FastAPI 0.14x | WebSockets, SSE (ab 0.135) und OpenTelemetry (0.142) eingebaut |
 | Contracts und Config | Pydantic 2.13 + pydantic-settings | Events, API-DTOs, Settings und Validierungsregeln aus einem Modell-System |
-| Messaging | NATS JetStream 2.12+ mit FastStream 0.7 | Persistenz, Replay, Request/Reply, Deduplizierung, geringer Ressourcenbedarf ([ADR-0002](../adr/0002-nats-jetstream-und-faststream.md)) |
+| Messaging | NATS JetStream 2.15 mit nats-py (geplant war FastStream 0.7) | Persistenz, Replay, Request/Reply, Deduplizierung, geringer Ressourcenbedarf ([ADR-0002](../adr/0002-nats-jetstream-und-faststream.md)) |
 | Datenbank | PostgreSQL 18 (19 erscheint voraussichtlich Ende Oktober 2026) | `uuidv7()` eingebaut, ein Schema und eine Rolle je Service ([ADR-0003](../adr/0003-postgresql-schema-pro-service.md)) |
 | ORM und Migrationen | SQLAlchemy 2.1 mit psycopg 3 + Alembic | Heute synchron (Batch, Phase 2). Einzelne Services stellen erst bei Bedarf auf die async-Engine um, dafür braucht es das Extra `sqlalchemy[asyncio]` ([datenhaltung.md](datenhaltung.md)). Kein SQLModel, damit Datenbank-Modelle und API-DTOs getrennt bleiben. |
 | Datenanalyse | pandas 3, NumPy 2 | pandas steht in `market-data`, `scoring`, `notification` und `va-platform` (`serialization`), NumPy ebenso außer in `notification`. `va-contracts` bleibt ohne (import-linter). pyarrow bleibt nur für den Altdaten-Import (`src/db/import_legacy.py` liest Parquet). |
@@ -114,7 +117,8 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 - Backtesting und Renditeberechnung: Score-Historie ja, Performance-Tracking nein.
 - Echtzeit- oder Intraday-Kurse: Der WebSocket synchronisiert nur die UI.
 - Sektor-relatives Ranking: zu wenige Werte pro Sektor.
-- Ein separates Dependency-Injection-Framework: `Depends` von FastAPI und FastStream reicht.
+- Ein separates Dependency-Injection-Framework: `Depends` von FastAPI und die Composition
+  Roots reichen.
 
 ## Dokumente
 

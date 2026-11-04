@@ -6,73 +6,94 @@ den README (der zeigt, **wie** das Projekt betrieben wird).
 
 ## Was das Projekt tut
 
-Wöchentlicher Batch-Job auf einer Synology, der DAX/MDAX (90 Werte) nach
-einer Value-+-Quality-Methodik durchscoresd und das Ergebnis als E-Mail
-versendet (HTML-Top/Flop-Tabellen + CSV-Vollranking). Die CSV enthält alle
-Titel, die den Größenfilter passieren, auch die ohne Score. Titel unter
-`MIN_MARKET_CAP` und gescheiterte Abrufe fehlen dort, stehen aber in der DB
-(`market_data.fundamental_snapshot`, `scoring.score_result` mit `passed_filter = false`).
+Screener für DAX und MDAX (90 Werte) nach einer Value-+-Quality-Methodik, betrieben als
+Docker-Stack auf einer Synology. Jeden Samstag bewertet er alle Titel und verschickt das Ergebnis
+als E-Mail (HTML-Top/Flop-Tabellen + CSV-Vollranking). Ein Web-UI im LAN zeigt Läufe, Rankings
+und Historie, verwaltet die Scoring-Profile und startet Läufe. Die CSV enthält alle Titel, die
+den Größenfilter passieren, auch die ohne Score. Titel unter `MIN_MARKET_CAP` und gescheiterte
+Abrufe fehlen dort, stehen aber in der DB (`market_data.fundamental_snapshot`,
+`scoring.score_result` mit `passed_filter = false`).
 
-## Architektur in einem Satz
+## Architektur
 
-Seit P5.4 plant das web-api den Wochenlauf (`WEB_API_SCHEDULE` aus `CRON_SCHEDULE`,
-`Europe/Berlin`) und legt den Run an. Die drei Services führen ihn über NATS aus, je in einem
-eigenen Container: market-data (Universum, yfinance) → `marketdata.snapshot.completed` →
-scoring (Cross-Sektional-Ranking) → `scoring.run.completed` → notification (HTML+CSV, SMTP,
-Healthcheck). Die Handler liegen unter `entrypoints/handlers.py` der Module. Jedes Modul speichert
-selbst in PostgreSQL 18 (`adapters/postgres/store.py`). Einen Cron gibt es nicht mehr.
+Ereignisgetriebene Services auf NATS JetStream, jeder mit eigenem Schema in PostgreSQL 18
+(Plan und Begründung: [docs/architecture/README.md](docs/architecture/README.md), ADR-0001 bis
+ADR-0008). Auf der NAS beschreibt `docker-compose.yml` den Stack, jeder Dienst hat einen eigenen
+Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-synology.md).
 
-Der Batch `src/main.py` gibt es weiter, aber nur auf Wunsch (Profil `run`, `make docker-run`). Er
-startet dieselbe Kette im Prozess (`va_platform.bus.InProcessBus`). `src/composition.py`
-verdrahtet sie mit denselben Funktionen wie die Services, `src/run_tracker.py` schließt dann
-`batch.run` ab.
+| Dienst | Aufgabe | Image |
+|---|---|---|
+| `db` | PostgreSQL 18, Daten unter `./pgdata` | `postgres:18` |
+| `nats` | NATS mit JetStream, Daten unter `./natsdata`, nur im Docker-Netz | `nats:2.15` |
+| `migrate` | migriert vor allen anderen (`python -m src.db.migrate`), legt neue Rollen an | App-Image |
+| `market-data` | Universum, yfinance, Kennzahlen | `va-market-data` |
+| `scoring` | Cross-sektionales Ranking, Scoring-Profile, Vorschau | `va-scoring` |
+| `notification` | HTML + CSV, SMTP, Healthcheck | `va-notification` |
+| `web-api` | REST, WebSocket, Projektionen, Runs mit Scheduler und Watchdog | `va-web-api` |
+| `frontend` | Angular hinter nginx, einziger Port (8080 über `UI_LAN_BIND`) | `va-frontend` |
+| `value-analyzer` | Batch und Werkzeuge, nur auf Wunsch (Profil `run`) | App-Image |
 
-**Umgebungen** ([docs/architecture/umgebungen.md](docs/architecture/umgebungen.md)):
-`docker-compose.yml` beschreibt den Live-Betrieb auf der NAS. Lokal legt
-`docker-compose.local.yml` den Build aus dem Arbeitsstand, Mailpit und pgweb darüber
-(`make local-*`). Dort zeigt SMTP fest auf Mailpit (`SMTP_PLAIN`, ohne TLS und Login) und
-`HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht. Das web-api
-(`services/web-api`, FastAPI, ab P3.1) läuft aus demselben Image, lokal unter
-`localhost:8000`. Es liest mit `WEB_API_DATABASE_URL` (Rolle `va_read`, schreibgeschützte
-Verbindung) und speichert Scoring-Profile mit `WEB_API_PROFILES_DATABASE_URL` (Rolle
-`va_profiles`, darf nur in `profile_version` und `profile_activation` anfügen, seit P3.3). Die
-Zugangsdaten des Batches bekommt es nie. Gestartet wird es über `src.web:create_app`: Diese
-Composition Root verdrahtet Vorschau und Profil-Befehle mit dem Code von scoring im selben
-Prozess (`src/scoring_ops.py`), denn `va_web_api` darf `va_scoring` nicht importieren. Mit
-`WEB_API_NATS_URL` beantwortet sie seit P4.8 der Worker über Request/Reply (`va_contracts.rpc.v1`,
-`va_web_api.rpc`), ohne Worker antworten sie mit 503. Seit P4.9 lesen die REST-Endpunkte mit NATS
-aus den Projektionen (Port `ReadModel`, `ProjectionReadModel`), Profile und Reports per
-Request/Reply; die Historie füllt `src.db.backfill` bei jeder Migration nach. Seit P5.1a startet
-jeder Service auch allein (`python -m va_market_data`, `va_scoring`, `va_notification`): eigene
-Settings (`entrypoints/settings.py`, der Batch erbt sie), eigener Einstieg
-(`entrypoints/service.py`, Laufrahmen `va_platform.service.run_service`). Request/Reply
-beantworten die Besitzer (`entrypoints/rpc.py`), die Vorschau rechnet scoring aus seiner Kopie
-der Eingangsdaten (`scoring.input_snapshot`). Seit P3.6
-laufen auf der NAS
-web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
-nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
-Seit P4.1 läuft im Compose auch `nats` (NATS 2.15 mit JetStream, Daten unter `./natsdata`, nur
-im Docker-Netz). `python -m va_platform.nats` legt Stream `VA_EVENTS` und die Consumer aus
-[docs/architecture/events.md](docs/architecture/events.md) an. Seit P4.3 kann der Batch die Kette
-über NATS laufen lassen: `EVENT_BUS=nats` mit `NATS_URL`, `va_platform.nats.NatsBus` (eigener
-Adapter mit nats-py statt FastStream, Nachtrag in ADR-0002). Dann wartet `src/main.py` höchstens
-`RUN_TIMEOUT_MINUTES` auf das Ergebnis des `RunTracker`. Seit P5.4 ist NATS auf der NAS der
-Standard; der Dienst `migrate` migriert vor allen anderen. Seit P4.4 füllt das web-api mit `WEB_API_NATS_URL` und
-`WEB_API_PROJECTIONS_DATABASE_URL` (Rolle `va_web`) die Projektionen im Schema `web` aus dem
-Consumer `web-api` (`va_web_api.events.EventManager`). Seit P4.5 meldet der WebSocket `/ws`
-(Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) die Änderungen an die
-offenen Tabs, nginx reicht `/ws` weiter. Seit P4.7 legt das web-api Runs an (`POST /api/v1/runs`, Scheduler mit
-`WEB_API_SCHEDULE`, standardmäßig aus) und überwacht sie (Watchdog). Es schreibt dafür mit `va_web` in
-`batch.run` und `web.run_request`. Ausgeführt werden diese Runs von den drei Services. Sie
-laufen seit P5.1 je in einem Container mit eigenem Image (`va-market-data`, `va-scoring`,
-`va-notification`, Profil `nats`). `python -m src.worker` startet alle drei in einem Prozess. Seit P4.3b hängt jeder Service über einen
-`ReliableBus` am Bus, in beiden Modi:
-Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
-`RUN_TIMEOUT_MINUTES`) und schickt Folge-Events über seine Outbox.
-`make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber: ein Wegwerf-Stack mit Datenbank auf
-tmpfs, in dem market-data eine Replay-Fixture statt Yahoo liest (`REPLAY_SOURCE`, Mail nur an
-Mailpit). Seit P5.2 ist das der ganze Stack mit NATS, den drei Services und dem web-api mit
-Projektionen, der Lauf startet über die API (`docker/e2e_run.py`).
+**Ablauf eines Runs:**
+- Das web-api legt ihn an, nach Plan (`WEB_API_SCHEDULE` aus `CRON_SCHEDULE`, `Europe/Berlin`)
+  oder aus dem UI (`POST /api/v1/runs`). Es schreibt mit der Rolle `va_web` in `batch.run` und
+  `web.run_request` und schickt `screening.run.requested` über seine Outbox.
+- market-data → `marketdata.snapshot.completed` → scoring → `scoring.run.completed` →
+  notification → `notification.report.sent`. Scheitert eine Stufe, kommt
+  `screening.run.failed`. Events, Subjects und Consumer:
+  [events.md](docs/architecture/events.md). Stream `VA_EVENTS` und Consumer legt der `NatsBus`
+  beim Start an (`va_platform.nats.provision`).
+- Aus den Events füllt das web-api die Projektionen im Schema `web` (Consumer `web-api`,
+  `va_web_api.events.EventManager`) und schließt `batch.run` ab. Der WebSocket `/ws`
+  (Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) meldet die
+  Änderungen an die offenen Tabs.
+- Der Watchdog im web-api meldet einen hängenden Run als gescheitert (Abruf 45, Bewertung 5,
+  Mail 5 Minuten).
+- Ein Run ist ein Trace (OpenTelemetry, `va_platform.tracing`). Der Kontext reist als
+  `traceparent` in der Hülle. `OTEL_TRACES_EXPORTER=console` schreibt die Spans ins Log.
+
+**Aufbau eines Service** (`services/<name>/src/va_<name>/`, Schichten domain, application,
+adapters, entrypoints):
+- `entrypoints/handlers.py`: die Handler der Events.
+- `entrypoints/settings.py`: die eigenen Settings. Der Batch (`src.config.Settings`) erbt sie.
+- `entrypoints/service.py`: baut die Adapter, verdrahtet die Handler (`wire`) und ist der
+  Einstieg `python -m va_<name>` (Laufrahmen `va_platform.service.run_service`).
+- `entrypoints/rpc.py`: Request/Reply für das web-api (`va_contracts.rpc.v1`).
+- `adapters/postgres/`: Modelle und Repository des eigenen Schemas, mit eigener Rolle.
+
+Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event einmal (Inbox),
+überspringt Reste abgebrochener Läufe (älter als `RUN_TIMEOUT_MINUTES`) und schickt Folge-Events
+über seine Outbox.
+
+**web-api** (`services/web-api`, FastAPI, Einstieg `va_web_api.main:create_app`):
+- Liest REST aus den Projektionen (Port `ReadModel`, `ProjectionReadModel`). Die Historie aus der
+  Zeit vor den Projektionen füllt `src.db.backfill` bei jeder Migration nach.
+- Profile, Vorschau und Reports holt es per Request/Reply bei ihren Besitzern (`va_web_api.rpc`).
+  Die Vorschau rechnet scoring aus seiner Kopie der Eingangsdaten (`scoring.input_snapshot`).
+  Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
+- Rollen `va_read` (schreibgeschützte Verbindung) und `va_web`. Die Zugangsdaten der Services
+  bekommt es nie.
+- Ohne NATS (`make api` aus der `.venv`) startet es über `src.web:create_app`. Diese Composition
+  Root rechnet Vorschau und Profil-Befehle mit dem Code von scoring im selben Prozess
+  (`LocalCaller`, Rolle `va_profiles`), denn `va_web_api` darf `va_scoring` nicht importieren.
+- nginx im `frontend` reicht `/api/` und `/ws` an das web-api weiter.
+
+**Batch, nur auf Wunsch:** `src/main.py` (Profil `run`, `make docker-run`) startet dieselbe Kette
+im Prozess (`va_platform.bus.InProcessBus`). `src/composition.py` verdrahtet sie mit denselben
+`wire`-Funktionen wie die Services, `src/run_tracker.py` schließt `batch.run` ab. Mit
+`EVENT_BUS=nats` und `NATS_URL` läuft der Batch über NATS (`va_platform.nats.NatsBus`, eigener
+Adapter mit nats-py statt FastStream, Nachtrag in ADR-0002) und wartet höchstens
+`RUN_TIMEOUT_MINUTES`. `python -m src.worker` startet alle drei Services in einem Prozess. Das
+App-Image enthält außerdem Migration, Regression und Altdaten-Import. Einen Cron gibt es nicht.
+
+**Umgebungen** ([umgebungen.md](docs/architecture/umgebungen.md)):
+- NAS: `docker-compose.yml`, Images aus GHCR.
+- Lokal: `docker-compose.local.yml` legt den Build aus dem Arbeitsstand, Mailpit und pgweb
+  darüber (`make local-*`). SMTP zeigt fest auf Mailpit (`SMTP_PLAIN`, ohne TLS und Login),
+  `HEALTHCHECK_URL` ist leer, damit lokal nichts nach außen geht.
+- End-to-End: `make local-e2e` (U5) legt `docker-compose.e2e.yml` darüber. Das ist ein
+  Wegwerf-Stack mit Datenbank auf tmpfs: NATS, die drei Services und das web-api. market-data
+  liest eine Replay-Fixture statt Yahoo (`REPLAY_SOURCE`), die Mail geht nur an Mailpit, der Lauf
+  startet über die API (`docker/e2e_run.py`).
 
 ## Methodik-Entscheidungen
 
@@ -170,10 +191,12 @@ das passiert, ist dort die einzige zu ändernde Stelle.
 
 **Konfiguration kommt aus Pydantic Settings**, niemals aus eingebetteten
 Konstanten. Wenn du eine Konstante brauchst und sie könnte sich je nach
-Deployment unterscheiden, geh durch `Settings`. Seit P5.1a gehört jedes Feld in die Settings
-seines Service (`va_<service>.entrypoints.settings`). `src.config.Settings` erbt alle drei und
-ergänzt nur, was allein der Batch braucht. Ein neues Feld muss auch in `ENV_PATTERN` von
-`entrypoint.sh` stehen, das prüft `tests/test_entrypoint.py`. Ausnahme seit P2b.3 (ADR-0009): Die fachlichen
+Deployment unterscheiden, geh durch `Settings`. Jedes Feld gehört in die Settings seines
+Service (`va_<service>.entrypoints.settings`, gemeinsame Felder in
+`va_platform.service.ServiceSettings`). `src.config.Settings` erbt alle drei und ergänzt nur, was
+allein der Batch braucht. Ein neues Feld braucht auch einen Eintrag beim Dienst in
+`docker-compose.yml`, denn die Services bekommen nur die Variablen, die dort stehen (keine
+`env_file`). Leer heißt dort Standardwert. Ausnahme seit P2b.3 (ADR-0009): Die fachlichen
 Scoring-Parameter stehen in den Profilen. `VALUE_WEIGHT`, `QUALITY_WEIGHT` und `MIN_MARKET_CAP`
 sind nur die Startwerte für das Profil „Standard“.
 
@@ -185,7 +208,7 @@ Schwellwert bekommt einen Standardwert, gespeicherte Profile ohne ihn erhalten i
 
 **Universum-Quellen: iShares → Deka → Fallback-CSV** (Kette in
 `va_market_data.application.universe`, Quellen in `va_market_data.adapters`,
-Verdrahtung mit dem CSV-Pfad in `src/composition.py`).
+Verdrahtung mit dem CSV-Pfad in `va_market_data.entrypoints.service.live_universe`).
 Wikipedia wurde ersetzt, weil die englische MDAX-Seite nachweislich veraltet
 war und die deutsche keine Ticker hat. Jede Live-Quelle wird hart validiert
 (lesbares JSON/XLSX, exakt 40/50 Aktien; iShares zusätzlich Stichtag
@@ -220,7 +243,7 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   ISIN und das einmalige Setzen von `published_at` in der Outbox (Trigger `va_guard_outbox`,
   `va_app` hat nur dieses Spaltenrecht). Projektionen sind veränderlich, aber nie löschbar
   (`MUTABLE_TABLES`, heute `web.run_status`). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
-  nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3), `va_web` nur im Schema
+  nur Profile lesen und Versionen/Aktivierungen anfügen (web-api ohne NATS, `make api`), `va_web` nur im Schema
   `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`), seit P4.7 dazu
   Runs in `batch.run` anlegen und einmal abschließen. Seit P5.3 je Service eine Rolle nur fürs
   eigene Schema (`va_market_data`, `va_scoring`, `va_notification`, `SERVICE_ROLES`,
@@ -261,19 +284,14 @@ Dockerfiles. Ruff, Pyright und die CI leiten sie davon ab. Ab 3.14 schreibt der
 Formatter Ausnahmen ohne Klammern (`except TypeError, ValueError:`, PEP 758).
 Das fängt beide Typen ab und ist kein Python-2-Binding.
 
-## Zielarchitektur (beschlossen, in Umsetzung)
+## Entscheidungen und Arbeitsweise
 
-Das Projekt wird schrittweise zu ereignisgetriebenen Microservices
-umgebaut: `market-data`, `scoring`, `notification` und `web-api` (FastAPI:
-REST, WebSocket, Eventmanager), dazu ein Angular-Frontend im eigenen
-nginx-Container, NATS JetStream und PostgreSQL. Plan und Roadmap:
-`docs/architecture/README.md`, Entscheidungen: `docs/adr/` (ADR-0001 bis
-ADR-0011; ADR-0011 ist nur vorgeschlagen), Recherche: `docs/research/`.
-
-Bis eine Phase umgesetzt ist, beschreibt dieses Dokument den **Ist-Stand**.
-Neue Arbeit folgt der Zielrichtung, bei Widersprüchen gelten die ADRs.
-Pläne und Recherche-Ergebnisse werden in `docs/` fortgeschrieben, nicht nur
-im Chat besprochen.
+Der Umbau zu ereignisgetriebenen Services ist umgesetzt (Phasen 0 bis 5 der
+[Roadmap](docs/architecture/roadmap.md)). Offen ist Track F: ADR-0010 sammelt Daten,
+ADR-0011 ist nur vorgeschlagen. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0011), Recherche:
+`docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei Widersprüchen gelten die
+ADRs. Pläne und Recherche-Ergebnisse werden in `docs/` fortgeschrieben, nicht nur im Chat
+besprochen.
 
 **Arbeitsweise:** Umgesetzt wird in Arbeitspaketen nach dem Zyklus
 Test → Implementierung → Grün → Review
@@ -309,8 +327,8 @@ Gemergt wird erst nach Abnahme durch den User. Abgehakt wird in
 - Echtzeit-Daten oder Intraday. Wöchentlicher Batch reicht für
   Fundamentaldaten, die sich quartalsweise ändern. Der geplante WebSocket
   im web-api synchronisiert nur die UI und streamt keine Kurse.
-- Ein separates Dependency-Injection-Framework. `Depends` von FastAPI und
-  FastStream reicht.
+- Ein separates Dependency-Injection-Framework. `Depends` von FastAPI und die
+  Composition Roots (`entrypoints/service.py`, `src/composition.py`) reichen.
 
 Früher stand hier auch „Microservices/Message Queues“. Das ist durch
 ADR-0001 und ADR-0002 aufgehoben.
@@ -344,11 +362,12 @@ ADR-0001 und ADR-0002 aufgehoben.
 **Neues Universum (z.B. Stoxx 600)**:
 1. Quelle als Adapter in `va_market_data.adapters` (Klasse mit `name` und
    `load()`, Port `UniverseSource`; URL-Konstanten am Dateikopf), Soll-Anzahl
-   in `UniverseConfig.expected_counts`, Reihenfolge der Kette in `src/composition.py` (`load_universe`)
+   in `UniverseConfig.expected_counts`, Reihenfolge der Kette in
+   `va_market_data.entrypoints.service.live_universe`
 2. Fallback-CSV in `data/` inkl. ISIN-Spalte
-3. ENV `UNIVERSE` in `config.py` um neuen Literal-Wert erweitern
+3. ENV `UNIVERSE` in `va_market_data.entrypoints.settings` um neuen Literal-Wert erweitern
 4. Filter im Handler von market-data (`RunRequestedHandler`, heute `dax_only`) und
-   seine Verdrahtung in `src/composition.py:wire`
+   seine Verdrahtung in `va_market_data.entrypoints.service.wire`
 5. Währung prüfen: `MIN_MARKET_CAP` wird mit der Marktkapitalisierung in Handelswährung
    verglichen (Yahoo `marketCap`). Das stimmt, solange das Universum nur `.DE`-Titel (EUR)
    hat. Ein Universum mit anderen Währungen braucht vorher eine Umrechnung.
@@ -374,9 +393,9 @@ ADR-0001 und ADR-0002 aufgehoben.
 **Neue Mail-Empfänger**: `MAIL_TO` ist heute Single-Recipient. Wenn mehrere,
 auf Liste umstellen (`pydantic.EmailStr` → `list[EmailStr]`, `;`-getrennt
 parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `smtp_config` in
-`src/composition.py` anpassen. Dazu `NotificationConfig.recipient`
-(`va_notification.entrypoints.handlers`, gesetzt in `src/composition.py:wire`): Es
-landet im Versandprotokoll.
+`va_notification.entrypoints.service` anpassen. Dazu `NotificationConfig.recipient`
+(`va_notification.entrypoints.handlers`, gesetzt in `va_notification.entrypoints.service.wire`):
+Es landet im Versandprotokoll.
 
 ## Externe Quellen, von denen wir abhängen
 
@@ -443,6 +462,9 @@ Chromium unter `.local/playwright`), dass Mail, API und UI denselben Lauf mit de
 Fixture zeigen. Die Browser-Tests verlangen eine leere Konsole: Ein CSP-Verstoß ist ein Fehler.
 Ohne `E2E_BASE_URL` überspringen sich die Tests. Eine gewollte Methodik-Änderung erneuert
 zuerst die Replay-Fixture (`--update-golden`), dann stimmt auch der E2E-Test wieder.
+
+**Doku:** `tests/test_doc_links.py` prüft jeden relativen Link in den Markdown-Dateien,
+auch Anker auf Überschriften. Wer eine Überschrift umbenennt, sieht dort, wer auf sie zeigt.
 
 **Golden-Master der Mail** (`tests/test_golden_report.py`, Dateien unter
 `tests/golden/`): Ein eingefrorener Datensatz

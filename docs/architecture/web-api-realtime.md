@@ -35,9 +35,8 @@ services/web-api/src/va_web_api/
 └── main.py         # FastAPI-App; der Lifespan startet DB-Pool, Broker und Scheduler
 ```
 
-Der FastStream-Broker wird im Lifespan von FastAPI gestartet und gestoppt. Die frühere
-eingebaute FastAPI-Integration von FastStream ist veraltet und wurde in das Paket
-`faststream_fastapi` ausgelagert. Wir brauchen sie nicht.
+Der `NatsBus` (eigener Adapter mit nats-py, Nachtrag in ADR-0002) wird im Lifespan von
+FastAPI gestartet und gestoppt, ebenso der Takt von Scheduler und Watchdog.
 
 ## REST-API (v1)
 

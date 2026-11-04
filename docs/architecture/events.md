@@ -1,7 +1,8 @@
 # Event-Architektur
 
-> **Status:** Plan (30.09.2026). Ab Phase 1 mit einem Bus im Prozess, ab Phase 4 über NATS, siehe
-> [Roadmap](roadmap.md). Entscheidung: [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
+> **Status:** Umgesetzt: ab Phase 1 mit einem Bus im Prozess, seit Phase 4 über NATS, seit P5.4
+> der Standard auf der NAS, siehe [Roadmap](roadmap.md). Entscheidung:
+> [ADR-0002](../adr/0002-nats-jetstream-und-faststream.md).
 > Seit P4.1 (01.11.2026) gibt es den NATS-Dienst und die Provisionierung von Stream und Consumern
 > (`va_platform.nats`), seit P4.2 Outbox und Inbox (`va_platform.messaging`). Seit P4.3 kann der
 > Batch die Kette über NATS laufen lassen (`EVENT_BUS=nats`, `va_platform.nats.NatsBus`).
@@ -135,8 +136,9 @@ Regeln zur Weiterentwicklung:
 - Additive Änderungen (neue optionale Felder) sind jederzeit erlaubt.
 - Inkompatible Änderungen bekommen ein neues `dataschema` (`…:v2`). Während der Umstellung
   verstehen Empfänger beide Versionen (beide Einträge in `BY_DATASCHEMA`).
-- Aus denselben Modellen entstehen die JSON-Schemas für die TypeScript-Typen im Frontend und
-  die AsyncAPI-Doku. FastStream erzeugt Letztere automatisch.
+- Aus denselben Modellen entstehen die JSON-Schemas (Golden-Files) und über OpenAPI die
+  TypeScript-Typen im Frontend. Eine AsyncAPI-Doku gibt es ohne FastStream nicht, die Tabellen
+  hier ersetzen sie.
 
 ## Zuverlässigkeit: Outbox und Inbox
 
@@ -255,7 +257,7 @@ mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.fail
 
 Seit P4.7 in `va_web_api.runs`. Beides läuft nur mit NATS und Projektions-Datenbank, in einer
 Hintergrund-Aufgabe des web-api (Takt 60 s). Ausgeführt werden die Runs vom Dienste-Prozess
-den drei Services (seit P5.1 je ein Container, Profil `nats`; `python -m src.worker` startet
+den drei Services (seit P5.1 je ein Container, seit P5.4 ohne Profil; `python -m src.worker` startet
 alle drei in einem Prozess).
 
 - **Anlegen:** Ein Run des web-api entsteht in einer Transaktion: `batch.run`, `web.run_request`
@@ -263,8 +265,9 @@ alle drei in einem Prozess).
   Ein Start aus dem UI (`POST /api/v1/runs`) wird abgelehnt (409), solange ein Run läuft.
 - **Scheduler:** Der Cron-Ausdruck `WEB_API_SCHEDULE` wird mit expliziter Zeitzone ausgewertet
   (`WEB_API_SCHEDULE_TIMEZONE`, Standard `Europe/Berlin`), unabhängig von der Zeitzone des
-  Containers. Fällig ist der jüngste Termin, höchstens eine Stunde alt. Leer heißt aus; bis P5.4
-  startet der Cron im Batch-Container (`CRON_SCHEDULE`, Standard Samstag 07:30) die Wochenläufe.
+  Containers. Fällig ist der jüngste Termin, höchstens eine Stunde alt. Leer heißt aus. Auf der NAS
+  kommt der Ausdruck seit P5.4 aus `CRON_SCHEDULE` (Standard Samstag 07:30), den Cron im
+  Batch-Container gibt es nicht mehr.
 - **Idempotenz:** Jeder geplante Run wird mit seinem Termin als eindeutigem Schlüssel angelegt
   (`web.run_request.slot`). Feuert der Scheduler doppelt, entsteht kein zweiter Run.
 - **Watchdog:** Hängt ein Run des web-api länger als das Zeitlimit seiner Stufe, veröffentlicht
