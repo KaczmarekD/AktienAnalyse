@@ -15,7 +15,7 @@
 | 2 | Postgres als Historien-Schicht | 🚧 im Code erledigt und gepusht (`261dc8f`), Deployment auf der NAS offen |
 | 2b | Scoring-Profile in der DB | ✅ im Code erledigt (P2b.0–P2b.3): jeder Lauf rechnet mit dem aktiven Profil und nennt es in der Mail; API seit P3.3, Editor im UI offen; NAS: Deployment |
 | 3 | web-api + Angular (UI im LAN, Profil-Editor) | ✅ im Code erledigt (P3.1–P3.8): Analysen, Profil-Editor und Schutz der Schnittstelle; NAS: Deployment |
-| 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | 🚧 P4.1–P4.8 erledigt (NATS, Outbox/Inbox, NATS als Bus, idempotente Handler, Eventmanager mit Projektionen, WebSocket-Hub, Echtzeit im UI, Runs aus dem UI mit Worker, Scheduler und Watchdog, Vorschau und Profil-Befehle über NATS; Standard noch im Prozess), ab P4.9 offen |
+| 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | 🚧 P4.1–P4.9 erledigt (NATS, Outbox/Inbox, NATS als Bus, idempotente Handler, Eventmanager mit Projektionen, WebSocket-Hub, Echtzeit im UI, Runs aus dem UI mit Worker, Scheduler und Watchdog, Vorschau und Profil-Befehle über NATS, REST aus Projektionen; Standard noch im Prozess). Im Code fertig |
 | 5 | Aufteilen in Services (Zielarchitektur) | offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), Deployment offen; F2/F3 warten auf ADR-0011 |
@@ -171,7 +171,7 @@ Details: [Implementierungsplan, Phase 4](implementierungsplan.md#phase-4--events
 - [x] P4.6 Echtzeit im Frontend (`4baf52e`)
 - [x] P4.7 Runs aus dem UI, Watchdog, Scheduler (`7bc1881`)
 - [x] P4.8 Vorschau und Profil-Befehle über NATS (`9a4bb77`)
-- [ ] P4.9 REST aus Projektionen und Request/Reply (nachgetragen 04.11.2026)
+- [x] P4.9 REST aus Projektionen und Request/Reply (nachgetragen 04.11.2026, `3280951`)
 
 **Fertig, wenn:** alles über Events läuft und das UI live aktualisiert.
 
@@ -179,6 +179,7 @@ Details: [Implementierungsplan, Phase 4](implementierungsplan.md#phase-4--events
 
 Details: [Implementierungsplan, Phase 5](implementierungsplan.md#phase-5--aufteilen-in-services)
 
+- [ ] P5.1a Einstiegspunkte je Service (nachgetragen 04.11.2026: eigene Settings, Request/Reply beim Besitzer)
 - [ ] P5.1 Images je Service
 - [ ] P5.2 End-to-End-Test des ganzen Stacks
 - [ ] P5.3 Eine DB-Rolle je Service 🔒
