@@ -580,6 +580,13 @@
       "title": "Fundamentals",
       "type": "array"
     },
+    "isins": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Isins",
+      "type": "object"
+    },
     "options": {
       "$ref": "#/$defs/RunOptionsV1"
     },

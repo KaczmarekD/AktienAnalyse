@@ -36,8 +36,10 @@ from va_scoring.adapters.postgres.models import (
 )
 from va_web_api.adapters.postgres.models import (
     RankingRow,
+    RankingRun,
     RunRequest,
     RunStatus,
+    SnapshotRow,
     WebInbox,
     WebOutbox,
 )
@@ -64,6 +66,7 @@ __all__ = [
     "ProfileActivation",
     "ProfileVersion",
     "RankingRow",
+    "RankingRun",
     "RawInfo",
     "Report",
     "ReportingInbox",
@@ -77,6 +80,7 @@ __all__ = [
     "ScoringOutbox",
     "ScoringRun",
     "ShareCount",
+    "SnapshotRow",
     "StatementValue",
     "UniverseMember",
     "WebInbox",

@@ -54,7 +54,7 @@ Batch.
 | `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie des letzten Snapshots, `outbox`, `inbox` |
 | `reporting` | `notification` | `outbox`, `inbox` |
 | `batch` | `web-api` | Runs werden vom web-api angelegt (Scheduler/UI); `outbox` (`screening.run.requested`), `inbox` |
-| `web` (seit P4.4, Migration `0010`) | `web-api` | Read-Models für das UI: `run_status` (veränderlich, nie gelöscht) und `ranking_row` (aktuelles Ranking, Score-Verlauf je Titel); `run_request` (seit P4.7, Migration `0011`, nur zum Anfügen): die Runs, die das web-api angelegt hat, mit eindeutigem Cron-Termin; `outbox`, `inbox` |
+| `web` (seit P4.4, Migration `0010`) | `web-api` | Read-Models für das UI: `run_status` (veränderlich, nie gelöscht) und `ranking_row` (aktuelles Ranking, Score-Verlauf je Titel); `run_request` (seit P4.7, Migration `0011`, nur zum Anfügen): die Runs, die das web-api angelegt hat, mit eindeutigem Cron-Termin; `snapshot_row` und `ranking_run` (seit P4.9, Migration `0012`, nur zum Anfügen): Abrufe und Köpfe der Bewertungsläufe für die REST-Antworten, nachgefüllt aus den Tabellen von `src.db.backfill`; `outbox`, `inbox` |
 
 `outbox` und `inbox` gibt es seit P4.2 in allen vier Schemas (Migration `0009`). Die Modelle
 liegen beim Besitzer des Schemas, die Logik in `va_platform.messaging`

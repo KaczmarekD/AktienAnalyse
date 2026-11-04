@@ -8,7 +8,8 @@ meldet der Worker ``screening.run.failed`` (``src.dead_letters``).
 
 Seit P4.8 beantwortet er ausserdem Vorschau und Profil-Befehle des web-api ueber Request/Reply
 (``va_web_api.rpc.scoring_handlers`` mit ``src/scoring_ops.py``, Rolle ``va_app``) und meldet
-gespeicherte und aktivierte Profile als Event.
+gespeicherte und aktivierte Profile als Event. Seit P4.9 auch Profile und Reports zum Lesen
+(``va_web_api.rpc.read_handlers``).
 
 In P5.1 wird daraus ein Image je Service. Exit-Codes: 0 nach SIGTERM, 2 Konfiguration.
 """
@@ -25,7 +26,7 @@ from pydantic import ValidationError
 
 from va_platform.db import create_db_engine
 from va_platform.nats import MAX_DELIVER, NatsBus
-from va_web_api.rpc import QUEUE, scoring_handlers
+from va_web_api.rpc import queue_of, read_handlers, scoring_handlers
 
 from . import __version__
 from .composition import build_adapters, wire
@@ -75,12 +76,15 @@ def serve(settings: Settings, stop: threading.Event, *, adapters: Adapters | Non
     bus.start()
     try:
         wire(bus, adapters, settings, version=__version__)
-        # P4.8: Vorschau und Profil-Befehle fuer das web-api
-        handlers = scoring_handlers(
-            InProcessPreview(engine), InProcessCommands(engine), notify=bus.publish
-        )
+        # P4.8: Vorschau und Profil-Befehle, P4.9: Profile und Reports lesen, fuer das web-api
+        handlers = {
+            **scoring_handlers(
+                InProcessPreview(engine), InProcessCommands(engine), notify=bus.publish
+            ),
+            **read_handlers(engine),
+        }
         for spec, handler in handlers.items():
-            bus.serve(spec, handler, queue=QUEUE)
+            bus.serve(spec, handler, queue=queue_of(spec))
         log.info("=== value-analyzer v%s Worker laeuft ===", __version__)
         stop.wait()
         log.info("Worker wird beendet")

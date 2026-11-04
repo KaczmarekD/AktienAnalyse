@@ -37,7 +37,9 @@ Zugangsdaten des Batches bekommt es nie. Gestartet wird es über `src.web:create
 Composition Root verdrahtet Vorschau und Profil-Befehle mit dem Code von scoring im selben
 Prozess (`src/scoring_ops.py`), denn `va_web_api` darf `va_scoring` nicht importieren. Mit
 `WEB_API_NATS_URL` beantwortet sie seit P4.8 der Worker über Request/Reply (`va_contracts.rpc.v1`,
-`va_web_api.rpc`), ohne Worker antworten sie mit 503. Seit P3.6
+`va_web_api.rpc`), ohne Worker antworten sie mit 503. Seit P4.9 lesen die REST-Endpunkte mit NATS
+aus den Projektionen (Port `ReadModel`, `ProjectionReadModel`), Profile und Reports per
+Request/Reply; die Historie füllt `src.db.backfill` bei jeder Migration nach. Seit P3.6
 laufen auf der NAS
 web-api und `frontend` (nginx, eigenes Image `va-frontend`, Port 8080 über `UI_LAN_BIND`) mit;
 nur das frontend hat einen Port, es reicht `/api/` an das web-api weiter.
@@ -54,8 +56,7 @@ Consumer `web-api` (`va_web_api.events.EventManager`). Seit P4.5 meldet der WebS
 offenen Tabs, nginx reicht `/ws` weiter. Seit P4.7 legt das web-api Runs an (`POST /api/v1/runs`, Scheduler mit
 `WEB_API_SCHEDULE`, standardmäßig aus) und überwacht sie (Watchdog). Es schreibt dafür mit `va_web` in
 `batch.run` und `web.run_request`. Ausgeführt werden diese Runs vom Worker `python -m src.worker`
-(Compose-Dienst `worker`, Profil `nats`). Die REST-Endpunkte lesen weiter aus den
-Tabellen des Batches, bis NATS der Standard ist. Seit P4.3b hängt jeder Service über einen
+(Compose-Dienst `worker`, Profil `nats`). Seit P4.3b hängt jeder Service über einen
 `ReliableBus` am Bus, in beiden Modi:
 Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
 `RUN_TIMEOUT_MINUTES`) und schickt Folge-Events über seine Outbox.
@@ -191,7 +192,7 @@ einzige Quelle der Wahrheit (keine Parquet-Caches, kein Housekeeping mehr).
 Warum: Snapshots sind nicht rekonstruierbar – yfinance liefert nur den
 aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`, dazu seit P4.4
-  `web` (Projektionen des web-api).
+  `web` (Projektionen des web-api, seit P4.9 auch die Lesemodelle für REST).
   Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID
   (`tests/db/test_schema_boundaries.py` prüft Modelle und migrierte DB).
 - Jedes Schema gehört einem Modul, Modelle und Repository liegen dort unter

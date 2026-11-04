@@ -25,6 +25,7 @@ from va_contracts.events.v1 import (
     SNAPSHOT_COMPLETED,
     FundamentalsV1,
     IdentityV1,
+    MarketDataV1,
     ProfileSavedV1,
     RankingRowV1,
     ReportSentV1,
@@ -34,6 +35,7 @@ from va_contracts.events.v1 import (
     ScreeningRunRequestedV1,
     SnapshotCompletedV1,
     UniverseInfoV1,
+    ValueMetricsV1,
 )
 from va_web_api.events import EventManager, EventMessage
 from va_web_api.projections import register
@@ -260,6 +262,100 @@ class TestRanking:
         env = _env(PROFILE_SAVED, ProfileSavedV1(profile_id=1, version=2))
         assert _manager(engine, recorder).dispatch(env) is True
         assert [m.topic for m in recorder.messages] == ["profiles"]
+
+
+class TestReadModels:
+    """P4.9: Abruf und Kopf des Bewertungslaufs, damit REST nur noch aus ``web`` liest."""
+
+    def test_snapshot_rows_with_isin_and_fetch_ok(self, engine):
+        alpha = FundamentalsV1(
+            identity=IdentityV1(
+                symbol="A",
+                name="A AG",
+                index="DAX",
+                sector="Tech",
+                industry="Software",
+                currency="EUR",
+            ),
+            market=MarketDataV1(price=10.0, market_cap=5e9),
+            value=ValueMetricsV1(ev_ebit=8.0),
+            errors=["info: leer"],
+        )
+        data = SnapshotCompletedV1(
+            run_id=1,
+            trigger="scheduled",
+            options=OPTIONS,
+            fetch_run_id=10,
+            as_of=date(2026, 10, 17),
+            success_share=0.5,
+            universe=UNIVERSE,
+            fundamentals=[alpha, _fund("B")],
+            isins={"A": "DE000A"},
+        )
+        _manager(engine, Recorder(engine)).dispatch(_env(SNAPSHOT_COMPLETED, data))
+        rows = _rows(
+            engine,
+            "SELECT fetch_run_id, symbol, isin, fetched_on, fetch_ok, name, index_name, sector, "
+            "industry, currency, price, market_cap, ev_ebit, errors "
+            "FROM web.snapshot_row ORDER BY symbol",
+        )
+        assert [tuple(r) for r in rows] == [
+            (
+                10,
+                "A",
+                "DE000A",
+                date(2026, 10, 17),
+                True,
+                "A AG",
+                "DAX",
+                "Tech",
+                "Software",
+                "EUR",
+                10.0,
+                5e9,
+                8.0,
+                ["info: leer"],
+            ),
+            (
+                10,
+                "B",
+                None,
+                date(2026, 10, 17),
+                False,
+                "B AG",
+                "DAX",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                [],
+            ),
+        ]
+
+    def test_the_head_of_a_scoring_run(self, engine):
+        env = _completed()
+        _manager(engine, Recorder(engine)).dispatch(env)
+        [row] = _rows(
+            engine,
+            "SELECT scoring_run_id, run_id, fetch_run_id, origin, as_of, universe_source, "
+            "value_weight, quality_weight, created_at FROM web.ranking_run",
+        )
+        assert tuple(row)[:8] == (20, 1, 10, "live", date(2026, 10, 17), "iShares", 0.6, 0.4)
+        assert row.created_at == env.time
+
+    def test_a_rescore_is_marked(self, engine):
+        _manager(engine, Recorder(engine)).dispatch(_completed(run_id=None, trigger="rescore"))
+        [(origin, run_id)] = _rows(engine, "SELECT origin, run_id FROM web.ranking_run")
+        assert (origin, run_id) == ("rescore", None)
+
+    def test_a_redelivered_snapshot_changes_nothing(self, engine):
+        manager = _manager(engine, Recorder(engine))
+        manager.dispatch(_snapshot())
+        # Neues Event (neue ID) fuer denselben Abruf, etwa nach einem Neuaufbau: keine Dubletten
+        manager.dispatch(_snapshot())
+        assert len(_rows(engine, "SELECT symbol FROM web.snapshot_row")) == 3
 
 
 def _exec(engine: Engine, sql: str) -> None:

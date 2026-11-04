@@ -7,7 +7,7 @@ Eine Aenderung braucht ``--update-golden`` und eine Begruendung im Review.
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,18 @@ from va_contracts.rpc.v1 import (
     SCORING_PREVIEW,
     PreviewBasisV1,
     PreviewReplyV1,
+    ProfileDetailV1,
+    ProfileGetRequestV1,
+    ProfileReplyV1,
+    ProfilesReplyV1,
+    ProfilesRequestV1,
+    ProfileSummaryV1,
+    ProfileVersionV1,
     RankedTitleV1,
+    ReportCsvReplyV1,
+    ReportReplyV1,
+    ReportRequestV1,
+    ReportV1,
     RpcErrorV1,
     SaveVersionReplyV1,
     SaveVersionRequestV1,
@@ -36,12 +47,17 @@ def _schema_bytes(schema: dict[str, Any]) -> bytes:
 
 
 class TestCatalog:
-    def test_the_four_commands(self):
+    def test_the_commands(self):
         assert set(RPCS) == {
             "scoring.factors",
             "scoring.preview",
             "scoring.profiles.save",
             "scoring.profiles.activate",
+            # P4.9: was das web-api nicht mehr selbst aus fremden Schemas liest
+            "scoring.profiles.list",
+            "scoring.profiles.get",
+            "notification.report",
+            "notification.report.csv",
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 
@@ -121,3 +137,59 @@ class TestJsonSchemas:
         expected = {f"{n}.{part}.schema.json" for n in RPCS for part in ("request", "reply")}
         actual = {p.name for p in GOLDEN.iterdir()} if GOLDEN.exists() else set()
         assert actual == expected, f"Unerwartet: {actual - expected}, fehlt: {expected - actual}"
+
+
+class TestReads:
+    """P4.9: Nicht gefunden ist eine leere Antwort, kein Fehler (daraus wird 404)."""
+
+    def test_an_unknown_report_is_empty(self):
+        reply = ReportReplyV1()
+        assert (reply.report, reply.error) == (None, None)
+
+    def test_the_csv_travels_as_base64(self):
+        content = b"\xef\xbb\xbfsymbol;name\nSAP.DE;SAP\n"  # BOM wie im Mail-Anhang
+        reply = ReportCsvReplyV1(filename="value_ranking_20261107.csv", content=content)
+        raw = reply.model_dump_json()
+        assert "SAP.DE" not in raw  # Base64, nicht Klartext
+        assert ReportCsvReplyV1.model_validate_json(raw).content == content
+
+    def test_a_report_round_trips(self):
+        report = ReportV1(
+            id=3,
+            run_id=1,
+            scoring_run_id=2,
+            subject="[Value] partial",
+            generated_at=datetime(2026, 11, 7, 7, 45, tzinfo=UTC),
+            csv_filename="value_ranking_20261107.csv",
+            html="<!DOCTYPE html>",
+        )
+        reply = ReportReplyV1(report=report)
+        assert ReportReplyV1.model_validate_json(reply.model_dump_json()) == reply
+
+    def test_profiles_round_trip(self):
+        created = datetime(2026, 10, 31, 9, 0, tzinfo=UTC)
+        version = ProfileVersionV1(
+            version=1,
+            params=ProfileParamsV1(),
+            parent_version=None,
+            comment="Startwerte",
+            created_at=created,
+            active=True,
+        )
+        detail = ProfileDetailV1(
+            id=1,
+            name="Standard",
+            created_at=created,
+            latest_version=1,
+            active_version=1,
+            versions=[version],
+        )
+        listed = ProfilesReplyV1(
+            profiles=[ProfileSummaryV1(**detail.model_dump(exclude={"versions"}))]
+        )
+        assert ProfilesReplyV1.model_validate_json(listed.model_dump_json()) == listed
+        reply = ProfileReplyV1(profile=detail)
+        assert ProfileReplyV1.model_validate_json(reply.model_dump_json()) == reply
+        assert ProfileGetRequestV1(profile_id=1).profile_id == 1
+        assert ProfilesRequestV1() == ProfilesRequestV1()
+        assert ReportRequestV1(report_id=3).report_id == 3

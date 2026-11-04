@@ -1,4 +1,4 @@
-"""Request/Reply v1 (P4.8): Vorschau und Profil-Befehle zwischen web-api und scoring.
+"""Request/Reply v1: Vorschau und Profil-Befehle (P4.8), Profile und Reports lesen (P4.9).
 
 Subjects ``rpc.va.<name>`` liegen auf Core-NATS, ausserhalb des Streams (events.md). Jede Antwort
 traegt ein optionales ``error``: Fehler gehen als Antwort zurueck, nicht als Ausnahme im Transport.
@@ -8,10 +8,10 @@ Die Felder spiegeln die Ports des web-api (``va_web_api.ports``), damit die REST
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from ..base import Contract, PositiveId
 from ..profile import ProfileParamsV1
@@ -116,6 +116,75 @@ class ActivateReplyV1(RpcReplyV1):
     pass
 
 
+# -- scoring.profiles.list / .get (P4.9) --------------------------------------------------
+
+
+class ProfilesRequestV1(Contract):
+    pass
+
+
+class ProfileSummaryV1(Contract):
+    id: PositiveId
+    name: str
+    created_at: datetime
+    latest_version: int | None
+    active_version: int | None  # leer, wenn ein anderes Profil aktiv ist
+
+
+class ProfileVersionV1(Contract):
+    version: int = Field(ge=1)
+    params: ProfileParamsV1
+    parent_version: int | None
+    comment: str | None
+    created_at: datetime
+    active: bool
+
+
+class ProfileDetailV1(ProfileSummaryV1):
+    versions: list[ProfileVersionV1]  # neueste zuerst
+
+
+class ProfilesReplyV1(RpcReplyV1):
+    profiles: list[ProfileSummaryV1] = Field(default_factory=list)
+
+
+class ProfileGetRequestV1(Contract):
+    profile_id: PositiveId
+
+
+class ProfileReplyV1(RpcReplyV1):
+    profile: ProfileDetailV1 | None = None  # leer: unbekanntes Profil
+
+
+# -- notification.report / .report.csv (P4.9) ---------------------------------------------
+
+
+class ReportRequestV1(Contract):
+    report_id: PositiveId
+
+
+class ReportV1(Contract):
+    id: PositiveId
+    run_id: int | None
+    scoring_run_id: int | None
+    subject: str
+    generated_at: datetime
+    csv_filename: str
+    html: str
+
+
+class ReportReplyV1(RpcReplyV1):
+    report: ReportV1 | None = None  # leer: unbekannter Report
+
+
+class ReportCsvReplyV1(RpcReplyV1):
+    # Bytes im JSON als Base64; in Python bleiben es die rohen Bytes der Datei
+    model_config = ConfigDict(ser_json_bytes="base64", val_json_bytes="base64")
+
+    filename: str | None = None  # beides leer: unbekannter Report
+    content: bytes | None = None  # die CSV-Datei mit BOM
+
+
 # -- Katalog ------------------------------------------------------------------------------
 
 
@@ -137,13 +206,32 @@ SCORING_PREVIEW = RpcSpec("scoring.preview", PreviewRequestV1, PreviewReplyV1)
 PROFILE_SAVE = RpcSpec("scoring.profiles.save", SaveVersionRequestV1, SaveVersionReplyV1)
 PROFILE_ACTIVATE = RpcSpec("scoring.profiles.activate", ActivateRequestV1, ActivateReplyV1)
 
+PROFILE_LIST = RpcSpec("scoring.profiles.list", ProfilesRequestV1, ProfilesReplyV1)
+PROFILE_GET = RpcSpec("scoring.profiles.get", ProfileGetRequestV1, ProfileReplyV1)
+REPORT_GET = RpcSpec("notification.report", ReportRequestV1, ReportReplyV1)
+REPORT_CSV = RpcSpec("notification.report.csv", ReportRequestV1, ReportCsvReplyV1)
+
 RPCS: dict[str, RpcSpec[Any, Any]] = {
-    spec.name: spec for spec in (SCORING_FACTORS, SCORING_PREVIEW, PROFILE_SAVE, PROFILE_ACTIVATE)
+    spec.name: spec
+    for spec in (
+        SCORING_FACTORS,
+        SCORING_PREVIEW,
+        PROFILE_SAVE,
+        PROFILE_ACTIVATE,
+        PROFILE_LIST,
+        PROFILE_GET,
+        REPORT_GET,
+        REPORT_CSV,
+    )
 }
 
 __all__ = [
     "PROFILE_ACTIVATE",
+    "PROFILE_GET",
+    "PROFILE_LIST",
     "PROFILE_SAVE",
+    "REPORT_CSV",
+    "REPORT_GET",
     "RPCS",
     "SCORING_FACTORS",
     "SCORING_PREVIEW",
@@ -155,7 +243,18 @@ __all__ = [
     "PreviewBasisV1",
     "PreviewReplyV1",
     "PreviewRequestV1",
+    "ProfileDetailV1",
+    "ProfileGetRequestV1",
+    "ProfileReplyV1",
+    "ProfileSummaryV1",
+    "ProfileVersionV1",
+    "ProfilesReplyV1",
+    "ProfilesRequestV1",
     "RankedTitleV1",
+    "ReportCsvReplyV1",
+    "ReportReplyV1",
+    "ReportRequestV1",
+    "ReportV1",
     "RpcErrorCode",
     "RpcErrorV1",
     "RpcReplyV1",

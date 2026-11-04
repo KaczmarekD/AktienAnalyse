@@ -1,0 +1,14 @@
+{
+  "properties": {
+    "report_id": {
+      "minimum": 1,
+      "title": "Report Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "report_id"
+  ],
+  "title": "ReportRequestV1",
+  "type": "object"
+}

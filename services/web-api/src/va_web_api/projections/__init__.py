@@ -8,6 +8,9 @@ liest nur das Event, keine Tabellen anderer Services.
   ``report.sent`` setzt den Status nicht zurueck.
 - ``ranking_row``: je Bewertungslauf und Titel eine Zeile, nur zum Anfuegen. Auch ein Rescore
   (ohne Run) bekommt sein Ranking.
+- ``snapshot_row`` und ``ranking_run`` (P4.9): je Abruf die Titel mit Kennzahlen, je
+  Bewertungslauf der Kopf. Daraus beantwortet das web-api Ranking und Titelseite, ohne die
+  Tabellen von market-data und scoring zu lesen. Nur zum Anfuegen, Wiederholungen aendern nichts.
 - ``batch.run`` (P4.7): Runs, die das web-api angelegt hat (``web.run_request``), schliesst
   ``close_run`` beim ersten Ergebnis ab. Die Regeln sind die des ``RunTracker``. Runs des Batches
   schliesst der Batch selbst ab.
@@ -33,7 +36,13 @@ from va_contracts.events.v1 import (
 )
 
 from ..adapters.postgres.batch_run import BATCH_RUN
-from ..adapters.postgres.models import RankingRow, RunRequest, RunStatus
+from ..adapters.postgres.models import (
+    RankingRow,
+    RankingRun,
+    RunRequest,
+    RunStatus,
+    SnapshotRow,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -55,8 +64,10 @@ def register(manager: EventManager) -> None:
     """Haengt alle Projektionen an den Eventmanager."""
     manager.projection(RUN_REQUESTED)(requested)
     manager.projection(SNAPSHOT_COMPLETED)(fetched)
+    manager.projection(SNAPSHOT_COMPLETED)(snapshot)
     manager.projection(SCORING_RUN_COMPLETED)(scored)
     manager.projection(SCORING_RUN_COMPLETED)(ranking)
+    manager.projection(SCORING_RUN_COMPLETED)(ranking_run)
     manager.projection(REPORT_SENT)(reported)
     manager.projection(RUN_FAILED)(failed)
     # Nach run_status: close_run liest die Zaehler, die die Projektionen davor gesetzt haben
@@ -117,6 +128,80 @@ def ranking(session: Session, env: Envelope[Any]) -> None:
     ]
     # Schon vorhanden (etwa nach einem Neuaufbau der Inbox): nichts ueberschreiben
     session.execute(insert(RankingRow).values(rows).on_conflict_do_nothing())
+
+
+def snapshot(session: Session, env: Envelope[Any]) -> None:
+    """Je Titel des Abrufs eine Zeile mit den Kennzahlen, die REST zeigt (P4.9)."""
+    data = env.data
+    rows = [
+        snapshot_values(
+            fund, fetch_run_id=data.fetch_run_id, fetched_on=data.as_of, isins=data.isins
+        )
+        for fund in data.fundamentals
+    ]
+    if rows:
+        session.execute(insert(SnapshotRow).values(rows).on_conflict_do_nothing())
+
+
+def snapshot_values(
+    fund: Any, *, fetch_run_id: int, fetched_on: Any, isins: dict[str, str]
+) -> dict[str, Any]:
+    """Eine Zeile von ``web.snapshot_row`` aus ``FundamentalsV1``."""
+    identity, market, value, quality, growth = (
+        fund.identity,
+        fund.market,
+        fund.value,
+        fund.quality,
+        fund.growth,
+    )
+    return {
+        "fetch_run_id": fetch_run_id,
+        "symbol": identity.symbol,
+        "fetched_on": fetched_on,
+        "fetch_ok": market.market_cap is not None,  # wie market-data (fetch_ok)
+        "isin": isins.get(identity.symbol),
+        "name": identity.name,
+        "index_name": identity.index,
+        "sector": identity.sector,
+        "industry": identity.industry,
+        "currency": identity.currency,
+        "price": market.price,
+        "market_cap": market.market_cap,
+        "ev_ebit": value.ev_ebit,
+        "pe_ratio": value.pe_ratio,
+        "pb_ratio": value.pb_ratio,
+        "p_fcf": value.p_fcf,
+        "dividend_yield": value.dividend_yield,
+        "shareholder_yield": value.shareholder_yield,
+        "roic": quality.roic,
+        "fcf_margin": quality.fcf_margin,
+        "operating_margin": quality.operating_margin,
+        "net_debt_ebitda": quality.net_debt_ebitda,
+        "earnings_stability": quality.earnings_stability,
+        "revenue_growth_5y": growth.revenue_growth_5y,
+        "eps_growth_5y": growth.eps_growth_5y,
+        "errors": list(fund.errors),
+    }
+
+
+def ranking_run(session: Session, env: Envelope[Any]) -> None:
+    """Kopf des Bewertungslaufs (P4.9); der Zeitpunkt ist der des Events."""
+    data = env.data
+    session.execute(
+        insert(RankingRun)
+        .values(
+            scoring_run_id=data.scoring_run_id,
+            run_id=data.run_id,
+            fetch_run_id=data.fetch_run_id,
+            origin="rescore" if data.trigger == "rescore" else "live",
+            as_of=data.as_of,
+            universe_source=data.universe.source,
+            value_weight=data.value_weight,
+            quality_weight=data.quality_weight,
+            created_at=env.time,
+        )
+        .on_conflict_do_nothing()
+    )
 
 
 def reported(session: Session, env: Envelope[Any]) -> None:

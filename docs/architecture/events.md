@@ -80,19 +80,22 @@ bewertbaren Daten sind kein leeres Ranking, sondern `screening.run.failed` mit
 Feldnamen sind snake_case wie in Python und den Tabellen. Das WebSocket-Protokoll zum Browser
 (P4.5) hat eigene Nachrichtenmodelle und bildet dort auf camelCase ab.
 
-Request/Reply über Core-NATS. Seit P4.8 umgesetzt sind die vier Befehle für scoring
+Request/Reply über Core-NATS. Seit P4.8 umgesetzt sind die vier Befehle für scoring, seit P4.9
+die zum Lesen von Profilen und Reports
 (`va_contracts.rpc.v1`, Golden-Schemas unter `tests/golden/contracts/rpc/v1/`). Jede Antwort hat
 ein optionales `error` (`no_data`, `unknown_profile`, `unknown_version`, `conflict` mit `newest`,
-`invalid`, `internal`). Es antwortet der Worker in der Queue-Gruppe `scoring`.
+`invalid`, `internal`). Es antwortet der Worker in der Queue-Gruppe des Service (`scoring`,
+`notification`).
 
 | Subject | Anfrage → Antwort |
 |---|---|
 | `rpc.va.scoring.factors` (P4.8) | – → Faktor-Katalog mit Richtung und Methodik-Hinweis |
 | `rpc.va.scoring.preview` (P4.8) | Profil-Parameter → Ranking plus Vergleich zum aktiven Profil |
-| `rpc.va.scoring.profiles.list` / `.get` | – → Profile bzw. eine Version (noch nicht, das web-api liest die Tabellen) |
+| `rpc.va.scoring.profiles.list` / `.get` (P4.9) | – → Profile bzw. ein Profil mit seinen Versionen (leer: unbekannt) |
 | `rpc.va.scoring.profiles.save` (P4.8) | Parameter + Basisversion → neue Version oder Konflikt |
 | `rpc.va.scoring.profiles.activate` (P4.8) | profile_id + version → ok |
-| `rpc.va.marketdata.instrument` | Symbol → Stammdaten und Kennzahlen-Verlauf (noch nicht) |
+| `rpc.va.notification.report` / `.report.csv` (P4.9) | report_id → Mail bzw. CSV als Base64 (leer: unbekannt) |
+| `rpc.va.marketdata.instrument` | Symbol → Stammdaten und Kennzahlen-Verlauf (nicht nötig: die Titelseite kommt seit P4.9 aus den Projektionen) |
 
 ## Envelope
 

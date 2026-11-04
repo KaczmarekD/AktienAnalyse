@@ -1,0 +1,14 @@
+{
+  "properties": {
+    "profile_id": {
+      "minimum": 1,
+      "title": "Profile Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "profile_id"
+  ],
+  "title": "ProfileGetRequestV1",
+  "type": "object"
+}

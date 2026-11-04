@@ -1,0 +1,277 @@
+{
+  "$defs": {
+    "ProfileDetailV1": {
+      "properties": {
+        "active_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Version"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "minimum": 1,
+          "title": "Id",
+          "type": "integer"
+        },
+        "latest_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Version"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/ProfileVersionV1"
+          },
+          "title": "Versions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "created_at",
+        "latest_version",
+        "active_version",
+        "versions"
+      ],
+      "title": "ProfileDetailV1",
+      "type": "object"
+    },
+    "ProfileParamsV1": {
+      "additionalProperties": false,
+      "description": "Die Parameter eines Profils mit ihren Regeln.\n\nUnbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten\nparams oder im Formular darf nicht still wegfallen.",
+      "properties": {
+        "drop_negative_value_metrics": {
+          "default": true,
+          "description": "Negative Multiples aus dem Value-Ranking ausschliessen",
+          "title": "Drop Negative Value Metrics",
+          "type": "boolean"
+        },
+        "min_factor_count": {
+          "default": 2,
+          "description": "Mindestzahl vorhandener Faktoren je Gruppe",
+          "minimum": 1,
+          "title": "Min Factor Count",
+          "type": "integer"
+        },
+        "min_market_cap": {
+          "default": 300000000.0,
+          "description": "Mindest-Marktkapitalisierung (EUR)",
+          "minimum": 0,
+          "title": "Min Market Cap",
+          "type": "number"
+        },
+        "min_quality_factor_share": {
+          "default": 0.5,
+          "description": "Mindestanteil vorhandener Quality-Faktoren",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Quality Factor Share",
+          "type": "number"
+        },
+        "min_value_factor_share": {
+          "default": 0.5,
+          "description": "Mindestanteil vorhandener Value-Faktoren",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Value Factor Share",
+          "type": "number"
+        },
+        "quality_factors": {
+          "description": "Aktive Quality-Faktoren, mindestens 2",
+          "items": {
+            "enum": [
+              "roic",
+              "fcf_margin",
+              "operating_margin",
+              "net_debt_ebitda",
+              "earnings_stability"
+            ],
+            "type": "string"
+          },
+          "title": "Quality Factors",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "value_factors": {
+          "description": "Aktive Value-Faktoren, mindestens 2",
+          "items": {
+            "enum": [
+              "ev_ebit",
+              "pb",
+              "p_fcf",
+              "shareholder_yield"
+            ],
+            "type": "string"
+          },
+          "title": "Value Factors",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "value_trap_quality_threshold": {
+          "default": 0.3,
+          "description": "Value-Trap bis zu diesem Quality-Score",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Trap Quality Threshold",
+          "type": "number"
+        },
+        "value_trap_value_threshold": {
+          "default": 0.7,
+          "description": "Value-Trap ab diesem Value-Score",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Trap Value Threshold",
+          "type": "number"
+        },
+        "value_weight": {
+          "default": 0.6,
+          "description": "Gewicht von Value; Quality ist der Rest",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Weight",
+          "type": "number"
+        }
+      },
+      "title": "ProfileParamsV1",
+      "type": "object"
+    },
+    "ProfileVersionV1": {
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Comment"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ProfileParamsV1"
+        },
+        "parent_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Version"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "params",
+        "parent_version",
+        "comment",
+        "created_at",
+        "active"
+      ],
+      "title": "ProfileVersionV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProfileDetailV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "ProfileReplyV1",
+  "type": "object"
+}

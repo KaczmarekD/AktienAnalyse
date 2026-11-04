@@ -2,10 +2,18 @@
 
 Ein kompletter Lauf (Yahoo gepatcht wie in ``test_pipeline_db``) legt Runs, Ranking, Titel und
 die Mail an. Das web-api liest mit der Rolle ``va_read``.
+
+Seit P4.9 laeuft jeder Test zweimal: aus den Tabellen und aus den Projektionen. Fuer die
+Projektionen fuellt ``backfill_projections`` sie aus den Tabellen nach, Reports und Profile
+beantwortet der Worker ueber NATS. Die Variante braucht ``TEST_NATS_URL``.
 """
 
 from __future__ import annotations
 
+import threading
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 
 import pytest
@@ -13,6 +21,8 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy.engine import make_url
 
+from src.db.backfill import backfill_projections
+from src.worker import serve
 from tests.db.conftest import ROLE_PASSWORDS, _url_for
 from tests.db.test_pipeline_db import _patched_run
 from va_web_api.main import create_app
@@ -21,24 +31,62 @@ from va_web_api.settings import WebApiSettings
 SYMBOLS = {"AAA.DE", "BBB.DE", "CCC.DE", "TINY.DE"}
 
 
-def _read_client(db_url: str) -> TestClient:
+def _read_client(db_url: str, nats_url: str | None = None) -> TestClient:
+    """Ohne ``nats_url`` aus den Tabellen (``va_read``), mit aus den Projektionen (``va_web``)."""
     database = make_url(db_url).database
     assert database
     url = _url_for(database, "va_read", ROLE_PASSWORDS["va_read"])
-    return TestClient(create_app(WebApiSettings(database_url=SecretStr(url))))
+    web = _url_for(database, "va_web", ROLE_PASSWORDS["va_web"])
+    settings = WebApiSettings(
+        database_url=SecretStr(url),
+        nats_url=nats_url,
+        projections_database_url=None if nats_url is None else SecretStr(web),
+    )
+    return TestClient(create_app(settings))
 
 
-@pytest.fixture
-def api(db_settings, db_url):
-    rc, _, _ = _patched_run(db_settings)
-    assert rc == 0
-    with _read_client(db_url) as client:
+@contextmanager
+def _projection_client(db_settings, db_url: str, nats_url: str, engine) -> Iterator[TestClient]:
+    """P4.9: Projektionen aus den Tabellen nachfuellen, Worker fuer Reports und Profile starten."""
+    backfill_projections(engine)
+    stop = threading.Event()
+    settings = db_settings.model_copy(update={"event_bus": "nats", "nats_url": nats_url})
+    worker = threading.Thread(target=serve, args=(settings, stop), daemon=True)
+    worker.start()
+    try:
+        with _read_client(db_url, nats_url) as client:
+            deadline = time.monotonic() + 60
+            while client.get("/api/v1/reports/999").status_code == 503:
+                assert time.monotonic() < deadline, "Worker antwortet nicht"
+                time.sleep(0.2)
+            yield client
+    finally:
+        stop.set()
+        worker.join(timeout=60)
+
+
+@contextmanager
+def _client(request, db_settings, db_url, engine) -> Iterator[TestClient]:
+    if request.param == "tables":
+        with _read_client(db_url) as client:
+            yield client
+        return
+    nats_url = request.getfixturevalue("nats_url")
+    with _projection_client(db_settings, db_url, nats_url, engine) as client:
         yield client
 
 
-@pytest.fixture
-def empty_api(db_url):
-    with _read_client(db_url) as client:
+@pytest.fixture(params=["tables", "projections"])
+def api(request, db_settings, db_url, engine):
+    rc, _, _ = _patched_run(db_settings)
+    assert rc == 0
+    with _client(request, db_settings, db_url, engine) as client:
+        yield client
+
+
+@pytest.fixture(params=["tables", "projections"])
+def empty_api(request, db_settings, db_url, engine):
+    with _client(request, db_settings, db_url, engine) as client:
         yield client
 
 

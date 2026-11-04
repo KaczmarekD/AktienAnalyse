@@ -12,15 +12,22 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
+from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, text
+from sqlalchemy.engine import make_url
 
 from src.composition import build_adapters
+from src.web import create_app
 from src.worker import serve
+from tests.db.conftest import ROLE_PASSWORDS, _url_for
 from tests.db.test_replay_run_db import _replay_run
 from va_contracts.events.v1 import RunOptionsV1
 from va_contracts.profile import ProfileParamsV1
@@ -29,6 +36,7 @@ from va_web_api.events import open_event_consumer
 from va_web_api.ports import ScoringUnavailable
 from va_web_api.rpc import RemoteScoring
 from va_web_api.runs import RunManager, WatchdogLimits
+from va_web_api.settings import WebApiSettings
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "replay" / "2026-10-30_scoring-run-1.json"
 TIMEOUT = 120.0
@@ -37,6 +45,27 @@ TIMEOUT = 120.0
 class Broadcast:
     def publish(self, message: Any) -> None:
         pass
+
+
+@contextmanager
+def _web_client(db_settings, nats_url: str | None = None) -> Iterator[TestClient]:
+    """Das web-api: ohne ``nats_url`` aus den Tabellen, mit aus Projektionen und NATS."""
+    database = make_url(db_settings.database_url.get_secret_value()).database
+    assert database
+    read = _url_for(database, "va_read", ROLE_PASSWORDS["va_read"])
+    web = _url_for(database, "va_web", ROLE_PASSWORDS["va_web"])
+    settings = WebApiSettings(
+        database_url=SecretStr(read),
+        nats_url=nats_url,
+        projections_database_url=None if nats_url is None else SecretStr(web),
+    )
+    with TestClient(create_app(settings)) as client:
+        if nats_url is not None:
+            deadline = time.monotonic() + 30
+            while client.app.state.events is None:  # type: ignore[attr-defined]
+                assert time.monotonic() < deadline, "Event-Consumer startet nicht"
+                time.sleep(0.1)
+        yield client
 
 
 def _finished(engine: Engine, run_id: int) -> Any:
@@ -151,3 +180,58 @@ def test_profile_commands_over_nats_reach_the_open_tabs(db_settings, engine, web
     assert active == 2
     profiles = sorted(m.type for m in recorder.messages if m.topic == "profiles")
     assert profiles == ["scoring.profile.activated", "scoring.profile.saved"]
+
+
+def _without_times(value: Any) -> Any:
+    """Der Zeitpunkt des Bewertungslaufs kommt aus dem Event, nicht aus ``scoring_run``."""
+    if isinstance(value, dict):
+        return {k: _without_times(v) for k, v in value.items() if k != "created_at"}
+    if isinstance(value, list):
+        return [_without_times(v) for v in value]
+    return value
+
+
+def test_projections_from_events_answer_like_the_tables(db_settings, engine, web_engine, nats_url):
+    """P4.9: Ein Lauf ueber NATS fuellt die Projektionen; REST antwortet wie aus den Tabellen."""
+    settings = db_settings.model_copy(
+        update={
+            "replay_source": FIXTURE,
+            "smtp_plain": True,
+            "event_bus": "nats",
+            "nats_url": nats_url,
+        }
+    )
+    adapters = replace(
+        build_adapters(settings),
+        sender=Mock(send=Mock()),
+        heartbeat=Mock(ping=Mock(return_value=None)),
+    )
+    stop = threading.Event()
+    worker = threading.Thread(
+        target=serve, args=(settings, stop), kwargs={"adapters": adapters}, daemon=True
+    )
+    worker.start()
+    try:
+        with _web_client(db_settings, nats_url) as projections, _web_client(db_settings) as tables:
+            runs = projections.app.state.runs  # type: ignore[attr-defined]
+            run_id = runs.start(RunOptionsV1())
+            deadline = time.monotonic() + TIMEOUT
+            while _finished(engine, run_id) is None and time.monotonic() < deadline:
+                time.sleep(0.5)
+            assert _finished(engine, run_id) is not None, "Run nicht abgeschlossen"
+
+            ranking = tables.get("/api/v1/ranking/latest").json()
+            assert len(ranking["rows"]) == 90
+            assert _without_times(projections.get("/api/v1/ranking/latest").json()) == (
+                _without_times(ranking)
+            )
+            for row in ranking["rows"][::9]:
+                path = f"/api/v1/instruments/{row['symbol']}"
+                assert _without_times(projections.get(path).json()) == _without_times(
+                    tables.get(path).json()
+                )
+            detail = projections.get(f"/api/v1/runs/{run_id}").json()
+            assert detail == tables.get(f"/api/v1/runs/{run_id}").json()
+    finally:
+        stop.set()
+        worker.join(timeout=60)

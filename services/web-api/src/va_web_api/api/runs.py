@@ -8,10 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from va_contracts.events.v1 import RunOptionsV1
 
-from .. import read
 from ..models import RunDetail, RunStart, RunStarted, RunSummary
 from ..ports import RunActive, RunStarter
-from .deps import NOT_FOUND, Conn, not_found
+from .deps import NOT_FOUND, Reader, not_found
 
 router = APIRouter(tags=["runs"])
 
@@ -36,12 +35,12 @@ RunsPort = Annotated[RunStarter, Depends(_runs_port)]
 
 @router.get("/runs")
 def list_runs(
-    conn: Conn,
+    reader: Reader,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[RunSummary]:
     """Laeufe, neueste zuerst."""
-    return read.list_runs(conn, limit=limit, offset=offset)
+    return reader.list_runs(limit=limit, offset=offset)
 
 
 @router.post("/runs", status_code=202, responses=START_RESPONSES)
@@ -59,8 +58,8 @@ def start_run(body: RunStart, runs: RunsPort) -> RunStarted:
 
 
 @router.get("/runs/{run_id}", responses=NOT_FOUND)
-def get_run(run_id: int, conn: Conn) -> RunDetail:
-    run = read.get_run(conn, run_id)
+def get_run(run_id: int, reader: Reader) -> RunDetail:
+    run = reader.get_run(run_id)
     if run is None:
         raise not_found("Lauf")
     return run

@@ -2185,6 +2185,76 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - **`src/web.py`** enthält nur noch die Fabrik. Die Umsetzung der Ports liegt in
     `src/scoring_ops.py`, und der Worker importiert sie ohne FastAPI.
 
+#### P4.9 REST aus Projektionen und Request/Reply (nachgetragen 04.11.2026)
+
+- **Ziel:** Mit NATS liest das web-api nur noch, was ihm gehört: das Schema `web` und `batch.run`.
+  Alles andere kommt aus Projektionen oder per Request/Reply. Die REST-Antworten bleiben gleich.
+  Das ist die Voraussetzung für eine Rolle je Service (P5.3).
+- **Test:** Die Lese-Tests aus P3.2 (`tests/db/web_api/test_read_api.py`) laufen unverändert
+  zweimal, einmal aus den Tabellen und einmal aus Projektionen mit Request/Reply.
+- **Entwurf (04.11.2026):**
+  - **Umschalten:** Die Quelle wählt die Konfiguration, wie beim Event-Consumer.
+    - Mit `WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` liest das web-api aus den
+      Projektionen.
+    - Ohne bleibt es bei den Tabellen über `va_read`, so wie heute auf der NAS und im E2E-Stack.
+  - **Port `ReadModel`:** Die Router fragen ein Lesemodell statt eigener Verbindungen.
+    - `TableReadModel` umhüllt die bisherigen Abfragen (`va_web_api.read`).
+    - `ProjectionReadModel` liest aus `web` und `batch.run`.
+  - **Projektionen (Migration `0012`, nur zum Anfügen):**
+    - `web.snapshot_row` aus `marketdata.snapshot.completed`: je Abruf und Titel die Spalten, die
+      Ranking und Titelseite brauchen, mit `fetch_ok` (Marktkapitalisierung vorhanden) und ISIN.
+    - `web.ranking_run` aus `scoring.run.completed`: Kopf eines Bewertungslaufs mit Abruf, Herkunft
+      (`live` oder `rescore`), Tag, Indexquelle, Gewichten und Zeitpunkt.
+    - Am Größenfilter gescheiterte Titel stehen nicht im Event. Sie ergeben sich beim Lesen: Titel
+      des Abrufs ohne Zeile in `ranking_row`.
+  - **Contract, additiv:** `SnapshotCompletedV1.isins` (Symbol → ISIN). market-data füllt es aus
+    dem Universum, die Titelseite zeigt die ISIN weiter.
+  - **Request/Reply, neu:** Der Worker beantwortet die Anfragen mit den Abfragen aus
+    `va_web_api.read`. Sie berühren nur das Schema des jeweiligen Besitzers.
+    - `notification.report` und `notification.report.csv` (die CSV als Base64).
+    - `scoring.profiles.list` und `scoring.profiles.get`.
+    - Nicht gefunden heißt leere Antwort, nicht Fehler. Daraus wird im web-api 404.
+  - **`GET /runs/{id}`:** Die Report-ID eines laufenden Runs kommt aus `web.run_status` statt aus
+    `reporting.report`.
+  - **Nachfüllen aus den Tabellen:** Der Stream hält Events nur 30 Tage, die Historie liegt in
+    den Tabellen.
+    - `src.db.backfill` füllt `snapshot_row`, `ranking_run` und `ranking_row` aus `market_data`
+      und `scoring`, idempotent (`ON CONFLICT DO NOTHING`).
+    - `python -m src.db.migrate` ruft es nach jeder Migration mit der Owner-Rolle auf. So stehen
+      auch Läufe im Prozess, etwa vor dem Umstieg, in den Projektionen.
+  - **Nicht erreichbar:** Antwortet niemand, kommt 503 mit dem Namen des Service, etwa
+    „Notification nicht erreichbar“.
+  - **Test (rot):**
+    - Contracts:
+      - die vier neuen Befehle im Katalog, mit Golden-Schemas;
+      - `isins` im Golden-Schema des Snapshot-Events.
+    - Lese-API: `api` und `empty_api` bekommen den Parameter `tables`/`projections`. Für
+      `projections` gilt:
+      - erst der Lauf, dann das Nachfüllen;
+      - der Worker beantwortet Reports und Profile;
+      - das web-api läuft mit NATS und Projektionen.
+    - Nachfüllen: Zweimal hintereinander ändert nichts. `migrate` ruft es auf.
+    - Projektionen: Das Snapshot-Event füllt `snapshot_row` mit ISIN und `fetch_ok`, das
+      Scoring-Event `ranking_run`.
+    - NATS mit Worker: Ranking und Titelseite aus den Projektionen eines Laufs über NATS sind
+      gleich denen aus den Tabellen, bis auf den Zeitpunkt des Bewertungslaufs.
+    - market-data: Das Snapshot-Event trägt die ISINs des Universums.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Gleiche Antworten nachgewiesen:**
+    - Die Lese-Tests aus P3.2 laufen in beiden Varianten.
+    - Ein Lauf über NATS ergibt aus den Projektionen dasselbe Ranking und dieselben Titelseiten
+      wie aus den Tabellen. Einzige Ausnahme ist der Zeitpunkt des Bewertungslaufs: Mit
+      Projektionen ist es der des Events, Millisekunden nach `scoring_run.created_at`.
+  - **Nachfüllen in Python:** Der Tag eines Abrufs entsteht wie in `va_web_api.read` aus der
+    lokalen Zeit des Containers, nicht mit der Zeitzone der Datenbank. Gezählt wird über
+    `RETURNING`, weil `rowcount` bei mehreren Zeilen −1 ist.
+  - **`run_id` eines Bewertungslaufs** steht nicht in `scoring.scoring_run`. Das Nachfüllen holt
+    sie aus `batch.run.scoring_run_id`.
+  - **Queue-Gruppe je Service:** `queue_of` nimmt den ersten Teil des Namens (`scoring`,
+    `notification`).
+  - **503 je Service:** `RemoteUnavailable` mit `ScoringUnavailable` und
+    `NotificationUnavailable`.
+
 ### Phase 5 – Aufteilen in Services
 
 #### P5.1 Images je Service

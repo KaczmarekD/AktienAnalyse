@@ -33,6 +33,7 @@ from va_platform.db.ddl import (
 )
 
 from ..config import DatabaseSettings
+from .backfill import backfill_projections
 
 log = logging.getLogger(__name__)
 
@@ -134,7 +135,20 @@ def main() -> int:
         except Exception:
             # Der Batch braucht die Rollen nicht; nur Teile des web-api fallen dann aus
             log.warning("Rolle %s nicht eingerichtet", role, exc_info=True)
+    _backfill(secret.get_secret_value())
     return 0
+
+
+def _backfill(url: str) -> None:
+    """P4.9: Projektionen aus den Tabellen nachfuellen. Scheitert es, laeuft der Batch trotzdem;
+    nur die REST-Antworten aus den Projektionen fehlen dann (naechster Start versucht es erneut)."""
+    engine = create_engine(normalize_url(url))
+    try:
+        backfill_projections(engine)
+    except Exception:
+        log.warning("Projektionen nicht nachgefuellt", exc_info=True)
+    finally:
+        engine.dispose()
 
 
 if __name__ == "__main__":

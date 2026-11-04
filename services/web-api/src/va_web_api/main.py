@@ -42,11 +42,12 @@ from va_platform.nats import NatsBus
 
 from .api import health, instruments, ranking, reports, runs, scoring
 from .events import open_event_consumer
-from .ports import ScoringUnavailable
+from .ports import RemoteUnavailable
+from .read_models import ProjectionReadModel, TableReadModel
 from .realtime import endpoint
 from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
-from .rpc import RemoteScoring
+from .rpc import RemoteReads, RemoteScoring
 from .runs import RunManager
 from .security import JsonOnlyMiddleware
 from .settings import WebApiSettings
@@ -186,6 +187,14 @@ def create_app(
                 publisher=lambda: _publisher(app),
             )
             tasks.append(asyncio.create_task(_keep_runs(app.state.runs, settings.run_schedule)))
+        # P4.9: Mit NATS lesen die REST-Endpunkte aus den Projektionen, sonst aus den Tabellen
+        app.state.reader = (
+            TableReadModel(app.state.engine)
+            if app.state.projections_engine is None
+            else ProjectionReadModel(
+                app.state.projections_engine, RemoteReads(lambda: app.state.rpc)
+            )
+        )
         try:
             yield
         finally:
@@ -223,9 +232,9 @@ def create_app(
     # P4.5: WebSocket unter /ws, nginx reicht ihn neben /api/ weiter
     app.include_router(endpoint.router)
 
-    @app.exception_handler(ScoringUnavailable)
-    async def scoring_down(request: Request, exc: ScoringUnavailable) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI
-        return JSONResponse(status_code=503, content={"detail": "Scoring nicht erreichbar"})
+    @app.exception_handler(RemoteUnavailable)
+    async def remote_down(request: Request, exc: RemoteUnavailable) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI
+        return JSONResponse(status_code=503, content={"detail": f"{exc.service} nicht erreichbar"})
 
     @app.exception_handler(OperationalError)
     async def database_down(request: Request, exc: OperationalError) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI
