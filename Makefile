@@ -166,9 +166,9 @@ regression-export: ## Wie regression, dazu je Lauf eine Fixture nach data/replay
 # Arbeitsstand, Mails landen in Mailpit, kein Healthcheck-Ping. Die NAS nutzt diese Targets nicht.
 LOCAL = docker compose -f docker-compose.yml -f docker-compose.local.yml
 
-local-up: ## Lokal: DB, Mailpit (:8025), pgweb (:8081) und web-api (:8000) starten
+local-up: ## Lokal: DB, NATS, Mailpit (:8025), pgweb (:8081), web-api (:8000) und Worker starten
 	$(LOCAL) build value-analyzer
-	$(LOCAL) up -d
+	$(LOCAL) --profile nats up -d
 
 local-run: ## Lokal: ein Lauf mit dem Arbeitsstand, die Mail landet in Mailpit
 	$(LOCAL) run --rm --build value-analyzer python -m src.main
@@ -186,7 +186,7 @@ local-ui: ## Lokal: frontend (nginx) aus dem Arbeitsstand unter http://localhost
 	$(LOCAL) --profile ui up -d --build frontend
 
 local-down: ## Lokal: alles stoppen (die Daten in .local/ bleiben)
-	$(LOCAL) --profile run --profile ui down
+	$(LOCAL) --profile run --profile ui --profile nats down
 
 # ---------- E2E-Test (U5, docs/architecture/umgebungen.md) ------------------
 # Wegwerf-Stack mit Replay-Daten statt Yahoo: Datenbank auf tmpfs, UI unter :18080, Mailpit

@@ -21,8 +21,9 @@ echo "[entrypoint] Cron-Schedule: ${CRON_SCHEDULE}"
 # (Cron startet eine minimale Shell ohne Container-ENV.)
 # printf %q quotet Leerzeichen/Sonderzeichen (z.B. "[Value-Screening DAX/MDAX]"
 # oder Gmail-App-Passwoerter mit Leerzeichen) - sonst bricht das Sourcen ab.
-# DATABASE_OWNER_URL wird nur fuer die Migration vor jedem Lauf gebraucht.
-ENV_PATTERN='^(SMTP_|MAIL_|UNIVERSE$|TOP_N$|BOTTOM_N$|MIN_MARKET_CAP$|VALUE_WEIGHT$|QUALITY_WEIGHT$|DEFAULT_TAX_RATE$|HEALTHCHECK_URL$|DATABASE_URL$|DATABASE_OWNER_URL$|TZ$|DATA_DIR$|LOGS_DIR$)'
+# DATABASE_OWNER_URL wird nur fuer die Migration vor jedem Lauf gebraucht. Jede Einstellung des
+# Batches muss hier stehen (tests/test_entrypoint.py), sonst gilt im Cron-Lauf der Standardwert.
+ENV_PATTERN='^(SMTP_|MAIL_|UNIVERSE$|TOP_N$|BOTTOM_N$|MIN_MARKET_CAP$|VALUE_WEIGHT$|QUALITY_WEIGHT$|DEFAULT_TAX_RATE$|HEALTHCHECK_URL$|DATABASE_URL$|DATABASE_OWNER_URL$|TZ$|DATA_DIR$|LOGS_DIR$|EVENT_BUS$|NATS_URL$|RUN_TIMEOUT_MINUTES$|REPLAY_SOURCE$)'
 {
     for var in $(compgen -e); do
         if [[ "$var" =~ $ENV_PATTERN ]]; then

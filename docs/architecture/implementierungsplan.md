@@ -1975,6 +1975,141 @@ prüft dieses Paket, für jede gespeicherte Woche.
   - Derselbe Cron-Termin erzeugt nur einen Run.
   - Ein Start aus dem UI legt einen Run an.
 - **Implementierung:** Run-Verwaltung im web-api und Anzeige des Fortschritts im UI.
+- **Entwurf (04.11.2026):**
+  - **Wer einen Run ausführt:** Bisher hängen die Handler nur im kurzlebigen Batch-Prozess am
+    Bus. Ein Start aus dem UI braucht einen Prozess, der dauerhaft lauscht.
+    - Neu ist der Dienste-Prozess `python -m src.worker`. Er hängt market-data, scoring und
+      notification wie der Batch an den `NatsBus` (`wire`, je Service ein `ReliableBus`) und läuft,
+      bis er SIGTERM bekommt.
+    - Er legt keine Runs an und schließt keine ab, das macht das web-api.
+    - Scheitert ein Handler endgültig (Dead Letter), meldet der Worker `screening.run.failed`.
+      `trigger` und `options` nimmt er aus dem Event. Dieselbe Funktion nutzt auch der Batch.
+    - P5.1 teilt ihn in ein Image je Service auf.
+    - Compose: Dienst `worker` aus dem App-Image, eigener Einstieg ohne Migration (wie das
+      web-api), nur mit dem Profil `nats`. Auf der NAS läuft er also erst nach dem Umstieg,
+      lokal startet `make local-up` ihn mit.
+  - **Run-Verwaltung im web-api** (`va_web_api.runs`):
+    - `RunManager.start(trigger, options, slot=None)` legt den Run in einer Transaktion an:
+      - eine Zeile in `batch.run` (Art `batch`, Status `running`);
+      - eine Zeile in `web.run_request` (Trigger, Optionen, Termin);
+      - eine Zeile `requested` in `web.run_status`;
+      - `screening.run.requested` in die Outbox `web.outbox`.
+
+      Danach leert er die Outbox an NATS. Ist NATS gerade weg, holt das der nächste Takt nach.
+    - Die ID muss aus `batch.run` kommen, alle Services verweisen darauf. Das web-api schreibt
+      deshalb in `batch.run`, wie es die Zielarchitektur vorsieht (`batch` gehört dem web-api,
+      [datenhaltung.md](datenhaltung.md)).
+    - **Abschluss:** Eine Projektion schließt `batch.run` ab, wenn `notification.report.sent` oder
+      `screening.run.failed` ankommt. Das geschieht in der Transaktion des Eventmanagers und nur
+      für Runs des web-api (Zeile in `web.run_request`).
+      - Die Regeln sind die des `RunTracker`: `success` oder `partial` nach den Zählern,
+        `no_data` mit Exit 3, sonst `failed` mit Exit 1.
+      - Abgeschlossen wird beim ersten Ergebnis. Ein späterer Fehlschlag steht nur in
+        `web.run_status`, weil `batch.run` nur einmal abgeschlossen werden darf.
+      - Runs des Batches (Cron, `make run`) schließt weiter der Batch selbst ab.
+    - **Nur ein manueller Run zur Zeit:** Läuft schon ein Run des web-api, antwortet ein Start
+      aus dem UI mit 409. Zwei Abrufe zugleich verdoppelten die Last auf Yahoo. Eine Sperre
+      (`pg_advisory_xact_lock`) verhindert, dass zwei Klicks gleichzeitig durchkommen. Der
+      Scheduler startet trotzdem: Ein hängender manueller Run blockiert den Wochenlauf nicht,
+      der Watchdog räumt ihn ab.
+  - **Scheduler:**
+    - `WEB_API_SCHEDULE` ist ein Cron-Ausdruck, ausgewertet in `WEB_API_SCHEDULE_TIMEZONE`
+      (Standard `Europe/Berlin`), unabhängig von der Zeitzone des Containers. Die Bibliothek ist
+      `cronsim`: klein, ohne Abhängigkeiten, Sommerzeit wie cron.
+    - Leer (Standard) heißt aus. Liefen Cron im Container und Scheduler zugleich, gäbe es zwei
+      Wochenläufe. Den Umstieg macht P5.4: Standard wird der Scheduler, der Cron entfällt.
+    - Jeder Takt (60 s) nimmt den jüngsten Termin. Liegt er höchstens eine Stunde zurück,
+      legt der Takt ihn als Run mit `trigger=scheduled` an. Ein Neustart kurz nach dem Termin
+      holt ihn also nach.
+    - Idempotent über einen eindeutigen Index auf `web.run_request.slot`. Derselbe Termin ergibt
+      nur einen Run, auch bei mehreren Takten, einem Neustart oder zwei Instanzen.
+  - **Watchdog:** Er prüft im selben Takt die offenen Runs des web-api, also Runs ohne Ergebnis in
+    `web.run_status`. Die Grenzen sind einstellbar:
+    - Abruf: `WEB_API_WATCHDOG_FETCH_MINUTES`, Standard 45, ab der Anfrage.
+    - Bewertung: `…_SCORING_MINUTES`, Standard 5, ab `fetched`.
+    - Mail: `…_REPORT_MINUTES`, Standard 5, ab `scored`.
+
+    Ist eine Grenze überschritten, kommt in einer Transaktion zusammen:
+    - `screening.run.failed` (`stage=watchdog`, `reason=timeout`, im `detail` die Stufe) in die
+      Outbox;
+    - `failed` in `web.run_status`;
+    - der Abschluss von `batch.run`.
+
+    Der nächste Takt sieht den Run nicht mehr als offen und meldet ihn kein zweites Mal.
+    notification schickt die Fehlermail, bei `scheduled` auch den Ping auf `/fail`. Liefert eine
+    Stufe danach doch noch, bleibt der Run gescheitert. Eine Mail kann dann trotzdem rausgehen,
+    abbrechen kann das web-api den Abruf nicht.
+  - **Takt:** eine Hintergrund-Aufgabe im Lifespan, gestartet nur mit NATS und
+    Projektions-Datenbank. Sie ruft Scheduler, Watchdog und Outbox im Thread auf. Die Uhr ist
+    ein Parameter, Tests steuern sie.
+  - **Datenbank (Migration `0011`):**
+    - Neue Tabelle `web.run_request`, nur zum Anfügen, mit eindeutigem `slot`.
+    - `va_web` bekommt Rechte im Schema `batch`: `SELECT` und `INSERT` auf `batch.run`,
+      `UPDATE` nur auf die Spalten des Abschlusses, dazu die Sequenz. Der Trigger
+      `va_guard_finished` lässt weiter nur den einmaligen Abschluss zu.
+    - Keine neue Rolle: Aus `va_web` wird in P5.3 die Rolle des web-api.
+  - **REST:** `POST /api/v1/runs` mit `force_refresh`, `dry_run`, `notify`:
+    - Erfolg: 202 mit der ID des Runs.
+    - 409: Es läuft schon ein Run.
+    - 503: Ohne NATS oder Projektions-Datenbank.
+
+    Additiv: neuer OpenAPI-Snapshot und neuer TS-Client.
+  - **UI:** Auf der Seite Runs ein Formular „Lauf starten“ mit den drei Optionen. Nach dem Start
+    erscheint der Run über das Run-Event in der Liste, der Fortschritt kommt aus P4.6. Fehler
+    (409, 503) stehen als Meldung über der Tabelle.
+  - **Nebenbei:** `entrypoint.sh` gibt `EVENT_BUS`, `NATS_URL` und `RUN_TIMEOUT_MINUTES` an den
+    Cron-Lauf weiter. Bisher lief der Cron-Batch immer im Prozess, egal was in der `.env` stand.
+  - **Test (rot):**
+    - Scheduler, rein:
+      - Der jüngste Termin in `Europe/Berlin`, auch über die Sommerzeit.
+      - Kein Termin, wenn der letzte über eine Stunde zurückliegt.
+      - Ein ungültiger Ausdruck scheitert beim Start der Settings.
+    - Datenbank (`tests/db/web_api/test_runs.py`, mit steuerbarer Uhr):
+      - Ein Start legt `batch.run`, `run_request`, `run_status` und das Event in der Outbox an.
+      - Derselbe Termin zweimal ergibt einen Run.
+      - Ein manueller Start bei offenem Run wird abgelehnt.
+      - Der Watchdog meldet einen Timeout:
+        - Vor der Grenze passiert nichts.
+        - Danach stehen `run.failed` in der Outbox, `failed` in `run_status` und der Abschluss
+          von `batch.run`.
+        - Ein zweiter Takt meldet nichts mehr.
+        - Die Grenze gilt je Stufe.
+      - Die Projektion schließt Runs des web-api ab: `success`/`partial`, `no_data`, `failed`.
+        Runs des Batches bleiben unberührt.
+      - Rechte: `va_web` legt Runs an und schließt sie einmal ab. Löschen und ein zweiter
+        Abschluss scheitern.
+    - API: 202 mit ID, 409, 503, nur JSON, unbekannte Felder 422.
+    - NATS und Datenbank (`tests/test_worker_nats.py`): Das web-api startet einen Run, der Worker
+      führt ihn aus, der Eventmanager schließt `batch.run` mit `success` ab, die Mail ist da.
+    - Worker: Ein Dead Letter wird zu `screening.run.failed` mit Trigger und Optionen des
+      Events.
+    - Compose und Entrypoint: Dienst `worker` mit Profil `nats` und ohne Migration, die neuen
+      Variablen im Cron-Lauf.
+    - Frontend: Das Formular schickt die Optionen und zeigt 409 und 503 als Meldung.
+- **Umgesetzt (04.11.2026):** wie im Entwurf, dazu:
+  - **Ohne Zeile in `run_status` beim Start:** Sie entsteht wie bei jedem Run erst mit dem Event,
+    das über NATS zurückkommt. Der Watchdog misst den Abruf ab `run_request.requested_at`.
+  - **Stufe geht nie zurück:** `run_status` geht nur vorwärts, `last_event_at` ebenso. Die
+    Handler des `NatsBus` laufen parallel. Ein spätes `requested` hätte sonst ein `fetched`
+    überschrieben, und der Watchdog hätte die Bewertung ab dem früheren Zeitpunkt gemessen.
+  - **`batch.run` aus dem web-api:**
+    - Eine schlanke Tabellenbeschreibung (`va_web_api.adapters.postgres.batch_run`), weil das
+      web-api `src` nicht importieren darf.
+    - `app_version` ist die Version des Batches, `src.web` reicht sie an `create_app` weiter.
+    - `settings` und `universe_mode` bleiben leer, das web-api kennt die Settings des Batches nicht.
+  - **Dead Letter:** `src.dead_letters.run_failure` nutzen Batch und Worker gemeinsam. Run, Trigger
+    und Optionen kommen aus dem Event. Ein Rescore scheitert als Rescore.
+  - **Senden:** Ein Start aus dem UI leert die Outbox sofort über den Bus des Event-Consumers. Sonst
+    tut das der Takt (60 s).
+  - **Cron-Lauf:** `entrypoint.sh` gibt alle Settings des Batches weiter, auch `REPLAY_SOURCE`.
+    `tests/test_entrypoint.py` prüft das künftig für jedes neue Feld.
+  - **Langsamer Test:** Auf dem Windows-Rechner läuft eine Verbindung zu `127.0.0.1:1` erst nach
+    130 s in den Timeout. Der Test mit unerreichbarem NATS gibt der Datenbank-URL deshalb
+    `connect_timeout=2` mit, denn der Takt verbindet sich gleich beim Start.
+  - **Offen:**
+    - Die Log-Zeilen eines Worker-Runs landen nicht in `batch.run_log`, nur im Log des
+      Containers. Das kommt mit dem Tracing (P5.5).
+    - Den Umstieg vom Cron auf den Scheduler macht P5.4.
 
 #### P4.8 Vorschau und Profil-Befehle über NATS
 

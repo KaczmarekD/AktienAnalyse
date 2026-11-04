@@ -27,3 +27,12 @@ table {
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
 }
+
+// P4.7: Lauf starten
+.start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  margin-bottom: 1rem;
+}

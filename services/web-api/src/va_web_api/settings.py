@@ -3,13 +3,19 @@
 Die Zugangsdaten des Batches (``DATABASE_URL``, SMTP) sieht das web-api nie. Es liest mit der
 Rolle ``va_read`` (U4, docs/architecture/umgebungen.md) und speichert Scoring-Profile mit der
 Rolle ``va_profiles`` (P3.3), die nur in die Profil-Tabellen anfuegen darf. Die Projektionen
-(P4.4) schreibt es mit der Rolle ``va_web`` ins Schema ``web``, gespeist aus NATS.
+(P4.4) schreibt es mit der Rolle ``va_web`` ins Schema ``web``, gespeist aus NATS. Mit derselben
+Rolle legt es seit P4.7 Runs in ``batch.run`` an (Start aus dem UI, Scheduler, Watchdog).
 """
 
 from __future__ import annotations
 
-from pydantic import Field, SecretStr
+from datetime import timedelta
+from typing import Self
+
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .runs import Schedule, WatchdogLimits
 
 
 class WebApiSettings(BaseSettings):
@@ -33,6 +39,32 @@ class WebApiSettings(BaseSettings):
     # P4.5: erlaubte Herkunft fuer den WebSocket, durch Komma getrennt (kein JSON), etwa
     # "http://nas:8080, http://nas.fritz.box:8080". Leer: nur dieselbe Herkunft wie der Host.
     allowed_origins: str = ""
+    # P4.7: Cron-Ausdruck fuer geplante Runs, ausgewertet in schedule_timezone. Leer: aus. Bis
+    # P5.4 startet der Cron im Batch-Container die Wochenlaeufe; beides zugleich gaebe zwei Runs.
+    schedule: str = ""
+    schedule_timezone: str = "Europe/Berlin"
+    # P4.7: So lange darf eine Stufe dauern, dann meldet der Watchdog den Run als gescheitert
+    watchdog_fetch_minutes: float = Field(default=45, gt=0)
+    watchdog_scoring_minutes: float = Field(default=5, gt=0)
+    watchdog_report_minutes: float = Field(default=5, gt=0)
+
+    @model_validator(mode="after")
+    def _schedule_is_valid(self) -> Self:
+        _ = self.run_schedule  # ungueltiger Ausdruck oder Zeitzone: ValueError beim Start
+        return self
+
+    @property
+    def run_schedule(self) -> Schedule | None:
+        expression = self.schedule.strip()
+        return Schedule(expression, self.schedule_timezone) if expression else None
+
+    @property
+    def watchdog_limits(self) -> WatchdogLimits:
+        return WatchdogLimits(
+            fetch=timedelta(minutes=self.watchdog_fetch_minutes),
+            scoring=timedelta(minutes=self.watchdog_scoring_minutes),
+            report=timedelta(minutes=self.watchdog_report_minutes),
+        )
 
     @property
     def origins(self) -> frozenset[str]:

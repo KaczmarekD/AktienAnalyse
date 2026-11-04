@@ -1,8 +1,10 @@
-"""Ports des web-api zum Code von scoring (P3.3).
+"""Ports des web-api zum Code von scoring (P3.3) und zur Run-Verwaltung (P4.7).
 
 Phase 3: umgesetzt im selben Prozess (Composition Root ``src.web``), weil das web-api
 ``va_scoring`` nicht importieren darf. Ab Phase 4 per Request/Reply ueber NATS (P4.8). Die
 REST-API bleibt dabei gleich.
+
+``RunStarter`` setzt ``va_web_api.runs.RunManager`` um; die API-Tests nehmen einen Fake.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from datetime import date
 
+    from va_contracts.events.v1 import RunOptionsV1
     from va_contracts.profile import ProfileParamsV1
 
     from .models import Factor
@@ -89,3 +92,17 @@ class ProfileCommands(Protocol):
         ...
 
     def activate(self, profile_id: int, version: int) -> None: ...
+
+
+class RunActive(Exception):
+    """Ein Run laeuft noch; ein manueller Start wartet, bis er fertig ist (P4.7)."""
+
+    def __init__(self, run_id: int) -> None:
+        super().__init__(run_id)
+        self.run_id = run_id
+
+
+class RunStarter(Protocol):
+    def start(self, options: RunOptionsV1) -> int:
+        """Legt einen manuellen Run an und gibt seine ID zurueck; ``RunActive``, wenn einer laeuft."""
+        ...

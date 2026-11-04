@@ -12,6 +12,10 @@ im Hintergrund den Event-Consumer (P4.4): Die Events aus NATS fuellen die Projek
 
 Der WebSocket ``/ws`` (P4.5) meldet die Events des Eventmanagers an die offenen Tabs.
 
+Mit NATS und Projektions-Datenbank verwaltet das web-api auch Runs (P4.7): ``POST /runs`` legt
+einen an, eine Hintergrund-Aufgabe startet geplante Runs (``WEB_API_SCHEDULE``), ruft den
+Watchdog und leert die Outbox, einmal je ``RUNS_TICK_SECONDS``.
+
 Swagger und OpenAPI liegen unter ``/api``, damit nginx (P3.6) sie mit ``/api/*`` weiterreicht.
 """
 
@@ -23,7 +27,7 @@ import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import version
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -36,6 +40,7 @@ from .events import Broadcaster, open_event_consumer
 from .realtime import endpoint
 from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
+from .runs import RunManager
 from .security import JsonOnlyMiddleware
 from .settings import WebApiSettings
 
@@ -43,9 +48,11 @@ if TYPE_CHECKING:
     from fastapi.routing import APIRoute
     from sqlalchemy import Engine
 
+    from va_contracts import Envelope
     from va_platform.nats import NatsBus
 
     from .ports import ProfileCommands, ScoringPreview
+    from .runs import Schedule
 
 API_PREFIX = "/api/v1"
 
@@ -57,6 +64,7 @@ def _operation_id(route: APIRoute) -> str:
 
 
 EVENTS_RETRY_SECONDS = 30.0  # so oft versucht das web-api, den Event-Consumer zu starten
+RUNS_TICK_SECONDS = 60.0  # Takt von Scheduler, Watchdog und Outbox (P4.7)
 
 
 async def _keep_events(app: FastAPI, url: str, engine: Engine, broadcaster: Broadcaster) -> None:
@@ -82,14 +90,37 @@ async def _keep_events(app: FastAPI, url: str, engine: Engine, broadcaster: Broa
             return
 
 
+async def _keep_runs(manager: RunManager, schedule: Schedule | None) -> None:
+    """Takt der Run-Verwaltung (P4.7): Scheduler, Watchdog, Outbox. Ein Fehler (etwa die
+    Datenbank weg) kostet nur diesen Takt."""
+    while True:
+        try:
+            await asyncio.to_thread(manager.tick, schedule)
+        except Exception:
+            log.warning("Takt der Run-Verwaltung fehlgeschlagen", exc_info=True)
+        await asyncio.sleep(RUNS_TICK_SECONDS)
+
+
+def _publisher(app: FastAPI) -> Callable[[Envelope[Any]], None] | None:
+    """Senden ueber den Bus des Event-Consumers, sobald er laeuft."""
+    bus: NatsBus | None = app.state.events
+    return None if bus is None else bus.publish
+
+
 def create_app(
     settings: WebApiSettings | None = None,
     *,
     preview: Callable[[Engine], ScoringPreview] | None = None,
     commands: Callable[[Engine], ProfileCommands] | None = None,
+    app_version: str | None = None,
 ) -> FastAPI:
-    """``preview`` bekommt die lesende Engine, ``commands`` die von ``va_profiles``."""
+    """``preview`` bekommt die lesende Engine, ``commands`` die von ``va_profiles``.
+
+    ``app_version`` steht in ``batch.run`` der Runs, die das web-api anlegt; ohne die Version
+    des Pakets ``va-web-api``.
+    """
     settings = settings or WebApiSettings()  # type: ignore[call-arg]
+    run_version = app_version or version("va-web-api")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -112,21 +143,32 @@ def create_app(
         app.state.broadcaster = HubBroadcaster(app.state.hub, asyncio.get_running_loop())
         app.state.events = None
         app.state.projections_engine = None
-        starter: asyncio.Task[None] | None = None
+        app.state.runs = None
+        tasks: list[asyncio.Task[None]] = []
         nats_url, projections = settings.nats_url, settings.projections_database_url
         app.state.replayer = NatsReplayer(nats_url) if nats_url else None
         if nats_url and projections is not None:
             app.state.projections_engine = create_db_engine(projections.get_secret_value())
-            starter = asyncio.create_task(
-                _keep_events(app, nats_url, app.state.projections_engine, app.state.broadcaster)
+            tasks.append(
+                asyncio.create_task(
+                    _keep_events(app, nats_url, app.state.projections_engine, app.state.broadcaster)
+                )
             )
+            # P4.7: Runs anlegen, ueberwachen und ihre Events senden
+            app.state.runs = RunManager(
+                app.state.projections_engine,
+                version=run_version,
+                limits=settings.watchdog_limits,
+                publisher=lambda: _publisher(app),
+            )
+            tasks.append(asyncio.create_task(_keep_runs(app.state.runs, settings.run_schedule)))
         try:
             yield
         finally:
-            if starter is not None:
-                starter.cancel()
+            for task in tasks:
+                task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
-                    await starter
+                    await task
             if app.state.events is not None:
                 await asyncio.to_thread(app.state.events.close)
             if app.state.replayer is not None:

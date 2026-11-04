@@ -42,6 +42,20 @@ class RunDetail(RunSummary):
     report_id: int | None
 
 
+class RunStart(_Model):
+    """Ein Run aus dem UI (P4.7); die Optionen wie ``RunOptionsV1`` im Event."""
+
+    force_refresh: bool = Field(
+        default=False, description="Snapshot vom selben Tag nicht wiederverwenden"
+    )
+    dry_run: bool = Field(default=False, description="Mail rendern und speichern, nicht senden")
+    notify: bool = Field(default=True, description="Mail verschicken; aus fuer Test-Runs")
+
+
+class RunStarted(_Model):
+    id: int  # batch.run.id; Fortschritt und Ergebnis kommen ueber den WebSocket
+
+
 class RankingRow(_Model):
     rank: int | None  # leer: am Groessenfilter gescheitert
     symbol: str

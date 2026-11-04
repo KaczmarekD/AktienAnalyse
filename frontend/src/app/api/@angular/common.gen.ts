@@ -32,6 +32,8 @@ import type {
   PreviewProfileResponse,
   SaveProfileVersionData,
   SaveProfileVersionResponse,
+  StartRunData,
+  StartRunResponse,
 } from '../types.gen';
 
 /**
@@ -125,6 +127,22 @@ export const listRunsRequest = <ThrowOnError extends boolean = false>(
   (options?.client ?? client).requestOptions<ListRunsResponse, ThrowOnError>({
     responseStyle: 'data',
     method: 'GET',
+    url: '/api/v1/runs',
+    ...options,
+  });
+
+/**
+ * Start Run
+ *
+ * Startet einen Run. Ausgefuehrt wird er vom Worker ueber NATS; Fortschritt und Ergebnis
+ * meldet der WebSocket.
+ */
+export const startRunRequest = <ThrowOnError extends boolean = false>(
+  options: Options<StartRunData, ThrowOnError>,
+): HttpRequest<StartRunResponse> =>
+  (options?.client ?? client).requestOptions<StartRunResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
     url: '/api/v1/runs',
     ...options,
   });
@@ -310,6 +328,20 @@ export const listRunsResource = <ThrowOnError extends boolean = false>(
   httpResource<ListRunsResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? listRunsRequest(opts) : undefined;
+  });
+
+/**
+ * Start Run
+ *
+ * Startet einen Run. Ausgefuehrt wird er vom Worker ueber NATS; Fortschritt und Ergebnis
+ * meldet der WebSocket.
+ */
+export const startRunResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<StartRunData, ThrowOnError> | undefined,
+) =>
+  httpResource<StartRunResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? startRunRequest(opts) : undefined;
   });
 
 /**

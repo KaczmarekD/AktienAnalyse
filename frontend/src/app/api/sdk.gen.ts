@@ -45,6 +45,9 @@ import type {
   SaveProfileVersionData,
   SaveProfileVersionErrors,
   SaveProfileVersionResponses,
+  StartRunData,
+  StartRunErrors,
+  StartRunResponses,
 } from './types.gen';
 import {
   zActivateProfileVersionBody,
@@ -74,6 +77,8 @@ import {
   zSaveProfileVersionHeaders,
   zSaveProfileVersionPath,
   zSaveProfileVersionResponse,
+  zStartRunBody,
+  zStartRunResponse,
 } from './zod.gen';
 
 export type Options<
@@ -235,6 +240,33 @@ export const listRuns = <ThrowOnError extends boolean = false>(
     responseValidator: async (data) => await zListRunsResponse.parseAsync(data),
     url: '/api/v1/runs',
     ...options,
+  });
+
+/**
+ * Start Run
+ *
+ * Startet einen Run. Ausgefuehrt wird er vom Worker ueber NATS; Fortschritt und Ergebnis
+ * meldet der WebSocket.
+ */
+export const startRun = <ThrowOnError extends boolean = false>(
+  options: Options<StartRunData, ThrowOnError>,
+): RequestResult<StartRunResponses, StartRunErrors, ThrowOnError> =>
+  (options.client ?? client).post<StartRunResponses, StartRunErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zStartRunBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zStartRunResponse.parseAsync(data),
+    url: '/api/v1/runs',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

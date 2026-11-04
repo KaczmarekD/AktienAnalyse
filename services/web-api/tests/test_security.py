@@ -49,7 +49,8 @@ class TestMutationsOnlyWithJson:
         response = client.post(
             "/api/v1/runs", content=b"{}", headers={"Content-Type": content_type}
         )
-        assert response.status_code == 405  # bis Phase 4 gibt es kein POST /runs
+        # Durch die Pruefung; Runs starten kann dieses web-api nicht (ohne NATS, P4.7)
+        assert response.status_code == 503
 
     def test_reads_are_not_affected(self, client):
         response = client.get("/api/v1/health", headers={"Content-Type": "text/plain"})

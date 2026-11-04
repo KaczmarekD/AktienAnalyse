@@ -8,7 +8,8 @@ Rollen (legt ``db/init/01_roles.sh`` an, bzw. der DBA bei fremdem Postgres):
 - ``va_app``: SELECT/INSERT, UPDATE nur fuer Laufabschluss, ISIN und ``published_at`` der
   Outbox - kein DELETE.
 - ``va_read``: nur SELECT, fuer Auswertungen aus dem LAN.
-- ``va_profiles`` (P3.3) und ``va_web`` (P4.4): Rollen des web-api, siehe unten.
+- ``va_profiles`` (P3.3) und ``va_web`` (P4.4): Rollen des web-api, siehe unten. ``va_web``
+  legt seit P4.7 auch Runs in ``batch.run`` an und schliesst sie ab.
 """
 
 from __future__ import annotations
@@ -204,6 +205,44 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'va_read') THEN
         GRANT USAGE ON SCHEMA web TO va_read;
         GRANT SELECT ON ALL TABLES IN SCHEMA web TO va_read;
+    END IF;
+END
+$$;
+"""
+
+
+# P4.7: Spalten, die der Abschluss eines Laufs setzt (wie ``RunRepository.write_run_finish``)
+RUN_FINISH_COLUMNS = (
+    "status",
+    "finished_at",
+    "fetch_run_id",
+    "scoring_run_id",
+    "report_id",
+    "universe_size",
+    "scored_count",
+    "failed_count",
+    "exit_code",
+    "error",
+)
+
+
+def web_run_grant_statements() -> str:
+    """Rechte von ``va_web`` auf ``batch.run`` (P4.7): Das web-api legt Runs an und schliesst sie ab.
+
+    ``SELECT`` und ``INSERT`` samt Sequenz, ``UPDATE`` nur auf die Spalten des Abschlusses. Den
+    Abschluss erlaubt der Trigger ``va_guard_finished`` ohnehin nur einmal. Sonst nichts im
+    Schema ``batch``, auch nicht ``run_log``. Nur, wenn es die Rolle gibt (idempotent).
+    """
+    columns = ", ".join(RUN_FINISH_COLUMNS)
+    return f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{WEB_ROLE}') THEN
+        GRANT USAGE ON SCHEMA batch TO {WEB_ROLE};
+        GRANT SELECT, INSERT ON batch.run TO {WEB_ROLE};
+        GRANT UPDATE ({columns}) ON batch.run TO {WEB_ROLE};
+        EXECUTE format('GRANT USAGE ON SEQUENCE %s TO {WEB_ROLE}',
+                       pg_get_serial_sequence('batch.run', 'id'));
     END IF;
 END
 $$;

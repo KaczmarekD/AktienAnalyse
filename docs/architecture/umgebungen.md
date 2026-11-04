@@ -40,7 +40,12 @@ Zeitplan:
   kein Passwort gesendet. Der Versand bleibt sonst unverändert: STARTTLS oder SSL, jeweils mit
   Zertifikatsprüfung.
 - **Der Batch läuft lokal nicht dauerhaft.** `value-analyzer` hat dort das Profil `run`.
-  `make local-up` startet nur Datenbank, Mailpit und pgweb, `make local-run` startet einen Lauf.
+  `make local-up` startet Datenbank, NATS, Mailpit, pgweb und das web-api, `make local-run`
+  startet einen Lauf.
+- **Runs aus dem UI (P4.7):** `make local-up` startet mit dem Profil `nats` auch den Worker
+  (`python -m src.worker`). Er schickt Mails wie der Batch nur an Mailpit. Damit lassen sich
+  Runs auf der Seite Runs starten. Auf der NAS hat der Worker dasselbe Profil und läuft erst
+  nach dem Umstieg auf NATS.
 - **pgweb liest mit der Rolle `va_read`** und zusätzlich im Modus `--readonly`.
 - **Eigene Namen:** Der lokale Stack heißt `value-analyzer-local`, seine Container auch. Er
   kollidiert so nicht mit einem Stack aus `docker-compose.yml` auf demselben Rechner. Ist Port

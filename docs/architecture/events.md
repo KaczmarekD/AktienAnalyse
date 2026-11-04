@@ -240,10 +240,25 @@ mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.fail
 
 ## Scheduler und Watchdog (im web-api)
 
-- Der Cron-Ausdruck (heute `CRON_SCHEDULE`, Standard Samstag 07:30) wird mit expliziter Zeitzone
-  `Europe/Berlin` ausgewertet, unabhängig von der Zeitzone des Containers.
-- **Idempotenz:** Jeder geplante Run wird mit seinem Termin als eindeutigem Schlüssel angelegt.
-  Feuert der Scheduler doppelt, entsteht kein zweiter Run.
-- **Watchdog:** Hängt ein Run länger als das Zeitlimit seiner Stufe, veröffentlicht das web-api
-  `va.screening.run.failed` mit `reason=timeout`. Richtwerte, konfigurierbar: Abruf 45 min,
-  Scoring 5 min, Mail 5 min.
+Seit P4.7 in `va_web_api.runs`. Beides läuft nur mit NATS und Projektions-Datenbank, in einer
+Hintergrund-Aufgabe des web-api (Takt 60 s). Ausgeführt werden die Runs vom Dienste-Prozess
+`python -m src.worker` (Compose-Dienst `worker`, Profil `nats`).
+
+- **Anlegen:** Ein Run des web-api entsteht in einer Transaktion: `batch.run`, `web.run_request`
+  und `screening.run.requested` in `web.outbox`. Danach leert das web-api die Outbox an NATS.
+  Ein Start aus dem UI (`POST /api/v1/runs`) wird abgelehnt (409), solange ein Run läuft.
+- **Scheduler:** Der Cron-Ausdruck `WEB_API_SCHEDULE` wird mit expliziter Zeitzone ausgewertet
+  (`WEB_API_SCHEDULE_TIMEZONE`, Standard `Europe/Berlin`), unabhängig von der Zeitzone des
+  Containers. Fällig ist der jüngste Termin, höchstens eine Stunde alt. Leer heißt aus; bis P5.4
+  startet der Cron im Batch-Container (`CRON_SCHEDULE`, Standard Samstag 07:30) die Wochenläufe.
+- **Idempotenz:** Jeder geplante Run wird mit seinem Termin als eindeutigem Schlüssel angelegt
+  (`web.run_request.slot`). Feuert der Scheduler doppelt, entsteht kein zweiter Run.
+- **Watchdog:** Hängt ein Run des web-api länger als das Zeitlimit seiner Stufe, veröffentlicht
+  das web-api `va.screening.run.failed` mit `stage=watchdog` und `reason=timeout`. Die Grenzen
+  sind einstellbar: Abruf 45 min ab der Anfrage (`WEB_API_WATCHDOG_FETCH_MINUTES`), Scoring
+  5 min ab `fetched` (`…_SCORING_MINUTES`), Mail 5 min ab `scored` (`…_REPORT_MINUTES`). In
+  derselben Transaktion schließt es den Run ab, der nächste Takt meldet ihn nicht noch einmal.
+  Abbrechen kann es die Stufe nicht: Liefert sie später doch, kann trotzdem eine Mail rausgehen.
+- **Abschluss:** Eine Projektion des Eventmanagers schließt `batch.run` beim ersten Ergebnis ab
+  (`notification.report.sent` oder `screening.run.failed`), mit den Regeln des `RunTracker`.
+  Runs des Batches schließt weiter der Batch selbst ab.

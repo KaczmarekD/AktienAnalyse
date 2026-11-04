@@ -31,6 +31,8 @@ from va_web_api.ports import (
     UnknownVersion,
 )
 
+from . import __version__
+
 if TYPE_CHECKING:
     import pandas as pd
     from fastapi import FastAPI
@@ -43,7 +45,9 @@ log = logging.getLogger(__name__)
 
 
 def create_app(settings: WebApiSettings | None = None) -> FastAPI:
-    return web_api.create_app(settings, preview=InProcessPreview, commands=InProcessCommands)
+    return web_api.create_app(
+        settings, preview=InProcessPreview, commands=InProcessCommands, app_version=__version__
+    )
 
 
 class InProcessPreview:

@@ -49,7 +49,10 @@ Bus im Prozess. Seit P4.4 füllt das web-api mit `WEB_API_NATS_URL` und
 `WEB_API_PROJECTIONS_DATABASE_URL` (Rolle `va_web`) die Projektionen im Schema `web` aus dem
 Consumer `web-api` (`va_web_api.events.EventManager`). Seit P4.5 meldet der WebSocket `/ws`
 (Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) die Änderungen an die
-offenen Tabs, nginx reicht `/ws` weiter. Die REST-Endpunkte lesen weiter aus den
+offenen Tabs, nginx reicht `/ws` weiter. Seit P4.7 legt das web-api Runs an (`POST /api/v1/runs`, Scheduler mit
+`WEB_API_SCHEDULE`, standardmäßig aus) und überwacht sie (Watchdog). Es schreibt dafür mit `va_web` in
+`batch.run` und `web.run_request`. Ausgeführt werden diese Runs vom Worker `python -m src.worker`
+(Compose-Dienst `worker`, Profil `nats`). Die REST-Endpunkte lesen weiter aus den
 Tabellen des Batches, bis NATS der Standard ist. Seit P4.3b hängt jeder Service über einen
 `ReliableBus` am Bus, in beiden Modi:
 Er verarbeitet ein Event einmal, überspringt Reste abgebrochener Läufe (älter als
@@ -202,7 +205,8 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   `va_app` hat nur dieses Spaltenrecht). Projektionen sind veränderlich, aber nie löschbar
   (`MUTABLE_TABLES`, heute `web.run_status`). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
   nur Profile lesen und Versionen/Aktivierungen anfügen (web-api, P3.3), `va_web` nur im Schema
-  `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`). Eine Rolle, die nach
+  `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`), seit P4.7 dazu
+  Runs in `batch.run` anlegen und einmal abschließen. Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert

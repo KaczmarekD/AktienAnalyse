@@ -22,27 +22,21 @@ import sys
 import traceback
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
 from va_contracts import new_envelope
-from va_contracts.events.v1 import (
-    RUN_FAILED,
-    RUN_REQUESTED,
-    RunFailedV1,
-    RunOptionsV1,
-    ScreeningRunRequestedV1,
-    Stage,
-)
+from va_contracts.events.v1 import RUN_REQUESTED, RunOptionsV1, ScreeningRunRequestedV1
 from va_notification.entrypoints.handlers import notify_failure_without_run
-from va_platform.bus import InProcessBus, follow_up
+from va_platform.bus import InProcessBus
 from va_platform.nats import NatsBus
 
 from . import __version__
 from .composition import alert_channels, build_adapters, wire
 from .config import Settings, load_settings
 from .db.log_handler import BufferingLogHandler
+from .dead_letters import run_failure
 from .logging_setup import setup_logging
 from .run_tracker import EXIT_FAILED, EXIT_NO_DATA, EXIT_OK, RunOutcome, RunTracker
 
@@ -171,16 +165,9 @@ def _execute(
         # Ein Handler ist an einem Bug gescheitert: Der Lauf endet wie jeder Fehlschlag,
         # also mit Ping und Fehlermail. Ein gescheitertes Fehler-Event loest keines mehr aus.
         tracker.on_dead_letter(dead)
-        if dead.envelope.type != RUN_FAILED.type:
-            failed = RunFailedV1(
-                run_id=run_id,
-                trigger="scheduled",
-                options=options,
-                stage=_stage(dead.consumer),
-                reason=f"{dead.consumer}: {dead.error}",
-                detail="".join(traceback.format_exception(dead.error)),
-            )
-            bus.publish(follow_up(dead.envelope, RUN_FAILED, failed, source=SOURCE))
+        failure = run_failure(dead, source=SOURCE)
+        if failure is not None:
+            bus.publish(failure)
 
     with _open_bus(settings, dead_letter) as bus:
         wire(bus, adapters, settings, version=__version__)
@@ -239,11 +226,6 @@ def _alarm(adapters: Adapters, message: str, detail: str, *, dry_run: bool) -> N
         )
     except Exception:
         log.exception("Alarm konnte nicht verschickt werden")
-
-
-def _stage(consumer: str) -> Stage:
-    """Stufe fuer screening.run.failed; was keinem Modul gehoert, meldet der Watchdog."""
-    return consumer if consumer in get_args(Stage) else "watchdog"  # type: ignore[return-value]
 
 
 def run(force_refresh: bool = False, dry_run: bool = False) -> int:

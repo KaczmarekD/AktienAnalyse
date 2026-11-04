@@ -67,6 +67,13 @@ web-api-Prozesses. Geschrieben wird mit der Rolle `va_profiles`, die nur in die
 Profil-Tabellen anfügen darf, nicht mit der Rolle des Batches. Fehlt
 `WEB_API_PROFILES_DATABASE_URL`, antworten die schreibenden Endpunkte mit 503.
 
+**Runs aus dem UI (seit P4.7):** `POST /api/v1/runs` antwortet mit 202 und der ID des Runs.
+`va_web_api.runs.RunManager` legt ihn mit der Rolle `va_web` in `batch.run` an, dazu
+`web.run_request` und das Event in `web.outbox`. Läuft schon ein Run, kommt 409. Ohne
+`WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` gibt es keine Run-Verwaltung, dann
+kommt 503. Ausgeführt wird der Run vom Worker (`python -m src.worker`). Scheduler und Watchdog
+laufen im Takt einer Hintergrund-Aufgabe ([events.md](events.md#scheduler-und-watchdog-im-web-api)).
+
 ## Eventmanager
 
 Der Eventmanager ist die Drehscheibe im web-api. Er verarbeitet jedes Event in zwei Schritten:

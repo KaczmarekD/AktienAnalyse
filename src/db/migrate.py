@@ -29,6 +29,7 @@ from va_platform.db.ddl import (
     WEB_ROLE,
     profiles_grant_statements,
     web_grant_statements,
+    web_run_grant_statements,
 )
 
 from ..config import DatabaseSettings
@@ -97,12 +98,13 @@ def ensure_profiles_role(url: str, password: str) -> None:
 
 
 def ensure_web_role(url: str, password: str) -> None:
-    """Die Rolle der Projektionen (P4.4) samt Rechten im Schema ``web``."""
+    """Die Rolle der Projektionen (P4.4) samt Rechten im Schema ``web`` und auf ``batch.run``."""
     ensure_login_role(url, WEB_ROLE, password)
     engine = create_engine(normalize_url(url))
     try:
         with engine.begin() as conn:
             conn.execute(text(web_grant_statements()))
+            conn.execute(text(web_run_grant_statements()))  # P4.7: Runs in batch.run
     finally:
         engine.dispose()
 

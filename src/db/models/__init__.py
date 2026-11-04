@@ -34,7 +34,13 @@ from va_scoring.adapters.postgres.models import (
     ScoringOutbox,
     ScoringRun,
 )
-from va_web_api.adapters.postgres.models import RankingRow, RunStatus, WebInbox, WebOutbox
+from va_web_api.adapters.postgres.models import (
+    RankingRow,
+    RunRequest,
+    RunStatus,
+    WebInbox,
+    WebOutbox,
+)
 
 from .batch import BatchInbox, BatchOutbox, ImportFile, Run, RunLog
 
@@ -64,6 +70,7 @@ __all__ = [
     "ReportingOutbox",
     "Run",
     "RunLog",
+    "RunRequest",
     "RunStatus",
     "ScoreResult",
     "ScoringInbox",

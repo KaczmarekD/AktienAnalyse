@@ -692,6 +692,42 @@ export type RunDetail = {
 };
 
 /**
+ * RunStart
+ *
+ * Ein Run aus dem UI (P4.7); die Optionen wie ``RunOptionsV1`` im Event.
+ */
+export type RunStart = {
+  /**
+   * Dry Run
+   *
+   * Mail rendern und speichern, nicht senden
+   */
+  dry_run?: boolean;
+  /**
+   * Force Refresh
+   *
+   * Snapshot vom selben Tag nicht wiederverwenden
+   */
+  force_refresh?: boolean;
+  /**
+   * Notify
+   *
+   * Mail verschicken; aus fuer Test-Runs
+   */
+  notify?: boolean;
+};
+
+/**
+ * RunStarted
+ */
+export type RunStarted = {
+  /**
+   * Id
+   */
+  id: number;
+};
+
+/**
  * RunSummary
  */
 export type RunSummary = {
@@ -1138,6 +1174,39 @@ export type ListRunsResponses = {
 };
 
 export type ListRunsResponse = ListRunsResponses[keyof ListRunsResponses];
+
+export type StartRunData = {
+  body: RunStart;
+  path?: never;
+  query?: never;
+  url: '/api/v1/runs';
+};
+
+export type StartRunErrors = {
+  /**
+   * Es laeuft schon ein Run
+   */
+  409: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Runs lassen sich hier nicht starten (ohne NATS)
+   */
+  503: unknown;
+};
+
+export type StartRunError = StartRunErrors[keyof StartRunErrors];
+
+export type StartRunResponses = {
+  /**
+   * Successful Response
+   */
+  202: RunStarted;
+};
+
+export type StartRunResponse = StartRunResponses[keyof StartRunResponses];
 
 export type GetRunData = {
   body?: never;

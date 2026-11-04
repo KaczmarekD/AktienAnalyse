@@ -4,6 +4,7 @@ Projektionen sind die bewusst gekennzeichnete Ausnahme vom Schreibschutz
 (docs/architecture/datenhaltung.md): ``run_status`` wird mit jedem Event eines Runs
 aktualisiert. Geloescht wird auch hier nie. ``ranking_row`` ist nur zum Anfuegen, je
 Bewertungslauf und Titel eine Zeile; daraus ergeben sich aktuelles Ranking und Score-Verlauf.
+``run_request`` (P4.7) haelt die Runs fest, die das web-api selbst angelegt hat.
 Geschrieben wird mit der Rolle ``va_web``, gelesen auch mit ``va_read``.
 """
 
@@ -61,6 +62,32 @@ class RankingRow(Base):
     quality_score: Mapped[float | None]
     value_trap: Mapped[bool]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+RUN_TRIGGERS = ("scheduled", "manual")
+
+
+class RunRequest(Base):
+    """Ein Run, den das web-api angelegt hat (P4.7). Nur zum Anfuegen.
+
+    Die Zeile kennzeichnet die Runs, die das web-api ueberwacht und abschliesst; Runs des Batches
+    stehen nur in ``batch.run``. ``slot`` ist der Cron-Termin eines geplanten Runs und eindeutig:
+    Derselbe Termin ergibt nur einen Run.
+    """
+
+    __tablename__ = "run_request"
+    __table_args__ = (
+        CheckConstraint(in_values("trigger", RUN_TRIGGERS), name="trigger"),
+        {"schema": "web"},
+    )
+
+    run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)  # batch.run.id
+    trigger: Mapped[str]
+    slot: Mapped[datetime | None] = mapped_column(unique=True)
+    force_refresh: Mapped[bool]
+    dry_run: Mapped[bool]
+    notify: Mapped[bool]
+    requested_at: Mapped[datetime]
 
 
 class WebInbox(InboxMixin, Base):

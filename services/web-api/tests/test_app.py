@@ -105,7 +105,8 @@ class TestEventConsumer:
             update={
                 "nats_url": "nats://127.0.0.1:1",
                 "projections_database_url": SecretStr(
-                    "postgresql+psycopg://va_web:x@127.0.0.1:1/none"
+                    # Kurzer Timeout: Der Takt der Runs (P4.7) verbindet sich beim Start
+                    "postgresql+psycopg://va_web:x@127.0.0.1:1/none?connect_timeout=2"
                 ),
             }
         )

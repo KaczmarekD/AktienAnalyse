@@ -59,6 +59,7 @@ def _config(
     env: str | None = None,
     env_file: str | None = None,
     extra_env: dict[str, str] | None = None,
+    profiles: tuple[str, ...] = ("run", "ui"),
 ) -> dict[str, Any]:
     """``env``: Inhalt der .env; ohne Angabe .env.example mit echt wirkenden Werten.
 
@@ -86,7 +87,7 @@ def _config(
     environ = {k: v for k, v in os.environ.items() if k not in _COMPOSE_INPUTS}
     environ |= extra_env or {}
     result = subprocess.run(  # feste Argumente, keine Shell
-        [*args, "--profile", "run", "--profile", "ui", "config", "--format", "json"],
+        [*args, *(f"--profile={name}" for name in profiles), "config", "--format", "json"],
         capture_output=True,
         text=True,
         check=False,
@@ -117,6 +118,20 @@ def e2e(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def nas(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _config(tmp_path_factory.mktemp("nas"), NAS)
+
+
+@pytest.fixture(scope="module")
+def nas_nats(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """Die NAS mit dem Profil ``nats`` (P4.7): Erst dann laeuft der Worker."""
+    return _config(tmp_path_factory.mktemp("nas-nats"), NAS, profiles=("nats",))
+
+
+@pytest.fixture(scope="module")
+def local_nats(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """Wie ``make local-up``: lokal mit dem Profil ``nats``."""
+    return _config(
+        tmp_path_factory.mktemp("local-nats"), NAS, LOCAL, profiles=("run", "ui", "nats")
+    )
 
 
 def _mounts(service: dict[str, Any]) -> dict[str, str]:
@@ -423,3 +438,42 @@ class TestE2eStack:
         assert services["value-analyzer"]["image"] == "value-analyzer:ci"
         assert services["web-api"]["image"] == "value-analyzer:ci"
         assert services["frontend"]["image"] == "va-frontend:ci"
+
+
+class TestWorker:
+    """P4.7: Der Dienste-Prozess fuehrt die Runs des web-api ueber NATS aus."""
+
+    def test_the_nas_starts_it_only_with_the_nats_profile(self, nas, nas_nats):
+        assert "worker" not in nas["services"]
+        assert "worker" in nas_nats["services"]
+
+    def test_runs_the_app_image_without_migration(self, nas_nats):
+        worker = nas_nats["services"]["worker"]
+        assert worker["image"] == nas_nats["services"]["value-analyzer"]["image"]
+        # Eigener Einstieg: Die Migration macht der Batch-Container, nicht zwei zugleich
+        assert worker["entrypoint"] == ["python", "-m", "src.worker"]
+        assert "ports" not in worker
+        assert set(worker["depends_on"]) == {"db", "nats"}
+
+    def test_uses_the_app_role_and_nats(self, nas_nats):
+        env = nas_nats["services"]["worker"]["environment"]
+        assert env["DATABASE_URL"].startswith("postgresql+psycopg://va_app:")
+        assert "DATABASE_OWNER_URL" not in env
+        assert env["NATS_URL"] == "nats://nats:4222"
+        assert env["SMTP_HOST"] == "smtp.gmail.com"  # aus der .env, wie der Batch
+
+    def test_local_worker_uses_the_working_tree_and_mailpit(self, local_nats):
+        worker = local_nats["services"]["worker"]
+        assert worker["image"] == "value-analyzer:local"
+        assert worker["container_name"] == "value-analyzer-local-worker"
+        env = worker["environment"]
+        assert (env["SMTP_HOST"], env["SMTP_PORT"], env["SMTP_PLAIN"]) == (
+            "mailpit",
+            "1025",
+            "true",
+        )
+        assert env["HEALTHCHECK_URL"] == ""
+        assert env["DATA_DIR"] == "/app/data"
+
+    def test_the_e2e_stack_has_no_worker(self, e2e):
+        assert "worker" not in e2e["services"]

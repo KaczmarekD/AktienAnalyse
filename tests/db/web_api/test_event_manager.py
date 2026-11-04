@@ -223,6 +223,14 @@ class TestRunStatus:
         row = _status(engine)
         assert (row.run_id, row.status, row.fetch_run_id) == (1, "fetched", 10)
 
+    def test_a_late_event_does_not_set_the_run_back(self, engine):
+        """Die Handler des NatsBus laufen parallel: Eine Stufe geht nie zurueck (P4.7)."""
+        manager = _manager(engine, Recorder(engine))
+        manager.dispatch(_snapshot())
+        manager.dispatch(_requested())
+        row = _status(engine)
+        assert (row.status, row.last_event_type) == ("fetched", RUN_REQUESTED.type)
+
 
 class TestRanking:
     def test_scoring_completed_writes_the_ranking(self, engine):
@@ -282,8 +290,10 @@ class TestProtectionAndRoles:
         for env in (_requested(), _completed()):
             _manager(web_engine, recorder).dispatch(env)
         assert _status(engine).status == "scored"
-        with pytest.raises(ProgrammingError, match="permission denied"):
-            _exec(web_engine, "SELECT count(*) FROM batch.run")
+        # Seit P4.7 legt va_web Runs in batch.run an (tests/db/web_api/test_runs.py), sonst nichts
+        for table in ("batch.run_log", "market_data.fetch_run", "scoring.scoring_run"):
+            with pytest.raises(ProgrammingError, match="permission denied"):
+                _exec(web_engine, f"SELECT count(*) FROM {table}")
 
     def test_read_role_reads_web(self, engine, read_engine):
         _manager(engine, Recorder(engine)).dispatch(_requested())

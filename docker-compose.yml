@@ -76,6 +76,33 @@ services:
     # Altdaten importieren (einmalig, mehrfach ausfuehrbar):
     #   docker compose run --rm value-analyzer python -m src.db.import_legacy /app/data
 
+  worker:
+    # P4.7: Dienste-Prozess fuer die Runs aus dem web-api (Start im UI, Scheduler): market-data,
+    # scoring und notification dauerhaft an NATS. Nur mit dem Profil nats
+    # (docker compose --profile nats up -d), bis die Kette ueber NATS Standard ist; dann
+    # braucht das web-api auch WEB_API_NATS_URL und WEB_API_PROJECTIONS_DATABASE_URL.
+    # In P5.1 wird daraus ein Image je Service.
+    image: ${REG:-ghcr.io/kaczmarekd}/value-analyzer:${VERSION:-latest}
+    container_name: value-analyzer-worker
+    profiles: ["nats"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    # Eigener Einstieg: keine Migration, die macht der Batch-Container beim Start
+    entrypoint: ["python", "-m", "src.worker"]
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Berlin
+      - DATABASE_URL=postgresql+psycopg://va_app:${VA_APP_PASSWORD}@db:5432/value_analyzer
+      - NATS_URL=nats://nats:4222
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
   web-api:
     # REST fuer das UI (P3.1-P3.6). Dasselbe Image wie der Batch, aber ohne Port: Nur das
     # frontend (nginx) erreicht es im internen Docker-Netz.
