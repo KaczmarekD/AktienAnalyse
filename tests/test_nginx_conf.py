@@ -100,6 +100,29 @@ def test_index_html_is_never_cached():
     assert "expires -1;" in block.group(1)
 
 
+class TestTrustChain:
+    """D1.5 (nutzer.md Regel 10): Die Client-Adresse kommt nur vom DSM-Proxy, sonst sperrte die
+    Sperre je IP alle gemeinsam, und ein Angreifer koennte ``X-Forwarded-For`` faelschen."""
+
+    def test_the_real_address_only_from_the_trusted_proxy(self):
+        conf = _conf()
+        assert re.findall(r"set_real_ip_from ([^;]+);", conf) == ["${VA_TRUSTED_PROXY}"]
+        assert "real_ip_header X-Forwarded-For;" in conf
+
+    def test_not_recursive_so_the_last_address_counts(self):
+        """Haengt der DSM-Proxy die echte Adresse an einen gefaelschten Kopf an, zaehlt sie."""
+        assert "real_ip_recursive on" not in _conf()
+
+    def test_the_web_api_gets_exactly_this_address(self):
+        """Ueberschreiben statt anhaengen: Nichts vom Client reist bis zum web-api durch."""
+        conf = _conf()
+        assert "$proxy_add_x_forwarded_for" not in conf
+        for location in ("location ^~ /api/", "location = /ws"):
+            block = re.search(re.escape(location) + r" \{(.*?)\n    \}", conf, re.S)
+            assert block is not None, location
+            assert "proxy_set_header X-Forwarded-For $remote_addr;" in block.group(1)
+
+
 def test_no_add_header_inside_locations():
     # nginx erbt add_header nur, wenn die location selbst keins setzt
     for location in re.findall(r"location [^{]+\{([^}]*)\}", _conf()):

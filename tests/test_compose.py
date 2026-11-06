@@ -16,6 +16,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -51,7 +52,27 @@ _COMPOSE_INPUTS = (
     "E2E_APP_IMAGE",
     "E2E_FRONTEND_IMAGE",
     "E2E_FIXTURE",
+    "UI_ORIGINS",
+    "UI_TRUSTED_PROXY",
+    "UI_FORWARDED_ALLOW_IPS",
+    "NATS_MARKET_DATA_PASSWORD",
+    "NATS_SCORING_PASSWORD",
+    "NATS_NOTIFICATION_PASSWORD",
+    "NATS_WEB_API_PASSWORD",
+    "NATS_BATCH_PASSWORD",
 )
+# D1.5: je NATS-Nutzer sein Passwort aus der .env
+NATS_PASSWORDS = {
+    "market-data": "NATS_MARKET_DATA_PASSWORD",
+    "scoring": "NATS_SCORING_PASSWORD",
+    "notification": "NATS_NOTIFICATION_PASSWORD",
+    "web-api": "NATS_WEB_API_PASSWORD",
+    "batch": "NATS_BATCH_PASSWORD",
+}
+
+
+def _nats_user(url: str) -> str | None:
+    return urlsplit(url).username
 
 
 def _config(
@@ -198,7 +219,12 @@ class TestLocalStack:
     def test_database_and_logs_are_separate_from_the_nas(self, local):
         db = _mounts(local["services"]["db"])
         assert db["/var/lib/postgresql"].endswith("/.local/pgdata")
-        assert _mounts(local["services"]["nats"])["/data"].endswith("/.local/natsdata")
+        nats = _mounts(local["services"]["nats"])
+        assert nats["/data"].endswith("/.local/natsdata")
+        # D1.5: lokal dieselben NATS-Nutzer wie auf der NAS
+        assert nats["/etc/nats/nats.conf"].replace("\\", "/").endswith("/docker/nats/nats.conf")
+        # Der Batch ueber NATS (EVENT_BUS=nats) als Nutzer batch
+        assert _nats_user(local["services"]["value-analyzer"]["environment"]["NATS_URL"]) == "batch"
         batch = _mounts(local["services"]["value-analyzer"])
         assert batch["/app/logs"].endswith("/.local/logs")
         assert batch["/app/data"].endswith("/data")
@@ -230,11 +256,13 @@ class TestLocalWebApi:
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
             "WEB_API_COOKIE_SECURE",
             "WEB_API_AUTH_REQUIRED",  # D1.4: lokal mit Login-Seite, also mit Sitzungspflicht
+            "WEB_API_ALLOWED_ORIGINS",  # D1.5, leer: dieselbe Herkunft
+            "FORWARDED_ALLOW_IPS",  # D1.5: uvicorn glaubt X-Forwarded-For nur von nginx
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
         assert env["WEB_API_IDENTITY_DATABASE_URL"].startswith("postgresql+psycopg://va_identity:")
-        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert _nats_user(env["WEB_API_NATS_URL"]) == "web-api"
         assert env["WEB_API_SCHEDULE"] == ""  # lokal keine Wochenlaeufe von selbst
         assert env["WEB_API_COOKIE_SECURE"] == "false"
         assert env["WEB_API_AUTH_REQUIRED"] == "true"
@@ -258,7 +286,7 @@ class TestLocalWebApi:
         """P5.2: Der E2E-Stack prueft die Zielarchitektur: NATS, Projektionen, Services."""
         api = e2e["services"]["web-api"]
         env = api["environment"]
-        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert _nats_user(env["WEB_API_NATS_URL"]) == "web-api"
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
         # Ohne src: laeuft mit dem App-Image wie mit dem Image des web-api (P5.1)
         assert "va_web_api.main:create_app" in api["entrypoint"]
@@ -266,7 +294,7 @@ class TestLocalWebApi:
     def test_nas_web_api_runs_with_nats_and_plans_the_week(self, nas):
         """P5.4: Auf der NAS ist NATS Standard; das web-api plant den Wochenlauf statt Cron."""
         env = nas["services"]["web-api"]["environment"]
-        assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
+        assert _nats_user(env["WEB_API_NATS_URL"]) == "web-api"
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
         assert env["WEB_API_SCHEDULE"] == "30 7 * * 6"  # CRON_SCHEDULE aus der .env
 
@@ -353,10 +381,36 @@ class TestNasDefinition:
         # P4.1: fester Stand, Daten unter ./natsdata, nur im Docker-Netz erreichbar
         nats = nas["services"]["nats"]
         assert nats["image"] == "nats:2.15.1-alpine"
-        assert "-js" in nats["command"]
         assert _mounts(nats)["/data"].endswith("/natsdata")
         assert "ports" not in nats
         assert "healthcheck" in nats
+
+    def test_nats_with_one_user_per_service(self, nas):
+        """D1.5 (nutzer.md Regel 11): JetStream und die Nutzer stehen in docker/nats/nats.conf,
+        die Passwoerter kommen aus der .env und nur in den Container von NATS."""
+        nats = nas["services"]["nats"]
+        assert nats["command"] == ["-c", "/etc/nats/nats.conf"]
+        conf = _mounts(nats)["/etc/nats/nats.conf"].replace("\\", "/")
+        assert conf.endswith("/docker/nats/nats.conf")
+        assert set(nats["environment"]) == set(NATS_PASSWORDS.values())
+        for service in ("market-data", "scoring", "notification", "web-api"):
+            for variable in NATS_PASSWORDS.values():
+                assert variable not in nas["services"][service]["environment"]
+
+    def test_web_api_trusts_only_nginx_for_the_client_address(self, nas):
+        """D1.5 (Regel 10): uvicorn glaubt X-Forwarded-For nur aus dem Docker-Netz, nginx nur
+        dem Proxy davor; das UI bleibt ohne LAN-Bindung nur fuer den DSM-Proxy erreichbar."""
+        env = nas["services"]["web-api"]["environment"]
+        assert env["FORWARDED_ALLOW_IPS"] == "172.16.0.0/12,192.168.0.0/16,10.0.0.0/8"
+        frontend = nas["services"]["frontend"]["environment"]
+        assert frontend["VA_TRUSTED_PROXY"] == "172.16.0.0/12"
+
+    def test_with_https_the_session_is_required(self, nas):
+        """D1.5: Der Uebergang endet, es gilt der Standard (Sitzungspflicht, Secure-Cookie)."""
+        env = nas["services"]["web-api"]["environment"]
+        assert "WEB_API_AUTH_REQUIRED" not in env
+        assert "WEB_API_COOKIE_SECURE" not in env
+        assert env["WEB_API_ALLOWED_ORIGINS"] == ""  # UI_ORIGINS, leer: dieselbe Herkunft
 
     def test_mail_healthcheck_and_lan_come_from_the_env(self, nas):
         env = nas["services"]["value-analyzer"]["environment"]
@@ -381,16 +435,13 @@ class TestNasDefinition:
             "WEB_API_IDENTITY_DATABASE_URL",  # D1.1: Konten und Sitzungen
             "WEB_API_SCHEDULE",
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
-            "WEB_API_AUTH_REQUIRED",  # D1.2: bis HTTPS (D1.5) aus, dann entfaellt der Eintrag
+            "WEB_API_ALLOWED_ORIGINS",  # D1.5: UI_ORIGINS, hinter dem DSM-Proxy
+            "FORWARDED_ALLOW_IPS",  # D1.5: Vertrauenskette der Proxys
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
         assert env["WEB_API_IDENTITY_DATABASE_URL"].startswith("postgresql+psycopg://va_identity:")
         assert env["WEB_API_OTEL_TRACES_EXPORTER"] == "none"
-        # Auf der NAS mit HTTPS (D1.5): Das Cookie ist Secure, das ist der Standard
-        assert "WEB_API_COOKIE_SECURE" not in env
-        # Ohne HTTPS geht kein Login: bis D1.5 ohne Sitzungspflicht wie unter ADR-0007
-        assert env["WEB_API_AUTH_REQUIRED"] == "false"
 
     def test_tracing_is_one_switch_for_all_services(self, nas):
         """P5.5: OTEL_TRACES_EXPORTER aus der .env gilt fuer jeden Dienst, der einen Run sieht."""
@@ -481,6 +532,8 @@ class TestE2eStack:
     def test_nats_is_thrown_away_too(self, e2e):
         nats = e2e["services"]["nats"]
         assert "/data" not in _mounts(nats)
+        # D1.5: mit denselben NATS-Nutzern wie auf der NAS
+        assert "/etc/nats/nats.conf" in _mounts(nats)
         assert any(str(t).startswith("/data") for t in nats["tmpfs"])
         assert "ports" not in nats
 
@@ -591,7 +644,9 @@ class TestServices:
             # P5.3: eine Rolle je Service, nur im eigenen Schema
             role = "va_" + name.replace("-", "_")
             assert env["DATABASE_URL"].startswith(f"postgresql+psycopg://{role}:")
-            assert env["NATS_URL"] == "nats://nats:4222"
+            # D1.5: ein NATS-Nutzer je Service
+            assert _nats_user(env["NATS_URL"]) == name
+            assert env["NATS_URL"].endswith("@nats:4222")
             assert "DATABASE_OWNER_URL" not in env
             assert "POSTGRES_PASSWORD" not in env
             has_smtp = any(key.startswith("SMTP_") for key in env)

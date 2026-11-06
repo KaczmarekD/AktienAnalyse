@@ -82,18 +82,25 @@ test-db-down: ## Wegwerf-Postgres stoppen (entfernt nur den Test-Container)
 
 # Wegwerf-NATS mit JetStream fuer die Integrationstests (P4.1); gleiche Version wie im Compose
 TEST_NATS_URL ?= nats://127.0.0.1:54222
+TEST_NATS_AUTH_URL ?= nats://127.0.0.1:54223
 
-test-nats-up: ## Wegwerf-NATS mit JetStream fuer Tests starten (Port 54222)
+test-nats-up: ## Wegwerf-NATS fuer Tests: JetStream (54222), mit Nutzern je Dienst (54223)
 	docker run -d --rm --name va-test-nats -p 54222:4222 nats:2.15.1-alpine -js
+	docker run -d --rm --name va-test-nats-auth -p 54223:4222 \
+		-v "$(CURDIR)/docker/nats:/etc/nats:ro" \
+		-e NATS_MARKET_DATA_PASSWORD=test-market-data -e NATS_SCORING_PASSWORD=test-scoring \
+		-e NATS_NOTIFICATION_PASSWORD=test-notification -e NATS_WEB_API_PASSWORD=test-web-api \
+		-e NATS_BATCH_PASSWORD=test-batch nats:2.15.1-alpine -c /etc/nats/nats.conf
 
 test-nats: ## Integrationstests gegen NATS (vorher: make test-nats-up)
-	TEST_NATS_URL=$(TEST_NATS_URL) $(RUN) pytest packages/va-platform/tests tests/test_pipeline_bus.py tests/test_main_nats.py
+	TEST_NATS_URL=$(TEST_NATS_URL) TEST_NATS_AUTH_URL=$(TEST_NATS_AUTH_URL) $(RUN) pytest packages/va-platform/tests tests/test_pipeline_bus.py tests/test_main_nats.py tests/test_nats_permissions.py
 
 test-nats-down: ## Wegwerf-NATS stoppen (entfernt nur den Test-Container)
-	docker stop va-test-nats
+	docker stop va-test-nats va-test-nats-auth
 
 nats-provision: ## Stream und Consumer im lokalen NATS anlegen bzw. angleichen (P4.1)
-	NATS_URL=nats://127.0.0.1:4222 $(RUN) python -m va_platform.nats
+	# D1.5: als NATS-Nutzer batch; make liest die .env nicht, das Passwort kommt von dort
+	NATS_URL=nats://batch:$$(sed -n 's/^NATS_BATCH_PASSWORD=//p' .env)@127.0.0.1:4222 $(RUN) python -m va_platform.nats
 
 # J4125 der NAS (ADR-0008): kein AVX/AVX2. Die Stufe j4125-check im Dockerfile ist das
 # App-Image plus QEMU; Python laeuft dort mit einem CPU-Modell ohne AVX. Braucht ein Paket

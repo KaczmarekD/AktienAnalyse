@@ -57,7 +57,8 @@ def serve(settings: Settings, stop: threading.Event, *, adapters: Adapters | Non
         scoring_service.serve(bus, engine)
         notification_service.serve(bus, engine)
 
-    run_service(name="worker", settings=settings, setup=setup, stop=stop)
+    # Alle drei Consumer: mit NATS-Nutzern (D1.5) als Nutzer batch, der sie anlegen darf
+    run_service(name="worker", settings=settings, setup=setup, stop=stop, all_consumers=True)
 
 
 def main() -> int:

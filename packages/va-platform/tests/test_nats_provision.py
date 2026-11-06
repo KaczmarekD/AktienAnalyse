@@ -120,6 +120,23 @@ def test_durable_consumers_with_filter_and_limits():
     _run(scenario)
 
 
+def test_a_service_provisions_only_its_own_consumer():
+    """D1.5: Mit NATS-Nutzern darf ein Dienst nur seinen eigenen Consumer anlegen."""
+    from nats.js.errors import NotFoundError
+
+    from va_platform.nats import provision
+
+    async def scenario(nc: Any, jsm: Any) -> None:
+        await provision(jsm, consumers=("scoring",))
+        assert (await jsm.stream_info("VA_EVENTS")).config.subjects == ["va.>"]
+        assert (await jsm.consumer_info("VA_EVENTS", "scoring")).config.durable_name == "scoring"
+        for other in ("market-data", "notification", "web-api", "batch"):
+            with pytest.raises(NotFoundError):
+                await jsm.consumer_info("VA_EVENTS", other)
+
+    _run(scenario)
+
+
 def test_same_message_id_lands_once():
     from va_platform.nats import provision
 

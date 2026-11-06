@@ -17,11 +17,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from nats.js.api import AckPolicy, ConsumerConfig, StorageType, StreamConfig
 from nats.js.errors import NotFoundError
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from nats.js.client import JetStreamContext
     from nats.js.manager import JetStreamManager
 
@@ -87,11 +90,27 @@ def stream_config() -> StreamConfig:
     )
 
 
-async def provision(jsm: JetStreamManager) -> None:
-    """Stream und Consumer wie vorgegeben, idempotent."""
+async def provision(jsm: JetStreamManager, *, consumers: Iterable[str] | None = None) -> None:
+    """Stream und Consumer wie vorgegeben, idempotent.
+
+    ``consumers``: nur diese Consumer (D1.5). Mit einem NATS-Nutzer je Dienst darf ein Dienst nur
+    seinen eigenen anlegen. Ohne Angabe alle (Batch, Werkzeuge, Tests).
+    """
+    wanted = None if consumers is None else set(consumers)
     await _ensure_stream(jsm, stream_config())
     for spec in CONSUMERS:
-        await _ensure_consumer(jsm, spec)
+        if wanted is None or spec.durable in wanted:
+            await _ensure_consumer(jsm, spec)
+
+
+def inbox_prefix(url: str) -> str:
+    """Inbox des NATS-Nutzers aus der URL (D1.5): ``_INBOX.<nutzer>``, ohne Nutzer ``_INBOX``.
+
+    Mit ``_INBOX.>`` laese jeder Dienst die Antworten an alle anderen mit; die Rechte in
+    ``docker/nats/nats.conf`` erlauben jedem Nutzer nur seine eigene Inbox.
+    """
+    user = urlsplit(url).username
+    return f"_INBOX.{user}" if user else "_INBOX"
 
 
 async def _ensure_stream(jsm: JetStreamManager, wanted: StreamConfig) -> None:
@@ -110,7 +129,18 @@ async def _ensure_stream(jsm: JetStreamManager, wanted: StreamConfig) -> None:
         # Nur die eigenen Felder angleichen, die uebrigen behalten die Werte des Servers
         for field, value in drift.items():
             setattr(current, field, value)
-        await jsm.update_stream(current)
+        try:
+            await jsm.update_stream(current)
+        except Exception:
+            # D1.5: Umstellen darf nur der NATS-Nutzer batch (make nats-provision); ein Dienst
+            # laeuft mit dem bisherigen Stream weiter, statt nicht zu starten
+            log.warning(
+                "Stream %s weicht ab (%s), angleichen mit make nats-provision",
+                STREAM_NAME,
+                ", ".join(sorted(drift)),
+                exc_info=True,
+            )
+            return
         log.info("Stream %s angeglichen: %s", STREAM_NAME, ", ".join(sorted(drift)))
 
 

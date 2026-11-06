@@ -103,8 +103,13 @@ def run_service(
     setup: Callable[[NatsBus, Engine], None],
     stop: threading.Event,
     max_deliver: int = MAX_DELIVER,
+    all_consumers: bool = False,
 ) -> None:
-    """Startet den Bus, ruft ``setup`` und kehrt erst zurueck, wenn ``stop`` gesetzt ist."""
+    """Startet den Bus, ruft ``setup`` und kehrt erst zurueck, wenn ``stop`` gesetzt ist.
+
+    Der Bus legt nur den Consumer ``name`` an (D1.5); ``all_consumers`` fuer ``src.worker``, der
+    alle drei Services in einem Prozess startet (NATS-Nutzer ``batch``).
+    """
     if not settings.nats_url:
         msg = f"{name} braucht NATS_URL"
         raise ValueError(msg)
@@ -120,7 +125,13 @@ def run_service(
         except Exception:
             log.exception("Fehlschlag von Run %s nicht gemeldet", failure.data.run_id)
 
-    bus = NatsBus(settings.nats_url, max_deliver=max_deliver, on_dead_letter=dead_letter)
+    # D1.5: Mit einem NATS-Nutzer je Dienst legt der Service nur seinen eigenen Consumer an
+    bus = NatsBus(
+        settings.nats_url,
+        max_deliver=max_deliver,
+        on_dead_letter=dead_letter,
+        consumers=None if all_consumers else (name,),
+    )
     bus.start()
     try:
         setup(bus, engine)

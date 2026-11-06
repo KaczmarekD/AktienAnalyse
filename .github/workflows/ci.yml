@@ -46,6 +46,8 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/postgres
       # P4.1: Integrationstests gegen NATS mit JetStream (Container im Schritt unten)
       TEST_NATS_URL: nats://localhost:4222
+      # D1.5: zweiter NATS mit docker/nats/nats.conf (ein Nutzer je Dienst, Passwort test-<nutzer>)
+      TEST_NATS_AUTH_URL: nats://localhost:4223
       # Jeder uv-Aufruf bricht ab, wenn uv.lock nicht zu pyproject.toml passt,
       # und lockt nie still neu
       UV_LOCKED: "1"
@@ -59,6 +61,18 @@ jobs:
       # P4.1: Ein Service-Container kann keine Argumente bekommen, JetStream braucht -js
       - name: NATS mit JetStream fuer die Integrationstests
         run: docker run -d --name va-test-nats -p 4222:4222 nats:2.15.1-alpine -js
+
+      # D1.5: die Rechte der NATS-Nutzer mit genau der Konfiguration der NAS
+      - name: NATS mit Nutzern je Dienst fuer den Rechtetest
+        run: |
+          docker run -d --name va-test-nats-auth -p 4223:4222 \
+            -v "$PWD/docker/nats:/etc/nats:ro" \
+            -e NATS_MARKET_DATA_PASSWORD=test-market-data \
+            -e NATS_SCORING_PASSWORD=test-scoring \
+            -e NATS_NOTIFICATION_PASSWORD=test-notification \
+            -e NATS_WEB_API_PASSWORD=test-web-api \
+            -e NATS_BATCH_PASSWORD=test-batch \
+            nats:2.15.1-alpine -c /etc/nats/nats.conf
 
       # P3.8: Die REST-API bleibt unter /api/v1 abwaertskompatibel. Frueh, damit ein Bruch
       # auffaellt, bevor die Tests laufen. Referenz: der Snapshot am Abzweigpunkt von main.

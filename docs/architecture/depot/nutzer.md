@@ -91,13 +91,17 @@ Firewall auf das eigene Subnetz. Dazu kommen:
 9. **HTTPS über den Reverse-Proxy von DSM** (entschieden am 06.11.2026). DSM terminiert TLS und
    leitet an den `frontend`-Container weiter. Port 8080 ist danach nicht mehr per HTTP im LAN
    erreichbar: `UI_LAN_BIND=127.0.0.1`. Der Proxy setzt HSTS. Offen ist nur das Zertifikat
-   (eigene Domain oder eigene CA, [README](README.md#offene-fragen)).
+   (eigene Domain oder eigene CA, [README](README.md#offene-fragen)); das Runbook beschreibt beide
+   Wege ([betrieb-synology.md](../betrieb-synology.md#https-über-den-reverse-proxy-von-dsm)).
+   Umgesetzt mit D1.5.
 10. **Vertrauenskette der Proxys:** nginx übernimmt die Client-Adresse nur vom DSM-Proxy
     (`set_real_ip_from`), uvicorn nur von nginx (`forwarded_allow_ips`). Sonst sieht das web-api
     für alle Anfragen dieselbe Adresse, und ein Angreifer könnte `X-Forwarded-For` fälschen.
-11. **NATS mit Anmeldung:** Heute kann jeder Container im Docker-Netz alles in NATS lesen und
-    senden. Ab D1 bekommt jeder Dienst einen eigenen NATS-Nutzer mit Rechten nur auf seine
-    Subjects. Ab D8 sind die Bank-Subjects (`rpc.va.bank.>`) nur für web-api und depot-gateway
+    Umgesetzt mit D1.5 (`VA_TRUSTED_PROXY`, `FORWARDED_ALLOW_IPS`; nginx reicht genau die erkannte
+    Adresse weiter, nicht die Kette).
+11. **NATS mit Anmeldung:** Jeder Dienst hat einen eigenen NATS-Nutzer mit Rechten nur auf seine
+    Subjects und seine Inbox (seit D1.5, [events.md](../events.md#nats-nutzer-und-rechte-seit-d15)).
+    Ab D8 sind die Bank-Subjects (`rpc.va.bank.>`) nur für web-api und depot-gateway
     erlaubt, `VA_PRIVATE` nur für die Dienste, die ihn brauchen
     ([README](README.md#events-im-überblick)).
 
