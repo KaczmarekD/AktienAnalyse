@@ -219,8 +219,9 @@ Mail unverändert ist.
 **F2/F3 – Auswertung** ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md),
 vorgeschlagen, erst nach Annahme):
 
-- [ ] Entscheidung über ADR-0011 nach P1.5 und P2b.2. Vorher laufen ein Rescore-Vergleich v1/v2 und
-      die Prüfung des Immobilien-EBIT.
+- [x] Vorprüfung: Rescore-Vergleich v1/v2 und Prüfung des Immobilien-EBIT
+      ([Bericht](../research/adr-0011-vorpruefung/bericht.md), `f6daa2b`)
+- [ ] Entscheidung (du) über ADR-0011; P1.5 und P2b.2 sind erledigt, die Vorprüfung liegt vor
 - [ ] F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme
 - [ ] F2.2 Netto-Aktienemission
 - [ ] F2.3 Momentum und Value-Trap-Regel
