@@ -3,6 +3,22 @@
 import * as z from 'zod';
 
 /**
+ * Account
+ *
+ * Ein Konto in der Nutzerverwaltung.
+ */
+export const zAccount = z.object({
+  active: z.boolean(),
+  created_at: z.iso.datetime().nullable(),
+  display_name: z.string().nullable(),
+  email: z.string().nullable(),
+  id: z.int(),
+  must_change_password: z.boolean(),
+  role: z.enum(['admin', 'user']),
+  username: z.string(),
+});
+
+/**
  * ActivateProfileVersion
  */
 export const zActivateProfileVersion = z.object({
@@ -53,6 +69,7 @@ export const zFactorRanks = z.object({
  * Health
  */
 export const zHealth = z.object({
+  auth_required: z.boolean(),
   status: z.literal('ok'),
   version: z.string(),
 });
@@ -74,8 +91,39 @@ export const zMe = z.object({
   display_name: z.string().nullable(),
   email: z.string().nullable(),
   id: z.int(),
+  must_change_password: z.boolean(),
   role: z.enum(['admin', 'user']),
   username: z.string(),
+});
+
+/**
+ * NewAccount
+ *
+ * Neues Konto mit Einmal-Passwort, das der Nutzer bei der ersten Anmeldung ersetzt.
+ */
+export const zNewAccount = z.object({
+  display_name: z.string().max(100).nullish(),
+  email: z.string().max(254).nullish(),
+  one_time_password: z.string().min(1).max(1024),
+  role: z.enum(['admin', 'user']).optional().default('user'),
+  username: z.string().min(1).max(64),
+});
+
+/**
+ * PasswordChange
+ */
+export const zPasswordChange = z.object({
+  current_password: z.string().min(1).max(1024),
+  new_password: z.string().min(1).max(1024),
+});
+
+/**
+ * PasswordReset
+ *
+ * Neues Einmal-Passwort; alle Sitzungen des Kontos enden.
+ */
+export const zPasswordReset = z.object({
+  one_time_password: z.string().min(1).max(1024),
 });
 
 /**
@@ -167,6 +215,15 @@ export const zProfileSummary = z.object({
   id: z.int(),
   latest_version: z.int().nullable(),
   name: z.string(),
+});
+
+/**
+ * ProfileUpdate
+ *
+ * Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6).
+ */
+export const zProfileUpdate = z.object({
+  display_name: z.string().max(100).nullish(),
 });
 
 /**
@@ -354,6 +411,28 @@ export const zScorePoint = z.object({
 });
 
 /**
+ * SessionInfo
+ *
+ * Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage.
+ */
+export const zSessionInfo = z.object({
+  created_at: z.iso.datetime(),
+  current: z.boolean(),
+  expires_at: z.iso.datetime(),
+  last_seen: z.iso.datetime(),
+  user_agent: z.string().nullable(),
+});
+
+/**
+ * SessionState
+ *
+ * Wer angemeldet ist; ``user`` fehlt ohne gueltige Sitzung (D1.4).
+ */
+export const zSessionState = z.object({
+  user: zMe.nullable(),
+});
+
+/**
  * Snapshot
  */
 export const zSnapshot = z.object({
@@ -412,6 +491,49 @@ export const zHttpValidationError = z.object({
   detail: z.array(zValidationError).optional(),
 });
 
+/**
+ * Response List Users
+ *
+ * Successful Response
+ */
+export const zListUsersResponse = z.array(zAccount);
+
+export const zCreateUserBody = zNewAccount;
+
+/**
+ * Successful Response
+ */
+export const zCreateUserResponse = zAccount;
+
+export const zDisableUserPath = z.object({
+  user_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zDisableUserResponse = z.void();
+
+export const zEnableUserPath = z.object({
+  user_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zEnableUserResponse = z.void();
+
+export const zResetPasswordBody = zPasswordReset;
+
+export const zResetPasswordPath = z.object({
+  user_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zResetPasswordResponse = z.void();
+
 export const zLoginBody = zLoginRequest;
 
 /**
@@ -423,6 +545,11 @@ export const zLoginResponse = z.void();
  * Successful Response
  */
 export const zLogoutResponse = z.void();
+
+/**
+ * Successful Response
+ */
+export const zCurrentSessionResponse = zSessionState;
 
 /**
  * Successful Response
@@ -442,6 +569,32 @@ export const zGetInstrumentResponse = zInstrument;
  * Successful Response
  */
 export const zMeResponse = zMe;
+
+export const zChangePasswordBody = zPasswordChange;
+
+/**
+ * Successful Response
+ */
+export const zChangePasswordResponse = z.void();
+
+export const zUpdateProfileBody = zProfileUpdate;
+
+/**
+ * Successful Response
+ */
+export const zUpdateProfileResponse = zMe;
+
+/**
+ * Response List Sessions
+ *
+ * Successful Response
+ */
+export const zListSessionsResponse = z.array(zSessionInfo);
+
+/**
+ * Successful Response
+ */
+export const zRevokeAllSessionsResponse = z.void();
 
 /**
  * Successful Response

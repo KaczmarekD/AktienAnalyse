@@ -30,10 +30,10 @@ if TYPE_CHECKING:
     from sqlalchemy import Engine, Row
 
 _USER = """
-SELECT a.id, a.username, a.role,
+SELECT a.id, a.username, a.role, a.created_at,
        p.display_name, p.email,
        COALESCE(s.status, 'active') = 'active' AS active,
-       c.hash AS password_hash
+       c.hash AS password_hash, COALESCE(c.must_change, false) AS must_change
 FROM identity.user_account a
 LEFT JOIN LATERAL (
     SELECT display_name, email FROM identity.user_profile_version
@@ -43,8 +43,21 @@ LEFT JOIN LATERAL (
     SELECT status FROM identity.user_status WHERE user_id = a.id ORDER BY id DESC LIMIT 1
 ) s ON true
 LEFT JOIN LATERAL (
-    SELECT hash FROM identity.password_credential WHERE user_id = a.id ORDER BY id DESC LIMIT 1
+    SELECT hash, must_change FROM identity.password_credential
+    WHERE user_id = a.id ORDER BY id DESC LIMIT 1
 ) c ON true
+"""
+
+# D1.4: neue Profil-Version mit neuem Namen, Mail-Adresse und Bestaetigung aus der juengsten
+_DISPLAY_NAME = """
+INSERT INTO identity.user_profile_version (user_id, display_name, email, email_confirmed_at,
+                                           created_at)
+SELECT :user_id, :display_name, p.email, p.email_confirmed_at, :at
+FROM (SELECT 1) one
+LEFT JOIN LATERAL (
+    SELECT email, email_confirmed_at FROM identity.user_profile_version
+    WHERE user_id = :user_id ORDER BY id DESC LIMIT 1
+) p ON true
 """
 
 # "Seit dem letzten Erfolg" nach Einfuegereihenfolge (id), nicht nach Zeit: gleiche Zeitstempel
@@ -66,13 +79,12 @@ SELECT
        AND e.id > l.id AND e.at >= :since AND e.at <= :now) AS by_ip
 """
 
-_SESSION = """
-SELECT s.id_hash, s.user_id, s.created_at, s.expires_at,
+_SESSIONS = """
+SELECT s.id_hash, s.user_id, s.created_at, s.expires_at, s.user_agent,
        GREATEST(s.created_at, (SELECT max(seen_at) FROM identity.session_seen v
                                WHERE v.id_hash = s.id_hash)) AS last_seen,
        EXISTS (SELECT 1 FROM identity.session_revocation r WHERE r.id_hash = s.id_hash) AS revoked
 FROM identity.session s
-WHERE s.id_hash = :id_hash
 """
 
 _REVOKE = """
@@ -80,6 +92,15 @@ INSERT INTO identity.session_revocation (id_hash, reason, at)
 SELECT :id_hash, :reason, :at
 WHERE EXISTS (SELECT 1 FROM identity.session WHERE id_hash = :id_hash)
 ON CONFLICT (id_hash) DO NOTHING
+"""
+
+# D1.4: alle offenen Sitzungen eines Nutzers ausser einer; RETURNING nennt die widerrufenen
+_REVOKE_ALL = """
+INSERT INTO identity.session_revocation (id_hash, reason, at)
+SELECT s.id_hash, :reason, :at FROM identity.session s
+WHERE s.user_id = :user_id AND s.id_hash IS DISTINCT FROM CAST(:keep AS text)
+ON CONFLICT (id_hash) DO NOTHING
+RETURNING id_hash
 """
 
 
@@ -94,6 +115,20 @@ def _user(row: Row | None) -> UserRecord | None:
         email=row.email,
         active=bool(row.active),
         password_hash=row.password_hash,
+        must_change=bool(row.must_change),
+        created_at=row.created_at,
+    )
+
+
+def _session(row: Row) -> SessionRecord:
+    return SessionRecord(
+        id_hash=row.id_hash,
+        user_id=row.user_id,
+        created_at=row.created_at,
+        expires_at=row.expires_at,
+        last_seen=row.last_seen,
+        revoked=bool(row.revoked),
+        user_agent=row.user_agent,
     )
 
 
@@ -110,6 +145,7 @@ class PostgresIdentityStore:
         display_name: str | None,
         email: str | None,
         at: datetime,
+        must_change: bool = False,
     ) -> int:
         try:
             with self._engine.begin() as conn:
@@ -126,7 +162,7 @@ class PostgresIdentityStore:
                 conn.execute(insert(UserStatus).values(user_id=user_id, status="active", at=at))
                 conn.execute(
                     insert(PasswordCredential).values(
-                        user_id=user_id, hash=password_hash, created_at=at
+                        user_id=user_id, hash=password_hash, must_change=must_change, created_at=at
                     )
                 )
         except IntegrityError as e:
@@ -145,10 +181,31 @@ class PostgresIdentityStore:
             row = conn.execute(text(_USER + " WHERE a.id = :id"), {"id": user_id}).first()
         return _user(row)
 
+    def list_users(self) -> list[UserRecord]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(_USER + " ORDER BY a.id")).all()
+        return [user for row in rows if (user := _user(row)) is not None]
+
     def set_status(self, user_id: int, status: str, *, reason: str | None, at: datetime) -> None:
         with self._engine.begin() as conn:
             conn.execute(
                 insert(UserStatus).values(user_id=user_id, status=status, reason=reason, at=at)
+            )
+
+    def set_password(
+        self, user_id: int, password_hash: str, *, must_change: bool, at: datetime
+    ) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                insert(PasswordCredential).values(
+                    user_id=user_id, hash=password_hash, must_change=must_change, created_at=at
+                )
+            )
+
+    def set_display_name(self, user_id: int, display_name: str | None, *, at: datetime) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                text(_DISPLAY_NAME), {"user_id": user_id, "display_name": display_name, "at": at}
             )
 
     def record_login(
@@ -208,17 +265,27 @@ class PostgresIdentityStore:
 
     def find_session(self, id_hash: str) -> SessionRecord | None:
         with self._engine.connect() as conn:
-            row = conn.execute(text(_SESSION), {"id_hash": id_hash}).first()
-        if row is None:
-            return None
-        return SessionRecord(
-            id_hash=row.id_hash,
-            user_id=row.user_id,
-            created_at=row.created_at,
-            expires_at=row.expires_at,
-            last_seen=row.last_seen,
-            revoked=bool(row.revoked),
-        )
+            row = conn.execute(
+                text(_SESSIONS + " WHERE s.id_hash = :id_hash"), {"id_hash": id_hash}
+            ).first()
+        return None if row is None else _session(row)
+
+    def list_sessions(self, user_id: int) -> list[SessionRecord]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(_SESSIONS + " WHERE s.user_id = :user_id ORDER BY s.created_at"),
+                {"user_id": user_id},
+            ).all()
+        return [_session(row) for row in rows]
+
+    def revoke_sessions(
+        self, user_id: int, *, reason: str, at: datetime, keep: str | None = None
+    ) -> list[str]:
+        with self._engine.begin() as conn:
+            rows = conn.execute(
+                text(_REVOKE_ALL), {"user_id": user_id, "reason": reason, "at": at, "keep": keep}
+            ).all()
+        return [row.id_hash for row in rows]
 
     def touch_session(self, id_hash: str, *, at: datetime) -> None:
         with self._engine.begin() as conn:

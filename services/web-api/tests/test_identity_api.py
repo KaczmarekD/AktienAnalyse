@@ -166,6 +166,7 @@ class TestSession:
             "role": "admin",
             "display_name": None,
             "email": "dennis@example.com",
+            "must_change_password": False,  # D1.4
         }
 
     def test_me_without_session(self, client):
@@ -201,6 +202,39 @@ class TestSession:
         assert user is not None
         store.set_status(user.id, "disabled", reason="test", at=identity.now())
         assert client.get("/api/v1/me").status_code == 401
+
+
+class TestSessionProbe:
+    """D1.4: Das UI fragt bei jedem Start, wer angemeldet ist. Ohne Sitzung kein 401, sonst
+    stuende bei jedem Aufruf der Anmeldeseite ein Fehler in der Konsole des Browsers."""
+
+    def test_without_session(self, client):
+        response = client.get("/api/v1/auth/session")
+        assert response.status_code == 200
+        assert response.json() == {"user": None}
+
+    def test_with_session(self, client):
+        _login(client)
+        user = client.get("/api/v1/auth/session").json()["user"]
+        assert (user["username"], user["role"], user["must_change_password"]) == (
+            "dennis",
+            "admin",
+            False,
+        )
+
+    def test_with_an_ended_session(self, client):
+        _login(client)
+        token = client.cookies[COOKIE]
+        client.post("/api/v1/auth/logout", json={})
+        client.cookies.set(COOKIE, token, domain="testserver")
+        assert client.get("/api/v1/auth/session").json() == {"user": None}
+
+    def test_without_identity_database(self):
+        c = _client(None)
+        try:
+            assert c.get("/api/v1/auth/session").json() == {"user": None}
+        finally:
+            c.__exit__(None, None, None)
 
 
 class TestLogout:

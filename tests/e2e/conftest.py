@@ -5,6 +5,9 @@
 - ``E2E_FIXTURE``: Dateiname der Replay-Fixture unter ``tests/fixtures/replay/``, mit der der
   Batch lief (wie in ``docker/e2e.env``). Nur dann vergleichen die Tests auch mit ihren
   Erwartungswerten (``make local-e2e``); ohne sie nur die Zusammenhaenge (``make local-check``).
+- ``E2E_USERNAME`` und ``E2E_PASSWORD`` (D1.4): Konto, mit dem sich die Tests anmelden. Der
+  E2E-Stack legt es an (``docker/e2e.sh``); gegen den lokalen Stack ein eigenes Konto. Ohne sie
+  laufen die Tests ohne Anmeldung (Stack ohne Sitzungspflicht).
 
 Ohne ``E2E_BASE_URL`` werden alle Tests hier uebersprungen, wie die DB-Tests ohne
 ``TEST_DATABASE_URL``.
@@ -39,9 +42,28 @@ def base_url() -> str:
     return _env("E2E_BASE_URL")
 
 
+def credentials() -> tuple[str, str] | None:
+    """Konto fuer die Anmeldung (D1.4), sonst ``None``."""
+    username = os.environ.get("E2E_USERNAME", "").strip()
+    password = os.environ.get("E2E_PASSWORD", "")
+    return (username, password) if username and password else None
+
+
+def login(client: httpx.Client) -> None:
+    """Meldet an wie das UI: JSON, das Cookie bleibt im Client."""
+    account = credentials()
+    if account is None:
+        return
+    response = client.post(
+        "/api/v1/auth/login", json={"username": account[0], "password": account[1]}
+    )
+    assert response.status_code == 204, f"Anmeldung im E2E-Stack: {response.status_code}"
+
+
 @pytest.fixture(scope="session")
 def ui(base_url: str) -> Iterator[httpx.Client]:
     with httpx.Client(base_url=base_url, timeout=30) as client:
+        login(client)
         yield client
 
 

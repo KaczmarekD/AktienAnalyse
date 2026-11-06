@@ -29,6 +29,8 @@ class UserRecord:
     email: str | None
     active: bool
     password_hash: str | None  # juengster Hash; None nur, wenn nie einer gesetzt wurde
+    must_change: bool = False  # D1.4: Einmal-Passwort, vor allem anderen zu ersetzen
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,7 @@ class SessionRecord:
     expires_at: datetime
     last_seen: datetime  # juengster Eintrag in session_seen, sonst created_at
     revoked: bool
+    user_agent: str | None = None
 
 
 class IdentityStore(Protocol):
@@ -51,6 +54,7 @@ class IdentityStore(Protocol):
         display_name: str | None,
         email: str | None,
         at: datetime,
+        must_change: bool = False,
     ) -> int:
         """Legt Konto, Profil, Status ``active`` und Passwort an; wirft ``UserExists``."""
         ...
@@ -59,8 +63,22 @@ class IdentityStore(Protocol):
 
     def get_user(self, user_id: int) -> UserRecord | None: ...
 
+    def list_users(self) -> list[UserRecord]:
+        """Alle Konten in der Reihenfolge, in der sie angelegt wurden (D1.4)."""
+        ...
+
     def set_status(self, user_id: int, status: str, *, reason: str | None, at: datetime) -> None:
         """Neuer Status als neue Zeile; gueltig ist die juengste."""
+        ...
+
+    def set_password(
+        self, user_id: int, password_hash: str, *, must_change: bool, at: datetime
+    ) -> None:
+        """Neues Passwort als neue Zeile; gueltig ist die juengste (D1.4)."""
+        ...
+
+    def set_display_name(self, user_id: int, display_name: str | None, *, at: datetime) -> None:
+        """Neue Profil-Version mit diesem Namen; Mail-Adresse und Bestaetigung bleiben (D1.4)."""
         ...
 
     def record_login(
@@ -98,4 +116,15 @@ class IdentityStore(Protocol):
 
     def revoke_session(self, id_hash: str, *, reason: str, at: datetime) -> None:
         """Widerruft eine Sitzung; ein zweiter Widerruf aendert nichts."""
+        ...
+
+    def list_sessions(self, user_id: int) -> list[SessionRecord]:
+        """Alle Sitzungen eines Nutzers, auch abgelaufene und widerrufene (D1.4)."""
+        ...
+
+    def revoke_sessions(
+        self, user_id: int, *, reason: str, at: datetime, keep: str | None = None
+    ) -> list[str]:
+        """Widerruft alle offenen Sitzungen eines Nutzers ausser ``keep``; gibt ihre Hashes
+        zurueck (D1.4), damit der Hub ihre WebSockets trennen kann."""
         ...

@@ -5,6 +5,46 @@ export type ClientOptions = {
 };
 
 /**
+ * Account
+ *
+ * Ein Konto in der Nutzerverwaltung.
+ */
+export type Account = {
+  /**
+   * Active
+   */
+  active: boolean;
+  /**
+   * Created At
+   */
+  created_at: string | null;
+  /**
+   * Display Name
+   */
+  display_name: string | null;
+  /**
+   * Email
+   */
+  email: string | null;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Must Change Password
+   */
+  must_change_password: boolean;
+  /**
+   * Role
+   */
+  role: 'admin' | 'user';
+  /**
+   * Username
+   */
+  username: string;
+};
+
+/**
  * ActivateProfileVersion
  */
 export type ActivateProfileVersion = {
@@ -107,6 +147,10 @@ export type HttpValidationError = {
  */
 export type Health = {
   /**
+   * Auth Required
+   */
+  auth_required: boolean;
+  /**
    * Status
    */
   status: 'ok';
@@ -185,6 +229,10 @@ export type Me = {
    */
   id: number;
   /**
+   * Must Change Password
+   */
+  must_change_password: boolean;
+  /**
    * Role
    */
   role: 'admin' | 'user';
@@ -192,6 +240,60 @@ export type Me = {
    * Username
    */
   username: string;
+};
+
+/**
+ * NewAccount
+ *
+ * Neues Konto mit Einmal-Passwort, das der Nutzer bei der ersten Anmeldung ersetzt.
+ */
+export type NewAccount = {
+  /**
+   * Display Name
+   */
+  display_name?: string | null;
+  /**
+   * Email
+   */
+  email?: string | null;
+  /**
+   * One Time Password
+   */
+  one_time_password: string;
+  /**
+   * Role
+   */
+  role?: 'admin' | 'user';
+  /**
+   * Username
+   */
+  username: string;
+};
+
+/**
+ * PasswordChange
+ */
+export type PasswordChange = {
+  /**
+   * Current Password
+   */
+  current_password: string;
+  /**
+   * New Password
+   */
+  new_password: string;
+};
+
+/**
+ * PasswordReset
+ *
+ * Neues Einmal-Passwort; alle Sitzungen des Kontos enden.
+ */
+export type PasswordReset = {
+  /**
+   * One Time Password
+   */
+  one_time_password: string;
 };
 
 /**
@@ -483,6 +585,18 @@ export type ProfileSummary = {
    * Name
    */
   name: string;
+};
+
+/**
+ * ProfileUpdate
+ *
+ * Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6).
+ */
+export type ProfileUpdate = {
+  /**
+   * Display Name
+   */
+  display_name?: string | null;
 };
 
 /**
@@ -940,6 +1054,43 @@ export type ScorePoint = {
 };
 
 /**
+ * SessionInfo
+ *
+ * Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage.
+ */
+export type SessionInfo = {
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Current
+   */
+  current: boolean;
+  /**
+   * Expires At
+   */
+  expires_at: string;
+  /**
+   * Last Seen
+   */
+  last_seen: string;
+  /**
+   * User Agent
+   */
+  user_agent: string | null;
+};
+
+/**
+ * SessionState
+ *
+ * Wer angemeldet ist; ``user`` fehlt ohne gueltige Sitzung (D1.4).
+ */
+export type SessionState = {
+  user: Me | null;
+};
+
+/**
  * Snapshot
  */
 export type Snapshot = {
@@ -1053,6 +1204,238 @@ export type ValidationError = {
   type: string;
 };
 
+export type ListUsersData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/admin/users';
+};
+
+export type ListUsersErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type ListUsersResponses = {
+  /**
+   * Response List Users
+   *
+   * Successful Response
+   */
+  200: Array<Account>;
+};
+
+export type ListUsersResponse = ListUsersResponses[keyof ListUsersResponses];
+
+export type CreateUserData = {
+  body: NewAccount;
+  path?: never;
+  query?: never;
+  url: '/api/v1/admin/users';
+};
+
+export type CreateUserErrors = {
+  /**
+   * Name, Mail-Adresse oder Einmal-Passwort ungueltig
+   */
+  400: unknown;
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
+  /**
+   * Den Benutzernamen gibt es schon
+   */
+  409: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type CreateUserError = CreateUserErrors[keyof CreateUserErrors];
+
+export type CreateUserResponses = {
+  /**
+   * Successful Response
+   */
+  201: Account;
+};
+
+export type CreateUserResponse = CreateUserResponses[keyof CreateUserResponses];
+
+export type DisableUserData = {
+  body?: never;
+  path: {
+    /**
+     * User Id
+     */
+    user_id: number;
+  };
+  query?: never;
+  url: '/api/v1/admin/users/{user_id}/disable';
+};
+
+export type DisableUserErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
+  /**
+   * Konto unbekannt
+   */
+  404: unknown;
+  /**
+   * Nicht am eigenen Konto
+   */
+  409: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type DisableUserError = DisableUserErrors[keyof DisableUserErrors];
+
+export type DisableUserResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type DisableUserResponse = DisableUserResponses[keyof DisableUserResponses];
+
+export type EnableUserData = {
+  body?: never;
+  path: {
+    /**
+     * User Id
+     */
+    user_id: number;
+  };
+  query?: never;
+  url: '/api/v1/admin/users/{user_id}/enable';
+};
+
+export type EnableUserErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
+  /**
+   * Konto unbekannt
+   */
+  404: unknown;
+  /**
+   * Nicht am eigenen Konto
+   */
+  409: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type EnableUserError = EnableUserErrors[keyof EnableUserErrors];
+
+export type EnableUserResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type EnableUserResponse = EnableUserResponses[keyof EnableUserResponses];
+
+export type ResetPasswordData = {
+  body: PasswordReset;
+  path: {
+    /**
+     * User Id
+     */
+    user_id: number;
+  };
+  query?: never;
+  url: '/api/v1/admin/users/{user_id}/reset-password';
+};
+
+export type ResetPasswordErrors = {
+  /**
+   * Einmal-Passwort zu schwach
+   */
+  400: unknown;
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
+  /**
+   * Konto unbekannt
+   */
+  404: unknown;
+  /**
+   * Nicht am eigenen Konto
+   */
+  409: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type ResetPasswordError = ResetPasswordErrors[keyof ResetPasswordErrors];
+
+export type ResetPasswordResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type ResetPasswordResponse = ResetPasswordResponses[keyof ResetPasswordResponses];
+
 export type LoginData = {
   body: LoginRequest;
   path?: never;
@@ -1112,6 +1495,22 @@ export type LogoutResponses = {
 };
 
 export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type CurrentSessionData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/auth/session';
+};
+
+export type CurrentSessionResponses = {
+  /**
+   * Successful Response
+   */
+  200: SessionState;
+};
+
+export type CurrentSessionResponse = CurrentSessionResponses[keyof CurrentSessionResponses];
 
 export type HealthData = {
   body?: never;
@@ -1193,6 +1592,137 @@ export type MeResponses = {
 };
 
 export type MeResponse = MeResponses[keyof MeResponses];
+
+export type ChangePasswordData = {
+  body: PasswordChange;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me/password';
+};
+
+export type ChangePasswordErrors = {
+  /**
+   * Bisheriges Passwort falsch oder neues zu schwach
+   */
+  400: unknown;
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Zu viele Fehlversuche, voruebergehend gesperrt
+   */
+  429: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
+
+export type UpdateProfileData = {
+  body: ProfileUpdate;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me/profile';
+};
+
+export type UpdateProfileErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type UpdateProfileError = UpdateProfileErrors[keyof UpdateProfileErrors];
+
+export type UpdateProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: Me;
+};
+
+export type UpdateProfileResponse = UpdateProfileResponses[keyof UpdateProfileResponses];
+
+export type ListSessionsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me/sessions';
+};
+
+export type ListSessionsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type ListSessionsResponses = {
+  /**
+   * Response List Sessions
+   *
+   * Successful Response
+   */
+  200: Array<SessionInfo>;
+};
+
+export type ListSessionsResponse = ListSessionsResponses[keyof ListSessionsResponses];
+
+export type RevokeAllSessionsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me/sessions/revoke-all';
+};
+
+export type RevokeAllSessionsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type RevokeAllSessionsResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type RevokeAllSessionsResponse =
+  RevokeAllSessionsResponses[keyof RevokeAllSessionsResponses];
 
 export type LatestRankingData = {
   body?: never;

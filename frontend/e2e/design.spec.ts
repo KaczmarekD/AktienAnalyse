@@ -52,10 +52,8 @@ async function rankedSymbol(request: APIRequestContext): Promise<string> {
 
 const tooltip = (page: Page) => page.locator('.mat-mdc-tooltip-surface');
 
-test('Tooltip erscheint bei Hover und beim Tastaturfokus auf „EV/EBIT“', async ({
-  page,
-  request,
-}) => {
+test('Tooltip erscheint bei Hover und beim Tastaturfokus auf „EV/EBIT“', async ({ page }) => {
+  const request = page.request;
   const symbol = await rankedSymbol(request);
   await page.goto(`/instruments/${encodeURIComponent(symbol)}`);
   // Der fokussierbare Teil von app-term ist das innere span mit dem Tooltip
@@ -96,14 +94,17 @@ async function pages(request: APIRequestContext): Promise<string[]> {
     '/profiles',
     ...profiles.slice(0, 1).map((profile) => `/profiles/${profile.id}`),
     '/glossary',
+    // D1.4: angemeldet als Admin (auth.setup.ts); ohne Anmeldung führen beide zur Anmeldeseite
+    '/account',
+    '/admin/users',
   ];
 }
 
 for (const scheme of ['light', 'dark'] as const) {
   test(`axe findet nichts Ernstes (${scheme === 'light' ? 'hell' : 'dunkel'})`, async ({
     page,
-    request,
   }) => {
+    const request = page.request;
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     const found: string[] = [];
     for (const path of await pages(request)) {

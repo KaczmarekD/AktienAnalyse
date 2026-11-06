@@ -26,7 +26,16 @@ class TestHealth:
     def test_is_ok_without_a_database(self, client):
         response = client.get("/api/v1/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "ok", "version": version("va-web-api")}
+        assert response.json() == {
+            "status": "ok",
+            "version": version("va-web-api"),
+            "auth_required": True,  # D1.4: Das UI weiss so, ob es eine Anmeldung braucht
+        }
+
+    def test_tells_when_no_login_is_needed(self):
+        settings = SETTINGS.model_copy(update={"auth_required": False})
+        with TestClient(create_app(settings)) as c:
+            assert c.get("/api/v1/health").json()["auth_required"] is False
 
     def test_unknown_path_is_404(self, client):
         assert client.get("/api/v1/gibt-es-nicht").status_code == 404

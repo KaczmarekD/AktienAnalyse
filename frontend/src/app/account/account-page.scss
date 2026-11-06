@@ -1,0 +1,53 @@
+// Konto (D1.4): drei Abschnitte untereinander, Formulare höchstens 24 rem breit
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--va-space-lg);
+}
+
+.one-time {
+  display: flex;
+  gap: var(--va-space-sm);
+  align-items: center;
+  margin: 0;
+  font-weight: var(--va-weight-strong);
+}
+
+.who {
+  display: flex;
+  gap: var(--va-space-sm);
+  align-items: center;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-sm);
+  align-items: center;
+  max-width: 32rem;
+
+  mat-form-field {
+    flex: 1;
+  }
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: var(--va-space-xs);
+  max-width: 24rem;
+
+  button {
+    align-self: flex-start;
+  }
+}
+
+// Nur für Passwort-Manager, nicht sichtbar
+.hidden-username {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

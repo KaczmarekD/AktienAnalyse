@@ -8,6 +8,20 @@ import type {
   ActivateProfileVersionData,
   ActivateProfileVersionErrors,
   ActivateProfileVersionResponses,
+  ChangePasswordData,
+  ChangePasswordErrors,
+  ChangePasswordResponses,
+  CreateUserData,
+  CreateUserErrors,
+  CreateUserResponses,
+  CurrentSessionData,
+  CurrentSessionResponses,
+  DisableUserData,
+  DisableUserErrors,
+  DisableUserResponses,
+  EnableUserData,
+  EnableUserErrors,
+  EnableUserResponses,
   GetInstrumentData,
   GetInstrumentErrors,
   GetInstrumentResponses,
@@ -40,6 +54,12 @@ import type {
   ListRunsData,
   ListRunsErrors,
   ListRunsResponses,
+  ListSessionsData,
+  ListSessionsErrors,
+  ListSessionsResponses,
+  ListUsersData,
+  ListUsersErrors,
+  ListUsersResponses,
   LoginData,
   LoginErrors,
   LoginResponses,
@@ -52,17 +72,35 @@ import type {
   PreviewProfileData,
   PreviewProfileErrors,
   PreviewProfileResponses,
+  ResetPasswordData,
+  ResetPasswordErrors,
+  ResetPasswordResponses,
+  RevokeAllSessionsData,
+  RevokeAllSessionsErrors,
+  RevokeAllSessionsResponses,
   SaveProfileVersionData,
   SaveProfileVersionErrors,
   SaveProfileVersionResponses,
   StartRunData,
   StartRunErrors,
   StartRunResponses,
+  UpdateProfileData,
+  UpdateProfileErrors,
+  UpdateProfileResponses,
 } from './types.gen';
 import {
   zActivateProfileVersionBody,
   zActivateProfileVersionPath,
   zActivateProfileVersionResponse,
+  zChangePasswordBody,
+  zChangePasswordResponse,
+  zCreateUserBody,
+  zCreateUserResponse,
+  zCurrentSessionResponse,
+  zDisableUserPath,
+  zDisableUserResponse,
+  zEnableUserPath,
+  zEnableUserResponse,
   zGetInstrumentPath,
   zGetInstrumentResponse,
   zGetProfilePath,
@@ -80,6 +118,8 @@ import {
   zListProfilesResponse,
   zListRunsQuery,
   zListRunsResponse,
+  zListSessionsResponse,
+  zListUsersResponse,
   zLoginBody,
   zLoginResponse,
   zLogoutResponse,
@@ -87,12 +127,18 @@ import {
   zPreviewProfileBody,
   zPreviewProfileQuery,
   zPreviewProfileResponse,
+  zResetPasswordBody,
+  zResetPasswordPath,
+  zResetPasswordResponse,
+  zRevokeAllSessionsResponse,
   zSaveProfileVersionBody,
   zSaveProfileVersionHeaders,
   zSaveProfileVersionPath,
   zSaveProfileVersionResponse,
   zStartRunBody,
   zStartRunResponse,
+  zUpdateProfileBody,
+  zUpdateProfileResponse,
 } from './zod.gen';
 
 export type Options<
@@ -112,6 +158,124 @@ export type Options<
    */
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * List Users
+ *
+ * Alle Konten in der Reihenfolge, in der sie angelegt wurden.
+ */
+export const listUsers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListUsersData, ThrowOnError>,
+): RequestResult<ListUsersResponses, ListUsersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListUsersResponses, ListUsersErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zListUsersResponse.parseAsync(data),
+    url: '/api/v1/admin/users',
+    ...options,
+  });
+
+/**
+ * Create User
+ *
+ * Legt ein Konto mit Einmal-Passwort an.
+ */
+export const createUser = <ThrowOnError extends boolean = false>(
+  options: Options<CreateUserData, ThrowOnError>,
+): RequestResult<CreateUserResponses, CreateUserErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateUserResponses, CreateUserErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zCreateUserBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zCreateUserResponse.parseAsync(data),
+    url: '/api/v1/admin/users',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Disable User
+ *
+ * Deaktiviert ein Konto; alle seine Sitzungen enden.
+ */
+export const disableUser = <ThrowOnError extends boolean = false>(
+  options: Options<DisableUserData, ThrowOnError>,
+): RequestResult<DisableUserResponses, DisableUserErrors, ThrowOnError> =>
+  (options.client ?? client).post<DisableUserResponses, DisableUserErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zDisableUserPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zDisableUserResponse.parseAsync(data),
+    url: '/api/v1/admin/users/{user_id}/disable',
+    ...options,
+  });
+
+/**
+ * Enable User
+ *
+ * Aktiviert ein Konto wieder; es braucht eine neue Anmeldung.
+ */
+export const enableUser = <ThrowOnError extends boolean = false>(
+  options: Options<EnableUserData, ThrowOnError>,
+): RequestResult<EnableUserResponses, EnableUserErrors, ThrowOnError> =>
+  (options.client ?? client).post<EnableUserResponses, EnableUserErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zEnableUserPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zEnableUserResponse.parseAsync(data),
+    url: '/api/v1/admin/users/{user_id}/enable',
+    ...options,
+  });
+
+/**
+ * Reset Password
+ *
+ * Setzt ein Einmal-Passwort; alle Sitzungen des Kontos enden.
+ */
+export const resetPassword = <ThrowOnError extends boolean = false>(
+  options: Options<ResetPasswordData, ThrowOnError>,
+): RequestResult<ResetPasswordResponses, ResetPasswordErrors, ThrowOnError> =>
+  (options.client ?? client).post<ResetPasswordResponses, ResetPasswordErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zResetPasswordBody,
+          path: zResetPasswordPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zResetPasswordResponse.parseAsync(data),
+    url: '/api/v1/admin/users/{user_id}/reset-password',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
 /**
  * Login
@@ -158,6 +322,29 @@ export const logout = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zLogoutResponse.parseAsync(data),
     url: '/api/v1/auth/logout',
+    ...options,
+  });
+
+/**
+ * Current Session
+ *
+ * Wer angemeldet ist, ohne 401 (D1.4). Das UI fragt das bei jedem Start; ein 401 stuende
+ * sonst bei jedem Aufruf der Anmeldeseite als Fehler in der Konsole des Browsers.
+ */
+export const currentSession = <ThrowOnError extends boolean = false>(
+  options?: Options<CurrentSessionData, ThrowOnError>,
+): RequestResult<CurrentSessionResponses, unknown, ThrowOnError> =>
+  (options?.client ?? client).get<CurrentSessionResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zCurrentSessionResponse.parseAsync(data),
+    url: '/api/v1/auth/session',
     ...options,
   });
 
@@ -220,6 +407,106 @@ export const me = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zMeResponse.parseAsync(data),
     url: '/api/v1/me',
+    ...options,
+  });
+
+/**
+ * Change Password
+ *
+ * Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.
+ */
+export const changePassword = <ThrowOnError extends boolean = false>(
+  options: Options<ChangePasswordData, ThrowOnError>,
+): RequestResult<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError> =>
+  (options.client ?? client).put<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zChangePasswordBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zChangePasswordResponse.parseAsync(data),
+    url: '/api/v1/me/password',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Update Profile
+ *
+ * Aendert den Anzeigenamen; leer entfernt ihn.
+ */
+export const updateProfile = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateProfileData, ThrowOnError>,
+): RequestResult<UpdateProfileResponses, UpdateProfileErrors, ThrowOnError> =>
+  (options.client ?? client).put<UpdateProfileResponses, UpdateProfileErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zUpdateProfileBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zUpdateProfileResponse.parseAsync(data),
+    url: '/api/v1/me/profile',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * List Sessions
+ *
+ * Die gueltigen eigenen Sitzungen, zuletzt aktive zuerst.
+ */
+export const listSessions = <ThrowOnError extends boolean = false>(
+  options?: Options<ListSessionsData, ThrowOnError>,
+): RequestResult<ListSessionsResponses, ListSessionsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListSessionsResponses, ListSessionsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zListSessionsResponse.parseAsync(data),
+    url: '/api/v1/me/sessions',
+    ...options,
+  });
+
+/**
+ * Revoke All Sessions
+ *
+ * Ueberall abmelden, auch hier; trennt die WebSockets aller Sitzungen.
+ */
+export const revokeAllSessions = <ThrowOnError extends boolean = false>(
+  options?: Options<RevokeAllSessionsData, ThrowOnError>,
+): RequestResult<RevokeAllSessionsResponses, RevokeAllSessionsErrors, ThrowOnError> =>
+  (options?.client ?? client).post<
+    RevokeAllSessionsResponses,
+    RevokeAllSessionsErrors,
+    ThrowOnError
+  >({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zRevokeAllSessionsResponse.parseAsync(data),
+    url: '/api/v1/me/sessions/revoke-all',
     ...options,
   });
 

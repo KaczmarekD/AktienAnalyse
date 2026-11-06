@@ -1,6 +1,6 @@
 # Value-Analyzer - haeufige Kommandos.
 # Nutze 'make help' fuer eine Uebersicht.
-.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down test-nats test-nats-up test-nats-down nats-provision lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api api-breaking ui-install ui ui-api ui-check ui-e2e-install
+.PHONY: help install install-dev lock upgrade run dry force test test-cov test-db test-db-up test-db-down test-nats test-nats-up test-nats-down nats-provision lint format typecheck imports check check-j4125 clean pull build up down logs restart shell docker-dry docker-run db-up db-migrate db-import db-backup db-shell regression regression-export local-up local-admin local-run local-dry local-regression local-logs local-down local-ui local-e2e local-check api api-breaking ui-install ui ui-api ui-check ui-e2e-install
 
 # Alle Python-Befehle laufen ueber uv im Projekt-Environment (.venv, aus uv.lock).
 # --locked: bricht ab, wenn uv.lock nicht mehr zu pyproject.toml passt (dann: make lock),
@@ -179,6 +179,10 @@ local-dry: ## Lokal: Dry-Run mit dem Arbeitsstand (Vorschau nach data/, keine Ma
 local-regression: ## Lokal: gespeicherte Wochen mit dem Arbeitsstand nachspielen
 	$(LOCAL) run --rm --build value-analyzer python -m src.regression
 
+local-admin: ## Lokal: Admin anlegen (D1.4, lokal mit Sitzungspflicht): make local-admin NAME=<name>
+	@test -n "$(NAME)" || (echo "NAME fehlt: make local-admin NAME=<name>" >&2; exit 2)
+	$(LOCAL) exec web-api python -m va_web_api.admin create-user "$(NAME)" --admin
+
 local-logs: ## Lokal: Logs von DB, Mailpit und pgweb verfolgen
 	$(LOCAL) logs -f
 
@@ -198,7 +202,7 @@ local-e2e: ## Lokal: ganze Kette mit Replay-Daten pruefen (Batch, Mail, API, UI)
 	$(E2E) build value-analyzer frontend
 	bash docker/e2e.sh
 
-local-check: ## Lokal: Mail, API und UI des lokalen Stacks zum letzten Lauf pruefen (braucht make local-ui)
+local-check: ## Lokal: Mail, API und UI des lokalen Stacks zum letzten Lauf pruefen (braucht make local-ui, E2E_USERNAME/E2E_PASSWORD)
 	E2E_BASE_URL=http://127.0.0.1:8080 E2E_MAILPIT_URL=http://127.0.0.1:8025 $(RUN) pytest tests/e2e -p no:cacheprovider
 	cd frontend && E2E_BASE_URL=http://127.0.0.1:8080 PLAYWRIGHT_BROWSERS_PATH=../.local/playwright npx playwright test
 

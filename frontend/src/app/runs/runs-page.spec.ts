@@ -10,6 +10,7 @@ import { Dispatcher } from '@ngrx/signals/events';
 
 import { serverEvents } from '../shared/realtime/realtime.events';
 import { apiTestingProviders, query, respond, text } from '../testing/api';
+import { me, provideAuthTesting } from '../testing/auth';
 import { run } from '../testing/fixtures';
 import {
   abbreviationsWithoutExplanation,
@@ -77,6 +78,16 @@ function render(): Fixture {
 
 describe('RunsPage', () => {
   afterEach(() => TestBed.inject(MatDialog).closeAll());
+
+  it('offers the start only to admins (D1.4)', async () => {
+    TestBed.configureTestingModule({
+      providers: [...apiTestingProviders(), provideAuthTesting({ user: me() })],
+    });
+    const fixture = TestBed.createComponent(RunsPage);
+    await respond(fixture, RUNS, [run({ id: 1 })]);
+    expect(query(fixture, 'button[data-action="open-start"]').length).toBe(0);
+    expect(query(fixture, 'tr[data-run]').length).toBe(1);
+  });
 
   it('lists runs with start, duration, status, counts, kind and marks', async () => {
     const fixture = render();

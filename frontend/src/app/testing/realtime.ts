@@ -56,6 +56,12 @@ export class FakeWebSocket {
     this.readyState = 3;
     this.onclose?.({ wasClean: false, code: 1006, reason: '' } as CloseEvent);
   }
+
+  /** Server schließt mit einem Code, z. B. 4401: Sitzung beendet (D1.3). */
+  end(code: number): void {
+    this.readyState = 3;
+    this.onclose?.({ wasClean: true, code, reason: '' } as CloseEvent);
+  }
 }
 
 /** Provider fuer Tests: Fake-WebSocket, feste Wartezeiten, Zufall fest auf 1 (kein Abschlag). */

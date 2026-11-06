@@ -260,10 +260,12 @@ class Preview(_Model):
 
 
 # D1.1: Anmeldung (docs/architecture/depot/nutzer.md)
+PASSWORD_MAX = 1024  # Obergrenze gegen sehr lange Eingaben vor dem teuren Hash
+
+
 class LoginRequest(_Model):
     username: str = Field(min_length=1, max_length=64)
-    # Obergrenze gegen sehr lange Eingaben vor dem teuren Hash
-    password: str = Field(min_length=1, max_length=1024)
+    password: str = Field(min_length=1, max_length=PASSWORD_MAX)
 
 
 class Me(_Model):
@@ -274,3 +276,62 @@ class Me(_Model):
     role: Literal["admin", "user"]
     display_name: str | None
     email: str | None
+    # D1.4: Einmal-Passwort; bis es ersetzt ist, antworten die anderen Endpunkte mit 403
+    must_change_password: bool
+
+
+class SessionState(_Model):
+    """Wer angemeldet ist; ``user`` fehlt ohne gueltige Sitzung (D1.4)."""
+
+    user: Me | None
+
+
+# D1.4: eigenes Konto und Nutzerverwaltung (NUT-11, Rollen)
+class PasswordChange(_Model):
+    current_password: str = Field(min_length=1, max_length=PASSWORD_MAX)
+    new_password: str = Field(min_length=1, max_length=PASSWORD_MAX)
+
+
+class ProfileUpdate(_Model):
+    """Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6)."""
+
+    display_name: str | None = Field(default=None, max_length=100)
+
+
+class SessionInfo(_Model):
+    """Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage."""
+
+    created_at: datetime
+    last_seen: datetime
+    expires_at: datetime
+    user_agent: str | None
+    current: bool
+
+
+class Account(_Model):
+    """Ein Konto in der Nutzerverwaltung."""
+
+    id: int
+    username: str
+    role: Literal["admin", "user"]
+    display_name: str | None
+    email: str | None
+    active: bool
+    must_change_password: bool
+    created_at: datetime | None
+
+
+class NewAccount(_Model):
+    """Neues Konto mit Einmal-Passwort, das der Nutzer bei der ersten Anmeldung ersetzt."""
+
+    username: str = Field(min_length=1, max_length=64)
+    role: Literal["admin", "user"] = "user"
+    display_name: str | None = Field(default=None, max_length=100)
+    email: str | None = Field(default=None, max_length=254)
+    one_time_password: str = Field(min_length=1, max_length=PASSWORD_MAX)
+
+
+class PasswordReset(_Model):
+    """Neues Einmal-Passwort; alle Sitzungen des Kontos enden."""
+
+    one_time_password: str = Field(min_length=1, max_length=PASSWORD_MAX)

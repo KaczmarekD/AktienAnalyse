@@ -34,6 +34,7 @@ import type {
 import { zProfileParamsV1Input } from '../api/zod.gen';
 import { optionalNumber } from '../shared/api-error';
 import { DayPipe, DayTimePipe, MISSING, NumPipe } from '../shared/format';
+import { AuthStore } from '../shared/auth/auth.store';
 import { CONTROLS } from '../shared/glossary/controls';
 import { ENTRIES, termTip } from '../shared/glossary/glossary';
 import { loaded, loadError } from '../shared/resource';
@@ -168,6 +169,8 @@ export class ProfileEditorPage {
   });
 
   private readonly delay = inject(PREVIEW_DEBOUNCE_MS);
+  /** D1.4: Speichern und Aktivieren nur für Admins; die Vorschau dürfen alle. */
+  protected readonly admin = inject(AuthStore).isAdmin;
   protected readonly controls = CONTROLS;
   protected readonly tips = {
     active: termTip(ENTRIES.active),

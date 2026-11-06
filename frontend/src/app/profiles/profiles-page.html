@@ -19,8 +19,8 @@
             matButton="outlined"
             data-action="edit"
             [routerLink]="['/profiles', profile.id]"
-            [matTooltip]="controls['profiles.edit']"
-            >Bearbeiten</a
+            [matTooltip]="admin() ? controls['profiles.edit'] : controls['profiles.view']"
+            >{{ admin() ? 'Bearbeiten' : 'Ansehen' }}</a
           >
           <p class="versions">
             @if (profile.active_version !== null) {

@@ -32,8 +32,10 @@ class _User:
     role: str
     display_name: str | None
     email: str | None
+    created_at: datetime
     statuses: list[str] = field(default_factory=lambda: ["active"])
-    hashes: list[str] = field(default_factory=list)
+    # (Hash, must_change); gueltig ist der juengste Eintrag
+    passwords: list[tuple[str, bool]] = field(default_factory=list)
 
 
 @dataclass
@@ -41,6 +43,7 @@ class _Session:
     user_id: int
     created_at: datetime
     expires_at: datetime
+    user_agent: str | None
     seen: list[datetime] = field(default_factory=list)
     revoked: bool = False
 
@@ -67,17 +70,25 @@ class MemoryIdentityStore:
         password_hash: str,
         display_name: str | None,
         email: str | None,
-        at: datetime,  # noqa: ARG002 - wie der Postgres-Speicher
+        at: datetime,
+        must_change: bool = False,
     ) -> int:
         if any(u.username == username for u in self._users.values()):
             raise UserExists(username)
         user_id = next(self._ids)
         self._users[user_id] = _User(
-            user_id, username, role, display_name, email, hashes=[password_hash]
+            user_id,
+            username,
+            role,
+            display_name,
+            email,
+            created_at=at,
+            passwords=[(password_hash, must_change)],
         )
         return user_id
 
     def _record(self, user: _User) -> UserRecord:
+        password_hash, must_change = user.passwords[-1] if user.passwords else (None, False)
         return UserRecord(
             id=user.id,
             username=user.username,
@@ -85,7 +96,9 @@ class MemoryIdentityStore:
             display_name=user.display_name,
             email=user.email,
             active=user.statuses[-1] == "active",
-            password_hash=user.hashes[-1] if user.hashes else None,
+            password_hash=password_hash,
+            must_change=must_change,
+            created_at=user.created_at,
         )
 
     def find_user(self, username: str) -> UserRecord | None:
@@ -98,6 +111,9 @@ class MemoryIdentityStore:
         user = self._users.get(user_id)
         return None if user is None else self._record(user)
 
+    def list_users(self) -> list[UserRecord]:
+        return [self._record(user) for _, user in sorted(self._users.items())]
+
     def set_status(
         self,
         user_id: int,
@@ -107,6 +123,25 @@ class MemoryIdentityStore:
         at: datetime,  # noqa: ARG002
     ) -> None:
         self._users[user_id].statuses.append(status)
+
+    def set_password(
+        self,
+        user_id: int,
+        password_hash: str,
+        *,
+        must_change: bool,
+        at: datetime,  # noqa: ARG002 - wie der Postgres-Speicher
+    ) -> None:
+        self._users[user_id].passwords.append((password_hash, must_change))
+
+    def set_display_name(
+        self,
+        user_id: int,
+        display_name: str | None,
+        *,
+        at: datetime,  # noqa: ARG002 - wie der Postgres-Speicher
+    ) -> None:
+        self._users[user_id].display_name = display_name
 
     def record_login(
         self,
@@ -144,15 +179,12 @@ class MemoryIdentityStore:
         user_id: int,
         created_at: datetime,
         expires_at: datetime,
-        user_agent: str | None,  # noqa: ARG002 - wie der Postgres-Speicher
-        ip: str | None,  # noqa: ARG002
+        user_agent: str | None,
+        ip: str | None,  # noqa: ARG002 - wie der Postgres-Speicher
     ) -> None:
-        self._sessions[id_hash] = _Session(user_id, created_at, expires_at)
+        self._sessions[id_hash] = _Session(user_id, created_at, expires_at, user_agent)
 
-    def find_session(self, id_hash: str) -> SessionRecord | None:
-        session = self._sessions.get(id_hash)
-        if session is None:
-            return None
+    def _session(self, id_hash: str, session: _Session) -> SessionRecord:
         return SessionRecord(
             id_hash=id_hash,
             user_id=session.user_id,
@@ -160,7 +192,12 @@ class MemoryIdentityStore:
             expires_at=session.expires_at,
             last_seen=max([session.created_at, *session.seen]),
             revoked=session.revoked,
+            user_agent=session.user_agent,
         )
+
+    def find_session(self, id_hash: str) -> SessionRecord | None:
+        session = self._sessions.get(id_hash)
+        return None if session is None else self._session(id_hash, session)
 
     def touch_session(self, id_hash: str, *, at: datetime) -> None:
         self._sessions[id_hash].seen.append(at)
@@ -169,3 +206,25 @@ class MemoryIdentityStore:
         session = self._sessions.get(id_hash)
         if session is not None:
             session.revoked = True
+
+    def list_sessions(self, user_id: int) -> list[SessionRecord]:
+        return [
+            self._session(id_hash, session)
+            for id_hash, session in self._sessions.items()
+            if session.user_id == user_id
+        ]
+
+    def revoke_sessions(
+        self,
+        user_id: int,
+        *,
+        reason: str,  # noqa: ARG002 - wie der Postgres-Speicher
+        at: datetime,  # noqa: ARG002
+        keep: str | None = None,
+    ) -> list[str]:
+        revoked = []
+        for id_hash, session in self._sessions.items():
+            if session.user_id == user_id and not session.revoked and id_hash != keep:
+                session.revoked = True
+                revoked.append(id_hash)
+        return revoked

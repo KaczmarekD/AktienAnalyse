@@ -9,3 +9,8 @@ export const FORM_FIELD_DEFAULTS = {
   provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
   useValue: { appearance: 'outline' },
 };
+
+/** Der Text eines Eingabefelds aus seinem input-Ereignis (Felder mit Signals statt Forms). */
+export function inputValue(event: Event): string {
+  return (event.target as HTMLInputElement).value;
+}

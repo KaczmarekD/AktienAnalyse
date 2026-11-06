@@ -1,0 +1,58 @@
+// Nutzerverwaltung (D1.4)
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--va-space-lg);
+}
+
+.intro {
+  margin: 0;
+}
+
+.state,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-xs);
+  align-items: center;
+}
+
+// Das Einmal-Passwort: gut lesbar, in Schreibmaschinenschrift, zum Abschreiben oder Kopieren
+.one-time {
+  padding: var(--va-space-md);
+  border: var(--va-divider);
+  border-radius: var(--va-radius-card);
+  background-color: var(--mat-sys-surface-container-lowest);
+
+  p {
+    margin: 0;
+  }
+
+  code {
+    font-family: monospace;
+    font-size: var(--mat-sys-title-medium-size);
+    letter-spacing: 0.05em;
+  }
+}
+
+.create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--va-space-xs);
+  max-width: 24rem;
+
+  button {
+    align-self: flex-start;
+  }
+}
+
+.role {
+  display: flex;
+  gap: var(--va-space-md);
+  align-items: center;
+}
+
+.label {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+}

@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { injectDispatch } from '@ngrx/signals/events';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
 import { ClientMessage, PROTOCOL, ServerMessage, SubscribeMessage } from './protocol';
@@ -8,6 +8,9 @@ import { REALTIME_CONFIG, REALTIME_DEFAULTS, RealtimeConfig } from './realtime.c
 import { serverEvents } from './realtime.events';
 
 export type RealtimeStatus = 'idle' | 'connecting' | 'online' | 'offline';
+
+/** Der Server trennt, weil die Sitzung endete (D1.3, web-api-realtime.md). */
+const CLOSE_SESSION_ENDED = 4401;
 
 /**
  * Verbindung zum WebSocket des web-api (P4.6, frontend.md, web-api-realtime.md).
@@ -30,6 +33,11 @@ export class RealtimeService {
 
   /** idle (nicht gestartet), connecting, online, offline (wartet auf den naechsten Versuch). */
   readonly status = this.state.asReadonly();
+  /**
+   * Meldet Code 4401: Die Sitzung endete (D1.4). Der AuthStore entscheidet, ob es weitergeht;
+   * bis dahin verbindet der Dienst wie nach jedem Abbruch neu.
+   */
+  readonly sessionEnded = new Subject<void>();
 
   private started = false;
   private attempt = 0;
@@ -64,6 +72,13 @@ export class RealtimeService {
       protocol: PROTOCOL,
       WebSocketCtor: this.config.WebSocketCtor,
       openObserver: { next: () => this.opened(socket) },
+      closeObserver: {
+        next: (event: CloseEvent) => {
+          if (event.code === CLOSE_SESSION_ENDED) {
+            this.sessionEnded.next();
+          }
+        },
+      },
     });
     this.subscription = socket.subscribe({
       next: (message) => this.received(message as ServerMessage),

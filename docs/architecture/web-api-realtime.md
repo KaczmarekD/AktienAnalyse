@@ -252,9 +252,9 @@ Secrets (SMTP-Passwort, DB-Passwörter) sind nie über die API lesbar oder ände
 **Seit D1.2** ([ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md),
 [nutzer.md](depot/nutzer.md#sicherheitsregeln)) kommen dazu:
 
-- Jeder Endpunkt außer Health, Anmelden, Abmelden und der API-Beschreibung verlangt eine
-  Sitzung. Run-Start, Profil speichern und aktivieren dürfen nur Admins. Übergang bis D1.4/D1.5:
-  `WEB_API_AUTH_REQUIRED=false`.
+- Jeder Endpunkt außer Health, Anmelden, Abmelden, `GET /auth/session` und der API-Beschreibung
+  verlangt eine Sitzung. Run-Start, Profil speichern und aktivieren dürfen nur Admins. Übergang
+  auf der NAS bis D1.5: `WEB_API_AUTH_REQUIRED=false` (lokal und im E2E-Stack seit D1.4 an).
 - Jede schreibende Anfrage mit fremdem `Origin` ergibt 403, mit derselben Regel wie am WebSocket.
   Mit dem Sitzungs-Cookie reicht der Preflight allein nicht mehr gegen CSRF.
 - Logs enthalten keine Passwörter, Tokens, Sitzungs-IDs oder Mail-Adressen
@@ -264,6 +264,11 @@ Secrets (SMTP-Passwort, DB-Passwörter) sind nie über die API lesbar oder ände
 bekommt nur dieser Nutzer. Abmelden trennt alle Verbindungen der Sitzung sofort (`4401`). Jede
 Verbindung prüft ihre Sitzung alle 60 s, ohne sie zu verlängern, und trennt sonst ebenfalls mit
 `4401`.
+
+**Seit D1.4:** Das UI verbindet sich erst, wenn es darf: angemeldet ohne Einmal-Passwort, oder ohne
+Sitzungspflicht. Nach `4401` meldet der `RealtimeService` das Ende der Sitzung (`sessionEnded`),
+der `AuthStore` führt zur Anmeldung und hält den WebSocket an. Ohne Sitzungspflicht verbindet er
+sich wie bisher neu. Mit Einmal-Passwort lehnt der Server den Handshake ab.
 
 ## Warum WebSocket und nicht SSE
 

@@ -1,18 +1,20 @@
 <app-page-header>
   Läufe
-  <button
-    pageAction
-    matButton="filled"
-    type="button"
-    data-action="open-start"
-    disabledInteractive
-    [disabled]="active() !== undefined"
-    [matTooltip]="startTip()"
-    (click)="openStart()"
-  >
-    <app-icon name="play_arrow" />
-    Lauf starten
-  </button>
+  @if (admin()) {
+    <button
+      pageAction
+      matButton="filled"
+      type="button"
+      data-action="open-start"
+      disabledInteractive
+      [disabled]="active() !== undefined"
+      [matTooltip]="startTip()"
+      (click)="openStart()"
+    >
+      <app-icon name="play_arrow" />
+      Lauf starten
+    </button>
+  }
 </app-page-header>
 <app-notice [notice]="notice()" />
 

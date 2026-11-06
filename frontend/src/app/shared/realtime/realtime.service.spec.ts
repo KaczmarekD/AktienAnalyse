@@ -31,6 +31,19 @@ describe('RealtimeService', () => {
     vi.useRealTimers();
   });
 
+  it('reports when the server ends the session (code 4401, D1.3/D1.4)', () => {
+    const service = start();
+    let ended = 0;
+    service.sessionEnded.subscribe(() => (ended += 1));
+    FakeWebSocket.latest().open();
+    FakeWebSocket.latest().end(1000); // normales Ende: keine Meldung
+    expect(ended).toBe(0);
+    vi.advanceTimersByTime(60_000);
+    FakeWebSocket.latest().open();
+    FakeWebSocket.latest().end(4401);
+    expect(ended).toBe(1);
+  });
+
   it('connects with the subprotocol and subscribes the topics', () => {
     const service = start();
     const socket = FakeWebSocket.latest();

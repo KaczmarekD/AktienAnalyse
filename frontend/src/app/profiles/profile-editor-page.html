@@ -284,34 +284,42 @@
     </app-section>
   </div>
 
-  <div class="save-bar" data-bar="save" [class.sticky-bar]="dirty()">
-    <mat-form-field class="comment" subscriptSizing="dynamic">
-      <mat-label>Kommentar zur neuen Version</mat-label>
-      <input matInput data-field="comment" [value]="comment()" (input)="onComment($event)" />
-    </mat-form-field>
-    <button
-      matButton="outlined"
-      type="button"
-      data-action="discard"
-      disabledInteractive
-      [disabled]="!dirty()"
-      [matTooltip]="discardTip()"
-      (click)="discard()"
-    >
-      Verwerfen
-    </button>
-    <button
-      matButton="filled"
-      type="button"
-      data-action="save"
-      disabledInteractive
-      [disabled]="!canSave()"
-      [matTooltip]="saveTip()"
-      (click)="save()"
-    >
-      {{ saving() ? 'Speichert …' : 'Als neue Version speichern' }}
-    </button>
-  </div>
+  @if (admin()) {
+    <div class="save-bar" data-bar="save" [class.sticky-bar]="dirty()">
+      <mat-form-field class="comment" subscriptSizing="dynamic">
+        <mat-label>Kommentar zur neuen Version</mat-label>
+        <input matInput data-field="comment" [value]="comment()" (input)="onComment($event)" />
+      </mat-form-field>
+      <button
+        matButton="outlined"
+        type="button"
+        data-action="discard"
+        disabledInteractive
+        [disabled]="!dirty()"
+        [matTooltip]="discardTip()"
+        (click)="discard()"
+      >
+        Verwerfen
+      </button>
+      <button
+        matButton="filled"
+        type="button"
+        data-action="save"
+        disabledInteractive
+        [disabled]="!canSave()"
+        [matTooltip]="saveTip()"
+        (click)="save()"
+      >
+        {{ saving() ? 'Speichert …' : 'Als neue Version speichern' }}
+      </button>
+    </div>
+  } @else {
+    <!-- D1.4: Nutzer probieren die Vorschau aus, speichern aber nicht -->
+    <p class="meta" data-readonly>
+      Nur Admins speichern und aktivieren Profile. Die Vorschau oben zeigt trotzdem, was eine
+      Änderung bewirken würde.
+    </p>
+  }
 
   <app-section heading="Versionen" class="versions">
     <ul class="divided-list">
@@ -328,7 +336,7 @@
           <span class="spacer"></span>
           @if (version.active) {
             <span class="badge" tabindex="0" [matTooltip]="tips.active">aktiv</span>
-          } @else {
+          } @else if (admin()) {
             <button
               matButton
               type="button"

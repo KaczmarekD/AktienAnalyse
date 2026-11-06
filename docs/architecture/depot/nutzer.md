@@ -28,7 +28,7 @@ ADR-0007 nennt diesen Fall selbst als Auslöser für einen Login.
 | NUT-06 | Muss | Schutz gegen Durchprobieren: Nach 5 Fehlversuchen je Konto oder je IP-Adresse 15 Minuten Sperre. Die IP-Adresse kommt über eine Vertrauenskette der Proxys (Regel 10), sonst sperrt die Regel alle. Jeder Anmeldeversuch wird protokolliert. |
 | NUT-07 | Muss | HTTPS für jeden Zugriff mit Login. Ohne HTTPS setzt der Browser kein `Secure`-Cookie. Nur der lokale Stack (`make local-*`) darf ohne HTTPS laufen, per Setting. |
 | NUT-08 | Muss | WebSocket: Der Handshake prüft Sitzung und `Origin`. Topics mit Nutzerbezug (`depot:<id>`, `bank-sync:<id>`, `user:<id>`) bekommt nur, wer berechtigt ist. Endet die Sitzung, trennt der Hub die Verbindung. |
-| NUT-09 | Muss | Jeder Endpunkt verlangt eine Sitzung, außer `GET /api/v1/health`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` (löscht nur das Cookie), `POST /api/v1/auth/confirm-email` (dort ist das Token der Nachweis) und der API-Beschreibung (OpenAPI, keine Daten). Ein fremdes Depot ergibt 404, nicht 403. So lässt sich nicht ausprobieren, welche IDs es gibt. Übergang bis D1.4/D1.5: `WEB_API_AUTH_REQUIRED=false` schaltet die Sitzungspflicht ab (Verhalten wie unter ADR-0007). |
+| NUT-09 | Muss | Jeder Endpunkt verlangt eine Sitzung, außer `GET /api/v1/health`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` (löscht nur das Cookie), `GET /api/v1/auth/session` (sagt ohne 401, wer angemeldet ist, D1.4), `POST /api/v1/auth/confirm-email` (dort ist das Token der Nachweis) und der API-Beschreibung (OpenAPI, keine Daten). Ein fremdes Depot ergibt 404, nicht 403. So lässt sich nicht ausprobieren, welche IDs es gibt. Übergang auf der NAS bis D1.5: `WEB_API_AUTH_REQUIRED=false` schaltet die Sitzungspflicht ab (Verhalten wie unter ADR-0007); das eigene Konto und die Nutzerverwaltung brauchen trotzdem eine echte Sitzung. |
 | NUT-10 | Soll | Der Admin hinterlegt die Mail-Adresse beim Anlegen, sie gilt als bestätigt. Ändert ein Nutzer sie selbst, gilt die neue erst nach Bestätigung: Mail mit Link auf eine Seite des UI, die das Token per `POST /api/v1/auth/confirm-email` schickt. |
 | NUT-11 | Soll | Ein Nutzer ändert selbst Passwort und Anzeigename, sieht seine Sitzungen und beendet sie („überall abmelden“). |
 | NUT-12 | Soll | Ein Nutzer exportiert alle seine Daten als JSON (Depots, Verlauf, Abos, Hinweise). |
@@ -159,14 +159,20 @@ Das Löschkommando hat der User mit ADR-0012 am 06.11.2026 angenommen.
 |---|---|---|
 | `POST /api/v1/auth/login` | anmelden | – |
 | `POST /api/v1/auth/logout` | abmelden | angemeldet |
+| `GET /api/v1/auth/session` | wer angemeldet ist (`{"user": …}` oder `null`), ohne 401 (D1.4) | – |
 | `POST /api/v1/auth/confirm-email` | Mail-Adresse mit Token bestätigen | – (Token) |
-| `GET /api/v1/me` | eigenes Konto, Rolle | angemeldet |
-| `PUT /api/v1/me/password` | Passwort ändern (altes Passwort nötig) | angemeldet |
-| `PUT /api/v1/me/profile` | Anzeigename, Mail (mit Bestätigung) | angemeldet |
-| `GET /api/v1/me/sessions`, `POST /api/v1/me/sessions/revoke-all` | Sitzungen | angemeldet |
+| `GET /api/v1/me` | eigenes Konto, Rolle, `must_change_password` | angemeldet |
+| `PUT /api/v1/me/password` | Passwort ändern (altes Passwort nötig, Fehlversuche zählen wie beim Anmelden) | angemeldet |
+| `PUT /api/v1/me/profile` | Anzeigename (D1.4), Mail mit Bestätigung (D1.6) | angemeldet |
+| `GET /api/v1/me/sessions`, `POST /api/v1/me/sessions/revoke-all` | Sitzungen, überall abmelden (auch diese) | angemeldet |
 | `GET /api/v1/me/export` | alle eigenen Daten als JSON (NUT-12) | angemeldet |
-| `GET /api/v1/admin/users`, `POST /api/v1/admin/users` | Nutzer auflisten, anlegen | Admin |
-| `POST /api/v1/admin/users/{id}/disable`, `…/enable`, `…/reset-password` | verwalten | Admin |
+| `GET /api/v1/admin/users`, `POST /api/v1/admin/users` | Nutzer auflisten, mit Einmal-Passwort anlegen | Admin |
+| `POST /api/v1/admin/users/{id}/disable`, `…/enable`, `…/reset-password` | verwalten (nicht am eigenen Konto) | Admin |
+
+Seit D1.4 umgesetzt bis auf `confirm-email`, die Mail-Adresse in `/me/profile` und `/me/export`
+(D1.6). `/me` und `/admin` brauchen auch im Übergang eine echte Sitzung. Das Einmal-Passwort
+vergibt der Admin, das UI schlägt ein zufälliges vor; der Server schickt nie ein Passwort zurück.
+Mit Einmal-Passwort antworten alle anderen Endpunkte mit 403, bis es ersetzt ist.
 
 Schützt das web-api bestehende Endpunkte neu, meldet `oasdiff breaking` das womöglich als Bruch,
 weil sich die Sicherheitsangaben ändern. Das Paket D1 klärt, ob das als gewollter Bruch

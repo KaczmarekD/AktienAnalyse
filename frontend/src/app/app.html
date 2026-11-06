@@ -13,7 +13,7 @@
     <span>Value-Analyzer</span>
   </a>
   <nav aria-label="Hauptnavigation">
-    @for (item of nav; track item.path) {
+    @for (item of nav(); track item.path) {
       <a
         [routerLink]="item.path"
         [class.active]="section() === item.path"
@@ -35,8 +35,43 @@
       </span>
     }
   </span>
+  @if (auth.user(); as user) {
+    <a
+      class="pill"
+      data-account
+      routerLink="/account"
+      [class.active]="onAccount()"
+      [attr.aria-current]="onAccount() ? 'page' : null"
+      [attr.aria-label]="'Konto von ' + name(user)"
+      [matTooltip]="controls['nav.account']"
+    >
+      <app-icon name="person" />
+      <span>{{ name(user) }}</span>
+    </a>
+    <button
+      class="round"
+      type="button"
+      data-action="logout"
+      aria-label="Abmelden"
+      [matTooltip]="controls['nav.logout']"
+      (click)="logout()"
+    >
+      <app-icon name="logout" size="md" />
+    </button>
+  } @else if (auth.ready() && !auth.required() && !onLogin()) {
+    <a
+      class="pill"
+      data-login
+      routerLink="/login"
+      aria-label="Anmelden"
+      [matTooltip]="controls['nav.login']"
+    >
+      <app-icon name="login" />
+      <span>Anmelden</span>
+    </a>
+  }
   <a
-    class="help"
+    class="help round"
     routerLink="/glossary"
     aria-label="Begriffe"
     [attr.aria-current]="onGlossary() ? 'page' : null"

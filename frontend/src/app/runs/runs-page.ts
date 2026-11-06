@@ -8,6 +8,7 @@ import { RouterLink } from '@angular/router';
 import { getRunResource, listRunsResource } from '../api/@angular/common.gen';
 import type { RunSummary } from '../api/types.gen';
 import { DayTimePipe, DurationPipe, RunKindPipe } from '../shared/format';
+import { AuthStore } from '../shared/auth/auth.store';
 import { CONTROLS } from '../shared/glossary/controls';
 import { ENTRIES, termTip } from '../shared/glossary/glossary';
 import { LiveStore } from '../shared/realtime/live.store';
@@ -52,6 +53,8 @@ import { StartRunDialog } from './start-run-dialog';
 export class RunsPage {
   private readonly live = inject(LiveStore);
   private readonly dialog = inject(MatDialog);
+  /** D1.4: Läufe starten nur Admins */
+  protected readonly admin = inject(AuthStore).isAdmin;
   protected readonly controls = CONTROLS;
   protected readonly tips = {
     dry_run: termTip(ENTRIES.dry_run),

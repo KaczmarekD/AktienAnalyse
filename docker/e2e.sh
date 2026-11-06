@@ -5,7 +5,8 @@
 # Wegwerf-Stack aus docker-compose.e2e.yml: Datenbank auf tmpfs, UI unter 127.0.0.1:18080,
 # Mailpit unter 127.0.0.1:18025. Seit P5.2 der ganze Stack: NATS, die drei Services, das web-api
 # mit Projektionen. Ablauf: Datenbank, NATS und Mailpit starten, migrieren, Services und UI
-# starten, den Lauf ueber die API ausloesen (docker/e2e_run.py), dann die Pruefungen unter
+# starten, einen Admin anlegen (D1.4, E2E_USERNAME), den Lauf ueber die API ausloesen
+# (docker/e2e_run.py, angemeldet), dann die Pruefungen unter
 # tests/e2e/ (uv) und der Browser-Test unter frontend/e2e/ (Playwright, Chromium aus
 # make ui-e2e-install). Danach wird der Stack entfernt, auch bei einem Fehler.
 # Images: E2E_APP_IMAGE, E2E_FRONTEND_IMAGE, E2E_WEB_API_IMAGE und E2E_<SERVICE>_IMAGE
@@ -47,6 +48,11 @@ echo "=== E2E: Datenbank, NATS und Mailpit starten"
 echo "=== E2E: migrate, Services, web-api und frontend starten"
 "${COMPOSE[@]}" up -d --no-build --wait market-data scoring notification web-api frontend
 "${COMPOSE[@]}" exec -T frontend nginx -t
+
+# D1.4: Der Stack laeuft mit Sitzungspflicht; die Tests melden sich mit diesem Admin an
+echo "=== E2E: Admin $E2E_USERNAME anlegen"
+printf '%s' "$E2E_PASSWORD" | "${COMPOSE[@]}" exec -T web-api \
+    python -m va_web_api.admin create-user "$E2E_USERNAME" --admin --password-stdin
 
 echo "=== E2E: Lauf ueber die API mit tests/fixtures/replay/$E2E_FIXTURE"
 uv run --no-project python -I docker/e2e_run.py "$E2E_BASE_URL"

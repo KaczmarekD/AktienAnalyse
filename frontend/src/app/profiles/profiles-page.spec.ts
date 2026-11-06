@@ -5,6 +5,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
+import { me, provideAuthTesting } from '../testing/auth';
 import { PROFILES } from '../testing/fixtures';
 import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from '../testing/tooltips';
 import { ProfilesPage } from './profiles-page';
@@ -13,8 +14,8 @@ const URL = '/api/v1/scoring/profiles';
 
 type Fixture = ComponentFixture<ProfilesPage>;
 
-function render(): Fixture {
-  TestBed.configureTestingModule({ providers: apiTestingProviders() });
+function render(...extra: unknown[]): Fixture {
+  TestBed.configureTestingModule({ providers: [...apiTestingProviders(), ...(extra as [])] });
   return TestBed.createComponent(ProfilesPage);
 }
 
@@ -30,6 +31,14 @@ function card(fixture: Fixture, id: number): string {
 }
 
 describe('ProfilesPage', () => {
+  it('lets a user look at a profile but calls it "Ansehen" (D1.4)', async () => {
+    const fixture = render(provideAuthTesting({ user: me() }));
+    await respond(fixture, URL, PROFILES);
+    const [link] = query(fixture, '[data-profile="1"] a[data-action="edit"]');
+    expect(link.textContent?.trim()).toBe('Ansehen');
+    expect(tooltip(fixture, link)).toContain('Nur Admins');
+  });
+
   it('says what a profile is and which version counts', async () => {
     const fixture = render();
     await respond(fixture, URL, PROFILES);
