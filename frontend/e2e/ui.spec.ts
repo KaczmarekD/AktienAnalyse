@@ -87,7 +87,7 @@ test('Lauf-Detail zeigt die Mail abgeschottet im iframe', async ({ page, request
   const runs = await getJson<RunSummary[]>(request, '/api/v1/runs');
   const sent = runs.find((run) => run.finished_at !== null && !run.dry_run);
   if (sent === undefined) {
-    throw new Error('kein abgeschlossener Lauf ohne Dry-Run');
+    throw new Error('kein abgeschlossener Lauf ohne Probelauf');
   }
   const run = await getJson<RunDetail>(request, `/api/v1/runs/${sent.id}`);
   expect(run.report_id).not.toBeNull();
@@ -96,7 +96,7 @@ test('Lauf-Detail zeigt die Mail abgeschottet im iframe', async ({ page, request
   await page.goto('/runs');
   await page.getByRole('link', { name: `#${run.id}`, exact: true }).click();
   await expect(page).toHaveURL(`/runs/${run.id}`);
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(`Lauf ${run.id}`);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(`Lauf #${run.id}`);
   await expect(page.getByText(report.subject, { exact: true })).toBeVisible();
 
   const mail = page.locator('iframe[title="Mail des Laufs"]');

@@ -264,6 +264,11 @@ describe('RunStatus', () => {
     const status = element.querySelector('app-run-status');
     expect(status?.getAttribute('data-status')).toBe('failed');
     expect(status?.textContent?.trim()).toBe('fehlgeschlagen');
+    // Bedeutung ohne Farbe: Icon und Tooltip aus dem Glossar
+    expect(status?.querySelector('app-icon svg')).not.toBeNull();
+    expect(tooltip(fixture, status?.querySelector('[tabindex="0"]') ?? null)).toContain(
+      'abgebrochen',
+    );
   });
 
   it('shows the progress of a running fetch only when there is one', () => {
@@ -274,7 +279,10 @@ describe('RunStatus', () => {
     fixture.detectChanges();
     const progress = element.querySelector('[data-progress]');
     expect(progress?.textContent?.trim()).toBe('57/90');
-    expect(progress?.getAttribute('title')).toBe('SAP.DE');
+    // Tooltip statt nativem title (Spec, Technik)
+    expect(progress?.hasAttribute('title')).toBe(false);
+    expect(tooltip(fixture, progress)).toBe('57 von 90 Titeln abgerufen, zuletzt SAP.DE.');
+    expect(element.querySelector('[data-progress] [role="progressbar"]')).not.toBeNull();
   });
 });
 
@@ -301,6 +309,8 @@ describe('NoticeBox', () => {
     const { fixture, element } = render(NoticeHost);
     fixture.componentInstance.notice.set({ text: 'Lauf #8 gestartet.' });
     fixture.detectChanges();
+    // Bedeutung ohne Farbe: Erfolg mit Häkchen, Fehler mit Fehler-Icon
+    expect(element.querySelector('[role="status"] app-icon svg')).not.toBeNull();
     expect(element.querySelector('[role="status"]')?.textContent?.trim()).toBe(
       'Lauf #8 gestartet.',
     );

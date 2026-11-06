@@ -74,7 +74,11 @@ function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 }
 
-/** Kürzel aus dem Glossar, die im Text stehen, ohne dass ein Element darum einen Tooltip hat. */
+/**
+ * Kürzel aus dem Glossar, die im Text stehen, ohne dass ein Element darum einen Tooltip hat.
+ * Ausgenommen ist wörtlich wiedergegebener Text in [data-verbatim], etwa der Betreff einer Mail:
+ * Er ist ein Zitat aus den Daten, keine Beschriftung des UI.
+ */
 export function abbreviationsWithoutExplanation(fixture: ComponentFixture<unknown>): string[] {
   const root = fixture.nativeElement as HTMLElement;
   const hosts = tooltipHosts(fixture);
@@ -92,6 +96,9 @@ export function abbreviationsWithoutExplanation(fixture: ComponentFixture<unknow
   const found = new Set<string>();
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('[data-verbatim]')) {
+      continue;
+    }
     const text = node.textContent ?? '';
     for (const abbreviation of ABBREVIATIONS) {
       const pattern = new RegExp(`(?<![\\w.])${escape(abbreviation)}(?![\\w])`);
