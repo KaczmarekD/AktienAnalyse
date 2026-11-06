@@ -10,7 +10,11 @@ import { By } from '@angular/platform-browser';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { FACTORS, PARAMS, PREVIEW, PROFILE } from '../testing/fixtures';
-import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from '../testing/tooltips';
+import {
+  abbreviationsWithoutExplanation,
+  controlsWithoutTooltip,
+  headersWithoutScope,
+} from '../testing/tooltips';
 import { PREVIEW_DEBOUNCE_MS, ProfileEditorPage } from './profile-editor-page';
 
 const DETAIL = '/api/v1/scoring/profiles/1';
@@ -324,5 +328,7 @@ describe('ProfileEditorPage', () => {
     await change(fixture);
     expect(controlsWithoutTooltip(fixture)).toEqual([]);
     expect(abbreviationsWithoutExplanation(fixture)).toEqual([]);
+    // Spaltenköpfe mit scope (Spec, Barrierefreiheit)
+    expect(headersWithoutScope(fixture)).toEqual([]);
   });
 });

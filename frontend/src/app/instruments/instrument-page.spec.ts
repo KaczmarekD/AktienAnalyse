@@ -8,7 +8,11 @@ import { vi } from 'vitest';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { FACTORS, INSTRUMENT, RANKING } from '../testing/fixtures';
-import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from '../testing/tooltips';
+import {
+  abbreviationsWithoutExplanation,
+  controlsWithoutTooltip,
+  headersWithoutScope,
+} from '../testing/tooltips';
 import { InstrumentPage } from './instrument-page';
 
 const URL = '/api/v1/instruments/ALV.DE';
@@ -148,5 +152,7 @@ describe('InstrumentPage', () => {
     const fixture = await loaded();
     expect(controlsWithoutTooltip(fixture)).toEqual([]);
     expect(abbreviationsWithoutExplanation(fixture)).toEqual([]);
+    // Spaltenköpfe mit scope (Spec, Barrierefreiheit)
+    expect(headersWithoutScope(fixture)).toEqual([]);
   });
 });

@@ -3,7 +3,11 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
-import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from './tooltips';
+import {
+  abbreviationsWithoutExplanation,
+  controlsWithoutTooltip,
+  headersWithoutScope,
+} from './tooltips';
 
 @Component({
   imports: [MatTooltipModule],
@@ -13,7 +17,7 @@ import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from './toolt
     <button type="button">Titelname</button>
     <table>
       <tr>
-        <th><span matTooltip="Kurs-Buchwert-Verhältnis.">KBV</span></th>
+        <th scope="col"><span matTooltip="Kurs-Buchwert-Verhältnis.">KBV</span></th>
         <th>Spalte ohne</th>
       </tr>
     </table>
@@ -36,6 +40,12 @@ describe('controlsWithoutTooltip', () => {
       { text: 'Titelname', reason: 'Link mit sprechendem Text' },
     ]);
     expect(missing).toEqual(['button „Ohne Tooltip“', 'th „Spalte ohne“', 'span „Badge ohne“']);
+  });
+});
+
+describe('headersWithoutScope', () => {
+  it('finds table headers without scope', () => {
+    expect(headersWithoutScope(render())).toEqual(['th „Spalte ohne“']);
   });
 });
 

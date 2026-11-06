@@ -66,6 +66,15 @@ export function controlsWithoutTooltip(
     .map(describeElement);
 }
 
+/** Spaltenköpfe ohne scope (Spec, Barrierefreiheit: „Tabellen haben th mit scope“). */
+export function headersWithoutScope(fixture: ComponentFixture<unknown>): string[] {
+  return fixture.debugElement
+    .queryAll(By.css('th'))
+    .map((debug: DebugElement) => debug.nativeElement as Element)
+    .filter((element) => !element.hasAttribute('scope'))
+    .map(describeElement);
+}
+
 const ABBREVIATIONS = Object.values(ENTRIES)
   .filter((entry) => entry.abbr)
   .flatMap((entry) => [entry.label, ...(entry.short ? [entry.short] : [])]);

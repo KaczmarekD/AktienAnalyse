@@ -11,7 +11,11 @@ import { Dispatcher } from '@ngrx/signals/events';
 import { serverEvents } from '../shared/realtime/realtime.events';
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { run } from '../testing/fixtures';
-import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from '../testing/tooltips';
+import {
+  abbreviationsWithoutExplanation,
+  controlsWithoutTooltip,
+  headersWithoutScope,
+} from '../testing/tooltips';
 import { RunsPage } from './runs-page';
 
 const RUNS = '/api/v1/runs?limit=50';
@@ -256,5 +260,7 @@ describe('RunsPage', () => {
     await respond(fixture, '/api/v1/runs/2', run({ id: 2, scoring_run_id: 7 }));
     expect(controlsWithoutTooltip(fixture)).toEqual([]);
     expect(abbreviationsWithoutExplanation(fixture)).toEqual([]);
+    // Spaltenköpfe mit scope (Spec, Barrierefreiheit)
+    expect(headersWithoutScope(fixture)).toEqual([]);
   });
 });
