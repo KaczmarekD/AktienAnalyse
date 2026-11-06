@@ -288,10 +288,12 @@ Das fängt beide Typen ab und ist kein Python-2-Binding.
 
 Der Umbau zu ereignisgetriebenen Services ist umgesetzt (Phasen 0 bis 5 der
 [Roadmap](docs/architecture/roadmap.md)). Offen ist Track F: ADR-0010 sammelt Daten,
-ADR-0011 ist nur vorgeschlagen. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0011), Recherche:
-`docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei Widersprüchen gelten die
-ADRs. Pläne und Recherche-Ergebnisse werden in `docs/` fortgeschrieben, nicht nur im Chat
-besprochen.
+ADR-0011 ist nur vorgeschlagen. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
+als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
+bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007), umgesetzt ist davon
+noch nichts. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
+Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
+fortgeschrieben, nicht nur im Chat besprochen.
 
 **Arbeitsweise:** Umgesetzt wird in Arbeitspaketen nach dem Zyklus
 Test → Implementierung → Grün → Review

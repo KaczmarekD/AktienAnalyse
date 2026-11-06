@@ -2870,3 +2870,103 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
   - Komponententest der Ansicht mit Chart und Sensitivität der Anker.
 - **Implementierung:** Endpunkt `GET /api/v1/instruments/{id}/anchors` und Chart im Titel-Detail.
 - **Review:** Das UI zeigt an, wie viele Jahre die Wertlinie abdeckt.
+
+### Track D – Depots, mehrere Nutzer und Bankanbindung
+
+Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
+[ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis
+[ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md) (angenommen am 06.11.2026).
+
+- **Stand (06.11.2026):** Die ADRs sind angenommen, D1 ist in Pakete geschnitten (unten). Die
+  übrigen offenen Fragen der Spezifikation klärt der User vor der Stufe, die sie braucht.
+- **Pakete:** Jede Stufe D1 bis D9 wird zu Beginn in Pakete geschnitten. Der Entwurf je Paket
+  kommt dann hierher, nach dem Muster der Phasen oben (Test, Implementierung, Review). Die
+  Anforderungs-IDs der Spezifikation (z. B. `NUT-01`, `HIN-K01`) stehen in Tests und Entwürfen.
+- **Grenzen, die jede Stufe einhält:**
+  - Die Golden-Master der Samstags-Mail und die Replay-Fixtures bleiben unverändert.
+  - Contracts und REST-API ändern sich nur additiv. Den Bruch durch die Anmeldung klärt D1.
+  - Neue Abhängigkeiten (argon2-cffi, cryptography, fints, yfinance ≥ 1.8) laufen durch
+    `make check-j4125`.
+  - Jede neue Tabelle bekommt den Löschschutz. Persönliche Schemas bekommen keine Rechte für
+    `va_read`.
+
+#### D1 Mehrere Nutzer – Paketschnitt
+
+- **Stand (06.11.2026):** Entwurf. ADR-0012 ist angenommen, dazu die Fragen 1, 2, 3 und 6 der
+  Spezifikation. Anforderungen: [depot/nutzer.md](depot/nutzer.md). Reihenfolge D1.1 → D1.2 →
+  D1.3; D1.4 kann nach D1.2 parallel laufen; D1.5 und D1.6 zum Schluss.
+- **Ausgangslage im Code:** `va_web_api.security.JsonOnlyMiddleware` (P3.4), `Origin`-Prüfung am
+  WebSocket, Settings in `va_web_api.settings.WebApiSettings` (Präfix `WEB_API_`), letzte
+  Migration `0014_service_roles`, Grants in `va_platform.db.ddl` (`SCHEMAS`, `SERVICE_ROLES`).
+
+**D1.1 Konten, Anmeldung, Sitzungen 🔒** (NUT-01, 02, 04, 05, 06, 09)
+- **Test:**
+  - DB: Tabellen aus [nutzer.md](depot/nutzer.md#datenmodell) mit Löschschutz; `va_read` und
+    `va_app` lesen nichts in `identity` (auch nicht nach erneutem Lauf der Grants).
+  - Domain: Passwortregeln (Länge, Liste häufiger Passwörter), Hash und Prüfung, Sperre nach
+    5 Fehlversuchen je Konto und je IP, Ablauf nach Inaktivität und absolut, Widerruf.
+  - API: Login (204 mit Cookie, 401 bei falschem Passwort, 429 bei Sperre), Logout, `GET /me`;
+    das Cookie enthält nur die ID, in der DB steht ihr SHA-256.
+  - Kommando `python -m va_web_api.admin create-user --admin` legt genau einen Admin an.
+- **Implementierung:** Migration `0015_identity` (Schema, Tabellen, Rolle `va_identity`, eigene
+  Grant-Funktion außerhalb von `SCHEMAS`), Modul `va_web_api.identity` (domain, Repository,
+  Router `auth` und `me`), Setting `WEB_API_IDENTITY_DATABASE_URL`, Passwort `VA_IDENTITY_PASSWORD`
+  in `src.db.migrate`. Hash mit `argon2-cffi`, sofern `make check-j4125` grün ist, sonst
+  `hashlib.scrypt`.
+- **Review:** `/code-review high`, `/security-review`.
+
+**D1.2 Rollen und Schutz der bestehenden Endpunkte 🔒** (NUT-02, 03, 09, Regeln 6 und 7)
+- **Test:**
+  - Eine Tabelle aller Routen: ohne Sitzung 401 außer Health, Login und `confirm-email`.
+  - Nutzer bekommt 403 bei Run starten, Profil speichern und aktivieren; Admin darf.
+  - Schreibende Anfrage mit fremdem `Origin` ergibt 403, auch mit gültigem Cookie.
+  - Log-Filter: Passwort, Token, Sitzungs-ID und Mail-Adresse erscheinen in keinem Log
+    (auch `va_notification.adapters.smtp`).
+- **Implementierung:** `CurrentUser` und `require_admin` als `Depends`, `Origin`-Prüfung in der
+  Middleware neben `JsonOnlyMiddleware`, Filter im Logging. OpenAPI-Snapshot und TS-Client neu
+  (`make ui-api`). Klären, ob `oasdiff breaking` die neuen Sicherheitsangaben als Bruch meldet;
+  wenn ja, als bewusst begründete Ausnahme im Review, nicht als `/api/v2`.
+- **Review:** `/code-review high`, `/security-review`.
+
+**D1.3 WebSocket mit Sitzung 🔒** (NUT-08)
+- **Test:** Handshake ohne Sitzung abgelehnt; Topic `user:<id>` nur für diesen Nutzer; Abmelden
+  trennt die Verbindungen der Sitzung; die globalen Topics (`runs`, `ranking`, `profiles`) wie
+  bisher für alle Angemeldeten.
+- **Implementierung:** Sitzungsprüfung im Endpunkt `/ws`, Berechtigung je Topic im Hub,
+  Golden-Schema `tests/golden/realtime/v1.json` nur additiv.
+- **Review:** `/code-review high`, `/security-review`.
+
+**D1.4 Frontend: Anmeldung und Nutzerverwaltung** (NUT-10, 11, Rollen)
+- **Test:** Komponententests für Login-Seite, Guard und Behandlung von 401 (zurück zum Login);
+  Admin-Ansicht der Nutzer; Playwright: anmelden, Ranking sehen, abmelden, mit leerer Konsole.
+- **Implementierung:** Login-Seite, Route-Guard, Nutzermenü (Passwort ändern, Sitzungen),
+  Verwaltung der Nutzer für Admins, Run-Start und Profil-Editor nur für Admins sichtbar.
+  Der E2E-Stack (`docker/e2e.sh`) legt einen Testnutzer an.
+- **Review:** `/code-review high`.
+
+**D1.5 Betrieb: HTTPS, Proxys, NATS-Nutzer 🔒** (NUT-07, Regeln 9 bis 11)
+- **Test:**
+  - `tests/test_nginx_conf.py`: `set_real_ip_from` nur für das Netz des DSM-Proxys.
+  - Gefälschtes `X-Forwarded-For` von außen ändert die erkannte Adresse nicht.
+  - NATS-Integrationstest (`TEST_NATS_URL`): Ein Dienst ohne Recht kann fremde Subjects weder
+    senden noch lesen.
+  - Cookie ohne `Secure` nur mit dem lokalen Setting.
+- **Implementierung:** NATS-Konfiguration mit einem Nutzer je Dienst (Passwörter in der `.env`),
+  `forwarded_allow_ips` für uvicorn, Runbook-Abschnitt „HTTPS über den Reverse-Proxy von DSM“ in
+  [betrieb-synology.md](betrieb-synology.md) mit `UI_LAN_BIND=127.0.0.1`. Vorher entscheidet der
+  User das Zertifikat (eigene Domain oder eigene CA).
+- **Review:** `/code-review high`, `/security-review`.
+
+**D1.6 Mail-Bestätigung, Datenexport, Löschkommando** (NUT-10, 12, Löschkommando aus ADR-0012)
+- **Test:** Token einmalig und 24 h gültig; `confirm-email` ohne Sitzung; Export enthält alle
+  eigenen Zeilen aus `identity`; `erase_user` entfernt alle Zeilen eines Nutzers in `identity`,
+  schreibt `erasure_log` ohne Inhalte und lässt fremde Zeilen unberührt.
+- **Implementierung:** Event `priv.va.identity.email_confirmation.requested` braucht `VA_PRIVATE`
+  (Plattform-Änderungen aus der Spezifikation, hier zuerst gebaut), Versand in notification mit
+  Empfänger als Parameter von `ReportSender`. `erase_user` zuerst für `identity`, die anderen
+  Besitzer folgen mit ihren Stufen.
+- **Review:** `/code-review high`, `/security-review`.
+
+**Fertig, wenn:** jeder Zugriff eine Anmeldung braucht, Admin und Nutzer getrennte Rechte haben,
+der E2E-Test mit Testnutzer grün ist und das Runbook HTTPS über DSM beschreibt. Die Samstags-Mail
+und ihr Golden-Master bleiben unverändert.

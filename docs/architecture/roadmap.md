@@ -19,6 +19,7 @@
 | 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; F2/F3 warten auf ADR-0011 |
+| D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 📝 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1 in Pakete geschnitten, Umsetzung offen |
 
 **NAS:** Alle offenen NAS-Punkte (unter „Sofort“ und in Phase 0, 2, 3, 5 und F1) erledigt ein
 Durchgang nach dem [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig). Er enthält auch den Altdaten-Import und die Sicherung.
@@ -230,11 +231,42 @@ vorgeschlagen, erst nach Annahme):
 **Fertig, wenn:** über ADR-0011 entschieden ist. Wird es angenommen, außerdem: Das Standardprofil v2
 ist aktiv, und das Titel-Detail zeigt die Anker.
 
+## Track D – Depots, mehrere Nutzer und Bankanbindung
+
+Spezifikation: [depot/README.md](depot/README.md). Details:
+[Implementierungsplan, Track D](implementierungsplan.md#track-d--depots-mehrere-nutzer-und-bankanbindung)
+
+- [x] D0 Entscheidung (du): ADR-0012, ADR-0013 und ADR-0014 angenommen, offene Fragen 1, 2, 3
+      und 6 entschieden (06.11.2026)
+- [ ] D0 Entscheidung (du): übrige offene Fragen der Spezifikation (4, 5, 7–13), jeweils
+      spätestens vor der Stufe, die sie braucht
+- [ ] D0 (du): FinTS-Produktregistrierung als „Privatanwender-Software“ beantragen (kostenlos,
+      10–15 Arbeitstage, [Recherche](../research/2026-11-depot-datenquellen-und-bankzugang.md#fints-produktregistrierung))
+- [ ] D1 Mehrere Nutzer: Login, Sitzungen, Rollen, HTTPS 🔒
+  - [ ] D1.1 Konten, Anmeldung, Sitzungen, Schema `identity` 🔒
+  - [ ] D1.2 Rollen und Schutz der bestehenden Endpunkte, Log-Filter 🔒
+  - [ ] D1.3 WebSocket mit Sitzung, Topics je Nutzer 🔒
+  - [ ] D1.4 Frontend: Anmeldung, Nutzerverwaltung, E2E mit Testnutzer
+  - [ ] D1.5 Betrieb: HTTPS über DSM, Vertrauenskette der Proxys, NATS-Nutzer je Dienst 🔒
+  - [ ] D1.6 Mail-Bestätigung, Datenexport, Löschkommando für `identity`
+- [ ] D2 Wertpapiere über ISIN, Suche, Abdeckung, Tageskurse
+- [ ] D3 Dienst portfolio, Depots und Depotstände
+- [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
+- [ ] D5 Hinweise
+- [ ] D6 News
+- [ ] D7 Berichte mit eigenem Intervall
+- [ ] D8 depot-gateway, Port `DepotSource`, Datei-Adapter 🔒
+- [ ] D9 DKB über FinTS 🔒
+- [ ] NAS (du): HTTPS einrichten (mit D1), neue Passwörter der Rollen in die `.env` (je Stufe)
+
+**Fertig, wenn:** Nutzer ihre Depots angelegt haben, Analyse, Hinweise, News und Berichte darauf
+laufen und der Bestand der DKB nur lesend abrufbar ist.
+
 ## Danach (Ideen, nicht beschlossen)
 
-- Watchlists und Diagramme zum Score-Verlauf
-- Mehrere Mail-Empfänger. Dann auch einen einfachen Login einführen
-  ([ADR-0007](../adr/0007-lan-only-ohne-login.md)).
+- Diagramme zum Score-Verlauf. Watchlists sind als Beobachtungslisten Teil von Track D (DEP-09).
+- Mehrere Mail-Empfänger: mit Track D, Login in D1 ([ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md))
+  und Berichte je Nutzer in D7.
 - Weitere Kanäle in `notification`, z. B. Telegram
 - Wechsel des Datenanbieters (FMP/EODHD) als weiterer Adapter in `market-data`, etwa für eine
   lange Abschlusshistorie der Anker. ESAP (öffentlich ab Juli 2027) als freie Quelle prüfen.

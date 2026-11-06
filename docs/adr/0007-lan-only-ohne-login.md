@@ -1,6 +1,7 @@
 # ADR-0007: Nur im LAN erreichbar, zum Start ohne Login
 
-- **Status:** akzeptiert
+- **Status:** ersetzt durch [ADR-0012](0012-mehrbenutzer-mit-lokalen-konten.md) (06.11.2026). Die
+  vier Schutzregeln unten gelten weiter, ADR-0012 ergänzt sie.
 - **Datum:** 2026-09-30
 
 ## Kontext
