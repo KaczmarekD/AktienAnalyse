@@ -124,12 +124,13 @@ test('Profil-Editor: Vorschau, Speichern, neue Version in der Liste', async ({ p
   const next = standard.latest_version + 1;
 
   await page.goto('/profiles');
-  await page.getByRole('link', { name: 'Standard', exact: true }).click();
+  await page.locator(`[data-profile="${standard.id}"] a[data-action="edit"]`).click();
   await expect(page).toHaveURL(`/profiles/${standard.id}`);
   await expect(page.getByText(`Grundlage: Version ${standard.latest_version}`)).toBeVisible();
 
-  await page.locator('[data-field="value_weight"]').fill('0.3');
-  await expect(page.locator('section.preview tbody tr').first()).toBeVisible();
+  // Gewichtung als Schieberegler in Prozent (G7), das Modell bleibt 0 bis 1
+  await page.locator('[data-field="value_weight"]').fill('30');
+  await expect(page.locator('[data-section="preview"] tbody tr').first()).toBeVisible();
   await page.locator('[data-field="comment"]').fill('Browser-Test');
   await page.locator('button[data-action="save"]').click();
 

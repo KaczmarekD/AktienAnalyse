@@ -1,11 +1,16 @@
-// Profil-Editor (P3.7 mit den Endpunkten aus P3.3): Formular, Live-Vorschau, Speichern mit
-// If-Match, Konflikt (409), Aktivieren. Die Vorschau wartet hier nicht (PREVIEW_DEBOUNCE_MS = 0).
+// Profil-Editor (P3.7 mit den Endpunkten aus P3.3, neu gestaltet mit Track G, G7): Formular in
+// Prozent und Mio. €, Live-Vorschau mit Zusammenfassung, Speichern-Leiste mit Grund im Tooltip,
+// Speichern mit If-Match, Konflikt (409), Aktivieren. Die Vorschau wartet hier nicht
+// (PREVIEW_DEBOUNCE_MS = 0).
 import { HttpTestingController, TestRequest } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { FACTORS, PARAMS, PREVIEW, PROFILE } from '../testing/fixtures';
+import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from '../testing/tooltips';
 import { PREVIEW_DEBOUNCE_MS, ProfileEditorPage } from './profile-editor-page';
 
 const DETAIL = '/api/v1/scoring/profiles/1';
@@ -59,6 +64,24 @@ function expectRequest(url: string, method: string): TestRequest {
   return http().expectOne((r) => r.urlWithParams === url && r.method === method);
 }
 
+function tooltip(fixture: Fixture, element: Element | undefined): string | undefined {
+  return fixture.debugElement
+    .queryAll(By.directive(MatTooltip))
+    .find((debug) => debug.nativeElement === element)
+    ?.injector.get(MatTooltip).message;
+}
+
+function saveButton(fixture: Fixture): HTMLButtonElement {
+  return query<HTMLButtonElement>(fixture, 'button[data-action="save"]')[0];
+}
+
+/** Ändert die Gewichtung und beantwortet die Vorschau, wie es ein Nutzer täte. */
+async function change(fixture: Fixture, percent = '45'): Promise<void> {
+  await type(fixture, 'value_weight', percent);
+  expectRequest(PREVIEW_URL, 'POST').flush(PREVIEW);
+  await settle();
+}
+
 describe('ProfileEditorPage', () => {
   it('uses form fields with an outline (G1, not in the start bundle)', async () => {
     const fixture = await render();
@@ -67,14 +90,32 @@ describe('ProfileEditorPage', () => {
     );
   });
 
-  it('loads the newest version into the form', async () => {
+  it('loads the newest version into the form, in percent and million euros', async () => {
     const fixture = await render();
-    expect(input(fixture, 'value_weight').value).toBe('0.5');
-    expect(input(fixture, 'min_market_cap').value).toBe('300000000');
+    // Die Ansicht rechnet um, das Modell bleibt 0 bis 1 und Euro (Spec, Profil-Editor)
+    expect(input(fixture, 'value_weight').value).toBe('50');
+    expect(input(fixture, 'min_market_cap').value).toBe('300');
+    expect(input(fixture, 'min_value_factor_share').value).toBe('50');
     const content = text(fixture);
-    expect(content).toContain('Standard');
-    expect(content).toContain('Grundlage: Version 2');
-    expect(content).toMatch(/50\s%\sQuality/);
+    expect(query(fixture, 'h1')[0].textContent).toContain('Standard');
+    expect(query(fixture, 'h1')[0].textContent).toContain('aktiv: Version 1');
+    expect(content).toContain('Grundlage: Version 2. Speichern legt Version 3 an.');
+    expect(content).toMatch(/50\s%\sValue · 50\s%\sQuality/);
+  });
+
+  it('keeps the rarely changed fields under Erweitert, closed', async () => {
+    const fixture = await render();
+    const advanced = query(fixture, 'mat-expansion-panel[data-panel="advanced"]')[0];
+    expect(advanced.classList).not.toContain('mat-expanded');
+    for (const field of [
+      'min_value_factor_share',
+      'min_quality_factor_share',
+      'value_trap_value_threshold',
+      'value_trap_quality_threshold',
+    ]) {
+      expect(advanced.querySelector(`[data-field="${field}"]`)).not.toBeNull();
+    }
+    expect(advanced.textContent).toContain('Negative Multiples ausschließen');
   });
 
   it('shows the factors with direction and hint', async () => {
@@ -96,19 +137,39 @@ describe('ProfileEditorPage', () => {
     expect(query(fixture, '[data-activate="1"]')).toHaveLength(0);
   });
 
-  it('previews a change against the active profile', async () => {
+  it('previews a change against the active profile with a summary', async () => {
     const fixture = await render();
-    await type(fixture, 'value_weight', '0.4');
+    await type(fixture, 'value_weight', '40');
     const preview = expectRequest(PREVIEW_URL, 'POST');
     expect(preview.request.body).toEqual({ ...PARAMS, value_weight: 0.4 });
     preview.flush(PREVIEW);
     await settle();
-    const content = text(fixture);
-    expect(content).toContain('Neu in den Top 20: SAP');
-    expect(content).toContain('Nicht mehr in den Top 20: DBK.DE');
-    expect(content).toContain('Value-Trap geändert: BASF');
-    const sap = query(fixture, 'tr[data-symbol="SAP.DE"]')[0];
-    expect(sap.textContent).toContain('↑ 23');
+    expect(text(fixture)).toContain('Abruf 30.10.2026, verglichen mit Standard, Version 1');
+    const summary = (name: string) => query(fixture, `[data-summary="${name}"]`)[0];
+    expect(summary('entered').textContent?.trim()).toBe('1 neu in den Top 20');
+    expect(tooltip(fixture, summary('entered'))).toContain('SAP');
+    expect(summary('left').textContent?.trim()).toBe('1 nicht mehr in den Top 20');
+    expect(tooltip(fixture, summary('left'))).toContain('DBK.DE');
+    expect(summary('trap').textContent?.trim()).toBe('1 Value-Trap geändert');
+    expect(tooltip(fixture, summary('trap'))).toContain('BASF');
+  });
+
+  it('shows the rank change as arrow with an explanation', async () => {
+    const fixture = await render();
+    const delta = query(fixture, 'tr[data-symbol="SAP.DE"] [data-delta]')[0];
+    expect(delta.textContent?.trim()).toBe('23');
+    expect(delta.querySelector('app-icon svg')).not.toBeNull();
+    expect(tooltip(fixture, delta)).toBe('23 Plätze besser als mit dem aktiven Profil (Rang 25).');
+    const same = query(fixture, 'tr[data-symbol="ALV.DE"] [data-delta]')[0];
+    expect(tooltip(fixture, same)).toBe('Gleicher Rang wie mit dem aktiven Profil.');
+  });
+
+  it('converts percent and million euros back for the model', async () => {
+    const fixture = await render();
+    await type(fixture, 'min_market_cap', '500');
+    expect(expectRequest(PREVIEW_URL, 'POST').request.body.min_market_cap).toBe(500_000_000);
+    await type(fixture, 'min_value_factor_share', '60');
+    expect(expectRequest(PREVIEW_URL, 'POST').request.body.min_value_factor_share).toBe(0.6);
   });
 
   it('marks value traps in the preview like the ranking does', async () => {
@@ -118,16 +179,23 @@ describe('ProfileEditorPage', () => {
     expect(row.textContent).toContain('Value-Trap?');
   });
 
-  it('shows a field error and sends no preview for an invalid value', async () => {
+  it('shows a field error in the unit of the field and sends no preview', async () => {
     const fixture = await render();
-    await type(fixture, 'value_weight', '1.5');
+    await type(fixture, 'value_trap_value_threshold', '1.5');
     http().expectNone(PREVIEW_URL);
-    const errors = query(fixture, '[data-error="value_weight"]');
+    const errors = query(fixture, '[data-error="value_trap_value_threshold"]');
     expect(errors).toHaveLength(1);
-    // Zod meldet auf Deutsch: Die Sprache laedt der Editor selbst, nicht das Start-Bundle
-    expect(errors[0].textContent).toContain('Zu groß');
-    const save = query<HTMLButtonElement>(fixture, 'button[data-action="save"]')[0];
-    expect(save.disabled).toBe(true);
+    expect(errors[0].textContent?.trim()).toBe('Wert zwischen 0 und 1.');
+    expect(saveButton(fixture).getAttribute('aria-disabled')).toBe('true');
+    expect(tooltip(fixture, saveButton(fixture))).toBe(
+      'Erst speichern, wenn alle Felder gültig sind.',
+    );
+
+    await type(fixture, 'value_trap_value_threshold', '0.7');
+    await type(fixture, 'min_value_factor_share', '120');
+    expect(query(fixture, '[data-error="min_value_factor_share"]')[0].textContent?.trim()).toBe(
+      'Wert zwischen 0 und 100 %.',
+    );
   });
 
   it('shows the rule the server checks and blocks saving', async () => {
@@ -149,15 +217,44 @@ describe('ProfileEditorPage', () => {
     );
     await settle();
     expect(text(fixture)).toContain('value_factors: mindestens 2 aktive Faktoren');
-    const save = query<HTMLButtonElement>(fixture, 'button[data-action="save"]')[0];
-    expect(save.disabled).toBe(true);
+    expect(saveButton(fixture).getAttribute('aria-disabled')).toBe('true');
+    expect(tooltip(fixture, saveButton(fixture))).toContain('wenn die Regel oben erfüllt ist');
+  });
+
+  it('pins the save bar once something changed and says what saving does', async () => {
+    const fixture = await render();
+    const bar = query(fixture, '[data-bar="save"]')[0];
+    expect(bar.classList).not.toContain('sticky-bar');
+    expect(saveButton(fixture).getAttribute('aria-disabled')).toBe('true');
+    expect(tooltip(fixture, saveButton(fixture))).toContain('Nichts zu speichern');
+
+    await change(fixture);
+    expect(bar.classList).toContain('sticky-bar');
+    expect(saveButton(fixture).getAttribute('aria-disabled')).not.toBe('true');
+    expect(tooltip(fixture, saveButton(fixture))).toBe(
+      'Legt Version 3 an. Aktiv wird sie erst mit „Aktivieren“.',
+    );
+  });
+
+  it('discards the changes back to the base version', async () => {
+    const fixture = await render();
+    await change(fixture);
+    await type(fixture, 'comment', 'verworfen');
+    const discard = query<HTMLButtonElement>(fixture, 'button[data-action="discard"]')[0];
+    expect(tooltip(fixture, discard)).toBe('Setzt alle Felder auf Version 2 zurück.');
+    discard.click();
+    await settle();
+    fixture.detectChanges();
+    expect(input(fixture, 'value_weight').value).toBe('50');
+    expect(input(fixture, 'comment').value).toBe('');
+    expect(query(fixture, '[data-bar="save"]')[0].classList).not.toContain('sticky-bar');
+    // Zurück auf der Grundlage: dieselbe Vorschau wie am Anfang
+    expectRequest(PREVIEW_URL, 'POST').flush(PREVIEW);
   });
 
   it('saves a new version on top of the newest one', async () => {
     const fixture = await render();
-    await type(fixture, 'value_weight', '0.45');
-    expectRequest(PREVIEW_URL, 'POST').flush(PREVIEW);
-    await settle();
+    await change(fixture, '45');
     await type(fixture, 'comment', 'etwas mehr Quality');
     await click('button[data-action="save"]', fixture);
 
@@ -179,6 +276,7 @@ describe('ProfileEditorPage', () => {
 
   it('says while saving and reports a failed save as alert', async () => {
     const fixture = await render();
+    await change(fixture);
     await click('button[data-action="save"]', fixture);
     const button = query<HTMLButtonElement>(fixture, 'button[data-action="save"]')[0];
     expect(button.textContent?.trim()).toBe('Speichert …');
@@ -193,6 +291,7 @@ describe('ProfileEditorPage', () => {
 
   it('offers a reload after a conflict', async () => {
     const fixture = await render();
+    await change(fixture);
     await click('button[data-action="save"]', fixture);
     expectRequest(DETAIL, 'PUT').flush(
       { detail: 'Version 2 ist nicht mehr die neueste (aktuell: 3)' },
@@ -200,6 +299,8 @@ describe('ProfileEditorPage', () => {
     );
     await settle();
     expect(text(fixture)).toContain('Inzwischen wurde eine neuere Version gespeichert');
+    const reload = query(fixture, 'button[data-action="reload"]')[0];
+    expect(tooltip(fixture, reload)).toContain('Deine Änderungen hier gehen verloren');
 
     await click('button[data-action="reload"]', fixture);
     expectRequest(DETAIL, 'GET').flush(PROFILE);
@@ -216,5 +317,12 @@ describe('ProfileEditorPage', () => {
     expectRequest(DETAIL, 'GET').flush({ ...PROFILE, active_version: 2 });
     await settle();
     expect(text(fixture)).toContain('Version 2 ist aktiv');
+  });
+
+  it('explains every control, label and abbreviation (tests 1 and 2)', async () => {
+    const fixture = await render();
+    await change(fixture);
+    expect(controlsWithoutTooltip(fixture)).toEqual([]);
+    expect(abbreviationsWithoutExplanation(fixture)).toEqual([]);
   });
 });
