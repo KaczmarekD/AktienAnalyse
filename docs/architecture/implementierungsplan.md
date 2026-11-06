@@ -2940,3 +2940,36 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   `.term` in `_patterns.scss`, Styleguide.
 - **Review:** Tooltips mit Maus und Tastatur, Start-Bundle unter 500 kB.
 - **NAS (du):** nichts Eigenes.
+
+#### G3 API-Ergänzungen (additiv)
+
+- **Voraussetzung:** Entscheidung E5 (06.11.2026). Unabhängig von G1 und G2.
+- **Ziel:** Tooltips nennen die Werte des Profils, das Titel-Detail zeigt „Rang 1 von N“ und je
+  Faktor das Perzentil.
+- **Test:**
+  - `params_from_config` (`va_contracts.profile`): die Parameter eines Bewertungslaufs aus
+    `scoring.scoring_run.config`, ohne brauchbare Konfiguration `None`.
+  - scoring: `scoring.run.completed` trägt die Parameter des Laufs (`params`, optional,
+    additiv; Golden-Schema bewusst erneuert).
+  - Projektionen (`tests/db/web_api/test_event_manager.py`): Profil und Parameter je
+    Bewertungslauf in `web.ranking_profile`, die Perzentile je Titel in `web.ranking_factor`.
+    Ohne Profil und Parameter keine Zeile.
+  - Lesen aus Tabellen und Projektionen (`test_read_api.py`): `Ranking.profile` (id, Version,
+    Name) und `Ranking.params`; `ScorePoint.ranked_count` (Titel mit Rang im selben Lauf);
+    `Instrument.factor_ranks` aus dem jüngsten Bewertungslauf außer Rescores, nur die Faktoren
+    seines Profils (fehlende Daten als `null`).
+  - Backfill (`test_backfill.py`): beide Tabellen für die Historie, ein zweiter Aufruf fügt
+    nichts an.
+- **Implementierung:**
+  - Vertrag `ScoringRunCompletedV1.params: ProfileParamsV1 | None`, gesetzt im Handler von scoring
+    aus der `ScoringConfig` des Laufs.
+  - Migration `0015`: `web.ranking_profile` und `web.ranking_factor`, nur zum Anfügen
+    (`protect_table`), Rechte für `va_web` und `va_read`. Neue Tabellen statt neuer Spalten, denn
+    die vorhandenen Zeilen lassen sich nicht ändern und der Backfill kann neue Tabellen ganz füllen.
+  - Projektionen `ranking_profile` und `ranking_factor`, Backfill aus `scoring.scoring_run`,
+    `scoring.profile` und `scoring.factor_score`.
+  - `TableReadModel` und `ProjectionReadModel`, Antwortmodelle, OpenAPI-Snapshot, TS-Client.
+- **Nicht in G3:** der nächste geplante Lauf. Der Scheduler kennt nur den fälligen Termin; das kommt,
+  wenn das UI ihn braucht.
+- **Review:** `make api-breaking` grün (nur additive Felder).
+- **NAS (du):** nichts Eigenes; die Migration läuft beim Start, der Backfill danach.

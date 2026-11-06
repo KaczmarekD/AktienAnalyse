@@ -26,6 +26,7 @@ from va_contracts.events.v1 import (
     FundamentalsV1,
     IdentityV1,
     MarketDataV1,
+    ProfileRefV1,
     ProfileSavedV1,
     RankingRowV1,
     ReportSentV1,
@@ -37,6 +38,7 @@ from va_contracts.events.v1 import (
     UniverseInfoV1,
     ValueMetricsV1,
 )
+from va_contracts.profile import ProfileParamsV1
 from va_web_api.events import EventManager, EventMessage
 from va_web_api.projections import register
 
@@ -71,7 +73,9 @@ def _snapshot() -> Envelope[Any]:
     return _env(SNAPSHOT_COMPLETED, data)
 
 
-def _completed(run_id: int | None = 1, trigger: str = "scheduled") -> Envelope[Any]:
+def _completed(
+    run_id: int | None = 1, trigger: str = "scheduled", *, details: bool = True
+) -> Envelope[Any]:
     data = ScoringRunCompletedV1(
         run_id=run_id,
         trigger=trigger,  # type: ignore[arg-type]
@@ -82,6 +86,9 @@ def _completed(run_id: int | None = 1, trigger: str = "scheduled") -> Envelope[A
         universe=UNIVERSE,
         value_weight=0.6,
         quality_weight=0.4,
+        # Track G (G3): Profil, Parameter und Perzentile je Faktor reisen mit
+        profile=ProfileRefV1(profile_id=1, version=3, name="Standard") if details else None,
+        params=ProfileParamsV1(value_trap_value_threshold=0.75) if details else None,
         ranking=[
             RankingRowV1(
                 fundamentals=_fund("A"),
@@ -89,6 +96,7 @@ def _completed(run_id: int | None = 1, trigger: str = "scheduled") -> Envelope[A
                 value_score=0.9,
                 quality_score=0.8,
                 composite_score=0.86,
+                factor_ranks={"ev_ebit": 0.9, "roic": None},
             ),
             RankingRowV1(
                 fundamentals=_fund("B"),
@@ -345,6 +353,26 @@ class TestReadModels:
         assert tuple(row)[:8] == (20, 1, 10, "live", date(2026, 10, 17), "iShares", 0.6, 0.4)
         assert row.created_at == env.time
 
+    def test_profile_and_parameters_of_a_scoring_run(self, engine):
+        _manager(engine, Recorder(engine)).dispatch(_completed())
+        [row] = _rows(
+            engine,
+            "SELECT scoring_run_id, profile_id, profile_version, profile_name, params "
+            "FROM web.ranking_profile",
+        )
+        assert tuple(row)[:4] == (20, 1, 3, "Standard")
+        assert ProfileParamsV1.model_validate(row.params).value_trap_value_threshold == 0.75
+
+    def test_without_profile_and_parameters_there_is_no_profile_row(self, engine):
+        _manager(engine, Recorder(engine)).dispatch(_completed(details=False))
+        assert _rows(engine, "SELECT scoring_run_id FROM web.ranking_profile") == []
+
+    def test_factor_ranks_per_title(self, engine):
+        _manager(engine, Recorder(engine)).dispatch(_completed())
+        rows = _rows(engine, "SELECT scoring_run_id, symbol, ranks FROM web.ranking_factor")
+        # Nur Titel mit Rängen; B und C haben im Test keine
+        assert [tuple(r) for r in rows] == [(20, "A", {"ev_ebit": 0.9, "roic": None})]
+
     def test_a_rescore_is_marked(self, engine):
         _manager(engine, Recorder(engine)).dispatch(_completed(run_id=None, trigger="rescore"))
         [(origin, run_id)] = _rows(engine, "SELECT origin, run_id FROM web.ranking_run")
@@ -369,6 +397,8 @@ class TestProtectionAndRoles:
         for sql in (
             "UPDATE web.ranking_row SET rank_overall = 9",
             "DELETE FROM web.ranking_row",
+            "UPDATE web.ranking_profile SET profile_version = 9",
+            "DELETE FROM web.ranking_factor",
             "DELETE FROM web.inbox",
             "UPDATE web.inbox SET consumer = 'x'",
         ):

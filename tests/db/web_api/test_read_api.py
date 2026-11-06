@@ -90,6 +90,9 @@ def empty_api(request, db_settings, db_url, engine):
         yield client
 
 
+VALUE_FACTORS = {"ev_ebit", "pb", "p_fcf", "shareholder_yield"}
+
+
 def _run(api: TestClient) -> dict:
     [run] = api.get("/api/v1/runs").json()
     return run
@@ -140,6 +143,19 @@ class TestRanking:
         assert ranking["fetched_on"] == date.today().isoformat()
         assert ranking["universe_source"] == "iShares"
 
+    def test_names_profile_and_parameters_of_the_scoring_run(self, api):
+        # Track G (G3): Tooltips nennen Gewichte, Schwellen und Größenschwelle des Laufs
+        ranking = api.get("/api/v1/ranking/latest").json()
+        profile = ranking["profile"]
+        assert profile["name"] == "Standard"
+        assert profile["version"] >= 1
+        params = ranking["params"]
+        assert (params["value_weight"], params["value_trap_value_threshold"]) == (0.6, 0.7)
+        assert params["value_trap_quality_threshold"] == 0.3
+        assert params["min_market_cap"] > 0
+        assert set(params["value_factors"]) <= VALUE_FACTORS
+        assert params["value_factors"]
+
     def test_rows_are_in_rank_order(self, api):
         rows = api.get("/api/v1/ranking/latest").json()["rows"]
         ranks = [row["rank"] for row in rows]
@@ -169,6 +185,25 @@ class TestInstruments:
         [point] = alpha["score_history"]
         assert point["rank"] is not None
         assert point["composite_score"] is not None
+
+    def test_score_point_says_how_many_titles_have_a_rank(self, api):
+        ranking = api.get("/api/v1/ranking/latest").json()
+        ranked = sum(row["rank"] is not None for row in ranking["rows"])
+        [point] = api.get("/api/v1/instruments/AAA.DE").json()["score_history"]
+        assert point["ranked_count"] == ranked
+
+    def test_factor_ranks_of_the_newest_scoring_run(self, api):
+        latest = api.get("/api/v1/ranking/latest").json()
+        factors = api.get("/api/v1/instruments/AAA.DE").json()["factor_ranks"]
+        assert factors["scoring_run_id"] == latest["scoring_run_id"]
+        # Genau die Faktoren des Profils dieses Laufs; fehlende Daten als null
+        active = set(latest["params"]["value_factors"]) | set(latest["params"]["quality_factors"])
+        assert set(factors["ranks"]) == active
+        assert all(rank is None or 0 <= rank <= 1 for rank in factors["ranks"].values())
+        assert any(rank is not None for rank in factors["ranks"].values())
+
+    def test_filtered_title_has_no_factor_ranks(self, api):
+        assert api.get("/api/v1/instruments/TINY.DE").json()["factor_ranks"] is None
 
     def test_filtered_title_has_history_without_scores(self, api):
         [point] = api.get("/api/v1/instruments/TINY.DE").json()["score_history"]

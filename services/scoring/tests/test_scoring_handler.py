@@ -139,6 +139,20 @@ def test_weights_come_from_the_config(bus, mock_universe_df):
     assert (seen[0].data.value_weight, seen[0].data.quality_weight) == (0.5, 0.5)
 
 
+def test_the_event_carries_the_parameters_of_the_run(bus, mock_universe_df):
+    # Track G (G3): das web-api nennt Schwellen und Faktoren des Laufs in Tooltips
+    cfg = ScoringConfig(value_weight=0.5, quality_weight=0.5, value_trap_value_threshold=0.8)
+    _subscribe(bus, FakeStore(), cfg)
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df)
+    params = seen[0].data.params
+    assert params is not None
+    assert (params.value_weight, params.value_trap_value_threshold) == (0.5, 0.8)
+    assert params.min_market_cap == cfg.min_market_cap
+    assert set(params.value_factors) == set(cfg.value_factors)
+    assert set(params.quality_factors) == set(cfg.quality_factors)
+
+
 def test_without_scoreable_data_the_run_fails_with_no_data(bus, mock_universe_df):
     store = FakeStore()
     _subscribe(bus, store)

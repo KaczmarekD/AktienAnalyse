@@ -15,7 +15,7 @@ from src.db import migrate
 from src.db.backfill import backfill_projections
 from tests.db.test_pipeline_db import _patched_run
 
-WEB = ("snapshot_row", "ranking_run", "ranking_row")
+WEB = ("snapshot_row", "ranking_run", "ranking_row", "ranking_profile", "ranking_factor")
 
 
 def _web(added: dict[str, int]) -> dict[str, int]:
@@ -45,6 +45,14 @@ def test_fills_every_projection_from_the_tables(db_settings, engine):
         engine, "SELECT count(*) FROM scoring.score_result WHERE passed_filter"
     )
     assert added["ranking_row"] < added["snapshot_row"]
+    # Track G (G3): Profil und Parameter je Bewertungslauf, Perzentile je bewertetem Titel
+    assert added["ranking_profile"] == added["ranking_run"]
+    assert added["ranking_factor"] == _count(
+        engine,
+        "SELECT count(*) FROM (SELECT DISTINCT scoring_run_id, instrument_id "
+        "FROM scoring.factor_score) f",
+    )
+    assert added["ranking_factor"] > 0
 
 
 def test_a_second_call_adds_nothing(db_settings, engine):
@@ -65,6 +73,22 @@ def test_isin_and_fetch_day_come_along(db_settings, engine):
     assert (row.isin, row.fetch_ok) == ("DE000AAA0001", True)
     assert row.fetched_on is not None
     assert origin == "live"
+
+
+def test_profile_parameters_and_factor_ranks_come_along(db_settings, engine):
+    _patched_run(db_settings)
+    backfill_projections(engine)
+    with engine.connect() as conn:
+        profile = conn.execute(text("SELECT profile_name, params FROM web.ranking_profile")).one()
+        ranks = conn.execute(
+            text("SELECT ranks FROM web.ranking_factor WHERE symbol = 'AAA.DE'")
+        ).scalar_one()
+    assert profile.profile_name == "Standard"
+    assert profile.params["value_trap_value_threshold"] == 0.7
+    # Die Faktoren des Profils, fehlende Daten als null
+    assert set(ranks) == set(profile.params["value_factors"]) | set(
+        profile.params["quality_factors"]
+    )
 
 
 def test_migrate_fills_the_projections(db_settings, engine, db_url, monkeypatch):
