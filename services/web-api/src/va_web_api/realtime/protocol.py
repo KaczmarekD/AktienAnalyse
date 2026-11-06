@@ -24,7 +24,18 @@ from pydantic.alias_generators import to_camel
 PROTOCOL = "va.v1"  # Subprotokoll; ein Client ohne wird beim Handshake abgelehnt
 MAX_MESSAGE_BYTES = 4096  # groessere Nachrichten schliessen die Verbindung (1009)
 MAX_TOPICS = 20
-TOPIC = re.compile(r"(runs|ranking|profiles|instrument:[A-Z0-9][A-Z0-9.\-]{0,19})")
+# D1.3: user:<id> gehoert genau diesem Nutzer (Berechtigung prueft der Endpunkt)
+TOPIC = re.compile(
+    r"(runs|ranking|profiles|instrument:[A-Z0-9][A-Z0-9.\-]{0,19}|user:[1-9][0-9]{0,18})"
+)
+USER_TOPIC = re.compile(r"user:([1-9][0-9]{0,18})")
+CLOSE_SESSION_ENDED = 4401  # D1.3: Sitzung abgemeldet, abgelaufen oder Konto deaktiviert
+
+
+def topic_owner(topic: str) -> int | None:
+    """Der Nutzer, dem ein Topic gehoert; ``None`` fuer die globalen Topics."""
+    match = USER_TOPIC.fullmatch(topic)
+    return None if match is None else int(match.group(1))
 
 
 class ProtocolError(ValueError):

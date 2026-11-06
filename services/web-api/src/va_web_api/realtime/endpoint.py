@@ -12,14 +12,19 @@ ADR-0007 Regel 2). Abgelehnt wird deshalb schon vor dem ``accept`` (HTTP 403):
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ..identity.domain import token_hash
+from ..identity.service import LAN_USER, IdentityService, User
 from ..security import origin_allowed
 from .protocol import (
+    CLOSE_SESSION_ENDED,
     MAX_MESSAGE_BYTES,
     PROTOCOL,
     Error,
@@ -31,6 +36,7 @@ from .protocol import (
     Subscribe,
     Unsubscribe,
     parse_client_message,
+    topic_owner,
 )
 from .replay import Replayer
 
@@ -44,13 +50,42 @@ router = APIRouter()
 
 CLOSE_POLICY = 1008
 CLOSE_TOO_BIG = 1009
+SESSION_CHECK_SECONDS = 60.0  # D1.3: so oft prueft jede Verbindung ihre Sitzung
 
 
-def _has_session(ws: WebSocket, settings: WebApiSettings) -> bool:
+async def _session_user(ws: WebSocket, settings: WebApiSettings) -> tuple[User, str | None] | None:
+    """Wer sich verbindet, mit dem Hash der Sitzung; ``None``: abzulehnen.
+
+    Im Uebergang ohne Sitzungspflicht ``LAN_USER`` ohne Sitzung (wie unter ADR-0007).
+    """
+    if not settings.auth_required:
+        return LAN_USER, None
     identity = getattr(ws.app.state, "identity", None)
-    return identity is not None and (
-        identity.authenticate(ws.cookies.get(settings.cookie_name)) is not None
-    )
+    token = ws.cookies.get(settings.cookie_name)
+    if identity is None or not token:
+        return None
+    # Die Pruefung liest die Datenbank: nicht in der Event-Loop
+    user = await asyncio.to_thread(identity.authenticate, token)
+    return None if user is None else (user, token_hash(token))
+
+
+async def _watch_session(
+    hub: WebSocketHub, client: Client, identity: IdentityService, token: str
+) -> None:
+    """D1.3: trennt, sobald die Sitzung endet (abgelaufen, widerrufen, Konto deaktiviert).
+
+    Ohne ``touch``: Ein offener Tab haelt die Sitzung nicht am Leben.
+    """
+    while True:
+        await asyncio.sleep(SESSION_CHECK_SECONDS)
+        try:
+            user = await asyncio.to_thread(identity.authenticate, token, touch=False)
+        except Exception:
+            log.warning("Sitzung des WebSockets nicht pruefbar", exc_info=True)
+            continue  # Datenbank weg: die Verbindung bleibt, der naechste Takt prueft erneut
+        if user is None:
+            hub.close(client, CLOSE_SESSION_ENDED)
+            return
 
 
 @router.websocket("/ws")
@@ -63,16 +98,26 @@ async def realtime(ws: WebSocket) -> None:
         log.info("WebSocket abgelehnt (Origin %s)", ws.headers.get("origin"))
         await ws.close(code=CLOSE_POLICY)  # vor accept: Uvicorn antwortet mit 403
         return
-    if settings.auth_required and not _has_session(ws, settings):
-        # D1.2: wie REST nur mit Sitzung; Topics je Nutzer und Trennen beim Abmelden folgen in D1.3
+    who = await _session_user(ws, settings)
+    if who is None:
         log.info("WebSocket abgelehnt (ohne Sitzung)")
         await ws.close(code=CLOSE_POLICY)
         return
+    user, session = who
     await ws.accept(subprotocol=PROTOCOL)
 
     hub: WebSocketHub = ws.app.state.hub
     replayer: Replayer = ws.app.state.replayer or Replayer()
-    client = hub.connect(ws)
+    client = hub.connect(ws, user_id=user.id, session=session)
+    watcher = (
+        None
+        if session is None
+        else asyncio.create_task(
+            _watch_session(
+                hub, client, ws.app.state.identity, ws.cookies.get(settings.cookie_name) or ""
+            )
+        )
+    )
     try:
         hub.send(client, Hello(server_time=datetime.now(UTC), last_seq=await replayer.last_seq()))
         while True:
@@ -95,7 +140,20 @@ async def realtime(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         return
     finally:
+        if watcher is not None:
+            watcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await watcher
         await hub.disconnect(client)
+
+
+def _forbidden(client: Client, topics: list[str]) -> str | None:
+    """Das erste Topic, das einem anderen Nutzer gehoert (``user:<id>``), sonst ``None``."""
+    for topic in topics:
+        owner = topic_owner(topic)
+        if owner is not None and owner != client.user_id:
+            return topic
+    return None
 
 
 async def _handle(
@@ -109,6 +167,9 @@ async def _handle(
             hub.send(client, Pong())
         case Unsubscribe(topics=topics):
             hub.unsubscribe(client, topics)
+        case Subscribe(topics=topics) if forbidden := _forbidden(client, topics):
+            # D1.3: kein Topic dieser Nachricht abonnieren, wenn eines fremd ist
+            hub.send(client, Error(code="forbidden", message=f"Kein Zugriff auf {forbidden}"))
         case Subscribe(topics=topics, resume_from=None):
             hub.subscribe(client, topics)
         case Subscribe(topics=topics, resume_from=after):

@@ -2133,7 +2133,7 @@
     },
     "/api/v1/auth/logout": {
       "post": {
-        "description": "Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.",
+        "description": "Beendet die Sitzung auf dem Server, trennt ihre WebSockets und loescht das Cookie.",
         "operationId": "logout",
         "responses": {
           "204": {

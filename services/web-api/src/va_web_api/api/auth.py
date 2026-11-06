@@ -14,7 +14,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from ..identity.service import IdentityService, LoginFailed, LoginLocked, User
+from ..identity.domain import token_hash
+from ..identity.service import LAN_USER, IdentityService, LoginFailed, LoginLocked, User
 from ..models import LoginRequest, Me
 from ..settings import WebApiSettings
 
@@ -51,10 +52,6 @@ Settings = Annotated[WebApiSettings, Depends(_settings)]
 
 UNAUTHORIZED: dict[int | str, dict[str, Any]] = {401: {"description": "Nicht angemeldet"}}
 FORBIDDEN: dict[int | str, dict[str, Any]] = {403: {"description": "Nur fuer Admins"}}
-
-# D1.2, Uebergang bis D1.4/D1.5 (WEB_API_AUTH_REQUIRED=false): wie unter ADR-0007 darf jeder im
-# LAN alles, als waere ein Admin angemeldet
-LAN_USER = User(id=0, username="lan", role="admin", display_name=None, email=None)
 
 
 def _authenticated(request: Request, identity: IdentityService, settings: WebApiSettings) -> User:
@@ -121,8 +118,13 @@ def login(
 
 @router.post("/auth/logout", status_code=204, responses=UNAVAILABLE)
 def logout(request: Request, response: Response, identity: Identity, settings: Settings) -> None:
-    """Beendet die Sitzung auf dem Server und loescht das Cookie im Browser."""
-    identity.logout(request.cookies.get(settings.cookie_name))
+    """Beendet die Sitzung auf dem Server, trennt ihre WebSockets und loescht das Cookie."""
+    token = request.cookies.get(settings.cookie_name)
+    identity.logout(token)
+    broadcaster = getattr(request.app.state, "broadcaster", None)
+    if token and broadcaster is not None:
+        # D1.3: Der Logout laeuft im Threadpool, der Hub in der Event-Loop
+        broadcaster.close_session(token_hash(token))
     response.delete_cookie(
         settings.cookie_name,
         path="/",

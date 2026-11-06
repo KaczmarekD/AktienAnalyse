@@ -179,6 +179,7 @@ inkompatiblen Protokollversion wird schon beim Handshake abgelehnt.
 | `ranking` | neues Ranking (Run oder Rescore) |
 | `profiles` | Profil gespeichert oder aktiviert |
 | `instrument:<SYMBOL>` | neue Daten zu einem Titel |
+| `user:<id>` | seit D1.3: Meldungen nur für diesen Nutzer (später Depots, Berichte). Abonnieren darf nur er selbst, sonst `error` mit Code `forbidden`. |
 
 **Client → Server**
 
@@ -196,7 +197,11 @@ inkompatiblen Protokollversion wird schon beim Handshake abgelehnt.
 | `event` | `topic`, `type`, `seq` (nur dauerhafte Events), `data` | eine Änderung |
 | `resync` | `topic` | Lücke zu groß, der Client lädt per REST neu |
 | `pong` | – | Antwort auf `ping` |
-| `error` | `code`, `message` | z. B. unbekanntes Topic |
+| `error` | `code`, `message` | z. B. unbekanntes Topic (`bad_request`), fremdes Topic (`forbidden`) |
+
+**Trennung durch den Server:** `1008` beim Handshake (fremder `Origin`, ohne Subprotokoll, seit
+D1.2 ohne Sitzung), `1009` bei zu großer Nachricht, `1013` bei voller Warteschlange, seit D1.3
+`4401`, wenn die Sitzung endet: abgemeldet, abgelaufen, widerrufen oder Konto deaktiviert.
 
 ```jsonc
 // Client → Server
@@ -254,6 +259,11 @@ Secrets (SMTP-Passwort, DB-Passwörter) sind nie über die API lesbar oder ände
   Mit dem Sitzungs-Cookie reicht der Preflight allein nicht mehr gegen CSRF.
 - Logs enthalten keine Passwörter, Tokens, Sitzungs-IDs oder Mail-Adressen
   (`va_platform.redaction`).
+
+**Seit D1.3:** Der WebSocket kennt Nutzer und Sitzung jeder Verbindung. `user:<id>`-Topics
+bekommt nur dieser Nutzer. Abmelden trennt alle Verbindungen der Sitzung sofort (`4401`). Jede
+Verbindung prüft ihre Sitzung alle 60 s, ohne sie zu verlängern, und trennt sonst ebenfalls mit
+`4401`.
 
 ## Warum WebSocket und nicht SSE
 

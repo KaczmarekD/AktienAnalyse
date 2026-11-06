@@ -142,7 +142,7 @@ export const login = <ThrowOnError extends boolean = false>(
 /**
  * Logout
  *
- * Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.
+ * Beendet die Sitzung auf dem Server, trennt ihre WebSockets und loescht das Cookie.
  */
 export const logout = <ThrowOnError extends boolean = false>(
   options?: Options<LogoutData, ThrowOnError>,

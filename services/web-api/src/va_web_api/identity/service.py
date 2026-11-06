@@ -59,6 +59,11 @@ class User:
         return cls(record.id, record.username, record.role, record.display_name, record.email)
 
 
+# D1.2, Uebergang bis D1.4/D1.5 (WEB_API_AUTH_REQUIRED=false): wie unter ADR-0007 darf jeder im
+# LAN alles, als waere ein Admin angemeldet. ID 0 gehoert keinem echten Konto.
+LAN_USER = User(id=0, username="lan", role="admin", display_name=None, email=None)
+
+
 @dataclass(frozen=True)
 class LoginResult:
     token: str  # nur fuer das Cookie, gespeichert wird sein Hash
@@ -174,8 +179,12 @@ class IdentityService:
         self._log(name, record.id, ip, "ok", now)
         return LoginResult(token=token, user=User.of(record), expires_at=expires_at)
 
-    def authenticate(self, token: str | None) -> User | None:
-        """Der Nutzer einer gueltigen Sitzung, sonst ``None``. Verlaengert die Inaktivitaetsfrist."""
+    def authenticate(self, token: str | None, *, touch: bool = True) -> User | None:
+        """Der Nutzer einer gueltigen Sitzung, sonst ``None``.
+
+        Mit ``touch`` (Anfragen) verlaengert sie die Inaktivitaetsfrist. Die Pruefung offener
+        WebSockets (D1.3) laeuft ohne: Ein offener Tab ist keine Aktivitaet.
+        """
         if not token:
             return None
         now = self.now()
@@ -191,7 +200,7 @@ class IdentityService:
         record = self._store.get_user(session.user_id)
         if record is None or not record.active:
             return None
-        if self.sessions.needs_touch(session.last_seen, now):
+        if touch and self.sessions.needs_touch(session.last_seen, now):
             self._store.touch_session(id_hash, at=now)
         return User.of(record)
 

@@ -60,7 +60,7 @@ export const loginRequest = <ThrowOnError extends boolean = false>(
 /**
  * Logout
  *
- * Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.
+ * Beendet die Sitzung auf dem Server, trennt ihre WebSockets und loescht das Cookie.
  */
 export const logoutRequest = <ThrowOnError extends boolean = false>(
   options?: Options<LogoutData, ThrowOnError>,
@@ -316,7 +316,7 @@ export const loginResource = <ThrowOnError extends boolean = false>(
 /**
  * Logout
  *
- * Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.
+ * Beendet die Sitzung auf dem Server, trennt ihre WebSockets und loescht das Cookie.
  */
 export const logoutResource = <ThrowOnError extends boolean = false>(
   options?: () => Options<LogoutData, ThrowOnError> | undefined,

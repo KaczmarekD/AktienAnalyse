@@ -87,6 +87,11 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   den Logs von Services, Batch und web-api. Ein neuer Endpunkt braucht einen Eintrag in den
   Tabellen von `services/web-api/tests/test_authz.py`, falls er offen sein oder nur Admins
   zustehen soll.
+- WebSocket seit D1.3: Jede Verbindung kennt Nutzer und Sitzung (`Client.user_id`,
+  `Client.session`). Topics `user:<id>` bekommt nur dieser Nutzer (`topic_owner` im Protokoll).
+  Abmelden trennt die Verbindungen der Sitzung (`HubBroadcaster.close_session`, Code 4401), und
+  jede Verbindung prüft ihre Sitzung im Takt `SESSION_CHECK_SECONDS` ohne Verlängerung
+  (`authenticate(..., touch=False)`).
 - Ohne NATS (`make api` aus der `.venv`) startet es über `src.web:create_app`. Diese Composition
   Root rechnet Vorschau und Profil-Befehle mit dem Code von scoring im selben Prozess
   (`LocalCaller`, Rolle `va_profiles`), denn `va_web_api` darf `va_scoring` nicht importieren.
@@ -324,8 +329,9 @@ Tooltips aus dem Glossar, [Spec](docs/architecture/ui-neugestaltung.md), abgenom
 06.11.2026). Offen ist Track F: ADR-0010 sammelt Daten,
 ADR-0011 ist nur vorgeschlagen. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
 als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
-bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007), umgesetzt ist davon
-noch nichts. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
+bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt sind D1.1 bis
+D1.3 (Konten, Sitzungspflicht, WebSocket je Nutzer), die Sitzungspflicht ist in Compose bis D1.4
+und D1.5 abgeschaltet. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
 fortgeschrieben, nicht nur im Chat besprochen.
 

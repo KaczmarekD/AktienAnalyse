@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
-from .protocol import Event, ServerMessage, encode, event_payload
+from .protocol import CLOSE_SESSION_ENDED, Event, ServerMessage, encode, event_payload
 
 if TYPE_CHECKING:
     from ..events import EventMessage
@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 
 QUEUE_SIZE = 256
 CLOSE_TOO_SLOW = 1013  # "Try Again Later": zu langsam, neu verbinden
+CLOSE_REASONS = {CLOSE_TOO_SLOW: "zu langsam", CLOSE_SESSION_ENDED: "Sitzung beendet"}
 
 
 class Sender(Protocol):
@@ -43,6 +44,8 @@ class Sender(Protocol):
 class Client:
     sender: Sender
     queue: asyncio.Queue[str]
+    user_id: int | None = None  # D1.3: wer verbunden ist (LAN_USER: 0)
+    session: str | None = None  # D1.3: SHA-256 der Sitzungs-ID; None im Uebergang ohne Login
     topics: set[str] = field(default_factory=set)
     held: list[EventMessage] | None = None  # gesetzt, solange nachgespielt wird
     closing: bool = False
@@ -55,8 +58,12 @@ class WebSocketHub:
         self._queue_size = queue_size
         self._clients: set[Client] = set()
 
-    def connect(self, sender: Sender) -> Client:
-        client = Client(sender, asyncio.Queue(maxsize=self._queue_size))
+    def connect(
+        self, sender: Sender, *, user_id: int | None = None, session: str | None = None
+    ) -> Client:
+        client = Client(
+            sender, asyncio.Queue(maxsize=self._queue_size), user_id=user_id, session=session
+        )
         client.writer = asyncio.get_running_loop().create_task(self._write(client))
         self._clients.add(client)
         return client
@@ -114,11 +121,22 @@ class WebSocketHub:
         except asyncio.QueueFull:
             self._close(client, CLOSE_TOO_SLOW)
 
+    def close(self, client: Client, code: int) -> None:
+        """Trennt einen Client mit diesem Code, etwa wenn seine Sitzung endet (D1.3)."""
+        self._close(client, code)
+
+    def close_session(self, session: str) -> None:
+        """Trennt alle Verbindungen einer Sitzung (Abmelden, D1.3)."""
+        for client in list(self._clients):
+            if client.session == session:
+                self._close(client, CLOSE_SESSION_ENDED)
+
     def _close(self, client: Client, code: int) -> None:
         if client.closing:
             return
         client.closing = True
-        log.info("WebSocket-Client zu langsam, getrennt (%d)", code)
+        reason = CLOSE_REASONS.get(code, "ohne Angabe")
+        log.info("WebSocket-Client getrennt (%d, %s)", code, reason)
         if client.writer is not None:
             client.writer.cancel()
         client.closer = asyncio.get_running_loop().create_task(_close_quietly(client, code))
@@ -162,3 +180,10 @@ class HubBroadcaster:
             self._loop.call_soon_threadsafe(self._hub.publish, message)
         except RuntimeError:
             log.debug("Event-Loop beendet, Meldung %s verworfen", message.type)
+
+    def close_session(self, session: str) -> None:
+        """Aus dem Threadpool (Logout, D1.3): alle Verbindungen dieser Sitzung trennen."""
+        try:
+            self._loop.call_soon_threadsafe(self._hub.close_session, session)
+        except RuntimeError:
+            log.debug("Event-Loop beendet, Sitzung nicht mehr zu trennen")

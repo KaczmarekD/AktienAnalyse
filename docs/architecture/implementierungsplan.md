@@ -3213,6 +3213,32 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
 - **Implementierung:** Sitzungsprüfung im Endpunkt `/ws`, Berechtigung je Topic im Hub,
   Golden-Schema `tests/golden/realtime/v1.json` nur additiv.
 - **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (06.11.2026):**
+  - Die Sitzungsprüfung am Handshake kam schon mit D1.2. Neu merkt sich jede Verbindung Nutzer
+    und Sitzung (SHA-256 der ID). Im Übergang (`WEB_API_AUTH_REQUIRED=false`) ist es `LAN_USER`
+    ohne Sitzung.
+  - **Topic `user:<id>`:** Das Muster kommt ins Protokoll, die Nachrichtenmodelle bleiben gleich,
+    also auch Golden-Schema und `protocol.ts`. Abonnieren darf nur der Nutzer mit dieser ID.
+    Sonst antwortet der Server mit `error` (Code `forbidden`) und abonniert kein Topic der
+    Nachricht. `LAN_USER` (ID 0) bekommt kein `user:`-Topic.
+  - **Abmelden** schließt alle Verbindungen dieser Sitzung mit dem neuen Code 4401 („Sitzung
+    beendet“). Der Logout läuft im Threadpool, deshalb über den `HubBroadcaster`.
+  - **Ablauf, Widerruf, deaktiviertes Konto:** Jede Verbindung prüft ihre Sitzung alle 60 s,
+    ohne sie zu verlängern (`authenticate(..., touch=False)`), und schließt sonst mit 4401. Ein
+    offener Tab hält die Sitzung also nicht künstlich am Leben.
+  - **Frontend unverändert:** Nach 4401 verbindet es sich mit wachsender Pause neu und scheitert,
+    bis D1.4 zur Anmeldung führt.
+- **Umgesetzt (06.11.2026, Branch `feat/d1-3-websocket`):**
+  - **Code:** `topic_owner` und `CLOSE_SESSION_ENDED` im Protokoll, `Client.user_id`/`session`,
+    `WebSocketHub.close`/`close_session` und `HubBroadcaster.close_session`, im Endpunkt
+    `_session_user`, `_watch_session` und `_forbidden`. `LAN_USER` zog nach
+    `va_web_api.identity.service`, damit REST und WebSocket dieselbe Definition nutzen.
+  - **Nebenbei behoben:** Die Sitzungsprüfung am Handshake (D1.2) las die Datenbank direkt in der
+    Event-Loop. Jetzt läuft sie per `asyncio.to_thread`.
+  - **Tests:** warten nie blind auf eine Nachricht. Nach jeder Aktion folgt ein `ping`, ein `pong`
+    statt der Erwartung lässt den Test fehlschlagen statt hängen (es gibt kein pytest-timeout).
+  - **Schnittstelle:** Protokollmodelle und Golden-Schema unverändert. Der OpenAPI-Snapshot ändert
+    sich nur in der Beschreibung von `/auth/logout`.
 
 **D1.4 Frontend: Anmeldung und Nutzerverwaltung** (NUT-10, 11, Rollen)
 - **Test:** Komponententests für Login-Seite, Guard und Behandlung von 401 (zurück zum Login);
