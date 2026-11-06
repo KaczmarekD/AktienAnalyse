@@ -13,6 +13,7 @@ export function me(values: Partial<Me> = {}): Me {
     display_name: 'Anna',
     email: null,
     must_change_password: false,
+    pending_email: null,
     ...values,
   };
 }

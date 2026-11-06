@@ -129,8 +129,9 @@ def nats_url() -> str:
 
         nc = await nats.connect(TEST_NATS_URL)
         try:
-            with contextlib.suppress(NotFoundError):
-                await nc.jsm().delete_stream("VA_EVENTS")
+            for stream in ("VA_EVENTS", "VA_PRIVATE"):  # D1.6: auch der private Stream
+                with contextlib.suppress(NotFoundError):
+                    await nc.jsm().delete_stream(stream)
         finally:
             await nc.close()
 

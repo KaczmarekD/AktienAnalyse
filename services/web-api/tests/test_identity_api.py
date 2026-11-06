@@ -167,6 +167,7 @@ class TestSession:
             "display_name": None,
             "email": "dennis@example.com",
             "must_change_password": False,  # D1.4
+            "pending_email": None,  # D1.6: neue Adresse, bis sie bestaetigt ist
         }
 
     def test_me_without_session(self, client):

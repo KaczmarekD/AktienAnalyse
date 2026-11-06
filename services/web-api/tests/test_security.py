@@ -84,7 +84,14 @@ class TestNoCors:
 
 # D1.4: Nur diese Anfragen nehmen ein Passwort entgegen (Anmelden, Passwort aendern, Nutzer
 # anlegen, Einmal-Passwort setzen). Keine Antwort enthaelt eins.
-PASSWORD_REQUESTS = {"LoginRequest", "PasswordChange", "NewAccount", "PasswordReset"}
+# D1.6: dazu das Token aus dem Bestaetigungslink
+PASSWORD_REQUESTS = {
+    "LoginRequest",
+    "PasswordChange",
+    "NewAccount",
+    "PasswordReset",
+    "EmailConfirmation",
+}
 SECRET_WORDS = ("password", "secret", "token")
 
 

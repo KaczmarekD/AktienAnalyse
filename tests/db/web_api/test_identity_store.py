@@ -294,3 +294,122 @@ class TestSessionsOfAUser:
         revoked = store.revoke_sessions(anna, reason="logout", at=T0)
         assert sorted(revoked) == ["a" * 64, "b" * 64]
         assert store.revoke_sessions(anna, reason="logout", at=T0) == []
+
+
+class TestEmailConfirmation:
+    """D1.6 (NUT-10): Eine neue Adresse gilt erst nach Bestaetigung; der Link ist einmalig und
+    gilt 24 h, nur die juengste Anfrage zaehlt. Gespeichert wird nur der Hash des Tokens."""
+
+    def _request(self, store, user_id, token="t" * 64, email="neu@example.com", minute=0):
+        store.add_email_confirmation(
+            user_id,
+            email=email,
+            token_hash=token,
+            expires_at=T0 + timedelta(hours=24, minutes=minute),
+            at=T0 + timedelta(minutes=minute),
+            envelope=None,
+        )
+
+    def test_a_request_is_pending_until_confirmed(self, store):
+        user_id = store.create_user(
+            username="anna",
+            role="user",
+            password_hash=HASH,
+            display_name="Anna",
+            email="alt@example.com",
+            at=T0,
+        )
+        self._request(store, user_id)
+        found = store.find_email_confirmation("t" * 64)
+        assert found is not None
+        assert (found.user_id, found.email, found.used, found.latest) == (
+            user_id,
+            "neu@example.com",
+            False,
+            True,
+        )
+        assert store.pending_email(user_id, now=T0 + timedelta(hours=1)) == "neu@example.com"
+        assert store.get_user(user_id).email == "alt@example.com"  # type: ignore[union-attr]
+
+        assert store.confirm_email("t" * 64, at=T0 + timedelta(hours=1)) is True
+        user = store.get_user(user_id)
+        assert user is not None
+        assert (user.email, user.display_name) == ("neu@example.com", "Anna")
+        assert store.pending_email(user_id, now=T0 + timedelta(hours=2)) is None
+        # Einmalig: ein zweites Mal aendert nichts
+        assert store.confirm_email("t" * 64, at=T0 + timedelta(hours=2)) is False
+        assert store.find_email_confirmation("t" * 64).used  # type: ignore[union-attr]
+
+    def test_only_the_newest_request_counts(self, store):
+        user_id = _user(store)
+        self._request(store, user_id, token="a" * 64, email="eins@example.com")
+        self._request(store, user_id, token="b" * 64, email="zwei@example.com", minute=5)
+        assert not store.find_email_confirmation("a" * 64).latest  # type: ignore[union-attr]
+        assert store.find_email_confirmation("b" * 64).latest  # type: ignore[union-attr]
+        assert store.pending_email(user_id, now=T0 + timedelta(hours=1)) == "zwei@example.com"
+
+    def test_an_expired_request_is_no_longer_pending(self, store):
+        user_id = _user(store)
+        self._request(store, user_id)
+        assert store.pending_email(user_id, now=T0 + timedelta(hours=25)) is None
+
+    def test_unknown_token(self, store):
+        assert store.find_email_confirmation("x" * 64) is None
+
+
+class TestExport:
+    """D1.6 (NUT-12): alle eigenen Zeilen aus identity, ohne Hashes, ohne fremde Zeilen."""
+
+    def test_own_rows_without_secrets(self, store):
+        anna = store.create_user(
+            username="anna",
+            role="user",
+            password_hash=HASH,
+            display_name="Anna",
+            email="anna@example.com",
+            at=T0,
+        )
+        ben = _user(store, "ben")
+        store.create_session(
+            id_hash="a" * 64,
+            user_id=anna,
+            created_at=T0,
+            expires_at=T0 + timedelta(days=30),
+            user_agent="Firefox",
+            ip="10.0.0.1",
+        )
+        store.create_session(
+            id_hash="b" * 64,
+            user_id=ben,
+            created_at=T0,
+            expires_at=T0 + timedelta(days=30),
+            user_agent="Chrome",
+            ip="10.0.0.2",
+        )
+        store.record_login(
+            username="anna", user_id=anna, ip="10.0.0.1", ok=True, reason="ok", at=T0
+        )
+        store.add_email_confirmation(
+            anna,
+            email="neu@example.com",
+            token_hash="c" * 64,
+            expires_at=T0 + timedelta(hours=24),
+            at=T0,
+            envelope=None,
+        )
+        data = store.export(anna)
+        assert set(data) >= {
+            "account",
+            "profiles",
+            "statuses",
+            "passwords",
+            "sessions",
+            "logins",
+            "email_confirmations",
+        }
+        assert data["account"][0]["username"] == "anna"
+        assert [s["user_agent"] for s in data["sessions"]] == ["Firefox"]
+        assert [c["email"] for c in data["email_confirmations"]] == ["neu@example.com"]
+        text = repr(data)
+        for secret in (HASH, "a" * 64, "c" * 64, "Chrome", "ben"):
+            assert secret not in text

@@ -15,7 +15,7 @@ import subprocess
 import sys
 from collections.abc import Awaitable, Callable
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -36,6 +36,8 @@ CONSUMERS = {
         "va.screening.run.failed",
     ],
 }
+# D1.6: Consumer in VA_PRIVATE (Namen ueber beide Streams eindeutig)
+PRIVATE_CONSUMERS = {"notification-private": ["priv.va.identity.email_confirmation.requested"]}
 
 
 def _run(scenario: Callable[[Any, Any], Awaitable[None]]) -> None:
@@ -48,8 +50,9 @@ def _run(scenario: Callable[[Any, Any], Awaitable[None]]) -> None:
         nc = await nats.connect(URL)
         try:
             jsm = nc.jsm()
-            with contextlib.suppress(NotFoundError):
-                await jsm.delete_stream("VA_EVENTS")
+            for stream in ("VA_EVENTS", "VA_PRIVATE"):
+                with contextlib.suppress(NotFoundError):
+                    await jsm.delete_stream(stream)
             await scenario(nc, jsm)
         finally:
             await nc.close()
@@ -69,6 +72,75 @@ def test_stream_as_in_events_md():
         assert config.storage == StorageType.FILE
         assert config.max_age == 30 * DAY
         assert config.duplicate_window == 10 * 60
+
+    _run(scenario)
+
+
+def test_private_stream_only_in_memory_and_for_a_day():
+    """D1.6: VA_PRIVATE (priv.va.>) fuer Mail-Adressen, Links, spaeter Bestaende: nur im Speicher,
+    also nicht im Backup-Ordner natsdata, und nach 24 h weg."""
+    from nats.js.api import StorageType
+
+    from va_platform.nats import provision
+
+    async def scenario(nc: Any, jsm: Any) -> None:
+        await provision(jsm)
+        config = (await jsm.stream_info("VA_PRIVATE")).config
+        assert config.subjects == ["priv.va.>"]
+        assert config.storage == StorageType.MEMORY
+        assert config.max_age == DAY
+        info = await jsm.consumer_info("VA_PRIVATE", "notification-private")
+        assert info.config.filter_subject == "priv.va.identity.email_confirmation.requested"
+
+    _run(scenario)
+
+
+def test_a_service_without_private_consumer_does_not_touch_va_private():
+    """Mit NATS-Nutzern sieht ein Dienst ohne privaten Consumer VA_PRIVATE gar nicht."""
+    from nats.js.errors import NotFoundError
+
+    from va_platform.nats import provision
+
+    async def scenario(nc: Any, jsm: Any) -> None:
+        with contextlib.suppress(NotFoundError):
+            await jsm.delete_stream("VA_PRIVATE")
+        await provision(jsm, consumers=("scoring",))
+        with pytest.raises(NotFoundError):
+            await jsm.stream_info("VA_PRIVATE")
+        await provision(jsm, consumers=("notification-private",))
+        assert (await jsm.stream_info("VA_PRIVATE")).config.subjects == ["priv.va.>"]
+
+    _run(scenario)
+
+
+def test_a_sender_can_ask_for_the_private_stream():
+    """Das web-api sendet nach VA_PRIVATE, ohne dort einen Consumer zu haben."""
+    from nats.js.errors import NotFoundError
+
+    from va_platform.nats import provision
+
+    async def scenario(nc: Any, jsm: Any) -> None:
+        with contextlib.suppress(NotFoundError):
+            await jsm.delete_stream("VA_PRIVATE")
+        await provision(jsm, consumers=("web-api",), streams=("VA_EVENTS", "VA_PRIVATE"))
+        assert (await jsm.stream_info("VA_PRIVATE")).config.storage is not None
+
+    _run(scenario)
+
+
+def test_the_publisher_picks_the_stream_by_subject():
+    from va_platform.messaging import OutboxMessage
+    from va_platform.nats import JetStreamPublisher, provision
+
+    async def scenario(nc: Any, jsm: Any) -> None:
+        await provision(jsm)
+        publisher = JetStreamPublisher(nc.jetstream())
+        await publisher.publish(
+            OutboxMessage(uuid4(), "priv.va.identity.email_confirmation.requested", b"{}")
+        )
+        await publisher.publish(OutboxMessage(uuid4(), "va.screening.run.failed", b"{}"))
+        assert (await jsm.stream_info("VA_PRIVATE")).state.messages == 1
+        assert (await jsm.stream_info("VA_EVENTS")).state.messages == 1
 
     _run(scenario)
 

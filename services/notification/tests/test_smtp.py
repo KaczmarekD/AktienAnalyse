@@ -118,6 +118,23 @@ class TestSmtpSender:
         assert [p.get_filename() for p in parts] == ["ranking.csv"]
         assert parts[0].get_payload(decode=True) == data
 
+    def test_a_mail_to_another_recipient_with_its_own_text(self, fake_smtp, caplog):
+        """D1.6: Die Bestaetigungsmail geht an die neue Adresse, nicht an MAIL_TO."""
+        caplog.set_level("INFO")
+        SmtpSender(CONFIG).send(
+            "Mail-Adresse bestätigen",
+            "<p>Link</p>",
+            recipient="anna@example.com",
+            text="Bitte bestätige: https://va.example/confirm-email?token=x",
+        )
+        msg = fake_smtp[0].messages[0]
+        assert msg["To"] == "anna@example.com"
+        plain = msg.get_body(preferencelist=("plain",))
+        assert plain is not None
+        assert "https://va.example/confirm-email?token=x" in plain.get_content()
+        assert list(msg.iter_attachments()) == []
+        assert "anna@example.com" not in caplog.text
+
     def test_without_prefix_the_subject_stays(self, fake_smtp):
         from dataclasses import replace
 

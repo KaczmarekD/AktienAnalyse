@@ -39,6 +39,7 @@ OPEN = {
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/logout"),
     ("GET", "/api/v1/auth/session"),  # D1.4: wer angemeldet ist, ohne 401
+    ("POST", "/api/v1/auth/confirm-email"),  # D1.6: das Token im Link ist der Nachweis
 }
 ADMIN_ONLY = {
     ("POST", "/api/v1/runs"),

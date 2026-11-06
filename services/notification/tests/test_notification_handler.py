@@ -46,8 +46,16 @@ class FakeSender:
         self.error = error
         self.sent: list[dict[str, Any]] = []
 
-    def send(self, subject, html_body, attachment=None):
-        self.sent.append({"subject": subject, "html": html_body, "attachment": attachment})
+    def send(self, subject, html_body, attachment=None, *, recipient=None, text=None):
+        self.sent.append(
+            {
+                "subject": subject,
+                "html": html_body,
+                "attachment": attachment,
+                "recipient": recipient,
+                "text": text,
+            }
+        )
         if self.error:
             raise self.error
 
@@ -365,3 +373,39 @@ class TestAlreadyDelivered:
         completed = _completed(dry_run=True)
         setup.bus.publish(new_envelope(SCORING_RUN_COMPLETED, completed, source="va/test"))
         assert len(setup.store.reports) == 1
+
+
+class TestEmailConfirmation:
+    """D1.6 (NUT-10): Die Bestaetigungsmail geht an die neue Adresse, ueber den privaten Consumer.
+    Kein Eintrag im Versandprotokoll: Die Adresse gehoert nicht ins Schema reporting."""
+
+    def _request(self, *, expires_in_hours: int = 24) -> Envelope[Any]:
+        from datetime import UTC, timedelta
+
+        from va_contracts.events.v1 import (
+            EMAIL_CONFIRMATION_REQUESTED,
+            EmailConfirmationRequestedV1,
+        )
+
+        data = EmailConfirmationRequestedV1(
+            user_id=2,
+            email="anna@example.com",
+            link="https://va.example/confirm-email?token=abc<x>",
+            expires_at=datetime.now(UTC) + timedelta(hours=expires_in_hours),
+        )
+        return new_envelope(EMAIL_CONFIRMATION_REQUESTED, data, source="va/web-api")
+
+    def test_sends_the_link_to_the_new_address(self, setup):
+        setup.bus.publish(self._request())
+        [mail] = setup.sender.sent
+        assert mail["recipient"] == "anna@example.com"
+        assert mail["subject"] == "Mail-Adresse bestätigen"
+        assert "https://va.example/confirm-email?token=abc&lt;x&gt;" in mail["html"]
+        assert "https://va.example/confirm-email?token=abc<x>" in mail["text"]
+        assert mail["attachment"] is None
+        assert setup.store.deliveries == []
+        assert setup.heartbeat.pings == []
+
+    def test_an_expired_link_is_not_sent(self, setup):
+        setup.bus.publish(self._request(expires_in_hours=-1))
+        assert setup.sender.sent == []
