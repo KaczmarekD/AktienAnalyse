@@ -3,10 +3,9 @@ th {
   white-space: nowrap;
 }
 
+// Symbol hinter dem Namen; Farbe und Größe kommen von .hint
 .symbol {
   margin-left: var(--va-space-sm);
-  color: var(--mat-sys-on-surface-variant);
-  font-size: var(--va-text-sm);
 }
 
 .value-trap {

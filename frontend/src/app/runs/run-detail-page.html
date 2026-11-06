@@ -12,20 +12,20 @@
 
   <dl class="kv-list">
     <dt>Status</dt>
-    <dd [attr.data-status]="run.status">{{ run.status | runStatus }}</dd>
+    <dd><app-run-status [status]="run.status" /></dd>
     <dt>Art</dt>
     <dd>{{ run.kind }}{{ run.force_refresh ? ', neu abgerufen' : '' }}</dd>
     <dt>Start</dt>
-    <dd>{{ run.started_at | date: 'dd.MM.yyyy HH:mm' }}</dd>
+    <dd>{{ run.started_at | dayTime }}</dd>
     <dt>Ende</dt>
-    <dd>{{ run.finished_at ? (run.finished_at | date: 'dd.MM.yyyy HH:mm') : '–' }}</dd>
+    <dd>{{ run.finished_at | dayTime }}</dd>
     <dt>Bewertet</dt>
     <dd>
-      {{ run.scored_count ?? '–' }} von {{ run.universe_size ?? '–' }}, fehlgeschlagen
-      {{ run.failed_count ?? '–' }}
+      {{ run.scored_count | orDash }} von {{ run.universe_size | orDash }}, fehlgeschlagen
+      {{ run.failed_count | orDash }}
     </dd>
     <dt>Exit-Code</dt>
-    <dd>{{ run.exit_code ?? '–' }}</dd>
+    <dd>{{ run.exit_code | orDash }}</dd>
     <dt>Version</dt>
     <dd>{{ run.app_version }}</dd>
   </dl>

@@ -21,7 +21,7 @@
   @if (title.latest; as figures) {
     <h2>Kennzahlen</h2>
     <p class="meta">
-      Stand {{ figures.fetched_on | date: 'dd.MM.yyyy' }}
+      Stand {{ figures.fetched_on | day }}
       @if (!figures.fetch_ok) {
         · Abruf unvollständig
       }
@@ -102,14 +102,14 @@
         <th mat-header-cell *matHeaderCellDef>Bewertet</th>
         <td mat-cell *matCellDef="let point">
           <a [routerLink]="['/ranking', point.scoring_run_id]">
-            {{ point.created_at | date: 'dd.MM.yyyy' }}
+            {{ point.created_at | day }}
           </a>
         </td>
       </ng-container>
       <ng-container matColumnDef="rank">
         <th mat-header-cell *matHeaderCellDef>Rang</th>
         <td mat-cell *matCellDef="let point">
-          {{ point.passed_filter ? (point.rank ?? '–') : 'unter der Größenschwelle' }}
+          {{ point.passed_filter ? (point.rank | orDash) : 'unter der Größenschwelle' }}
         </td>
       </ng-container>
       <ng-container matColumnDef="composite_score">
@@ -127,9 +127,7 @@
       <ng-container matColumnDef="value_trap_flag">
         <th mat-header-cell *matHeaderCellDef>Hinweis</th>
         <td mat-cell *matCellDef="let point">
-          @if (point.value_trap_flag) {
-            <span class="badge badge--error">Value-Trap</span>
-          }
+          <app-value-trap-badge [flagged]="point.value_trap_flag" />
         </td>
       </ng-container>
 

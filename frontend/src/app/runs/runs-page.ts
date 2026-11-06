@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -8,10 +7,12 @@ import { RouterLink } from '@angular/router';
 import { listRunsResource } from '../api/@angular/common.gen';
 import { startRun } from '../api/sdk.gen';
 import type { RunStart } from '../api/types.gen';
-import { errorMessage } from '../shared/api-error';
-import { RunStatusPipe } from '../shared/format';
+import { DayTimePipe, OrDashPipe } from '../shared/format';
 import { LiveStore } from '../shared/realtime/live.store';
+import { loaded, loadError } from '../shared/resource';
+import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
+import { RunStatus } from '../shared/ui/run-status';
 
 /** Optionen eines Runs aus dem UI (P4.7), wie RunOptionsV1 im Event. */
 type RunOptions = Required<RunStart>;
@@ -25,16 +26,17 @@ const DEFAULT_OPTIONS: RunOptions = { force_refresh: false, dry_run: false, noti
 @Component({
   selector: 'app-runs-page',
   imports: [
-    DatePipe,
+    DayTimePipe,
     MatButtonModule,
     MatCheckboxModule,
     MatTableModule,
+    NoticeBox,
+    OrDashPipe,
     PageHeader,
     RouterLink,
-    RunStatusPipe,
+    RunStatus,
   ],
   templateUrl: './runs-page.html',
-  styleUrl: './runs-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RunsPage {
@@ -48,19 +50,14 @@ export class RunsPage {
   /** Fortschritt laufender Abrufe je Run (marketdata.fetch.progressed). */
   protected readonly progress = this.live.progress;
 
-  protected readonly runs = computed(() =>
-    this.resource.hasValue() ? this.resource.value() : undefined,
-  );
-  protected readonly error = computed(() => {
-    const error = this.resource.error();
-    return error ? errorMessage(error, 'Keine Läufe gefunden.') : undefined;
-  });
+  protected readonly runs = computed(() => loaded(this.resource));
+  protected readonly error = computed(() => loadError(this.resource, 'Keine Läufe gefunden.'));
 
   protected readonly columns = ['id', 'started_at', 'kind', 'status', 'scored', 'exit_code'];
 
   protected readonly options = signal<RunOptions>({ ...DEFAULT_OPTIONS });
   protected readonly starting = signal(false);
-  protected readonly notice = signal<string | undefined>(undefined);
+  protected readonly notice = signal<Notice | undefined>(undefined);
 
   protected setOption(name: keyof RunOptions, value: boolean): void {
     this.options.update((options) => ({ ...options, [name]: value }));
@@ -72,17 +69,21 @@ export class RunsPage {
     const result = await startRun({ body: this.options() });
     this.starting.set(false);
     if (result.data) {
-      this.notice.set(`Lauf #${result.data.id} gestartet.`);
+      this.notice.set({ text: `Lauf #${result.data.id} gestartet.` });
       return;
     }
-    const status = result.response?.status;
-    if (status === 409) {
-      const detail = (result.error as { detail?: unknown } | undefined)?.detail;
-      this.notice.set(typeof detail === 'string' ? detail : 'Es läuft schon ein Lauf.');
-    } else if (status === 503) {
-      this.notice.set('Hier lassen sich keine Läufe starten: Das web-api läuft ohne NATS.');
-    } else {
-      this.notice.set('Der Lauf konnte nicht gestartet werden.');
-    }
+    this.notice.set({ text: startFailure(result.response?.status, result.error), error: true });
   }
+}
+
+/** Meldung, wenn der Start scheitert: 409 mit dem Grund des web-api, 503 ohne NATS. */
+function startFailure(status: number | undefined, error: unknown): string {
+  if (status === 409) {
+    const detail = (error as { detail?: unknown } | undefined)?.detail;
+    return typeof detail === 'string' ? detail : 'Es läuft schon ein Lauf.';
+  }
+  if (status === 503) {
+    return 'Hier lassen sich keine Läufe starten: Das web-api läuft ohne NATS.';
+  }
+  return 'Der Lauf konnte nicht gestartet werden.';
 }

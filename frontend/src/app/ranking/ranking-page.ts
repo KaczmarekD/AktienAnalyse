@@ -1,4 +1,3 @@
-import { DatePipe, PercentPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,10 +9,12 @@ import { RouterLink } from '@angular/router';
 
 import { getRankingResource, latestRankingResource } from '../api/@angular/common.gen';
 import type { RankingRow } from '../api/types.gen';
-import { errorMessage, optionalNumber } from '../shared/api-error';
-import { MrdPipe, NumPipe, PctPipe } from '../shared/format';
+import { optionalNumber } from '../shared/api-error';
+import { DayPipe, MrdPipe, NumPipe, OrDashPipe, PctPipe } from '../shared/format';
 import { LiveStore } from '../shared/realtime/live.store';
+import { loaded, loadError } from '../shared/resource';
 import { PageHeader } from '../shared/ui/page-header';
+import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
 
 type IndexFilter = 'all' | 'DAX' | 'MDAX';
 type SortKey = keyof RankingRow;
@@ -22,7 +23,7 @@ type SortKey = keyof RankingRow;
 @Component({
   selector: 'app-ranking-page',
   imports: [
-    DatePipe,
+    DayPipe,
     MatButtonToggleModule,
     MatFormFieldModule,
     MatInputModule,
@@ -32,9 +33,10 @@ type SortKey = keyof RankingRow;
     MrdPipe,
     NumPipe,
     PageHeader,
+    OrDashPipe,
     PctPipe,
-    PercentPipe,
     RouterLink,
+    ValueTrapBadge,
   ],
   templateUrl: './ranking-page.html',
   styleUrl: './ranking-page.scss',
@@ -45,9 +47,9 @@ export class RankingPage {
     transform: optionalNumber,
   });
 
-  // Eine der beiden Resources bleibt untaetig: ohne Optionen schickt sie keine Anfrage
   private readonly live = inject(LiveStore);
-  // Das neueste Ranking laedt neu, wenn der WebSocket ein neues meldet (P4.6)
+  // Eine der beiden Resources bleibt untaetig: ohne Optionen schickt sie keine Anfrage.
+  // Das neueste Ranking laedt neu, wenn der WebSocket ein neues meldet (P4.6).
   private readonly latest = latestRankingResource(() => {
     this.live.rankingVersion();
     return this.scoringRunId() === undefined ? {} : undefined;
@@ -59,16 +61,10 @@ export class RankingPage {
   protected readonly resource = computed(() =>
     this.scoringRunId() === undefined ? this.latest : this.byId,
   );
-  protected readonly ranking = computed(() => {
-    const resource = this.resource();
-    return resource.hasValue() ? resource.value() : undefined;
-  });
-  protected readonly error = computed(() => {
-    const error = this.resource().error();
-    return error
-      ? errorMessage(error, 'Noch kein Bewertungslauf. Er entsteht mit dem ersten Lauf.')
-      : undefined;
-  });
+  protected readonly ranking = computed(() => loaded(this.resource()));
+  protected readonly error = computed(() =>
+    loadError(this.resource(), 'Noch kein Bewertungslauf. Er entsteht mit dem ersten Lauf.'),
+  );
 
   protected readonly index = signal<IndexFilter>('all');
   protected readonly search = signal('');

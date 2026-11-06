@@ -122,9 +122,13 @@ describe('RunsPage', () => {
 
     const request = await start(fixture);
     expect(request.request.body).toEqual({ force_refresh: false, dry_run: true, notify: false });
+    const button = query<HTMLButtonElement>(fixture, 'button[data-action="start"]')[0];
+    expect(button.disabled).toBe(true);
+    expect(button.textContent?.trim()).toBe('Startet …');
     request.flush({ id: 8 }, { status: 202, statusText: 'Accepted' });
     await settle();
-    expect(text(fixture)).toContain('Lauf #8 gestartet');
+    expect(query(fixture, '[role="status"]')[0]?.textContent).toContain('Lauf #8 gestartet');
+    expect(button.textContent?.trim()).toBe('Lauf starten');
   });
 
   it('starts with mail and without dry-run by default', async () => {
@@ -144,7 +148,7 @@ describe('RunsPage', () => {
       { status: 409, statusText: 'Conflict' },
     );
     await settle();
-    expect(text(fixture)).toContain('Lauf #3 läuft noch');
+    expect(query(fixture, '[role="alert"]')[0]?.textContent).toContain('Lauf #3 läuft noch');
   });
 
   it('says when runs cannot be started here', async () => {

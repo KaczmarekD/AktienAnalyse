@@ -31,7 +31,7 @@ h2 {
 // Badge: neutral als Standard, --error nur für Warnungen, die zum Handeln auffordern
 .badge {
   display: inline-block;
-  padding: 0.1rem var(--va-space-sm);
+  padding: var(--va-space-2xs) var(--va-space-sm);
   border-radius: var(--va-radius-pill);
   background-color: var(--mat-sys-tertiary-container);
   color: var(--mat-sys-on-tertiary-container);
@@ -55,20 +55,13 @@ h2 {
   color: var(--mat-sys-on-error);
 }
 
-// Status eines Laufs: jedes Element mit data-status
-[data-status='failed'],
-[data-status='no_data'] {
-  color: var(--mat-sys-error);
-  font-weight: 500;
-}
-
 // Hinweis-Box: neutral als Standard, --error für Konflikte und Fehler
 .notice {
   display: flex;
   flex-wrap: wrap;
   gap: var(--va-space-md);
   align-items: center;
-  padding: var(--va-space-sm) 0.75rem;
+  padding: var(--va-space-sm) var(--va-space-md);
   border-radius: var(--va-radius-box);
   background-color: var(--mat-sys-secondary-container);
   color: var(--mat-sys-on-secondary-container);
@@ -104,7 +97,7 @@ h2 {
 }
 
 .kv-list--grid {
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--va-size-figure), 1fr));
   gap: var(--va-space-md) var(--va-space-xl);
 
   dt {
@@ -112,7 +105,7 @@ h2 {
   }
 
   dd {
-    font-weight: 500;
+    font-weight: var(--va-weight-emphasis);
   }
 }
 
@@ -125,7 +118,7 @@ h2 {
   > li {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: var(--va-space-md);
     align-items: baseline;
     padding: var(--va-space-sm) 0;
     border-bottom: var(--va-divider);

@@ -1,18 +1,29 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 
 import { getInstrumentResource } from '../api/@angular/common.gen';
-import { errorMessage } from '../shared/api-error';
-import { MrdPipe, NumPipe, PctPipe } from '../shared/format';
+import { DayPipe, MrdPipe, NumPipe, OrDashPipe, PctPipe } from '../shared/format';
+import { loaded, loadError } from '../shared/resource';
 import { BackLink } from '../shared/ui/back-link';
 import { PageHeader } from '../shared/ui/page-header';
+import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
 
 /** Ein Titel: Stammdaten, Kennzahlen des neuesten Abrufs, Score-Verlauf (/instruments/:symbol). */
 @Component({
   selector: 'app-instrument-page',
-  imports: [BackLink, DatePipe, MatTableModule, MrdPipe, NumPipe, PageHeader, PctPipe, RouterLink],
+  imports: [
+    BackLink,
+    DayPipe,
+    MatTableModule,
+    MrdPipe,
+    NumPipe,
+    OrDashPipe,
+    PageHeader,
+    PctPipe,
+    RouterLink,
+    ValueTrapBadge,
+  ],
   templateUrl: './instrument-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -21,13 +32,8 @@ export class InstrumentPage {
 
   private readonly resource = getInstrumentResource(() => ({ path: { symbol: this.symbol() } }));
 
-  protected readonly instrument = computed(() =>
-    this.resource.hasValue() ? this.resource.value() : undefined,
-  );
-  protected readonly error = computed(() => {
-    const error = this.resource.error();
-    return error ? errorMessage(error, 'Titel nicht gefunden.') : undefined;
-  });
+  protected readonly instrument = computed(() => loaded(this.resource));
+  protected readonly error = computed(() => loadError(this.resource, 'Titel nicht gefunden.'));
   /** Neueste Bewertung zuerst. */
   protected readonly history = computed(() =>
     [...(this.instrument()?.score_history ?? [])].reverse(),

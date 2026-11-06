@@ -1,6 +1,7 @@
 // Design-Tokens des Value-Analyzers (docs/architecture/styleguide.md).
-// Farben kommen nur aus --mat-sys-*; hier stehen Abstände, Schriftgrößen und Radien.
+// Farben kommen nur aus --mat-sys-*; hier stehen Abstände, Schrift, Radien und wiederkehrende Maße.
 :root {
+  --va-space-2xs: 0.125rem;
   --va-space-xs: 0.25rem;
   --va-space-sm: 0.5rem;
   --va-space-md: 1rem;
@@ -8,9 +9,15 @@
   --va-space-xl: 2rem;
 
   --va-text-sm: 0.8125rem;
+  --va-weight-emphasis: 500;
 
   --va-radius-pill: 0.75rem;
   --va-radius-box: 0.5rem;
+
+  // Mindestbreite einer Kennzahl im Raster (.kv-list--grid)
+  --va-size-figure: 11rem;
+  // Breite des Bedienfelds einer Checkbox; Text darunter rückt so weit ein
+  --va-size-control: 2.5rem;
 
   --va-divider: 1px solid var(--mat-sys-outline-variant);
 }

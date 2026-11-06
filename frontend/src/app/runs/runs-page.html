@@ -26,12 +26,10 @@
     [disabled]="starting()"
     (click)="start()"
   >
-    Lauf starten
+    {{ starting() ? 'Startet …' : 'Lauf starten' }}
   </button>
 </section>
-@if (notice(); as message) {
-  <p class="notice" role="status" data-notice>{{ message }}</p>
-}
+<app-notice [notice]="notice()" />
 
 @if (error(); as message) {
   <p class="message">{{ message }}</p>
@@ -53,7 +51,7 @@
       </ng-container>
       <ng-container matColumnDef="started_at">
         <th mat-header-cell *matHeaderCellDef>Start</th>
-        <td mat-cell *matCellDef="let run">{{ run.started_at | date: 'dd.MM.yyyy HH:mm' }}</td>
+        <td mat-cell *matCellDef="let run">{{ run.started_at | dayTime }}</td>
       </ng-container>
       <ng-container matColumnDef="kind">
         <th mat-header-cell *matHeaderCellDef>Art</th>
@@ -62,23 +60,21 @@
       <ng-container matColumnDef="status">
         <th mat-header-cell *matHeaderCellDef>Status</th>
         <td mat-cell *matCellDef="let run">
-          <span [attr.data-status]="run.status">{{ run.status | runStatus }}</span>
-          @if (run.status === 'running' && progress()[run.id]; as step) {
-            <span class="progress" data-progress [title]="step.symbol"
-              >{{ step.done }}/{{ step.total }}</span
-            >
-          }
+          <app-run-status
+            [status]="run.status"
+            [progress]="run.status === 'running' ? progress()[run.id] : undefined"
+          />
         </td>
       </ng-container>
       <ng-container matColumnDef="scored">
         <th mat-header-cell *matHeaderCellDef>Bewertet</th>
         <td mat-cell *matCellDef="let run">
-          {{ run.scored_count ?? '–' }}/{{ run.universe_size ?? '–' }}
+          {{ run.scored_count | orDash }}/{{ run.universe_size | orDash }}
         </td>
       </ng-container>
       <ng-container matColumnDef="exit_code">
         <th mat-header-cell *matHeaderCellDef>Exit</th>
-        <td mat-cell *matCellDef="let run">{{ run.exit_code ?? '–' }}</td>
+        <td mat-cell *matCellDef="let run">{{ run.exit_code | orDash }}</td>
       </ng-container>
 
       <tr mat-header-row *matHeaderRowDef="columns"></tr>

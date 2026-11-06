@@ -1,6 +1,6 @@
 <app-back-link to="/profiles">Alle Profile</app-back-link>
 
-@if (loadError(); as message) {
+@if (error(); as message) {
   <p class="message">{{ message }}</p>
 } @else if (profile(); as profile) {
   <app-page-header>
@@ -11,9 +11,7 @@
   </app-page-header>
   <p class="meta">Grundlage: Version {{ basedOn() }}. Speichern legt eine neue Version an.</p>
 
-  @if (notice(); as notice) {
-    <p class="notice" role="status">{{ notice }}</p>
-  }
+  <app-notice [notice]="notice()" />
   @if (conflict()) {
     <div class="notice notice--error" role="alert">
       <span>
@@ -39,7 +37,8 @@
           [formField]="form.value_weight"
         />
         <mat-hint
-          >{{ model().value_weight | percent }} Value, {{ quality() | percent }} Quality</mat-hint
+          >{{ model().value_weight | pct: '1.0-0' }} Value,
+          {{ quality() | pct: '1.0-0' }} Quality</mat-hint
         >
       </mat-form-field>
       @for (message of errorsOf('value_weight'); track $index) {
@@ -171,7 +170,7 @@
         [disabled]="!canSave()"
         (click)="save()"
       >
-        Als neue Version speichern
+        {{ saving() ? 'Speichert …' : 'Als neue Version speichern' }}
       </button>
     </section>
 
@@ -181,7 +180,7 @@
         <p class="message">{{ message }}</p>
       } @else if (preview(); as preview) {
         <p class="message">
-          Abruf vom {{ preview.fetched_on | date: 'dd.MM.yyyy' }}, verglichen mit
+          Abruf vom {{ preview.fetched_on | day }}, verglichen mit
           {{
             preview.active
               ? preview.active.name + ' v' + preview.active.version
@@ -232,11 +231,7 @@
                 <td class="delta">{{ delta(row.rank, row.rank_active) }}</td>
                 <td>{{ row.name ?? row.symbol }}</td>
                 <td>{{ row.composite_score | num }}</td>
-                <td>
-                  @if (row.value_trap_flag) {
-                    <span class="badge badge--error">Value-Trap?</span>
-                  }
-                </td>
+                <td><app-value-trap-badge [flagged]="row.value_trap_flag" /></td>
               </tr>
             }
           </tbody>
@@ -256,7 +251,7 @@
       @for (version of profile.versions; track version.version) {
         <li [attr.data-version]="version.version">
           <strong>Version {{ version.version }}</strong>
-          <span>{{ version.created_at | date: 'dd.MM.yyyy HH:mm' }}</span>
+          <span>{{ version.created_at | dayTime }}</span>
           @if (version.parent_version !== null) {
             <span>auf Basis von v{{ version.parent_version }}</span>
           }

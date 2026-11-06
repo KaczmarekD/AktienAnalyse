@@ -1,5 +1,4 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DatePipe, PercentPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -30,10 +29,13 @@ import type {
   ProfileParamsV1Output,
 } from '../api/types.gen';
 import { zProfileParamsV1Input } from '../api/zod.gen';
-import { errorMessage, optionalNumber } from '../shared/api-error';
-import { MrdPipe, NumPipe } from '../shared/format';
+import { optionalNumber } from '../shared/api-error';
+import { DayPipe, DayTimePipe, MISSING, MrdPipe, NumPipe, PctPipe } from '../shared/format';
+import { loaded, loadError } from '../shared/resource';
 import { BackLink } from '../shared/ui/back-link';
+import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
+import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
 
 /** Wartezeit der Live-Vorschau nach der letzten Aenderung (ms); Tests setzen 0. */
 export const PREVIEW_DEBOUNCE_MS = new InjectionToken<number>('PREVIEW_DEBOUNCE_MS', {
@@ -77,17 +79,20 @@ function validationMessage(error: HttpErrorResponse): string {
 @Component({
   selector: 'app-profile-editor-page',
   imports: [
-    DatePipe,
+    BackLink,
+    DayPipe,
+    DayTimePipe,
     FormField,
     MatButtonModule,
     MatCheckboxModule,
     MatFormFieldModule,
     MatInputModule,
-    BackLink,
     MrdPipe,
+    NoticeBox,
     NumPipe,
     PageHeader,
-    PercentPipe,
+    PctPipe,
+    ValueTrapBadge,
   ],
   templateUrl: './profile-editor-page.html',
   styleUrl: './profile-editor-page.scss',
@@ -106,13 +111,10 @@ export class ProfileEditorPage {
   });
   private readonly factorsResource = listFactorsResource(() => ({}));
 
-  protected readonly profile = computed(() =>
-    this.profileResource.hasValue() ? this.profileResource.value() : undefined,
+  protected readonly profile = computed(() => loaded(this.profileResource));
+  protected readonly error = computed(() =>
+    loadError(this.profileResource, 'Profil nicht gefunden.'),
   );
-  protected readonly loadError = computed(() => {
-    const error = this.profileResource.error();
-    return error ? errorMessage(error, 'Profil nicht gefunden.') : undefined;
-  });
   protected readonly valueFactors = computed(() => this.factorsOf('value'));
   protected readonly qualityFactors = computed(() => this.factorsOf('quality'));
 
@@ -125,9 +127,10 @@ export class ProfileEditorPage {
   protected readonly comment = signal('');
   protected readonly quality = computed(() => 1 - this.model().value_weight);
 
-  protected readonly notice = signal<string | undefined>(undefined);
+  protected readonly notice = signal<Notice | undefined>(undefined);
   protected readonly conflict = signal(false);
   protected readonly busy = signal(false);
+  protected readonly saving = signal(false);
   private forceReset = false;
 
   private readonly debounced = signal<Params | undefined>(undefined);
@@ -135,9 +138,7 @@ export class ProfileEditorPage {
     const params = this.debounced();
     return params === undefined ? undefined : { body: params, query: { top: TOP } };
   });
-  protected readonly preview = computed<Preview | undefined>(() =>
-    this.previewResource.hasValue() ? this.previewResource.value() : undefined,
-  );
+  protected readonly preview = computed<Preview | undefined>(() => loaded(this.previewResource));
   /** 422: eine Regel ueber mehrere Felder, die nur der Server prueft (z. B. 2 Faktoren). */
   protected readonly ruleViolation = computed(() => {
     const error = this.previewResource.error();
@@ -145,13 +146,14 @@ export class ProfileEditorPage {
       ? validationMessage(error)
       : undefined;
   });
-  protected readonly previewError = computed(() => {
-    const error = this.previewResource.error();
-    if (!error || this.ruleViolation()) {
-      return undefined;
-    }
-    return errorMessage(error, 'Noch kein Bewertungslauf, mit dem sich vergleichen ließe.');
-  });
+  protected readonly previewError = computed(() =>
+    this.ruleViolation()
+      ? undefined
+      : loadError(
+          this.previewResource,
+          'Noch kein Bewertungslauf, mit dem sich vergleichen ließe.',
+        ),
+  );
   protected readonly topRows = computed(() =>
     (this.preview()?.rows ?? []).filter((row) => row.rank !== null).slice(0, TOP),
   );
@@ -229,13 +231,13 @@ export class ProfileEditorPage {
 
   protected delta(rank: number | null, before: number | null): string {
     if (rank === null) {
-      return '–';
+      return MISSING;
     }
     if (before === null) {
       return 'neu';
     }
     const moved = before - rank;
-    return moved > 0 ? `↑ ${moved}` : moved < 0 ? `↓ ${-moved}` : '–';
+    return moved > 0 ? `↑ ${moved}` : moved < 0 ? `↓ ${-moved}` : MISSING;
   }
 
   protected direction(factor: Factor): string {
@@ -249,6 +251,7 @@ export class ProfileEditorPage {
       return;
     }
     this.busy.set(true);
+    this.saving.set(true);
     this.notice.set(undefined);
     this.conflict.set(false);
     const comment = this.comment().trim();
@@ -258,14 +261,15 @@ export class ProfileEditorPage {
       headers: { 'if-match': `"${basedOn}"` },
     });
     this.busy.set(false);
+    this.saving.set(false);
     if (result.data) {
-      this.notice.set(`Version ${result.data.version} gespeichert, noch nicht aktiv.`);
+      this.notice.set({ text: `Version ${result.data.version} gespeichert, noch nicht aktiv.` });
       this.comment.set('');
       this.profileResource.reload();
     } else if (result.response?.status === 409) {
       this.conflict.set(true);
     } else {
-      this.notice.set('Speichern hat nicht geklappt.');
+      this.notice.set({ text: 'Speichern hat nicht geklappt.', error: true });
     }
   }
 
@@ -286,15 +290,14 @@ export class ProfileEditorPage {
     const result = await activateProfileVersion({ path: { profile_id: id }, body: { version } });
     this.busy.set(false);
     if (result.data) {
-      this.notice.set(`Version ${version} ist aktiv. Der nächste Lauf rechnet damit.`);
+      this.notice.set({ text: `Version ${version} ist aktiv. Der nächste Lauf rechnet damit.` });
       this.profileResource.reload();
     } else {
-      this.notice.set('Aktivieren hat nicht geklappt.');
+      this.notice.set({ text: 'Aktivieren hat nicht geklappt.', error: true });
     }
   }
 
   private factorsOf(group: 'value' | 'quality'): Factor[] {
-    const factors = this.factorsResource.hasValue() ? this.factorsResource.value() : [];
-    return factors.filter((factor) => factor.group === group);
+    return (loaded(this.factorsResource) ?? []).filter((factor) => factor.group === group);
   }
 }

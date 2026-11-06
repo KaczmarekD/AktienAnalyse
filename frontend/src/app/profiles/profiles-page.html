@@ -10,7 +10,7 @@
       @for (profile of profiles; track profile.id) {
         <li [attr.data-profile]="profile.id">
           <a [routerLink]="['/profiles', profile.id]">{{ profile.name }}</a>
-          <span class="meta">v{{ profile.latest_version ?? '–' }}</span>
+          <span class="meta">v{{ profile.latest_version | orDash }}</span>
           @if (profile.active_version !== null) {
             <span class="badge">aktiv: v{{ profile.active_version }}</span>
           }

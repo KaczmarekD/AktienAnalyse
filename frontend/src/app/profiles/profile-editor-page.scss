@@ -1,3 +1,6 @@
+@use '../../styles/breakpoints';
+
+// Die Spaltenbreiten gelten nur für dieses Layout
 .layout {
   display: grid;
   grid-template-columns: minmax(18rem, 26rem) 1fr;
@@ -5,7 +8,7 @@
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: breakpoints.$narrow) {
   .layout {
     grid-template-columns: 1fr;
   }
@@ -22,7 +25,7 @@
 
 // Erklärung unter einer Checkbox, eingerückt auf Höhe des Labels
 .factor .hint {
-  margin: 0 0 var(--va-space-sm) 2.5rem;
+  margin: 0 0 var(--va-space-sm) var(--va-size-control);
 }
 
 .delta {

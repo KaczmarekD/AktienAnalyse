@@ -3,7 +3,7 @@ mat-toolbar {
 }
 
 .brand {
-  font-weight: 500;
+  font-weight: var(--va-weight-emphasis);
 }
 
 nav {
@@ -19,9 +19,7 @@ main {
   padding: var(--va-space-lg);
 }
 
-// P4.6: Verbindungsstatus des WebSockets, sichtbar nur offline
+// P4.6: Verbindungsstatus des WebSockets, sichtbar nur offline; Farbe und Größe von .hint
 .realtime {
   margin-left: auto;
-  font-size: 0.85rem;
-  opacity: 0.8;
 }

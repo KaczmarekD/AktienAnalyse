@@ -1,18 +1,19 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
 import { getReportResource, getRunResource } from '../api/@angular/common.gen';
-import { errorMessage, optionalNumber } from '../shared/api-error';
-import { RunStatusPipe } from '../shared/format';
+import { optionalNumber } from '../shared/api-error';
+import { DayTimePipe, OrDashPipe } from '../shared/format';
+import { loaded, loadError } from '../shared/resource';
 import { BackLink } from '../shared/ui/back-link';
 import { PageHeader } from '../shared/ui/page-header';
+import { RunStatus } from '../shared/ui/run-status';
 
 /** Ein Lauf mit Zaehlern, Fehler und der gerenderten Mail (/runs/:runId). */
 @Component({
   selector: 'app-run-detail-page',
-  imports: [BackLink, DatePipe, PageHeader, RouterLink, RunStatusPipe],
+  imports: [BackLink, DayTimePipe, OrDashPipe, PageHeader, RouterLink, RunStatus],
   templateUrl: './run-detail-page.html',
   styleUrl: './run-detail-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,21 +27,14 @@ export class RunDetailPage {
     const id = this.runId();
     return id === undefined ? undefined : { path: { run_id: id } };
   });
-  protected readonly run = computed(() =>
-    this.runResource.hasValue() ? this.runResource.value() : undefined,
-  );
-  protected readonly error = computed(() => {
-    const error = this.runResource.error();
-    return error ? errorMessage(error, 'Lauf nicht gefunden.') : undefined;
-  });
+  protected readonly run = computed(() => loaded(this.runResource));
+  protected readonly error = computed(() => loadError(this.runResource, 'Lauf nicht gefunden.'));
 
   private readonly reportResource = getReportResource(() => {
     const id = this.run()?.report_id;
     return id == null ? undefined : { path: { report_id: id } };
   });
-  protected readonly report = computed(() =>
-    this.reportResource.hasValue() ? this.reportResource.value() : undefined,
-  );
+  protected readonly report = computed(() => loaded(this.reportResource));
   // Die Mail stammt aus dem eigenen Report-Template. Sie laeuft in einem iframe mit leerem
   // sandbox-Attribut: keine Skripte, kein Zugriff auf die Seite. Deshalb darf ihr eigenes CSS
   // bleiben, das der HTML-Sanitizer von Angular sonst entfernen wuerde.

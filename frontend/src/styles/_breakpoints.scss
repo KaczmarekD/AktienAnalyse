@@ -1,0 +1,6 @@
+// Breakpoints (docs/architecture/styleguide.md). CSS-Variablen gelten in Media Queries nicht,
+// deshalb Sass: @use '../../styles/breakpoints' und @media (max-width: breakpoints.$narrow).
+// Erzeugt kein CSS.
+
+// Darunter stehen zweispaltige Layouts untereinander
+$narrow: 900px;

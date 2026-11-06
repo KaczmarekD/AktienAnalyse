@@ -103,6 +103,13 @@ describe('ProfileEditorPage', () => {
     expect(sap.textContent).toContain('↑ 23');
   });
 
+  it('marks value traps in the preview like the ranking does', async () => {
+    const fixture = await render();
+    const flagged = PREVIEW.rows.find((row) => row.value_trap_flag && row.rank !== null);
+    const row = query(fixture, `tr[data-symbol="${flagged?.symbol}"]`)[0];
+    expect(row.textContent).toContain('Value-Trap?');
+  });
+
   it('shows a field error and sends no preview for an invalid value', async () => {
     const fixture = await render();
     await type(fixture, 'value_weight', '1.5');
@@ -156,7 +163,21 @@ describe('ProfileEditorPage', () => {
     await settle();
     expectRequest(DETAIL, 'GET').flush({ ...PROFILE, latest_version: 3 });
     await settle();
-    expect(text(fixture)).toContain('Version 3 gespeichert');
+    expect(query(fixture, '[role="status"]')[0]?.textContent).toContain('Version 3 gespeichert');
+  });
+
+  it('says while saving and reports a failed save as alert', async () => {
+    const fixture = await render();
+    await click('button[data-action="save"]', fixture);
+    const button = query<HTMLButtonElement>(fixture, 'button[data-action="save"]')[0];
+    expect(button.textContent?.trim()).toBe('Speichert …');
+
+    expectRequest(DETAIL, 'PUT').flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+    expect(query(fixture, '[role="alert"]')[0]?.textContent).toContain(
+      'Speichern hat nicht geklappt',
+    );
+    expect(button.textContent?.trim()).toBe('Als neue Version speichern');
   });
 
   it('offers a reload after a conflict', async () => {
