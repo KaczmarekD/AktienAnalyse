@@ -1,7 +1,7 @@
 # Neugestaltung des UI
 
-> **Status:** Entwurf (04.11.2026, Papier-Design seit 06.11.2026). Die Designvorlage G0 hast du
-> am 06.11.2026 abgenommen, offen sind die Entscheidungen E1 und E3 bis E7.
+> **Status:** Abgenommen am 06.11.2026: die Designvorlage G0 und die Entscheidungen E1 bis E7
+> (E1 und E3 bis E7 wie vorgeschlagen). Umsetzung ab G1.
 > Gilt für alles unter `frontend/`. Klickbare Vorlage: [docs/design/vorlage.html](../design/vorlage.html).
 > Nach der Abnahme kommen die neuen Bausteine zuerst in den [Styleguide](styleguide.md), dann in
 > den Code, so wie es der Styleguide verlangt. Die Pakete stehen in der Roadmap unter
@@ -872,9 +872,9 @@ G2 den ganzen Katalog auf einmal an: Sonst kämen sich vier Pakete in `glossary.
 
 ## Entscheidungen
 
-E2 hast du am 04.11.2026 entschieden. Die übrigen sind Vorschläge, offen bis zu deiner Abnahme:
+E2 hast du am 04.11.2026 entschieden, E1 und E3 bis E7 am 06.11.2026 wie vorgeschlagen angenommen:
 
-| Nr. | Frage | Vorschlag |
+| Nr. | Frage | Entscheidung |
 |---|---|---|
 | E1 | Methodenbegriffe übersetzen? | Nein. Value, Quality, Composite und Value-Trap bleiben, wie in Mail und CSV, und werden per Tooltip erklärt. Alles andere wird deutsch. |
 | E2 | Farbpalette | **Entschieden:** Papier-Design, nur Graustufen und Papierfarbe, Töne wie Archivar. Warnungen stehen in voller Tinte statt in Rot. |
