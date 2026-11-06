@@ -82,19 +82,55 @@ class TestNoCors:
         assert response.status_code != 200
 
 
+# D1.4: Nur diese Anfragen nehmen ein Passwort entgegen (Anmelden, Passwort aendern, Nutzer
+# anlegen, Einmal-Passwort setzen). Keine Antwort enthaelt eins.
+PASSWORD_REQUESTS = {"LoginRequest", "PasswordChange", "NewAccount", "PasswordReset"}
+SECRET_WORDS = ("password", "secret", "token")
+
+
+def _secret_fields(schema: dict) -> list[str]:
+    """Felder, deren Name nach Geheimnis klingt; ein Schalter wie ``must_change_password`` nicht."""
+    return [
+        name
+        for name, prop in schema.get("properties", {}).items()
+        if any(word in name for word in SECRET_WORDS) and prop.get("type") != "boolean"
+    ]
+
+
+def _refs(node: object) -> set[str]:
+    if isinstance(node, dict):
+        found = {node["$ref"].rsplit("/", 1)[-1]} if "$ref" in node else set()
+        return found.union(*(_refs(value) for value in node.values()))
+    if isinstance(node, list):
+        return set().union(*(_refs(value) for value in node))
+    return set()
+
+
 class TestNoSecrets:
-    def test_api_description_mentions_no_secrets(self, client):
-        schema = client.get("/api/v1/openapi.json").json()
-        # D1.1: Nur die Anmeldung nimmt ein Passwort entgegen; keine Antwort enthaelt eins
-        schema["paths"].pop("/api/v1/auth/login")
-        schema["components"]["schemas"].pop("LoginRequest")
-        description = json.dumps(schema, ensure_ascii=False).lower()
-        for word in ("password", "passwort", "secret", "database_url", "smtp", "settings"):
+    def test_api_description_mentions_no_settings(self, client):
+        description = json.dumps(client.get("/api/v1/openapi.json").json()).lower()
+        for word in ("secret", "database_url", "smtp", "settings"):
             assert word not in description, word
 
-    def test_the_password_is_only_part_of_the_login_request(self, client):
+    def test_only_these_requests_take_a_password(self, client):
         schemas = client.get("/api/v1/openapi.json").json()["components"]["schemas"]
-        with_password = sorted(
-            n for n, s in schemas.items() if "password" in s.get("properties", {})
+        assert {name for name, schema in schemas.items() if _secret_fields(schema)} == (
+            PASSWORD_REQUESTS
         )
-        assert with_password == ["LoginRequest"]
+
+    def test_no_response_contains_a_secret(self, client):
+        schema = client.get("/api/v1/openapi.json").json()
+        schemas = schema["components"]["schemas"]
+        responses = _refs(
+            [op.get("responses", {}) for ops in schema["paths"].values() for op in ops.values()]
+        )
+        # Auch, was die Antworten ueber weitere Verweise enthalten
+        seen: set[str] = set()
+        while responses - seen:
+            name = (responses - seen).pop()
+            seen.add(name)
+            responses |= _refs(schemas[name])
+        assert not seen & PASSWORD_REQUESTS
+        assert {
+            name: _secret_fields(schemas[name]) for name in seen if _secret_fields(schemas[name])
+        } == {}

@@ -1,6 +1,82 @@
 {
   "components": {
     "schemas": {
+      "Account": {
+        "additionalProperties": false,
+        "description": "Ein Konto in der Nutzerverwaltung.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "role",
+          "display_name",
+          "email",
+          "active",
+          "must_change_password",
+          "created_at"
+        ],
+        "title": "Account",
+        "type": "object"
+      },
       "ActivateProfileVersion": {
         "additionalProperties": false,
         "properties": {
@@ -147,6 +223,10 @@
       },
       "Health": {
         "properties": {
+          "auth_required": {
+            "title": "Auth Required",
+            "type": "boolean"
+          },
           "status": {
             "const": "ok",
             "title": "Status",
@@ -159,7 +239,8 @@
         },
         "required": [
           "status",
-          "version"
+          "version",
+          "auth_required"
         ],
         "title": "Health",
         "type": "object"
@@ -320,6 +401,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
           "role": {
             "enum": [
               "admin",
@@ -338,9 +423,107 @@
           "username",
           "role",
           "display_name",
-          "email"
+          "email",
+          "must_change_password"
         ],
         "title": "Me",
+        "type": "object"
+      },
+      "NewAccount": {
+        "additionalProperties": false,
+        "description": "Neues Konto mit Einmal-Passwort, das der Nutzer bei der ersten Anmeldung ersetzt.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "one_time_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "One Time Password",
+            "type": "string"
+          },
+          "role": {
+            "default": "user",
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "one_time_password"
+        ],
+        "title": "NewAccount",
+        "type": "object"
+      },
+      "PasswordChange": {
+        "additionalProperties": false,
+        "properties": {
+          "current_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PasswordChange",
+        "type": "object"
+      },
+      "PasswordReset": {
+        "additionalProperties": false,
+        "description": "Neues Einmal-Passwort; alle Sitzungen des Kontos enden.",
+        "properties": {
+          "one_time_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "One Time Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "one_time_password"
+        ],
+        "title": "PasswordReset",
         "type": "object"
       },
       "Preview": {
@@ -838,6 +1021,26 @@
           "active_version"
         ],
         "title": "ProfileSummary",
+        "type": "object"
+      },
+      "ProfileUpdate": {
+        "additionalProperties": false,
+        "description": "Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6).",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "title": "ProfileUpdate",
         "type": "object"
       },
       "ProfileVersion": {
@@ -1814,6 +2017,72 @@
         "title": "ScorePoint",
         "type": "object"
       },
+      "SessionInfo": {
+        "additionalProperties": false,
+        "description": "Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "last_seen": {
+            "format": "date-time",
+            "title": "Last Seen",
+            "type": "string"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "created_at",
+          "last_seen",
+          "expires_at",
+          "user_agent",
+          "current"
+        ],
+        "title": "SessionInfo",
+        "type": "object"
+      },
+      "SessionState": {
+        "additionalProperties": false,
+        "description": "Wer angemeldet ist; ``user`` fehlt ohne gueltige Sitzung (D1.4).",
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Me"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "SessionState",
+        "type": "object"
+      },
       "Snapshot": {
         "additionalProperties": false,
         "properties": {
@@ -2087,6 +2356,262 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/users": {
+      "get": {
+        "description": "Alle Konten in der Reihenfolge, in der sie angelegt wurden.",
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
+                  },
+                  "title": "Response List Users",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "List Users",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Legt ein Konto mit Einmal-Passwort an.",
+        "operationId": "create_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAccount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Name, Mail-Adresse oder Einmal-Passwort ungueltig"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
+          "409": {
+            "description": "Den Benutzernamen gibt es schon"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/disable": {
+      "post": {
+        "description": "Deaktiviert ein Konto; alle seine Sitzungen enden.",
+        "operationId": "disable_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
+          "404": {
+            "description": "Konto unbekannt"
+          },
+          "409": {
+            "description": "Nicht am eigenen Konto"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Disable User",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/enable": {
+      "post": {
+        "description": "Aktiviert ein Konto wieder; es braucht eine neue Anmeldung.",
+        "operationId": "enable_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
+          "404": {
+            "description": "Konto unbekannt"
+          },
+          "409": {
+            "description": "Nicht am eigenen Konto"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Enable User",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/reset-password": {
+      "post": {
+        "description": "Setzt ein Einmal-Passwort; alle Sitzungen des Kontos enden.",
+        "operationId": "reset_password",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordReset"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Einmal-Passwort zu schwach"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
+          "404": {
+            "description": "Konto unbekannt"
+          },
+          "409": {
+            "description": "Nicht am eigenen Konto"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Reset Password",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Meldet an und setzt das Sitzungs-Cookie.",
@@ -2144,6 +2669,28 @@
           }
         },
         "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "description": "Wer angemeldet ist, ohne 401 (D1.4). Das UI fragt das bei jedem Start; ein 401 stuende\nsonst bei jedem Aufruf der Anmeldeseite als Fehler in der Konsole des Browsers.",
+        "operationId": "current_session",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Current Session",
         "tags": [
           "auth"
         ]
@@ -2243,6 +2790,154 @@
         "summary": "Me",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/me/password": {
+      "put": {
+        "description": "Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Bisheriges Passwort falsch oder neues zu schwach"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Zu viele Fehlversuche, voruebergehend gesperrt"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Change Password",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/me/profile": {
+      "put": {
+        "description": "Aendert den Anzeigenamen; leer entfernt ihn.",
+        "operationId": "update_profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Update Profile",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/me/sessions": {
+      "get": {
+        "description": "Die gueltigen eigenen Sitzungen, zuletzt aktive zuerst.",
+        "operationId": "list_sessions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionInfo"
+                  },
+                  "title": "Response List Sessions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/me/sessions/revoke-all": {
+      "post": {
+        "description": "Ueberall abmelden, auch hier; trennt die WebSockets aller Sitzungen.",
+        "operationId": "revoke_all_sessions",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Revoke All Sessions",
+        "tags": [
+          "account"
         ]
       }
     },

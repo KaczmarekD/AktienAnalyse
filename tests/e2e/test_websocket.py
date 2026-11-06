@@ -19,9 +19,19 @@ def _ws_url(base_url: str) -> str:
     return base_url.replace("http://", "ws://", 1).replace("https://", "wss://", 1) + "/ws"
 
 
-def test_own_origin_gets_hello(base_url):
+def _cookie(ui) -> dict[str, str]:
+    """D1.4: Mit Sitzungspflicht braucht der Handshake das Sitzungs-Cookie wie im Browser."""
+    cookies = "; ".join(f"{name}={value}" for name, value in ui.cookies.items())
+    return {"Cookie": cookies} if cookies else {}
+
+
+def test_own_origin_gets_hello(base_url, ui):
     with connect(
-        _ws_url(base_url), origin=Origin(base_url), subprotocols=[PROTOCOL], open_timeout=10
+        _ws_url(base_url),
+        origin=Origin(base_url),
+        subprotocols=[PROTOCOL],
+        additional_headers=_cookie(ui),
+        open_timeout=10,
     ) as ws:
         assert ws.subprotocol == "va.v1"
         hello = json.loads(ws.recv(timeout=10))

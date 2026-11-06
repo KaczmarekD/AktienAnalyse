@@ -48,7 +48,7 @@ from va_platform.nats import NatsBus
 from va_platform.redaction import install_redaction
 
 from .adapters.postgres.identity_store import PostgresIdentityStore
-from .api import auth, health, instruments, ranking, reports, runs, scoring
+from .api import account, admin, auth, health, instruments, ranking, reports, runs, scoring
 from .events import open_event_consumer
 from .identity.service import IdentityService
 from .ports import RemoteUnavailable
@@ -71,6 +71,8 @@ if TYPE_CHECKING:
     from .runs import Schedule
 
 API_PREFIX = "/api/v1"
+# Wo Anfragen Passwoerter enthalten (D1.1, D1.4): ein 422 wiederholt dort keine Eingaben
+PASSWORD_PATHS = (f"{API_PREFIX}/auth/", f"{API_PREFIX}/me/", f"{API_PREFIX}/admin/")
 
 log = logging.getLogger(__name__)
 
@@ -255,8 +257,9 @@ def create_app(
     app.add_middleware(JsonOnlyMiddleware)
     # D1.2: Mit dem Sitzungs-Cookie pruefen schreibende Anfragen auch die Herkunft
     app.add_middleware(OriginCheckMiddleware, allowed=settings.origins)
-    # Ohne Sitzung: Health, Anmelden, Abmelden (NUT-09)
-    for module in (health, auth):
+    # Ohne Sitzung: Health, Anmelden, Abmelden (NUT-09). Eigenes Konto und Nutzerverwaltung
+    # (D1.4) pruefen selbst, und zwar immer eine echte Sitzung, auch im Uebergang
+    for module in (health, auth, account, admin):
         app.include_router(module.router, prefix=API_PREFIX)
     # D1.2: alle anderen nur mit Sitzung, bis D1.4/D1.5 abschaltbar (WEB_API_AUTH_REQUIRED)
     for module in (runs, ranking, instruments, reports, scoring):
@@ -271,8 +274,8 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
-        if request.url.path.startswith(f"{API_PREFIX}/auth/"):
-            # D1.1: Die Standard-Antwort wiederholt die Eingaben, bei der Anmeldung das Passwort
+        if request.url.path.startswith(PASSWORD_PATHS):
+            # D1.1: Die Standard-Antwort wiederholt die Eingaben, hier auch Passwoerter
             errors = [
                 {"loc": e.get("loc"), "msg": e.get("msg"), "type": e.get("type")}
                 for e in exc.errors()

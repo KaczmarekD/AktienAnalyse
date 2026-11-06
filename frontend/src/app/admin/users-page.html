@@ -1,0 +1,219 @@
+<app-page-header>Nutzer</app-page-header>
+<p class="intro">
+  Konten für die Anmeldung. Ein neues Konto bekommt ein Einmal-Passwort, das sein Nutzer bei der
+  ersten Anmeldung ersetzt. Konten werden nie gelöscht, nur deaktiviert.
+</p>
+<app-notice [notice]="notice()" />
+
+@if (oneTime(); as shown) {
+  <div class="one-time" data-one-time>
+    <p>
+      Einmal-Passwort für <strong>{{ shown.username }}</strong
+      >:
+      <code data-verbatim>{{ shown.password }}</code>
+      <button
+        matButton
+        type="button"
+        data-action="copy"
+        [matTooltip]="controls['users.copy']"
+        (click)="copy(shown.password)"
+      >
+        <app-icon name="content_copy" />
+        Kopieren
+      </button>
+    </p>
+    <p class="meta">
+      Gib es persönlich weiter. Es steht nur hier und gilt bis zur ersten Anmeldung, dann setzt
+      {{ shown.username }} ein eigenes Passwort.
+    </p>
+  </div>
+}
+
+<app-section heading="Konten">
+  @if (users(); as users) {
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">
+            <span tabindex="0" [matTooltip]="controls['users.username']">Benutzername</span>
+          </th>
+          <th scope="col">
+            <span tabindex="0" [matTooltip]="controls['users.displayName']">Anzeigename</span>
+          </th>
+          <th scope="col">
+            <span tabindex="0" [matTooltip]="controls['account.role']">Rolle</span>
+          </th>
+          <th scope="col">
+            <span tabindex="0" [matTooltip]="controls['users.state']">Status</span>
+          </th>
+          <th scope="col">
+            <span tabindex="0" [matTooltip]="controls['users.actions']">Aktionen</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (account of users; track account.id) {
+          <tr [attr.data-user]="account.id">
+            <td>
+              <strong>{{ account.username }}</strong>
+            </td>
+            <td>{{ account.display_name ?? '–' }}</td>
+            <td>
+              <span
+                class="badge"
+                tabindex="0"
+                [matTooltip]="
+                  account.role === 'admin'
+                    ? controls['users.roleAdmin']
+                    : controls['users.roleUser']
+                "
+                >{{ account.role === 'admin' ? 'Admin' : 'Nutzer' }}</span
+              >
+            </td>
+            <td>
+              <div class="state">
+                @if (account.active) {
+                  <span class="badge" tabindex="0" [matTooltip]="controls['users.active']"
+                    >aktiv</span
+                  >
+                } @else {
+                  <span
+                    class="badge badge--muted"
+                    tabindex="0"
+                    [matTooltip]="controls['users.disabled']"
+                    >deaktiviert</span
+                  >
+                }
+                @if (account.must_change_password) {
+                  <span
+                    class="badge badge--muted"
+                    tabindex="0"
+                    [matTooltip]="controls['users.mustChange']"
+                    >Einmal-Passwort offen</span
+                  >
+                }
+              </div>
+            </td>
+            <td>
+              <div class="actions">
+                @if (account.active) {
+                  <button
+                    matButton
+                    type="button"
+                    data-action="disable"
+                    disabledInteractive
+                    [disabled]="isSelf(account) || busy()"
+                    [matTooltip]="
+                      isSelf(account)
+                        ? controls['users.own']
+                        : controls['users.disable'](account.username)
+                    "
+                    (click)="disable(account)"
+                  >
+                    Deaktivieren
+                  </button>
+                } @else {
+                  <button
+                    matButton
+                    type="button"
+                    data-action="enable"
+                    [disabled]="busy()"
+                    [matTooltip]="controls['users.enable'](account.username)"
+                    (click)="enable(account)"
+                  >
+                    Aktivieren
+                  </button>
+                }
+                <button
+                  matButton
+                  type="button"
+                  data-action="reset"
+                  disabledInteractive
+                  [disabled]="isSelf(account) || busy()"
+                  [matTooltip]="
+                    isSelf(account)
+                      ? controls['users.own']
+                      : controls['users.reset'](account.username)
+                  "
+                  (click)="reset(account)"
+                >
+                  Einmal-Passwort setzen
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <app-state [error]="error()" loading="Lade die Konten …" />
+  }
+</app-section>
+
+<app-section heading="Neues Konto">
+  <form class="create" (submit)="$event.preventDefault(); create()">
+    <mat-form-field>
+      <mat-label>Benutzername</mat-label>
+      <input
+        matInput
+        name="new-username"
+        autocomplete="off"
+        autocapitalize="none"
+        spellcheck="false"
+        [value]="username()"
+        (input)="username.set(value($event))"
+      />
+      <mat-hint>3 bis 32 Zeichen: Kleinbuchstaben, Ziffern, Punkt, Strich</mat-hint>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Anzeigename</mat-label>
+      <input
+        matInput
+        name="new-display-name"
+        autocomplete="off"
+        maxlength="100"
+        [value]="displayName()"
+        (input)="displayName.set(value($event))"
+      />
+      <mat-hint>freiwillig</mat-hint>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Mail-Adresse</mat-label>
+      <input
+        matInput
+        name="new-email"
+        type="email"
+        autocomplete="off"
+        maxlength="254"
+        [value]="email()"
+        (input)="email.set(value($event))"
+      />
+      <mat-hint>freiwillig</mat-hint>
+    </mat-form-field>
+    <div class="role">
+      <span id="new-role" class="label">Rolle</span>
+      <mat-radio-group
+        aria-labelledby="new-role"
+        [value]="role()"
+        (change)="role.set($event.value)"
+      >
+        <mat-radio-button value="user" [matTooltip]="controls['users.roleUser']"
+          >Nutzer</mat-radio-button
+        >
+        <mat-radio-button value="admin" [matTooltip]="controls['users.roleAdmin']"
+          >Admin</mat-radio-button
+        >
+      </mat-radio-group>
+    </div>
+    <button
+      matButton="filled"
+      type="submit"
+      data-action="create"
+      disabledInteractive
+      [disabled]="!canCreate()"
+      [matTooltip]="canCreate() ? controls['users.create'] : controls['users.createBlocked']"
+    >
+      {{ busy() ? 'Legt an …' : 'Konto anlegen' }}
+    </button>
+  </form>
+</app-section>

@@ -58,7 +58,8 @@ test.afterEach(() => {
   expect(errors, 'Fehler in der Konsole').toEqual([]);
 });
 
-test('Ranking zeigt die Titel in der Reihenfolge der API', async ({ page, request }) => {
+test('Ranking zeigt die Titel in der Reihenfolge der API', async ({ page }) => {
+  const request = page.request;
   const ranking = await getJson<{ rows: RankingRow[] }>(request, '/api/v1/ranking/latest');
   const top = ranking.rows.filter((row) => row.rank !== null).slice(0, 5);
   expect(top.length).toBeGreaterThan(0);
@@ -71,7 +72,8 @@ test('Ranking zeigt die Titel in der Reihenfolge der API', async ({ page, reques
   }
 });
 
-test('Klick auf den Spitzenreiter öffnet das Titel-Detail', async ({ page, request }) => {
+test('Klick auf den Spitzenreiter öffnet das Titel-Detail', async ({ page }) => {
+  const request = page.request;
   const ranking = await getJson<{ rows: RankingRow[] }>(request, '/api/v1/ranking/latest');
   const [first] = ranking.rows;
   const title = first.name ?? first.symbol;
@@ -83,7 +85,8 @@ test('Klick auf den Spitzenreiter öffnet das Titel-Detail', async ({ page, requ
   await expect(page.getByRole('heading', { name: 'Kennzahlen' })).toBeVisible();
 });
 
-test('Lauf-Detail zeigt die Mail abgeschottet im iframe', async ({ page, request }) => {
+test('Lauf-Detail zeigt die Mail abgeschottet im iframe', async ({ page }) => {
+  const request = page.request;
   const runs = await getJson<RunSummary[]>(request, '/api/v1/runs');
   const sent = runs.find((run) => run.finished_at !== null && !run.dry_run);
   if (sent === undefined) {
@@ -113,7 +116,8 @@ interface ProfileSummary {
   latest_version: number | null;
 }
 
-test('Profil-Editor: Vorschau, Speichern, neue Version in der Liste', async ({ page, request }) => {
+test('Profil-Editor: Vorschau, Speichern, neue Version in der Liste', async ({ page }) => {
+  const request = page.request;
   // Legt eine Profil-Version an: nur im Wegwerf-Stack (make local-e2e, CI), nie im lokalen
   test.skip(!process.env['E2E_FIXTURE'], 'schreibt in die Datenbank');
   const profiles = await getJson<ProfileSummary[]>(request, '/api/v1/scoring/profiles');

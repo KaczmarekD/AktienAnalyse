@@ -48,29 +48,32 @@
 nav {
   display: flex;
   gap: var(--va-space-xs);
+}
 
-  a {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--va-space-sm);
-    height: var(--va-size-control);
-    padding: 0 var(--va-space-md);
-    border-radius: var(--mat-sys-corner-full);
-    color: var(--mat-sys-on-surface-variant);
-    font: var(--mat-sys-label-large);
-    text-decoration: none;
+// Navigation und Konto (D1.4): Pille mit Icon und Text
+nav a,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--va-space-sm);
+  height: var(--va-size-control);
+  padding: 0 var(--va-space-md);
+  border-radius: var(--mat-sys-corner-full);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+  text-decoration: none;
+  white-space: nowrap;
 
-    &:hover {
-      background-color: var(--mat-sys-surface-container-low);
-      color: var(--mat-sys-on-surface);
-    }
+  &:hover {
+    background-color: var(--mat-sys-surface-container-low);
+    color: var(--mat-sys-on-surface);
+  }
 
-    // Aktiver Bereich: Vertiefung 3 als Pille, Schrift stärker
-    &.active {
-      background-color: var(--mat-sys-surface-container-high);
-      color: var(--mat-sys-on-surface);
-      font-weight: var(--va-weight-strong);
-    }
+  // Aktiver Bereich: Vertiefung 3 als Pille, Schrift stärker
+  &.active {
+    background-color: var(--mat-sys-surface-container-high);
+    color: var(--mat-sys-on-surface);
+    font-weight: var(--va-weight-strong);
   }
 }
 
@@ -106,11 +109,13 @@ footer {
   }
 
   .brand span,
-  nav a span {
+  nav a span,
+  .pill span {
     display: none;
   }
 
-  nav a {
+  nav a,
+  .pill {
     padding: 0 var(--va-space-sm);
   }
 
@@ -119,15 +124,20 @@ footer {
   }
 }
 
-// Icon „Begriffe“: runde Fläche wie ein Icon-Button, aktiv wie ein Navigationseintrag
-.help {
+// Icon „Begriffe“ und „Abmelden“ (D1.4): runde Fläche wie ein Icon-Button, aktiv wie ein
+// Navigationseintrag
+.round {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--va-size-control);
   height: var(--va-size-control);
+  padding: 0;
+  border: 0;
   border-radius: var(--mat-sys-corner-full);
+  background: none;
   color: var(--mat-sys-on-surface-variant);
+  cursor: pointer;
 
   &:hover {
     background-color: var(--mat-sys-surface-container-low);

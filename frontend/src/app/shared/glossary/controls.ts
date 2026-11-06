@@ -10,6 +10,12 @@ export const CONTROLS = {
   'nav.runs': 'Verlauf aller Läufe, neuen Lauf starten, Mails ansehen.',
   'nav.profiles': 'Gewichte und Faktoren des Scorings ansehen und ändern.',
   'nav.glossary': 'Alle Begriffe und Abkürzungen erklärt.',
+  // D1.4: Anmeldung in der App-Leiste
+  'nav.users': 'Konten anlegen, deaktivieren und Einmal-Passwörter setzen.',
+  'nav.account': 'Dein Konto: Anzeigename, Passwort und Sitzungen.',
+  'nav.logout': 'Beendet deine Sitzung auf diesem Gerät.',
+  'nav.login': 'Anmelden, um Konten zu verwalten. Ansehen geht hier auch ohne Anmeldung.',
+  'profiles.view': 'Profil und Vorschau ansehen. Nur Admins speichern und aktivieren Profile.',
   brand: 'Zum Ranking',
   offline:
     'Keine Live-Verbindung zum Server. Die Seite aktualisiert sich erst wieder, wenn er erreichbar ist.',

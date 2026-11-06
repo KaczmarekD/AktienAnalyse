@@ -7,6 +7,16 @@ import type { Options } from '../sdk.gen';
 import type {
   ActivateProfileVersionData,
   ActivateProfileVersionResponse,
+  ChangePasswordData,
+  ChangePasswordResponse,
+  CreateUserData,
+  CreateUserResponse,
+  CurrentSessionData,
+  CurrentSessionResponse,
+  DisableUserData,
+  DisableUserResponse,
+  EnableUserData,
+  EnableUserResponse,
   GetInstrumentData,
   GetInstrumentResponse,
   GetProfileData,
@@ -28,6 +38,10 @@ import type {
   ListProfilesResponse,
   ListRunsData,
   ListRunsResponse,
+  ListSessionsData,
+  ListSessionsResponse,
+  ListUsersData,
+  ListUsersResponse,
   LoginData,
   LoginResponse,
   LogoutData,
@@ -36,11 +50,92 @@ import type {
   MeResponse,
   PreviewProfileData,
   PreviewProfileResponse,
+  ResetPasswordData,
+  ResetPasswordResponse,
+  RevokeAllSessionsData,
+  RevokeAllSessionsResponse,
   SaveProfileVersionData,
   SaveProfileVersionResponse,
   StartRunData,
   StartRunResponse,
+  UpdateProfileData,
+  UpdateProfileResponse,
 } from '../types.gen';
+
+/**
+ * List Users
+ *
+ * Alle Konten in der Reihenfolge, in der sie angelegt wurden.
+ */
+export const listUsersRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<ListUsersData, ThrowOnError>,
+): HttpRequest<ListUsersResponse> =>
+  (options?.client ?? client).requestOptions<ListUsersResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/admin/users',
+    ...options,
+  });
+
+/**
+ * Create User
+ *
+ * Legt ein Konto mit Einmal-Passwort an.
+ */
+export const createUserRequest = <ThrowOnError extends boolean = false>(
+  options: Options<CreateUserData, ThrowOnError>,
+): HttpRequest<CreateUserResponse> =>
+  (options?.client ?? client).requestOptions<CreateUserResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/admin/users',
+    ...options,
+  });
+
+/**
+ * Disable User
+ *
+ * Deaktiviert ein Konto; alle seine Sitzungen enden.
+ */
+export const disableUserRequest = <ThrowOnError extends boolean = false>(
+  options: Options<DisableUserData, ThrowOnError>,
+): HttpRequest<DisableUserResponse> =>
+  (options?.client ?? client).requestOptions<DisableUserResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/admin/users/{user_id}/disable',
+    ...options,
+  });
+
+/**
+ * Enable User
+ *
+ * Aktiviert ein Konto wieder; es braucht eine neue Anmeldung.
+ */
+export const enableUserRequest = <ThrowOnError extends boolean = false>(
+  options: Options<EnableUserData, ThrowOnError>,
+): HttpRequest<EnableUserResponse> =>
+  (options?.client ?? client).requestOptions<EnableUserResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/admin/users/{user_id}/enable',
+    ...options,
+  });
+
+/**
+ * Reset Password
+ *
+ * Setzt ein Einmal-Passwort; alle Sitzungen des Kontos enden.
+ */
+export const resetPasswordRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ResetPasswordData, ThrowOnError>,
+): HttpRequest<ResetPasswordResponse> =>
+  (options?.client ?? client).requestOptions<ResetPasswordResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/admin/users/{user_id}/reset-password',
+    ...options,
+  });
 
 /**
  * Login
@@ -69,6 +164,22 @@ export const logoutRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'POST',
     url: '/api/v1/auth/logout',
+    ...options,
+  });
+
+/**
+ * Current Session
+ *
+ * Wer angemeldet ist, ohne 401 (D1.4). Das UI fragt das bei jedem Start; ein 401 stuende
+ * sonst bei jedem Aufruf der Anmeldeseite als Fehler in der Konsole des Browsers.
+ */
+export const currentSessionRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<CurrentSessionData, ThrowOnError>,
+): HttpRequest<CurrentSessionResponse> =>
+  (options?.client ?? client).requestOptions<CurrentSessionResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/auth/session',
     ...options,
   });
 
@@ -110,6 +221,66 @@ export const meRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'GET',
     url: '/api/v1/me',
+    ...options,
+  });
+
+/**
+ * Change Password
+ *
+ * Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.
+ */
+export const changePasswordRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ChangePasswordData, ThrowOnError>,
+): HttpRequest<ChangePasswordResponse> =>
+  (options?.client ?? client).requestOptions<ChangePasswordResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/me/password',
+    ...options,
+  });
+
+/**
+ * Update Profile
+ *
+ * Aendert den Anzeigenamen; leer entfernt ihn.
+ */
+export const updateProfileRequest = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateProfileData, ThrowOnError>,
+): HttpRequest<UpdateProfileResponse> =>
+  (options?.client ?? client).requestOptions<UpdateProfileResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/me/profile',
+    ...options,
+  });
+
+/**
+ * List Sessions
+ *
+ * Die gueltigen eigenen Sitzungen, zuletzt aktive zuerst.
+ */
+export const listSessionsRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<ListSessionsData, ThrowOnError>,
+): HttpRequest<ListSessionsResponse> =>
+  (options?.client ?? client).requestOptions<ListSessionsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/me/sessions',
+    ...options,
+  });
+
+/**
+ * Revoke All Sessions
+ *
+ * Ueberall abmelden, auch hier; trennt die WebSockets aller Sitzungen.
+ */
+export const revokeAllSessionsRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<RevokeAllSessionsData, ThrowOnError>,
+): HttpRequest<RevokeAllSessionsResponse> =>
+  (options?.client ?? client).requestOptions<RevokeAllSessionsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/me/sessions/revoke-all',
     ...options,
   });
 
@@ -301,6 +472,71 @@ export const activateProfileVersionRequest = <ThrowOnError extends boolean = fal
   });
 
 /**
+ * List Users
+ *
+ * Alle Konten in der Reihenfolge, in der sie angelegt wurden.
+ */
+export const listUsersResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<ListUsersData, ThrowOnError> | undefined,
+) =>
+  httpResource<ListUsersResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? listUsersRequest(opts) : undefined;
+  });
+
+/**
+ * Create User
+ *
+ * Legt ein Konto mit Einmal-Passwort an.
+ */
+export const createUserResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<CreateUserData, ThrowOnError> | undefined,
+) =>
+  httpResource<CreateUserResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? createUserRequest(opts) : undefined;
+  });
+
+/**
+ * Disable User
+ *
+ * Deaktiviert ein Konto; alle seine Sitzungen enden.
+ */
+export const disableUserResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<DisableUserData, ThrowOnError> | undefined,
+) =>
+  httpResource<DisableUserResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? disableUserRequest(opts) : undefined;
+  });
+
+/**
+ * Enable User
+ *
+ * Aktiviert ein Konto wieder; es braucht eine neue Anmeldung.
+ */
+export const enableUserResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<EnableUserData, ThrowOnError> | undefined,
+) =>
+  httpResource<EnableUserResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? enableUserRequest(opts) : undefined;
+  });
+
+/**
+ * Reset Password
+ *
+ * Setzt ein Einmal-Passwort; alle Sitzungen des Kontos enden.
+ */
+export const resetPasswordResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<ResetPasswordData, ThrowOnError> | undefined,
+) =>
+  httpResource<ResetPasswordResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? resetPasswordRequest(opts) : undefined;
+  });
+
+/**
  * Login
  *
  * Meldet an und setzt das Sitzungs-Cookie.
@@ -324,6 +560,20 @@ export const logoutResource = <ThrowOnError extends boolean = false>(
   httpResource<LogoutResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? logoutRequest(opts) : undefined;
+  });
+
+/**
+ * Current Session
+ *
+ * Wer angemeldet ist, ohne 401 (D1.4). Das UI fragt das bei jedem Start; ein 401 stuende
+ * sonst bei jedem Aufruf der Anmeldeseite als Fehler in der Konsole des Browsers.
+ */
+export const currentSessionResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<CurrentSessionData, ThrowOnError> | undefined,
+) =>
+  httpResource<CurrentSessionResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? currentSessionRequest(opts) : undefined;
   });
 
 /**
@@ -359,6 +609,58 @@ export const meResource = <ThrowOnError extends boolean = false>(
   httpResource<MeResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? meRequest(opts) : undefined;
+  });
+
+/**
+ * Change Password
+ *
+ * Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.
+ */
+export const changePasswordResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<ChangePasswordData, ThrowOnError> | undefined,
+) =>
+  httpResource<ChangePasswordResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? changePasswordRequest(opts) : undefined;
+  });
+
+/**
+ * Update Profile
+ *
+ * Aendert den Anzeigenamen; leer entfernt ihn.
+ */
+export const updateProfileResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<UpdateProfileData, ThrowOnError> | undefined,
+) =>
+  httpResource<UpdateProfileResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? updateProfileRequest(opts) : undefined;
+  });
+
+/**
+ * List Sessions
+ *
+ * Die gueltigen eigenen Sitzungen, zuletzt aktive zuerst.
+ */
+export const listSessionsResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<ListSessionsData, ThrowOnError> | undefined,
+) =>
+  httpResource<ListSessionsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? listSessionsRequest(opts) : undefined;
+  });
+
+/**
+ * Revoke All Sessions
+ *
+ * Ueberall abmelden, auch hier; trennt die WebSockets aller Sitzungen.
+ */
+export const revokeAllSessionsResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<RevokeAllSessionsData, ThrowOnError> | undefined,
+) =>
+  httpResource<RevokeAllSessionsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? revokeAllSessionsRequest(opts) : undefined;
   });
 
 /**

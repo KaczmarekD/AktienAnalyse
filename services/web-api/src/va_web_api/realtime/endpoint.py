@@ -56,7 +56,8 @@ SESSION_CHECK_SECONDS = 60.0  # D1.3: so oft prueft jede Verbindung ihre Sitzung
 async def _session_user(ws: WebSocket, settings: WebApiSettings) -> tuple[User, str | None] | None:
     """Wer sich verbindet, mit dem Hash der Sitzung; ``None``: abzulehnen.
 
-    Im Uebergang ohne Sitzungspflicht ``LAN_USER`` ohne Sitzung (wie unter ADR-0007).
+    Im Uebergang ohne Sitzungspflicht ``LAN_USER`` ohne Sitzung (wie unter ADR-0007). Mit
+    Einmal-Passwort keine Verbindung, wie bei REST (D1.4).
     """
     if not settings.auth_required:
         return LAN_USER, None
@@ -66,7 +67,9 @@ async def _session_user(ws: WebSocket, settings: WebApiSettings) -> tuple[User, 
         return None
     # Die Pruefung liest die Datenbank: nicht in der Event-Loop
     user = await asyncio.to_thread(identity.authenticate, token)
-    return None if user is None else (user, token_hash(token))
+    if user is None or user.must_change_password:
+        return None
+    return user, token_hash(token)
 
 
 async def _watch_session(

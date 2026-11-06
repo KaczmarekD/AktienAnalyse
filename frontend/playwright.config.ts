@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { STORAGE_STATE } from './e2e/state';
+
 // Browser-Test des UI (U5.3, docs/architecture/umgebungen.md) gegen einen laufenden Stack:
 // docker/e2e.sh (make local-e2e, CI) oder der lokale Stack. Startet selbst keinen Server.
 // Chromium liegt unter .local/playwright (make ui-e2e-install), nicht auf C:.
@@ -18,5 +20,13 @@ export default defineConfig({
     // Zum Debuggen: npx playwright test --trace on
     trace: 'off',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // D1.4: meldet sich einmal an (E2E_USERNAME, E2E_PASSWORD), die Tests nutzen das Cookie
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
+      dependencies: ['setup'],
+    },
+  ],
 });

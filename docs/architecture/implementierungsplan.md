@@ -3247,6 +3247,68 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   Verwaltung der Nutzer für Admins, Run-Start und Profil-Editor nur für Admins sichtbar.
   Der E2E-Stack (`docker/e2e.sh`) legt einen Testnutzer an.
 - **Review:** `/code-review high`.
+- **Entwurf (06.11.2026):** zwei Zyklen auf einem Branch, zuerst die API, dann Frontend und E2E.
+  Keine Migration: `must_change`, die Widerrufsgründe und alle Tabellen gibt es seit D1.1.
+  - **API für das eigene Konto** (NUT-11, immer mit echter Sitzung, auch im Übergang):
+    `PUT /me/password` (bisheriges und neues Passwort, 204), `PUT /me/profile` (nur der
+    Anzeigename; die Mail-Adresse kommt mit ihrer Bestätigung in D1.6), `GET /me/sessions` (die
+    gültigen Sitzungen mit Beginn, letzter Aktivität, Ende, Browser und `current`) und
+    `POST /me/sessions/revoke-all` („überall abmelden“, auch diese Sitzung, Grund `logout`).
+  - **Passwort ändern:** Ein falsches bisheriges Passwort zählt wie ein Fehlversuch beim
+    Anmelden (`wrong_password`, Sperre nach 5). Sonst ließe sich mit einer gestohlenen Sitzung
+    das Passwort durchprobieren. Danach sind alle anderen Sitzungen widerrufen
+    (`password_changed`) und ihre WebSockets getrennt.
+  - **API für Admins** (`/admin/users`, nur mit echter Admin-Sitzung, auch im Übergang): Im
+    Übergang gilt sonst jeder im LAN als Admin und könnte das Passwort des echten Admins
+    zurücksetzen. `GET` listet, `POST` legt an, `POST …/{id}/disable` und `…/enable`,
+    `POST …/{id}/reset-password`. Deaktivieren und Zurücksetzen widerrufen die Sitzungen des
+    Kontos (`disabled`, `admin`). Das eigene Konto kann ein Admin hier weder deaktivieren noch
+    zurücksetzen (409), so bleibt immer ein Admin übrig.
+  - **Einmal-Passwort:** Der Admin vergibt es beim Anlegen und Zurücksetzen, das UI schlägt ein
+    zufälliges vor (`crypto.getRandomValues`). Der Server schickt nie ein Passwort zurück. Das
+    Konto bekommt `must_change`: Bis zum neuen Passwort antworten alle anderen Endpunkte mit 403,
+    und der WebSocket nimmt keine Verbindung an. Erlaubt bleiben `/me`, `/me/*` und Abmelden.
+  - **`GET /me`** und die Nutzerliste melden `must_change_password`. **`GET /health`** meldet
+    `auth_required`: Das UI weiß so, ob es eine Anmeldung braucht.
+  - **Sicherheitstest aus P3.4:** „password“ darf jetzt in vier Anfragen stehen (Anmelden,
+    Passwort ändern, Nutzer anlegen, zurücksetzen). Geprüft wird stattdessen, dass keine Antwort
+    ein Feld mit Passwort, Geheimnis oder Token als Text hat.
+  - **Frontend:** `AuthStore` lädt beim Start `/health` und `/me`. Ein Guard schickt ohne Sitzung
+    zur Seite `/login` (mit Rücksprung, nur auf eigene Pfade), mit `must_change` zur Seite
+    `/account`. Ein Interceptor macht aus jedem 401 „Sitzung abgelaufen“ und führt zur Anmeldung.
+    Der WebSocket startet erst nach der Anmeldung, endet beim Abmelden und führt nach Code 4401
+    zur Anmeldung. Nutzermenü in der App-Leiste (Konto, Nutzer, Abmelden), Seite `/account`
+    (Anzeigename, Passwort, Sitzungen), Seite `/admin/users` (nur Admins). „Lauf starten“,
+    Speichern und Aktivieren von Profilen sehen nur Admins. Ohne Sitzungspflicht bleibt das UI
+    wie bisher.
+  - **Umschalten:** `docker-compose.local.yml` (und damit der E2E-Stack) setzt
+    `WEB_API_AUTH_REQUIRED=true`, `docker-compose.yml` bleibt bis D1.5 bei `false`. Der E2E-Stack
+    legt einen Admin an (`E2E_USERNAME`, `E2E_PASSWORD` in `docker/e2e.env`). `docker/e2e_run.py`,
+    `tests/e2e` und Playwright melden sich damit an.
+- **Umgesetzt (06.11.2026, Branch `feat/d1-4-frontend`):** wie im Entwurf, dazu:
+  - **`GET /auth/session`** (offen, immer 200, `{"user": …}` oder `null`): Ein 401 von `/me`
+    beim Start stünde auf jeder Anmeldeseite als Fehler in der Konsole des Browsers, die
+    Browser-Tests verlangen aber eine leere Konsole.
+  - **`jsonWritesInterceptor`:** Der generierte Client schickt bei Abmelden, Deaktivieren,
+    Aktivieren und „überall abmelden“ keinen Inhalt und damit keinen `Content-Type`. Das web-api
+    lehnte das ab (415). Statt die Regel aus ADR-0007 aufzuweichen, schickt das UI dann `{}` als
+    JSON.
+  - **Start-Bundle:** 490 kB vor D1.4, Grenze 500 kB. Deshalb kein Menü von Material in der
+    App-Leiste, sondern Konto-Link und Abmelden-Button, und „Nutzer“ in der Navigation nur für
+    Admins. Der `AuthStore` nutzt die Request-Bausteine ohne zod, die Tooltips der neuen Seiten
+    stehen in `shared/auth/controls.ts` (nachgeladen). Danach 492,8 kB.
+  - **204 ohne Inhalt:** Die zod-Prüfung des SDK scheitert an `null`, die Antwort ist trotzdem
+    da. Die Seiten prüfen deshalb den Status.
+  - **Gesperrte Buttons** mit `disabledInteractive` wie im Rest des UI; die Tests prüfen
+    `aria-disabled`.
+  - **Playwright:** Ein Setup-Projekt meldet sich einmal an (`storageState`), die Tests fragen die
+    API über `page.request` mit demselben Cookie. `login.spec.ts` prüft Anmelden, Rücksprung und
+    Abmelden mit leerer Konsole.
+  - **Sicherheitstest aus P3.4:** geprüft wird jetzt, dass nur die vier Anfragen ein Passwort
+    nehmen und keine Antwort ein Feld mit Passwort, Geheimnis oder Token als Text hat.
+  - **`make local-admin NAME=<name>`** legt im lokalen Stack das erste Konto an.
+  - **Offen gelassen:** `Retry-After` nennt weiter 900 s statt der Restzeit; das UI zeigt ohnehin
+    „in 15 Minuten“.
 
 **D1.5 Betrieb: HTTPS, Proxys, NATS-Nutzer 🔒** (NUT-07, Regeln 9 bis 11)
 - **Test:**

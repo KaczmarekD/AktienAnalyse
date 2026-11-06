@@ -1,0 +1,173 @@
+@if (auth.user(); as user) {
+  <app-page-header>Konto</app-page-header>
+  @if (user.must_change_password) {
+    <p class="one-time">
+      <app-icon name="warning" />
+      Du bist mit einem Einmal-Passwort angemeldet. Ersetze es hier durch ein eigenes, vorher geht
+      nichts anderes.
+    </p>
+  }
+
+  <app-section heading="Dein Konto">
+    @if (auth.canManageUsers()) {
+      <a
+        sectionActions
+        matButton="outlined"
+        routerLink="/admin/users"
+        [matTooltip]="controls['account.users']"
+        >Nutzer verwalten</a
+      >
+    }
+    <p class="who">
+      <strong>{{ user.username }}</strong>
+      <span class="badge" tabindex="0" [matTooltip]="controls['account.role']">{{
+        user.role === 'admin' ? 'Admin' : 'Nutzer'
+      }}</span>
+    </p>
+    <form class="row" (submit)="$event.preventDefault(); saveName()">
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-label>Anzeigename</mat-label>
+        <input
+          matInput
+          name="display-name"
+          autocomplete="name"
+          maxlength="100"
+          [value]="displayName()"
+          (input)="displayName.set(value($event))"
+        />
+      </mat-form-field>
+      <button
+        matButton="outlined"
+        type="submit"
+        data-action="save-name"
+        [disabled]="savingName()"
+        [matTooltip]="controls['account.saveName']"
+      >
+        Speichern
+      </button>
+    </form>
+    <app-notice [notice]="nameNotice()" />
+  </app-section>
+
+  <app-section heading="Passwort ändern">
+    <form class="password" (submit)="$event.preventDefault(); changePassword()">
+      <!-- Für Passwort-Manager: der Benutzername gehört zum Formular -->
+      <input
+        class="hidden-username"
+        name="username"
+        autocomplete="username"
+        tabindex="-1"
+        aria-hidden="true"
+        readonly
+        [value]="user.username"
+      />
+      <mat-form-field>
+        <mat-label>Bisheriges Passwort</mat-label>
+        <input
+          matInput
+          name="current-password"
+          type="password"
+          autocomplete="current-password"
+          [value]="current()"
+          (input)="current.set(value($event))"
+        />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Neues Passwort</mat-label>
+        <input
+          matInput
+          name="new-password"
+          type="password"
+          autocomplete="new-password"
+          [value]="next()"
+          (input)="next.set(value($event))"
+        />
+        <mat-hint>mindestens {{ minPassword }} Zeichen, kein häufiges Passwort</mat-hint>
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Neues Passwort wiederholen</mat-label>
+        <input
+          matInput
+          name="repeat-password"
+          type="password"
+          autocomplete="new-password"
+          [value]="repeat()"
+          (input)="repeat.set(value($event))"
+        />
+      </mat-form-field>
+      @if (tooShort()) {
+        <p class="meta">Das neue Passwort braucht mindestens {{ minPassword }} Zeichen.</p>
+      }
+      @if (mismatch()) {
+        <p class="meta">Die beiden neuen Passwörter stimmen nicht überein.</p>
+      }
+      <app-notice [notice]="passwordNotice()" />
+      <button
+        matButton="filled"
+        type="submit"
+        data-action="change-password"
+        disabledInteractive
+        [disabled]="!canChange()"
+        [matTooltip]="
+          canChange() ? controls['account.changePassword'] : controls['account.changeBlocked']
+        "
+      >
+        {{ changing() ? 'Ändert …' : 'Passwort ändern' }}
+      </button>
+    </form>
+  </app-section>
+
+  <app-section heading="Sitzungen">
+    <button
+      sectionActions
+      matButton="outlined"
+      type="button"
+      data-action="revoke-all"
+      [matTooltip]="controls['account.revokeAll']"
+      (click)="revokeAll()"
+    >
+      <app-icon name="logout" />
+      Überall abmelden
+    </button>
+    <app-notice [notice]="revokeNotice()" />
+    @if (sessions(); as sessions) {
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">
+              <span tabindex="0" [matTooltip]="controls['sessions.device']">Gerät</span>
+            </th>
+            <th scope="col">
+              <span tabindex="0" [matTooltip]="controls['sessions.started']">Angemeldet</span>
+            </th>
+            <th scope="col">
+              <span tabindex="0" [matTooltip]="controls['sessions.seen']">Zuletzt aktiv</span>
+            </th>
+            <th scope="col">
+              <span tabindex="0" [matTooltip]="controls['sessions.ends']">Endet spätestens</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (session of sessions; track $index) {
+            <tr data-session>
+              <td>
+                {{ device(session.user_agent) }}
+                @if (session.current) {
+                  <span class="badge" tabindex="0" [matTooltip]="controls['account.current']"
+                    >dieses Gerät</span
+                  >
+                }
+              </td>
+              <td>{{ session.created_at | dayTime }}</td>
+              <td>{{ session.last_seen | dayTime }}</td>
+              <td>{{ session.expires_at | dayTime }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    } @else {
+      <app-state [error]="sessionsError()" loading="Lade die Sitzungen …" />
+    }
+  </app-section>
+}

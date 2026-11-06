@@ -70,6 +70,60 @@ class TestUsers:
         assert found is not None
         assert found.active
 
+    def test_created_at_and_must_change(self, store):
+        """D1.4: Ein vom Admin angelegtes Konto muss sein Einmal-Passwort ersetzen."""
+        user_id = store.create_user(
+            username="lena",
+            role="user",
+            password_hash=HASH,
+            display_name=None,
+            email=None,
+            at=T0,
+            must_change=True,
+        )
+        found = store.get_user(user_id)
+        assert found is not None
+        assert (found.created_at, found.must_change) == (T0, True)
+        assert not store.get_user(_user(store)).must_change  # type: ignore[union-attr]
+
+    def test_list_users_in_order_of_creation(self, store):
+        first, second = _user(store, "dennis", "admin"), _user(store, "anna")
+        store.set_status(second, "disabled", reason="test", at=T0 + timedelta(minutes=1))
+        users = store.list_users()
+        assert [(u.id, u.username, u.active) for u in users] == [
+            (first, "dennis", True),
+            (second, "anna", False),
+        ]
+
+    def test_the_newest_password_wins(self, store):
+        user_id = _user(store)
+        store.set_password(user_id, HASH + "2", must_change=True, at=T0 + timedelta(minutes=1))
+        found = store.get_user(user_id)
+        assert found is not None
+        assert (found.password_hash, found.must_change) == (HASH + "2", True)
+        store.set_password(user_id, HASH + "3", must_change=False, at=T0 + timedelta(minutes=2))
+        found = store.get_user(user_id)
+        assert found is not None
+        assert (found.password_hash, found.must_change) == (HASH + "3", False)
+
+    def test_a_new_display_name_keeps_the_mail_address(self, store):
+        user_id = store.create_user(
+            username="dennis",
+            role="user",
+            password_hash=HASH,
+            display_name="Dennis",
+            email="d@example.com",
+            at=T0,
+        )
+        store.set_display_name(user_id, "Dennis K.", at=T0 + timedelta(minutes=1))
+        found = store.get_user(user_id)
+        assert found is not None
+        assert (found.display_name, found.email) == ("Dennis K.", "d@example.com")
+        store.set_display_name(user_id, None, at=T0 + timedelta(minutes=2))
+        found = store.get_user(user_id)
+        assert found is not None
+        assert (found.display_name, found.email) == (None, "d@example.com")
+
 
 class TestFailures:
     def test_counts_per_user_since_the_last_success(self, store):
@@ -192,3 +246,51 @@ class TestSessions:
         session = store.find_session("a" * 64)
         assert session is not None
         assert session.revoked
+
+
+def _session(store: IdentityStore, id_hash: str, user_id: int, minute: int = 0) -> None:
+    store.create_session(
+        id_hash=id_hash,
+        user_id=user_id,
+        created_at=T0 + timedelta(minutes=minute),
+        expires_at=T0 + timedelta(days=30),
+        user_agent=f"Browser {id_hash[0]}",
+        ip=None,
+    )
+
+
+class TestSessionsOfAUser:
+    """D1.4: Sitzungen eines Nutzers auflisten und alle auf einmal widerrufen."""
+
+    def test_list_only_the_own(self, store):
+        anna, dennis = _user(store, "anna"), _user(store, "dennis")
+        _session(store, "a" * 64, anna)
+        _session(store, "b" * 64, anna, minute=1)
+        _session(store, "c" * 64, dennis)
+        sessions = store.list_sessions(anna)
+        assert sorted((s.id_hash[0], s.user_agent) for s in sessions) == [
+            ("a", "Browser a"),
+            ("b", "Browser b"),
+        ]
+
+    def test_revoke_all_except_one(self, store):
+        anna, dennis = _user(store, "anna"), _user(store, "dennis")
+        for id_hash in ("a" * 64, "b" * 64, "c" * 64):
+            _session(store, id_hash, anna)
+        _session(store, "d" * 64, dennis)
+        store.revoke_session("c" * 64, reason="logout", at=T0)
+        revoked = store.revoke_sessions(
+            anna, reason="password_changed", at=T0 + timedelta(minutes=1), keep="a" * 64
+        )
+        assert revoked == ["b" * 64]  # c war schon widerrufen, a bleibt
+        state = {s.id_hash[0]: s.revoked for s in store.list_sessions(anna)}
+        assert state == {"a": False, "b": True, "c": True}
+        assert not store.find_session("d" * 64).revoked  # type: ignore[union-attr]
+
+    def test_revoke_all(self, store):
+        anna = _user(store, "anna")
+        _session(store, "a" * 64, anna)
+        _session(store, "b" * 64, anna)
+        revoked = store.revoke_sessions(anna, reason="logout", at=T0)
+        assert sorted(revoked) == ["a" * 64, "b" * 64]
+        assert store.revoke_sessions(anna, reason="logout", at=T0) == []

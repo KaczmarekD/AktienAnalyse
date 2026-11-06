@@ -5,6 +5,10 @@ Regeln aus docs/architecture/depot/nutzer.md:
   einen unbekannten Namen wird trotzdem ein Hash geprueft, damit die Antwortzeit nichts verraet.
 - Ab 5 Fehlversuchen je Konto oder IP ist 15 Minuten gesperrt, auch fuer das richtige Passwort.
 - Jeder Versuch steht in ``login_event``, ohne Passwort.
+
+Seit D1.4 (NUT-11, Rollen): Passwort und Anzeigename aendern, Sitzungen sehen und widerrufen,
+Konten verwalten. Ein falsches bisheriges Passwort zaehlt wie ein Fehlversuch beim Anmelden. Ein
+Admin vergibt Einmal-Passwoerter (``must_change``), am eigenen Konto aber nicht.
 """
 
 from __future__ import annotations
@@ -46,6 +50,19 @@ class WeakPassword(ValueError):
         self.problems = problems
 
 
+class WrongPassword(Exception):
+    """Das bisherige Passwort stimmt nicht (Passwort aendern, D1.4)."""
+
+
+class UnknownUser(LookupError):
+    """Kein Konto mit dieser ID."""
+
+
+class OwnAccount(Exception):
+    """Ein Admin deaktiviert oder setzt sein eigenes Konto nicht zurueck: Es bliebe sonst
+    womoeglich kein Admin uebrig, der sich anmelden kann."""
+
+
 @dataclass(frozen=True)
 class User:
     id: int
@@ -53,10 +70,56 @@ class User:
     role: str
     display_name: str | None
     email: str | None
+    must_change_password: bool = False  # D1.4: Einmal-Passwort, vor allem anderen zu ersetzen
 
     @classmethod
     def of(cls, record: UserRecord) -> User:
-        return cls(record.id, record.username, record.role, record.display_name, record.email)
+        return cls(
+            record.id,
+            record.username,
+            record.role,
+            record.display_name,
+            record.email,
+            must_change_password=record.must_change,
+        )
+
+
+@dataclass(frozen=True)
+class Account:
+    """Ein Konto, wie es ein Admin sieht (D1.4), ohne Passwort-Hash."""
+
+    id: int
+    username: str
+    role: str
+    display_name: str | None
+    email: str | None
+    active: bool
+    must_change_password: bool
+    created_at: datetime | None
+
+    @classmethod
+    def of(cls, record: UserRecord) -> Account:
+        return cls(
+            record.id,
+            record.username,
+            record.role,
+            record.display_name,
+            record.email,
+            record.active,
+            record.must_change,
+            record.created_at,
+        )
+
+
+@dataclass(frozen=True)
+class ActiveSession:
+    """Eine gueltige Sitzung des eigenen Kontos (D1.4), ohne ihre ID."""
+
+    created_at: datetime
+    last_seen: datetime
+    expires_at: datetime
+    user_agent: str | None
+    current: bool
 
 
 # D1.2, Uebergang bis D1.4/D1.5 (WEB_API_AUTH_REQUIRED=false): wie unter ADR-0007 darf jeder im
@@ -120,8 +183,12 @@ class IdentityService:
         role: str = "user",
         display_name: str | None = None,
         email: str | None = None,
+        must_change: bool = False,
     ) -> User:
-        """Wirft ``InvalidUsername``, ``WeakPassword``, ``UserExists`` oder ``ValueError``."""
+        """Wirft ``InvalidUsername``, ``WeakPassword``, ``UserExists`` oder ``ValueError``.
+
+        ``must_change``: ein Einmal-Passwort, das der Nutzer vor allem anderen ersetzt (D1.4).
+        """
         name = normalize_username(username)
         if role not in ROLES:
             msg = f"Rolle {role!r} gibt es nicht ({', '.join(ROLES)})"
@@ -141,20 +208,24 @@ class IdentityService:
             display_name=display,
             email=email,
             at=self.now(),
+            must_change=must_change,
         )
-        return User(user_id, name, role, display, email)
+        return User(user_id, name, role, display, email, must_change_password=must_change)
 
-    def login(
-        self, username: str, password: str, *, ip: str | None, user_agent: str | None = None
-    ) -> LoginResult:
-        now = self.now()
-        name = username.strip().lower()
+    def _ensure_not_locked(self, name: str, ip: str | None, now: datetime) -> None:
         failures = self._store.count_failures(
             username=name, ip=ip, since=self.lockout.since(now), now=now
         )
         if self.lockout.is_locked(failures):
             self._log(name, None, ip, "locked", now)
             raise LoginLocked(int(self.lockout.window.total_seconds()))
+
+    def login(
+        self, username: str, password: str, *, ip: str | None, user_agent: str | None = None
+    ) -> LoginResult:
+        now = self.now()
+        name = username.strip().lower()
+        self._ensure_not_locked(name, ip, now)
         record = self._store.find_user(name)
         if record is None or record.password_hash is None:
             self._verify(password, self._dummy_hash)
@@ -210,6 +281,135 @@ class IdentityService:
         id_hash = token_hash(token)
         if self._store.find_session(id_hash) is not None:
             self._store.revoke_session(id_hash, reason="logout", at=self.now())
+
+    # --- eigenes Konto (D1.4, NUT-11) ---
+
+    def change_password(
+        self, user: User, current: str, new: str, *, session: str | None
+    ) -> list[str]:
+        """Ersetzt das Passwort und widerruft alle anderen Sitzungen; gibt deren Hashes zurueck.
+
+        Wirft ``LoginLocked``, ``WrongPassword`` (zaehlt als Fehlversuch) oder ``WeakPassword``.
+        ``session`` ist der Hash der Sitzung, die bleibt.
+
+        Fehlversuche zaehlen nur fuer das Konto, nicht fuer die IP-Adresse: Hinter nginx teilen
+        sich bis D1.5 alle eine Adresse, die Vertipper eines Angemeldeten sperrten sonst jede
+        Anmeldung. Wer die Sitzung hat, kann ohnehin nur dieses Konto angreifen.
+        """
+        now = self.now()
+        self._ensure_not_locked(user.username, None, now)
+        record = self._store.get_user(user.id)
+        if (
+            record is None
+            or record.password_hash is None
+            or not self._verify(current, record.password_hash)
+        ):
+            self._log(user.username, user.id, None, "wrong_password", now)
+            raise WrongPassword
+        problems = password_problems(new, username=user.username)
+        if new == current:
+            problems.append("Das neue Passwort muss sich vom bisherigen unterscheiden")
+        if problems:
+            raise WeakPassword(problems)
+        self._store.set_password(user.id, self._hash(new), must_change=False, at=now)
+        return self._store.revoke_sessions(user.id, reason="password_changed", at=now, keep=session)
+
+    def set_display_name(self, user: User, display_name: str | None) -> User:
+        name = display_name.strip() if display_name else None
+        self._store.set_display_name(user.id, name or None, at=self.now())
+        record = self._store.get_user(user.id)
+        if record is None:
+            raise UnknownUser(user.id)
+        return User.of(record)
+
+    def active_sessions(self, user: User, *, current: str | None) -> list[ActiveSession]:
+        """Die gueltigen Sitzungen, zuletzt aktive zuerst. ``current``: Hash dieser Sitzung."""
+        now = self.now()
+        active = [
+            s
+            for s in self._store.list_sessions(user.id)
+            if self.sessions.is_active(
+                expires_at=s.expires_at, last_seen=s.last_seen, revoked=s.revoked, now=now
+            )
+        ]
+        active.sort(key=lambda s: (s.last_seen, s.created_at), reverse=True)
+        return [
+            ActiveSession(
+                s.created_at, s.last_seen, s.expires_at, s.user_agent, s.id_hash == current
+            )
+            for s in active
+        ]
+
+    def revoke_all(self, user: User) -> list[str]:
+        """Ueberall abmelden, auch diese Sitzung; gibt die widerrufenen Hashes zurueck."""
+        return self._store.revoke_sessions(user.id, reason="logout", at=self.now())
+
+    # --- Konten verwalten (D1.4, nur Admins) ---
+
+    def accounts(self) -> list[Account]:
+        return [Account.of(record) for record in self._store.list_users()]
+
+    def create_account(
+        self,
+        username: str,
+        one_time_password: str,
+        *,
+        role: str = "user",
+        display_name: str | None = None,
+        email: str | None = None,
+    ) -> Account:
+        """Legt ein Konto mit Einmal-Passwort an; Fehler wie ``create_user``."""
+        user = self.create_user(
+            username,
+            one_time_password,
+            role=role,
+            display_name=display_name,
+            email=email,
+            must_change=True,
+        )
+        return self._account(user.id)
+
+    def reset_password(self, admin: User, user_id: int, one_time_password: str) -> list[str]:
+        """Setzt ein Einmal-Passwort und widerruft alle Sitzungen des Kontos.
+
+        Wirft ``UnknownUser``, ``OwnAccount`` oder ``WeakPassword``.
+        """
+        record = self._other(admin, user_id)
+        problems = password_problems(one_time_password, username=record.username)
+        if problems:
+            raise WeakPassword(problems)
+        now = self.now()
+        self._store.set_password(user_id, self._hash(one_time_password), must_change=True, at=now)
+        return self._store.revoke_sessions(user_id, reason="admin", at=now)
+
+    def set_active(self, admin: User, user_id: int, *, active: bool) -> list[str]:
+        """Aktiviert oder deaktiviert; Deaktivieren widerruft alle Sitzungen des Kontos.
+
+        Wirft ``UnknownUser`` oder ``OwnAccount``.
+        """
+        if active:
+            if self._store.get_user(user_id) is None:
+                raise UnknownUser(user_id)
+            self._store.set_status(user_id, "active", reason=None, at=self.now())
+            return []
+        self._other(admin, user_id)
+        now = self.now()
+        self._store.set_status(user_id, "disabled", reason="admin", at=now)
+        return self._store.revoke_sessions(user_id, reason="disabled", at=now)
+
+    def _other(self, admin: User, user_id: int) -> UserRecord:
+        record = self._store.get_user(user_id)
+        if record is None:
+            raise UnknownUser(user_id)
+        if record.id == admin.id:
+            raise OwnAccount
+        return record
+
+    def _account(self, user_id: int) -> Account:
+        record = self._store.get_user(user_id)
+        if record is None:
+            raise UnknownUser(user_id)
+        return Account.of(record)
 
     def _log(
         self, name: str, user_id: int | None, ip: str | None, reason: str, at: datetime

@@ -50,6 +50,10 @@ Zeitplan:
   Mailpit. Damit lassen sich Runs auf der Seite Runs starten. Auf der NAS haben die Dienste
   dasselbe Profil und eigene Images aus GHCR (`va-market-data` usw.). Sie laufen erst
   nach dem Umstieg auf NATS.
+- **Anmeldung (seit D1.4):** Lokal gilt die Sitzungspflicht (`WEB_API_AUTH_REQUIRED=true`, Cookie
+  ohne `Secure`). Das erste Konto legt `make local-admin NAME=<name>` an, das Kommando fragt das
+  Passwort zweimal ab. Weitere Konten entstehen im UI unter „Nutzer“. Auf der NAS bleibt die
+  Sitzungspflicht bis HTTPS (D1.5) aus.
 - **pgweb liest mit der Rolle `va_read`** und zusätzlich im Modus `--readonly`.
 - **Eigene Namen:** Der lokale Stack heißt `value-analyzer-local`, seine Container auch. Er
   kollidiert so nicht mit einem Stack aus `docker-compose.yml` auf demselben Rechner. Ist Port
@@ -81,7 +85,9 @@ Zeitplan:
   31.10.2026, vor P2b.1 ([Implementierungsplan](implementierungsplan.md#u5-lokaler-end-to-end-test)).
   Seit P5.2 läuft er über den ganzen Stack: NATS, die drei Services, das web-api mit
   Projektionen. Den Lauf startet `docker/e2e_run.py` über die API, wie ein Klick im UI. Lokal
-  laufen alle Dienste aus dem App-Image, die CI nimmt die Images je Service.
+  laufen alle Dienste aus dem App-Image, die CI nimmt die Images je Service. Seit D1.4 mit
+  Sitzungspflicht: `docker/e2e.sh` legt einen Admin an (`E2E_USERNAME`, `E2E_PASSWORD` in
+  `docker/e2e.env`), Lauf-Skript, `tests/e2e` und Playwright melden sich damit an.
 
 ## Neue Implementierung lokal prüfen (ab U5)
 
@@ -94,7 +100,8 @@ Einmalig: `make ui-install` und `make ui-e2e-install` (Chromium nach `.local/pla
    <http://localhost:18080>, Mailpit unter <http://localhost:18025>).
 3. Alle gespeicherten Wochen: `make local-regression`, nach U2 mit den Daten der NAS.
 4. Bei Bedarf mit echten Daten ansehen: `make local-up`, `make local-run`, `make local-ui`,
-   dann `make local-check`, Mailpit und das UI im Browser.
+   dann `make local-check`, Mailpit und das UI im Browser. `make local-check` meldet sich mit
+   `E2E_USERNAME` und `E2E_PASSWORD` an (ein Konto aus `make local-admin`).
 
 ## Was gleich bleibt
 

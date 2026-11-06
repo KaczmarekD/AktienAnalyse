@@ -6,6 +6,9 @@
 - Run starten, Profil speichern und aktivieren duerfen nur Admins.
 - Schreibende Anfragen mit fremdem ``Origin`` ergeben 403, auch mit gueltigem Cookie.
 - Uebergang bis D1.4/D1.5: Mit ``auth_required=false`` verhaelt sich alles wie vor D1.2 (ADR-0007).
+  Ausnahme seit D1.4: das eigene Konto (``/me``) und die Nutzerverwaltung (``/admin``) nur mit
+  echter Sitzung.
+- Mit Einmal-Passwort (``must_change``, D1.4) nur das eigene Konto und Abmelden, sonst 403.
 """
 
 from __future__ import annotations
@@ -35,18 +38,29 @@ OPEN = {
     ("GET", "/api/v1/health"),
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/logout"),
+    ("GET", "/api/v1/auth/session"),  # D1.4: wer angemeldet ist, ohne 401
 }
 ADMIN_ONLY = {
     ("POST", "/api/v1/runs"),
     ("PUT", "/api/v1/scoring/profiles/{profile_id}"),
     ("POST", "/api/v1/scoring/profiles/{profile_id}/activate"),
+    # D1.4: Nutzerverwaltung
+    ("GET", "/api/v1/admin/users"),
+    ("POST", "/api/v1/admin/users"),
+    ("POST", "/api/v1/admin/users/{user_id}/disable"),
+    ("POST", "/api/v1/admin/users/{user_id}/enable"),
+    ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
 }
+# D1.4: auch im Uebergang nur mit echter Sitzung; mit Einmal-Passwort erlaubt (ausser /admin)
+OWN_ACCOUNT = "/api/v1/me"
+ADMIN = "/api/v1/admin"
 PATH_VALUES = {
     "{run_id}": "1",
     "{scoring_run_id}": "1",
     "{symbol}": "SAP.DE",
     "{report_id}": "1",
     "{profile_id}": "1",
+    "{user_id}": "2",
 }
 
 
@@ -226,6 +240,55 @@ class TestLanTransition:
         response = lan.post("/api/v1/runs", json={}, headers={"Origin": "http://boese.example"})
         assert response.status_code == 403
         assert runs.calls == []
+
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [r for r in _routes() if r[1].startswith((OWN_ACCOUNT, ADMIN))],
+    )
+    def test_own_account_and_user_management_need_a_real_session(
+        self, identity, runs, method, path
+    ):
+        """D1.4: Sonst koennte im LAN jeder als ``LAN_USER`` Konten anlegen und Passwoerter
+        zuruecksetzen, auch das des echten Admins."""
+        c = _client(LAN, identity, runs)
+        try:
+            response = c.request(method, _concrete(path), json={} if method != "GET" else None)
+            assert response.status_code == 401, (method, path)
+        finally:
+            c.__exit__(None, None, None)
+
+
+class TestOneTimePassword:
+    """D1.4: Bis das Einmal-Passwort ersetzt ist, nur das eigene Konto und Abmelden."""
+
+    @pytest.fixture
+    def lena(self, client, identity):
+        identity.create_user("lena", PASSWORD, role="admin", must_change=True)
+        _login(client, "lena")
+        return client
+
+    @pytest.mark.parametrize(("method", "path"), _routes())
+    def test_everything_else_answers_403(self, lena, method, path):
+        response = lena.request(
+            method,
+            _concrete(path),
+            json={} if method != "GET" else None,
+            headers={"Origin": ORIGIN},
+        )
+        if (method, path) in OPEN or path.startswith(OWN_ACCOUNT):
+            assert response.status_code not in (401, 403), (method, path)
+        else:
+            assert response.status_code == 403, (method, path)
+
+    def test_no_websocket(self, lena):
+        from starlette.websockets import WebSocketDisconnect
+
+        headers = {"origin": ORIGIN, "cookie": f"{COOKIE}={lena.cookies[COOKIE]}"}
+        with (
+            pytest.raises(WebSocketDisconnect),
+            lena.websocket_connect("/ws", subprotocols=["va.v1"], headers=headers) as ws,
+        ):
+            ws.receive_json()
 
 
 def test_the_default_requires_a_session():

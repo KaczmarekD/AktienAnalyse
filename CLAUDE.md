@@ -80,9 +80,9 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   --admin` an.
 - Seit D1.2 verlangen alle übrigen Endpunkte eine Sitzung (`current_user` beim Einbinden der
   Router in `main.create_app`), Run-Start, Profil speichern und aktivieren die Rolle Admin
-  (`require_admin`). Übergang: Bis Login-Seite (D1.4) und HTTPS (D1.5) da sind, setzen die
-  Compose-Dateien `WEB_API_AUTH_REQUIRED=false`, dann gilt das Verhalten von ADR-0007
-  (`LAN_USER`). Jede schreibende Anfrage mit fremdem `Origin` ergibt 403
+  (`require_admin`). Übergang: Bis HTTPS (D1.5) da ist, setzt `docker-compose.yml` (NAS)
+  `WEB_API_AUTH_REQUIRED=false`, dann gilt das Verhalten von ADR-0007 (`LAN_USER`). Lokal und im
+  E2E-Stack gilt seit D1.4 die Sitzungspflicht. Jede schreibende Anfrage mit fremdem `Origin` ergibt 403
   (`OriginCheckMiddleware`). `va_platform.redaction` schwärzt Mail-Adressen und Geheimnisse in
   den Logs von Services, Batch und web-api. Ein neuer Endpunkt braucht einen Eintrag in den
   Tabellen von `services/web-api/tests/test_authz.py`, falls er offen sein oder nur Admins
@@ -92,6 +92,13 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   Abmelden trennt die Verbindungen der Sitzung (`HubBroadcaster.close_session`, Code 4401), und
   jede Verbindung prüft ihre Sitzung im Takt `SESSION_CHECK_SECONDS` ohne Verlängerung
   (`authenticate(..., touch=False)`).
+- Konto und Nutzerverwaltung seit D1.4 (`api/account.py`, `api/admin.py`): `/me/password`,
+  `/me/profile`, `/me/sessions`, `/me/sessions/revoke-all` und `/admin/users` (anlegen,
+  deaktivieren, aktivieren, Einmal-Passwort setzen). Beide brauchen immer eine echte Sitzung, auch
+  im Übergang (`session_user`, `session_admin`), sonst könnte dort jeder im LAN als `LAN_USER`
+  Passwörter zurücksetzen. Mit Einmal-Passwort (`must_change`) antworten alle anderen Endpunkte
+  mit 403, der WebSocket nimmt keine Verbindung an. Der Server schickt nie ein Passwort zurück,
+  das Einmal-Passwort entsteht im Browser. `GET /auth/session` sagt ohne 401, wer angemeldet ist.
 - Ohne NATS (`make api` aus der `.venv`) startet es über `src.web:create_app`. Diese Composition
   Root rechnet Vorschau und Profil-Befehle mit dem Code von scoring im selben Prozess
   (`LocalCaller`, Rolle `va_profiles`), denn `va_web_api` darf `va_scoring` nicht importieren.
@@ -196,7 +203,15 @@ ab. Braucht es einen Bruch, kommt er als `/api/v2`. Das UI ruft nur relative Pfa
 seit P4.6 auch den WebSocket `/ws`) und lädt nichts aus dem Internet. Echtzeit (P4.6):
 `RealtimeService` und `LiveStore` (NgRx SignalStore) unter `frontend/src/app/shared/realtime/`. Die
 Protokoll-Typen dort sind von Hand gespiegelt, das Golden-Schema `tests/golden/realtime/v1.json`
-und `protocol.ts` ändern sich im selben Commit.
+und `protocol.ts` ändern sich im selben Commit. Anmeldung (D1.4) unter `frontend/src/app/shared/auth/`:
+- `AuthStore` fragt beim Start `/health` (Sitzungspflicht) und `/auth/session` und startet erst
+  dann den WebSocket.
+- Guards schützen die Routen (`authGuard`, `sessionGuard`, `adminGuard`, `loginGuard`).
+- `authInterceptor` macht aus jedem 401 „Sitzung abgelaufen“. `jsonWritesInterceptor` schickt
+  schreibende Anfragen ohne Inhalt als `{}` mit JSON-Header, sonst lehnt das web-api sie ab (415).
+- Das Start-Bundle liegt knapp unter der Grenze von 500 kB: Der Store nutzt die Request-Bausteine
+  ohne zod, die Seiten Anmelden, Konto und Nutzer laden nach und haben ihre Tooltips in
+  `shared/auth/controls.ts`.
 
 **Gestaltung des UI nach dem Styleguide** ([docs/architecture/styleguide.md](docs/architecture/styleguide.md)):
 Farben nur aus `--mat-sys-*`, ihre Werte stehen allein in der Papier-Palette
@@ -330,8 +345,8 @@ Tooltips aus dem Glossar, [Spec](docs/architecture/ui-neugestaltung.md), abgenom
 ADR-0011 ist nur vorgeschlagen. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
 als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
 bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt sind D1.1 bis
-D1.3 (Konten, Sitzungspflicht, WebSocket je Nutzer), die Sitzungspflicht ist in Compose bis D1.4
-und D1.5 abgeschaltet. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
+D1.4 (Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI). Auf der
+NAS bleibt die Sitzungspflicht bis HTTPS (D1.5) abgeschaltet. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
 fortgeschrieben, nicht nur im Chat besprochen.
 

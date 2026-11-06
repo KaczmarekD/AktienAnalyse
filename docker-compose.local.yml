@@ -117,6 +117,9 @@ services:
       WEB_API_SCHEDULE: ""
       # D1.1: lokal ohne HTTPS, das Sitzungs-Cookie darf nicht Secure sein
       WEB_API_COOKIE_SECURE: "false"
+      # D1.4: lokal mit Login-Seite, also mit Sitzungspflicht (die NAS folgt mit HTTPS in D1.5).
+      # Erstes Konto: make local-admin NAME=<name>
+      WEB_API_AUTH_REQUIRED: "true"
 
   frontend:
     # nginx mit dem Build aus dem Arbeitsstand (make local-ui). Nur auf Wunsch: Der Node-Build

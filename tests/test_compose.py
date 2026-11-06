@@ -229,7 +229,7 @@ class TestLocalWebApi:
             "WEB_API_SCHEDULE",
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
             "WEB_API_COOKIE_SECURE",
-            "WEB_API_AUTH_REQUIRED",  # D1.2: bis zur Login-Seite (D1.4) aus
+            "WEB_API_AUTH_REQUIRED",  # D1.4: lokal mit Login-Seite, also mit Sitzungspflicht
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
@@ -237,13 +237,22 @@ class TestLocalWebApi:
         assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
         assert env["WEB_API_SCHEDULE"] == ""  # lokal keine Wochenlaeufe von selbst
         assert env["WEB_API_COOKIE_SECURE"] == "false"
-        assert env["WEB_API_AUTH_REQUIRED"] == "false"
+        assert env["WEB_API_AUTH_REQUIRED"] == "true"
 
     def test_e2e_cookie_without_https(self, e2e):
         """D1.1: Der E2E-Stack spricht HTTP mit nginx, das Cookie darf dort nicht Secure sein."""
         env = e2e["services"]["web-api"]["environment"]
         assert env["WEB_API_COOKIE_SECURE"] == "false"
         assert env["WEB_API_IDENTITY_DATABASE_URL"].startswith("postgresql+psycopg://va_identity:")
+
+    def test_e2e_with_login(self, e2e):
+        """D1.4: Der E2E-Stack prueft die Anmeldung mit; der Test legt seinen Admin selbst an."""
+        assert e2e["services"]["web-api"]["environment"]["WEB_API_AUTH_REQUIRED"] == "true"
+        env = (ROOT / "docker" / "e2e.env").read_text(encoding="utf-8")
+        assert "E2E_USERNAME=" in env
+        assert "E2E_PASSWORD=" in env
+        script = (ROOT / "docker" / "e2e.sh").read_text(encoding="utf-8")
+        assert "va_web_api.admin create-user" in script
 
     def test_e2e_web_api_runs_the_full_stack(self, e2e):
         """P5.2: Der E2E-Stack prueft die Zielarchitektur: NATS, Projektionen, Services."""

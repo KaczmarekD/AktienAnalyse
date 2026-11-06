@@ -145,8 +145,8 @@ Tabellen sind tabellarisch, das setzt `_patterns.scss` für jede Tabelle, `.num`
   `shared/ui/icon.ts`, Material Icons, Apache 2.0) in `currentColor`.
 - Liste: `leaderboard`, `history`, `tune`, `help`, `info`, `warning`, `error`, `check_circle`,
   `progress_activity`, `play_arrow`, `download`, `content_copy`, `search`, `view_column`,
-  `arrow_back`, `arrow_upward`, `arrow_downward`, `cloud_off`, `close`, `expand_more`, `edit`.
-  Ein neues Icon kommt zuerst in diese Liste.
+  `arrow_back`, `arrow_upward`, `arrow_downward`, `cloud_off`, `close`, `expand_more`, `edit`,
+  seit D1.4 `person`, `logout`, `login`, `group`. Ein neues Icon kommt zuerst in diese Liste.
 - Icons sind Schmuck (`aria-hidden`). Steht eins allein in einem Icon-Button, braucht der Button
   `aria-label` und Tooltip mit demselben Text.
 

@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 
 import { listProfilesResource } from '../api/@angular/common.gen';
 import { DayPipe } from '../shared/format';
+import { AuthStore } from '../shared/auth/auth.store';
 import { CONTROLS } from '../shared/glossary/controls';
 import { ENTRIES, termTip } from '../shared/glossary/glossary';
 import { loaded, loadError } from '../shared/resource';
@@ -36,6 +37,8 @@ import { AppState } from '../shared/ui/state';
 export class ProfilesPage {
   private readonly resource = listProfilesResource(() => ({}));
   protected readonly controls = CONTROLS;
+  /** D1.4: Nutzer sehen Profile nur an */
+  protected readonly admin = inject(AuthStore).isAdmin;
   protected readonly activeTip = termTip(ENTRIES.active);
 
   protected readonly profiles = computed(() => loaded(this.resource));

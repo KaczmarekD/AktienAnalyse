@@ -9,6 +9,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
+import { me, provideAuthTesting } from '../testing/auth';
 import { FACTORS, PARAMS, PREVIEW, PROFILE } from '../testing/fixtures';
 import {
   abbreviationsWithoutExplanation,
@@ -36,9 +37,13 @@ async function settle(): Promise<void> {
   }
 }
 
-async function render(): Promise<Fixture> {
+async function render(...extra: unknown[]): Promise<Fixture> {
   TestBed.configureTestingModule({
-    providers: [...apiTestingProviders(), { provide: PREVIEW_DEBOUNCE_MS, useValue: 0 }],
+    providers: [
+      ...apiTestingProviders(),
+      { provide: PREVIEW_DEBOUNCE_MS, useValue: 0 },
+      ...(extra as []),
+    ],
   });
   const fixture = TestBed.createComponent(ProfileEditorPage);
   fixture.componentRef.setInput('profileId', '1');
@@ -87,6 +92,15 @@ async function change(fixture: Fixture, percent = '45'): Promise<void> {
 }
 
 describe('ProfileEditorPage', () => {
+  it('lets only admins save and activate, a user may still preview (D1.4)', async () => {
+    const fixture = await render(provideAuthTesting({ user: me() }));
+    expect(query(fixture, '[data-bar="save"]').length).toBe(0);
+    expect(query(fixture, 'button[data-activate]').length).toBe(0);
+    expect(text(fixture)).toContain('Nur Admins speichern und aktivieren Profile.');
+    await change(fixture); // die Vorschau geht weiter
+    expect(text(fixture)).toContain('Vorschau');
+  });
+
   it('uses form fields with an outline (G1, not in the start bundle)', async () => {
     const fixture = await render();
     expect(fixture.debugElement.injector.get(MAT_FORM_FIELD_DEFAULT_OPTIONS).appearance).toBe(
