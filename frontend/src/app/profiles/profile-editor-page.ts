@@ -36,6 +36,7 @@ import { BackLink } from '../shared/ui/back-link';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
 import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
+import '../shared/zod-de';
 
 /** Wartezeit der Live-Vorschau nach der letzten Aenderung (ms); Tests setzen 0. */
 export const PREVIEW_DEBOUNCE_MS = new InjectionToken<number>('PREVIEW_DEBOUNCE_MS', {

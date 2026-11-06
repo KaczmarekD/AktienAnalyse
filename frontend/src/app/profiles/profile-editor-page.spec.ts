@@ -114,7 +114,10 @@ describe('ProfileEditorPage', () => {
     const fixture = await render();
     await type(fixture, 'value_weight', '1.5');
     http().expectNone(PREVIEW_URL);
-    expect(query(fixture, '[data-error="value_weight"]')).toHaveLength(1);
+    const errors = query(fixture, '[data-error="value_weight"]');
+    expect(errors).toHaveLength(1);
+    // Zod meldet auf Deutsch: Die Sprache laedt der Editor selbst, nicht das Start-Bundle
+    expect(errors[0].textContent).toContain('Zu groß');
     const save = query<HTMLButtonElement>(fixture, 'button[data-action="save"]')[0];
     expect(save.disabled).toBe(true);
   });

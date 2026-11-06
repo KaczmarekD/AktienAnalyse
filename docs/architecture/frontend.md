@@ -14,6 +14,7 @@
 | WebSocket-Typen | aus den Pydantic-Modellen in `va-contracts` (JSON-Schema → TypeScript) | eine Quelle für Python und TypeScript |
 | UI-Bibliothek | Angular Material (entschieden am 31.10.2026) | vom Angular-Team, zieht mit jeder Angular-Version mit; die Tabelle mit Sortierung und Filtern reicht für 90 Titel, ein Grid wie AG Grid ist nicht nötig |
 | Gestaltung | [Styleguide](styleguide.md), verbindlich | zentrale Tokens und Muster-Klassen unter `src/styles/`, gemeinsame Komponenten unter `src/app/shared/ui/` |
+| Bundle | Start-Bundle höchstens 500 kB, darüber bricht der Build (`angular.json`, Budget `initial`) | Seiten laden einzeln (`loadComponent`). zod lädt nur mit den Seiten, die den erzeugten Client mit Prüfung nutzen (Profil-Editor, Läufe); die deutschen Meldungen setzt `shared/zod-de.ts`, nur die Ansichten mit Formular importieren es. Stand 06.11.2026: 424 kB |
 
 ## Ansichten
 
