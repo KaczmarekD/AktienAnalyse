@@ -1,0 +1,27 @@
+// Zeilenlänge des Einleitungssatzes, nur hier
+.intro {
+  max-width: 70ch;
+  margin: 0 0 var(--va-space-lg);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--va-space-md);
+}
+
+.versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-sm);
+  margin: 0 0 var(--va-space-sm);
+
+  .badge {
+    margin-left: 0;
+  }
+}
+
+.meta {
+  margin: 0;
+}

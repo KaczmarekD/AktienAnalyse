@@ -401,6 +401,12 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 - **Formularfelder mit Rand:** Ansichten mit `mat-form-field` nehmen `FORM_FIELD_DEFAULTS` aus
   `shared/ui/form-field.ts` in ihre `providers`. In `app.config.ts` stünde es auch richtig, käme
   dann aber mit Angular Forms ins Start-Bundle.
+- **Einheiten im Formular:** Die Ansicht zeigt Werte so, wie man sie liest: Anteile in Prozent,
+  Geld in Mio. € (`matTextSuffix`). Das Modell und die API bleiben bei 0 bis 1 und Euro, die
+  Ansicht rechnet um und rundet für die Anzeige. Ein Anteil, den man abwägt (Value gegen
+  Quality), ist ein `mat-slider` in Schritten von 5 %. Feldfehler nennen den erlaubten Bereich in
+  der Einheit des Felds, mit Icon `error`.
+- **Selten geänderte Felder** liegen in einem geschlossenen `mat-expansion-panel` „Erweitert“.
 
 ## Muster-Klassen
 
@@ -413,7 +419,7 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 | `.field-error` | Fehler direkt unter einem Formularfeld | „Wert zwischen 0 und 1“ |
 | `.num` | Zahl rechtsbündig mit tabellarischen Ziffern | Spalten mit Scores |
 | `.bar` | Balken in Tinte auf Vertiefung 4, innen ein `span` mit der Breite in Prozent | Composite, Perzentil eines Faktors |
-| `.badge` | kurzer neutraler Zustand, Vertiefung 2, Icon vorne erlaubt | Dry-Run, aktiv: v3 |
+| `.badge` | kurzer neutraler Zustand, Vertiefung 2, Icon vorne erlaubt | neu abgerufen, aktiv: Version 3 |
 | `.badge.badge--muted` | Hinweis, Vertiefung 4 | offline, teilweise |
 | `.badge.badge--error` | Warnung, die zum Handeln auffordert, volle Tinte | nur über `app-value-trap-badge` |
 | `.notice` | Rückmeldung nach einer Aktion, Vertiefung 3 | über `app-notice` |
@@ -421,7 +427,7 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 | `.cluster` | Zeile aus Bedienelementen oder Links, bricht um | Filter über dem Ranking, Lauf starten |
 | `.card-grid` | Karten in drei Spalten, unter `$narrow` untereinander | Abschnitte im Titel-Detail |
 | `.stat-grid` | Kennzahlkarten in vier Spalten, unter `$narrow` zwei | Kopf des Rankings |
-| `.sticky-bar` | Leiste, die unten klebt, mit Linie in Tinte | Speichern im Profil-Editor |
+| `.sticky-bar` | Leiste, die unten klebt, mit Linie in Tinte; im Editor erst nach einer Änderung (`[class.sticky-bar]`) | Speichern im Profil-Editor |
 | `.kv-list` | Schlüssel/Wert-Liste (`dl`), zweispaltig | Kopfdaten eines Laufs |
 | `.kv-list.kv-list--grid` | viele kurze Kennzahlen im Raster | Kennzahlen eines Titels |
 | `.divided-list` | Liste (`ul`) mit Trennlinien | Profile, Versionen |

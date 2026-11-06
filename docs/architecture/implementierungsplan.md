@@ -3026,3 +3026,24 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   zitierter Text (`[data-verbatim]`, der Betreff) zählt in Test 2 nicht als Beschriftung.
 - **Review:** hell und dunkel, 375 px, Start-Bundle unter 500 kB.
 - **NAS (du):** nichts Eigenes.
+
+#### G7 Profile und Editor
+
+- **Voraussetzung:** G1, G2.
+- **Test** (`profiles-page.spec.ts`, `profile-editor-page.spec.ts`, E2E `ui.spec.ts`):
+  - Profilliste: Einleitung, je Profil eine Karte mit „aktiv: Version n“, „neueste: Version m,
+    nicht aktiv“ nur bei Abweichung (Tooltip), angelegt am, „Bearbeiten“; leer und Fehler.
+  - Editor: Gewichtung als Schieberegler in Prozent, Größenschwelle in Mio. €, Mindestabdeckung in
+    Prozent; das Modell und der Body bleiben bei 0 bis 1 und Euro.
+  - Selten geänderte Felder unter „Erweitert“ (geschlossen).
+  - Feldfehler in der Einheit des Felds („Wert zwischen 0 und 100 %.“), ohne Vorschau.
+  - Vorschau mit drei Badges (neu, nicht mehr, Value-Trap) und Namen im Tooltip, Δ als Pfeil mit
+    Tooltip.
+  - Speichern-Leiste: klebt erst nach einer Änderung, „Verwerfen“ zurück zur Grundlage, Speichern
+    gesperrt mit Grund im Tooltip (ungültig, Regel, unverändert), sonst „Legt Version n an“.
+  - Speichern, Konflikt mit „Neu laden“, Aktivieren wie bisher. Tests 1 und 2 der Spec.
+- **Implementierung:** Ansichten `profiles/` mit `mat-slider`, `mat-expansion-panel`, Karten aus
+  `app-section`; die Vorschau klebt rechts und scrollt in sich, wenn sie höher als das Fenster
+  ist. Der Browser-Test setzt die Gewichtung in Prozent.
+- **Review:** hell und dunkel, 375 px, Tastatur am Schieberegler.
+- **NAS (du):** nichts Eigenes.

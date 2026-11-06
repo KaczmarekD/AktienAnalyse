@@ -1,35 +1,147 @@
 @use '../../styles/breakpoints';
 
-// Die Spaltenbreiten gelten nur für dieses Layout
+// Parameter links, Vorschau rechts; die Spaltenbreiten gelten nur für dieses Layout
 .layout {
   display: grid;
-  grid-template-columns: minmax(18rem, 26rem) 1fr;
-  gap: var(--va-space-xl);
+  grid-template-columns: minmax(20rem, 30rem) minmax(0, 1fr);
+  gap: var(--va-space-lg);
   align-items: start;
+  margin-top: var(--va-space-md);
+}
+
+// Die Vorschau bleibt beim Scrollen sichtbar, unter der App-Leiste. Ist sie höher als das
+// Fenster, scrollt sie in sich; 6rem lassen Platz für die Speichern-Leiste, die unten klebt.
+.preview {
+  position: sticky;
+  top: calc(var(--va-appbar-height) + var(--va-space-md));
+  max-height: calc(100dvh - var(--va-appbar-height) - var(--va-space-md) - 6rem);
+  overflow-y: auto;
 }
 
 @media (max-width: breakpoints.$narrow) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .preview {
+    position: static;
+    max-height: none;
   }
 }
 
-.editor {
+.field {
+  margin-bottom: var(--va-space-md);
+}
+
+.field-label,
+.field-row,
+.check-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--va-space-xs);
 }
 
-.editor mat-form-field {
-  width: 100%;
+.field-label {
+  font: var(--mat-sys-label-large);
 }
 
-// Erklärung unter einer Checkbox, eingerückt auf Höhe des Labels
-.factor .hint {
-  margin: 0 0 var(--va-space-sm) var(--va-size-control);
+.field-row {
+  align-items: baseline;
+
+  mat-form-field {
+    flex: 1;
+  }
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--va-space-sm);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+
+  mat-slider {
+    flex: 1;
+  }
+}
+
+.field .hint {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: var(--va-space-xs);
+}
+
+.advanced {
+  margin: var(--va-space-sm) 0 var(--va-space-lg);
+}
+
+h3 {
+  margin: var(--va-space-lg) 0 var(--va-space-xs);
+  font: var(--mat-sys-title-small);
+}
+
+// Ein Faktor: Schalter und Richtung in einer Zeile, darunter der Hinweis auf Höhe des Labels
+.factor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--va-space-sm);
+
+  .direction {
+    color: var(--mat-sys-on-surface-variant);
+    font: var(--mat-sys-body-small);
+  }
+
+  .hint {
+    flex-basis: 100%;
+    margin: 0 0 var(--va-space-sm) var(--va-size-control);
+  }
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-sm);
+
+  .badge {
+    margin-left: 0;
+  }
 }
 
 .delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--va-space-2xs);
   white-space: nowrap;
+}
+
+// Ohne Änderung liegt die Leiste unter dem Formular, mit Änderung klebt sie unten (.sticky-bar)
+.save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--va-space-md);
+  margin: var(--va-space-lg) 0;
+
+  .comment {
+    flex: 1;
+    min-width: 16rem;
+  }
+}
+
+.versions {
+  .spacer {
+    flex: 1;
+  }
+
+  li {
+    align-items: center;
+  }
 }
 
 .comment-text {

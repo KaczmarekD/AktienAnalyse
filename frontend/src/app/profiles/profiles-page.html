@@ -1,27 +1,51 @@
 <app-page-header>Scoring-Profile</app-page-header>
+<p class="intro">
+  Ein Profil legt fest, welche Faktoren zählen und wie Value und Quality gewichtet werden. Der
+  nächste Lauf rechnet mit der aktiven Version.
+</p>
 
-@if (error(); as message) {
-  <p class="message">{{ message }}</p>
-} @else if (profiles(); as profiles) {
+@if (profiles(); as profiles) {
   @if (profiles.length === 0) {
-    <p class="message">Noch kein Profil. „Standard“ entsteht mit dem ersten Lauf.</p>
+    <app-state
+      empty="Noch kein Profil. „Standard“ entsteht mit dem ersten Lauf."
+      emptyIcon="tune"
+    />
   } @else {
-    <ul class="divided-list">
+    <div class="cards">
       @for (profile of profiles; track profile.id) {
-        <li [attr.data-profile]="profile.id">
-          <a [routerLink]="['/profiles', profile.id]">{{ profile.name }}</a>
-          <span class="meta">v{{ profile.latest_version | orDash }}</span>
-          @if (profile.active_version !== null) {
-            <span class="badge">aktiv: v{{ profile.active_version }}</span>
-          }
-        </li>
+        <app-section [heading]="profile.name" [attr.data-profile]="profile.id">
+          <a
+            sectionActions
+            matButton="outlined"
+            data-action="edit"
+            [routerLink]="['/profiles', profile.id]"
+            [matTooltip]="controls['profiles.edit']"
+            >Bearbeiten</a
+          >
+          <p class="versions">
+            @if (profile.active_version !== null) {
+              <span class="badge" tabindex="0" [matTooltip]="activeTip"
+                >aktiv: Version {{ profile.active_version }}</span
+              >
+            }
+            @if (
+              profile.latest_version !== null && profile.latest_version !== profile.active_version
+            ) {
+              <span
+                class="badge badge--muted"
+                data-latest
+                tabindex="0"
+                [matTooltip]="controls['profiles.latest']"
+                ><app-icon name="info" />neueste: Version {{ profile.latest_version }}, nicht
+                aktiv</span
+              >
+            }
+          </p>
+          <p class="meta">angelegt am {{ profile.created_at | day }}</p>
+        </app-section>
       }
-    </ul>
-    <p class="hint">
-      Jedes Speichern legt eine neue Version an. Es rechnet immer die zuletzt aktivierte, ab dem
-      nächsten Lauf.
-    </p>
+    </div>
   }
 } @else {
-  <p class="message">Lade die Profile …</p>
+  <app-state [error]="error()" loading="Lade die Profile …" />
 }
