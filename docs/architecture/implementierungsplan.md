@@ -2870,3 +2870,45 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
   - Komponententest der Ansicht mit Chart und Sensitivität der Anker.
 - **Implementierung:** Endpunkt `GET /api/v1/instruments/{id}/anchors` und Chart im Titel-Detail.
 - **Review:** Das UI zeigt an, wie viele Jahre die Wertlinie abdeckt.
+
+### Track G – Gestaltung des UI
+
+Grundlage sind die [Spec](ui-neugestaltung.md) und die [Designvorlage](../design/vorlage.html),
+beide abgenommen am 06.11.2026. Zyklus und Definition of Done gelten unverändert, ab G1 läuft
+zusätzlich `make local-e2e`. G4 bis G7 laufen nach G2 in getrennten Worktrees. Was mehrere von
+ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1 an.
+
+#### G1 Fundament und Hülle
+
+- **Voraussetzung:** Spec und G0 abgenommen, Ergänzung des Styleguides `676ae81`.
+- **Test:**
+  - `tests/test_frontend_styles.py` (Test 6 der Spec): Kein Farbliteral (`#…`, `rgb(`, `hsl(`,
+    Farbnamen) in `frontend/src/**/*.scss` außer in `_paper.scss` und dem weißen Hintergrund der
+    Mail-Vorschau. In `_paper.scss` ist jeder Wert ein Grauton (Kanäle höchstens 16 auseinander),
+    und jede Rolle der Palette hat einen hellen und einen dunklen Wert.
+  - Bausteine (`ui.spec.ts`): `app-icon` zeichnet das SVG aus der festen Liste, mit
+    `aria-hidden`, in zwei Größen, Drehung nur auf Wunsch. `app-section` setzt den Titel und hat
+    Platz für ⓘ und Aktionen. `app-state` zeigt den Ladebalken erst nach 300 ms, einen Fehler mit
+    `role="alert"` und den leeren Zustand mit Icon, Satz und nächstem Schritt.
+  - App-Hülle (`app.spec.ts`): Navigation mit Icons und „Läufe“, der aktive Eintrag mit
+    `aria-current`, Tooltips an den Einträgen, der Offline-Chip mit Icon und Tooltip, die
+    Fußzeile mit Hinweis und Version aus `GET /api/v1/health` (ohne Antwort ohne Version), der
+    Titel „Läufe · Value-Analyzer“ und die Standardwerte der Tooltips.
+- **Implementierung:**
+  - `src/styles/_paper.scss`: Palette mit `light-dark()` über `mat.theme-overrides`, Overrides
+    für Karte, Dialog, Menü, Tooltip und Tabelle (ohne Schatten, Haarlinien, Linie in Tinte unter
+    dem Tabellenkopf). Serifen für Überschriften über `brand-family`.
+  - Neue Tokens, `breakpoints.$compact`, Fokusring, Links in Tinte. Muster-Klassen für G4 bis G7:
+    `.num`, `.card-grid`, `.stat-grid`, `.sticky-bar`, `.badge--muted`. `.badge` und `.notice`
+    nehmen die Stufen der Palette.
+  - `MAT_TOOLTIP_DEFAULT_OPTIONS` und Formularfelder mit Rand (`appearance: 'outline'`) in
+    `app.config.ts`.
+  - `app-icon`, `app-section` und `app-state` unter `shared/ui/`.
+  - App-Hülle: Marke, Navigation mit Icons (unter `$compact` nur Icons), Offline-Chip, Fußzeile,
+    Inhalt höchstens `--va-content-max` breit. „Läufe“ statt „Runs“, auch im Titel des Tabs.
+  - Die Meldungen in `api-error.ts` nennen den Server statt „das web-api“.
+  - Styleguide: Farben, Typografie, Tokens, Icons und die neuen Bausteine.
+- **Nicht in G1:** das Icon „Begriffe“ und das Glossar (G2), der Umbau der Seiten (G4 bis G7). Die
+  Seiten bekommen mit G1 nur das neue Theme.
+- **Review:** hell und dunkel bei 1366 px und 375 px angesehen, Start-Bundle unter 500 kB.
+- **NAS (du):** nichts Eigenes, es kommt mit dem Image `va-frontend`.
