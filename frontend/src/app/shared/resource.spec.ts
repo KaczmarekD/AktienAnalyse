@@ -37,7 +37,7 @@ describe('loaded and loadError', () => {
   it('name the web-api when it is not reachable', async () => {
     const ref = await settled(() => Promise.reject(new HttpErrorResponse({ status: 0 })));
     expect(loadError(ref, 'Lauf nicht gefunden.')).toBe(
-      'Das web-api oder seine Datenbank ist nicht erreichbar.',
+      'Der Server oder seine Datenbank ist nicht erreichbar.',
     );
   });
 });

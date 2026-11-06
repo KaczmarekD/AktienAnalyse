@@ -2,13 +2,52 @@
 import { ChangeDetectionStrategy, Component, signal, Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { vi } from 'vitest';
 
 import type { Progress } from '../realtime/live.store';
 import { BackLink } from './back-link';
+import { AppIcon, ICONS } from './icon';
 import { Notice, NoticeBox } from './notice';
 import { PageHeader } from './page-header';
 import { RunStatus } from './run-status';
+import { AppSection } from './section';
+import { AppState } from './state';
 import { ValueTrapBadge } from './value-trap-badge';
+
+@Component({
+  imports: [AppIcon],
+  template: `<app-icon name="warning" /><app-icon name="progress_activity" size="md" spin />`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class IconHost {}
+
+@Component({
+  imports: [AppSection],
+  template: `
+    <app-section heading="Kennzahlen">
+      <button sectionInfo type="button" aria-label="Was steht hier?">i</button>
+      <button sectionActions type="button">Kopieren</button>
+      <p>Inhalt</p>
+    </app-section>
+    <app-section heading="Verlauf" [level]="3"><p>mehr</p></app-section>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class SectionHost {}
+
+@Component({
+  imports: [AppState],
+  template: `
+    <app-state [error]="error()" [empty]="empty()" loading="Lade das Ranking …">
+      <button type="button">Lauf starten</button>
+    </app-state>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class StateHost {
+  readonly error = signal<string | undefined>(undefined);
+  readonly empty = signal<string | undefined>(undefined);
+}
 
 @Component({
   imports: [BackLink, PageHeader],
@@ -134,5 +173,102 @@ describe('NoticeBox', () => {
       'Es läuft schon ein Lauf.',
     );
     expect(element.querySelector('[role="status"]')).toBeNull();
+  });
+});
+
+describe('AppIcon', () => {
+  it('draws the path from the fixed list and hides it from screen readers', () => {
+    const [warning, progress] = Array.from(render(IconHost).element.querySelectorAll('app-icon'));
+    const svg = warning.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(svg?.querySelector('path')?.getAttribute('d')).toBe(ICONS.warning);
+    expect(warning.getAttribute('data-size')).toBe('sm');
+    expect(warning.hasAttribute('data-spin')).toBe(false);
+    expect(progress.getAttribute('data-size')).toBe('md');
+    expect(progress.hasAttribute('data-spin')).toBe(true);
+  });
+
+  it('has every icon of the spec', () => {
+    expect(Object.keys(ICONS)).toEqual(
+      expect.arrayContaining([
+        'leaderboard',
+        'history',
+        'tune',
+        'help',
+        'info',
+        'warning',
+        'error',
+        'check_circle',
+        'progress_activity',
+        'play_arrow',
+        'download',
+        'content_copy',
+        'search',
+        'view_column',
+        'arrow_back',
+        'arrow_upward',
+        'arrow_downward',
+        'cloud_off',
+        'close',
+      ]),
+    );
+  });
+});
+
+describe('AppSection', () => {
+  it('is a region named by its heading, with info and actions in the head', () => {
+    const [first, second] = Array.from(
+      render(SectionHost).element.querySelectorAll('app-section section'),
+    );
+    const heading = first.querySelector('h2');
+    expect(heading?.textContent?.trim()).toBe('Kennzahlen');
+    expect(first.getAttribute('aria-labelledby')).toBe(heading?.id);
+    const head = first.querySelector('[data-section-head]');
+    expect(head?.querySelector('button[aria-label="Was steht hier?"]')).not.toBeNull();
+    expect(head?.textContent).toContain('Kopieren');
+    expect(head?.textContent).not.toContain('Inhalt');
+    expect(first.textContent).toContain('Inhalt');
+    expect(second.querySelector('h3')?.textContent?.trim()).toBe('Verlauf');
+    expect(second.getAttribute('aria-labelledby')).not.toBe(first.getAttribute('aria-labelledby'));
+  });
+});
+
+describe('AppState', () => {
+  it('shows the loading bar and text only after 300 ms', () => {
+    vi.useFakeTimers();
+    try {
+      const { fixture, element } = render(StateHost);
+      vi.advanceTimersByTime(299);
+      fixture.detectChanges();
+      expect(element.querySelector('app-state')?.textContent?.trim()).toBe('');
+
+      vi.advanceTimersByTime(1);
+      fixture.detectChanges();
+      expect(element.querySelector('[role="status"]')?.textContent).toContain('Lade das Ranking …');
+      expect(element.querySelector('[role="progressbar"]')).not.toBeNull();
+      expect(element.textContent).not.toContain('Lauf starten');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows an error at once as alert, without the loading bar', () => {
+    const { fixture, element } = render(StateHost);
+    fixture.componentInstance.error.set('Der Server oder seine Datenbank ist nicht erreichbar.');
+    fixture.detectChanges();
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('nicht erreichbar');
+    expect(element.querySelector('[role="alert"] app-icon')).not.toBeNull();
+    expect(element.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it('shows the empty state with icon, sentence and the next step', () => {
+    const { fixture, element } = render(StateHost);
+    fixture.componentInstance.empty.set('Noch keine Läufe.');
+    fixture.detectChanges();
+    const state = element.querySelector('app-state');
+    expect(state?.textContent).toContain('Noch keine Läufe.');
+    expect(state?.querySelector('button')?.textContent).toBe('Lauf starten');
+    expect(state?.querySelector('app-icon')).not.toBeNull();
+    expect(element.querySelector('[role="alert"]')).toBeNull();
   });
 });
