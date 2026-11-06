@@ -19,7 +19,7 @@
 | 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; F2/F3 warten auf ADR-0011 |
-| D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 📝 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1 in Pakete geschnitten, Umsetzung offen |
+| D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 🚧 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1.1 (Konten, Anmeldung, Sitzungen) im Code erledigt |
 
 **NAS:** Alle offenen NAS-Punkte (unter „Sofort“ und in Phase 0, 2, 3, 5 und F1) erledigt ein
 Durchgang nach dem [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig). Er enthält auch den Altdaten-Import und die Sicherung.
@@ -243,7 +243,7 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
 - [ ] D0 (du): FinTS-Produktregistrierung als „Privatanwender-Software“ beantragen (kostenlos,
       10–15 Arbeitstage, [Recherche](../research/2026-11-depot-datenquellen-und-bankzugang.md#fints-produktregistrierung))
 - [ ] D1 Mehrere Nutzer: Login, Sitzungen, Rollen, HTTPS 🔒
-  - [ ] D1.1 Konten, Anmeldung, Sitzungen, Schema `identity` 🔒
+  - [x] D1.1 Konten, Anmeldung, Sitzungen, Schema `identity` 🔒 (`0d2d8bd`)
   - [ ] D1.2 Rollen und Schutz der bestehenden Endpunkte, Log-Filter 🔒
   - [ ] D1.3 WebSocket mit Sitzung, Topics je Nutzer 🔒
   - [ ] D1.4 Frontend: Anmeldung, Nutzerverwaltung, E2E mit Testnutzer

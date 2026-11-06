@@ -2939,7 +2939,7 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
     [--display-name …] [--password-stdin]`. Ohne `--password-stdin` fragt es zweimal per
     `getpass`.
   - **Bestehende Endpunkte** bleiben bis D1.2 offen. D1.1 fügt nur `auth` und `me` hinzu.
-- **Umgesetzt (06.11.2026, Branch `feat/d1-1-konten`, noch nicht auf `main`):**
+- **Umgesetzt (06.11.2026, auf `main` als `0d2d8bd`, CI grün):**
   - **Code:** `va_web_api.identity` (`domain`, `ports`, `service`, `memory`), Postgres-Speicher
     und Modelle unter `va_web_api.adapters.postgres.identity_*`, Router `api/auth.py`,
     Kommando `va_web_api.admin`, Migration `0015_identity`, Rolle `va_identity` in
