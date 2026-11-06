@@ -2993,3 +2993,14 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   mit Icon und Schwellen, Tabellen-Blatt mit klebendem Kopf unter der App-Leiste.
 - **Review:** hell und dunkel, 375 px, Start-Bundle unter 500 kB.
 - **NAS (du):** nichts Eigenes.
+
+#### G5 Titel-Detail
+
+- **Voraussetzung:** G1, G2, G3.
+- **Test** (`instrument-page.spec.ts`, `ui.spec.ts`): Stammdaten mit Begriffen und Sektor deutsch,
+  ISIN kopieren (CDK-Clipboard, Snackbar), vier Karten aus der neuesten Bewertung (Rang „von N“
+  mit Veränderung, Composite mit Gewichten, Value und Quality mit Abdeckung der Faktoren),
+  Kennzahlen in drei Karten mit Perzentil je Faktor, „keine Daten“ und „nicht aktiv“,
+  unvollständiger Abruf, Sparkline und Verlauf, Value-Trap im Kopf, Tests 1 und 2.
+- **Implementierung:** Ansicht `instruments/`, Baustein `app-sparkline`, Muster `.bar`.
+- **Review:** hell und dunkel, 375 px. **NAS (du):** nichts Eigenes.

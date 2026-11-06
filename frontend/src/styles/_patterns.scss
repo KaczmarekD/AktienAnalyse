@@ -54,6 +54,22 @@ a {
   cursor: help;
 }
 
+// Balken in Tinte auf Vertiefung 4 (Score, Perzentil); innen ein span mit der Breite in Prozent
+.bar {
+  display: inline-block;
+  width: var(--va-size-bar);
+  height: var(--va-bar-height);
+  overflow: hidden;
+  border-radius: var(--mat-sys-corner-full);
+  background-color: var(--mat-sys-surface-container-highest);
+
+  > span {
+    display: block;
+    height: 100%;
+    background-color: var(--mat-sys-primary);
+  }
+}
+
 // Zahlen in Tabellen und Karten rechtsbündig
 .num {
   text-align: right;

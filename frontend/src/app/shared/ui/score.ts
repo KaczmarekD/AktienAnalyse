@@ -35,20 +35,6 @@ import { scoreTip } from '../glossary/glossary';
       gap: var(--va-space-sm);
       font-variant-numeric: tabular-nums;
     }
-
-    .bar {
-      width: var(--va-size-bar);
-      height: var(--va-bar-height);
-      overflow: hidden;
-      border-radius: var(--mat-sys-corner-full);
-      background-color: var(--mat-sys-surface-container-highest);
-
-      span {
-        display: block;
-        height: 100%;
-        background-color: var(--mat-sys-primary);
-      }
-    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

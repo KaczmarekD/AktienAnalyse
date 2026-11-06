@@ -329,6 +329,16 @@ die gewählten Schlüssel und merkt sie sich im `localStorage` (Lesen und Schrei
 <app-column-picker [groups]="columnGroups()" [(selected)]="selected" />
 ```
 
+### `app-sparkline`
+
+Verlauf als kleine Linie in Tinte (Inline-SVG, ohne Diagramm-Bibliothek), ältester Punkt zuerst;
+Punkte ohne Wert fehlen. Jeder Punkt hat einen Tooltip, das SVG eine Beschreibung für
+Screenreader („Verlauf des Composite von 0,71 auf 0,78“). Unter zwei Werten steht ein Satz.
+
+```html
+<app-sparkline [points]="spark()" label="Composite" />
+```
+
 ### `app-icon`
 
 SVG-Icon aus der festen Liste, siehe [Icons](#icons). `size="md"` für 1,5 rem, `spin` dreht es
@@ -396,6 +406,7 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 | `.hint` | erklärender Nebentext oder Kürzel, klein und gedämpft | „Aktivieren wirkt ab dem nächsten Lauf.“, Symbol im Ranking |
 | `.field-error` | Fehler direkt unter einem Formularfeld | „Wert zwischen 0 und 1“ |
 | `.num` | Zahl rechtsbündig mit tabellarischen Ziffern | Spalten mit Scores |
+| `.bar` | Balken in Tinte auf Vertiefung 4, innen ein `span` mit der Breite in Prozent | Composite, Perzentil eines Faktors |
 | `.badge` | kurzer neutraler Zustand, Vertiefung 2, Icon vorne erlaubt | Dry-Run, aktiv: v3 |
 | `.badge.badge--muted` | Hinweis, Vertiefung 4 | offline, teilweise |
 | `.badge.badge--error` | Warnung, die zum Handeln auffordert, volle Tinte | nur über `app-value-trap-badge` |

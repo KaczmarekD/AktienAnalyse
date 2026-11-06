@@ -1,0 +1,62 @@
+@use '../../styles/breakpoints';
+
+.copy {
+  vertical-align: middle;
+}
+
+// Eine Kennzahl: Begriff links, Wert rechts, darunter das Perzentil
+.fig {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--va-space-2xs) var(--va-space-md);
+  padding: var(--va-space-sm) 0;
+  border-bottom: var(--va-divider);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  .value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--va-weight-emphasis);
+  }
+
+  .rank {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: var(--va-space-sm);
+    color: var(--mat-sys-on-surface-variant);
+    font: var(--mat-sys-body-small);
+  }
+
+  // Faktor, den das Profil des Laufs nicht nutzt
+  &.inactive {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+// Abgesetzte Zeile vor den Kennzahlen, die nicht in den Score eingehen
+.separator {
+  margin: var(--va-space-md) 0 0;
+  padding: var(--va-space-sm) 0 var(--va-space-xs);
+  border-top: var(--va-rule);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+}
+
+// Verlauf links, Tabelle rechts; die Breite der Linie gilt nur hier
+.history {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) 1fr;
+  gap: var(--va-space-xl);
+  align-items: start;
+}
+
+@media (max-width: breakpoints.$narrow) {
+  .history {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
