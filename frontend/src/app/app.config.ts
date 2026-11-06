@@ -6,6 +6,7 @@ import {
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
+import { MAT_TOOLTIP_DEFAULT_OPTIONS, MatTooltipDefaultOptions } from '@angular/material/tooltip';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 
 import { client } from './api/client.gen';
@@ -13,6 +14,17 @@ import { provideHeyApiClient } from './api/client/client.gen';
 import { routes } from './app.routes';
 import { RealtimeService } from './shared/realtime/realtime.service';
 import './locale';
+
+// Tooltips (Spec, Tooltips und Begriffe): erscheinen bei Hover, Fokus und langem Drücken
+const TOOLTIPS: MatTooltipDefaultOptions = {
+  showDelay: 400,
+  hideDelay: 0,
+  touchendHideDelay: 2500,
+  position: 'above',
+};
+
+// Formularfelder mit Rand setzen die Ansichten selbst (shared/ui/form-field.ts), damit das
+// Formularfeld nicht ins Start-Bundle kommt.
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -26,5 +38,6 @@ export const appConfig: ApplicationConfig = {
     { provide: LOCALE_ID, useValue: 'de-DE' },
     // P4.6: WebSocket beim Start; Aenderungen melden sich, REST liefert den Zustand
     provideAppInitializer(() => inject(RealtimeService).start()),
+    { provide: MAT_TOOLTIP_DEFAULT_OPTIONS, useValue: TOOLTIPS },
   ],
 };

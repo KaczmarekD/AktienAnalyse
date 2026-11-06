@@ -13,6 +13,7 @@ import { optionalNumber } from '../shared/api-error';
 import { DayPipe, MrdPipe, NumPipe, OrDashPipe, PctPipe } from '../shared/format';
 import { LiveStore } from '../shared/realtime/live.store';
 import { loaded, loadError } from '../shared/resource';
+import { FORM_FIELD_DEFAULTS } from '../shared/ui/form-field';
 import { PageHeader } from '../shared/ui/page-header';
 import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
 
@@ -38,6 +39,7 @@ type SortKey = keyof RankingRow;
     RouterLink,
     ValueTrapBadge,
   ],
+  providers: [FORM_FIELD_DEFAULTS],
   templateUrl: './ranking-page.html',
   styleUrl: './ranking-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

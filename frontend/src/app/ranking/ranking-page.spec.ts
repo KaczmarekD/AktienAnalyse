@@ -1,5 +1,6 @@
 // Ranking-Ansicht (P3.7): Darstellung, Filter, Sortierung, leere und fehlerhafte Antworten.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { Dispatcher } from '@ngrx/signals/events';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
@@ -28,6 +29,13 @@ async function click(fixture: ComponentFixture<RankingPage>, element: HTMLElemen
 }
 
 describe('RankingPage', () => {
+  it('uses form fields with an outline (G1, not in the start bundle)', async () => {
+    const fixture = await render();
+    expect(fixture.debugElement.injector.get(MAT_FORM_FIELD_DEFAULT_OPTIONS).appearance).toBe(
+      'outline',
+    );
+  });
+
   it('shows the scoring run with day, source and weights', async () => {
     const fixture = await render();
     await respond(fixture, LATEST, RANKING);

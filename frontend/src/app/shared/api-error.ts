@@ -1,13 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
-/** Verstaendliche Meldung fuer eine fehlgeschlagene Anfrage an das web-api. */
+/** Verständliche Meldung für eine fehlgeschlagene Anfrage an den Server (das web-api). */
 export function errorMessage(error: unknown, notFound: string): string {
   if (error instanceof HttpErrorResponse) {
     if (error.status === 404) {
       return notFound;
     }
     if (error.status === 0 || error.status >= 500) {
-      return 'Das web-api oder seine Datenbank ist nicht erreichbar.';
+      return 'Der Server oder seine Datenbank ist nicht erreichbar.';
     }
   }
   return 'Die Daten konnten nicht geladen werden.';

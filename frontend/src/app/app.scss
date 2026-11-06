@@ -1,25 +1,120 @@
-mat-toolbar {
+@use '../styles/breakpoints';
+
+// App-Hülle (Spec, App-Hülle): Leiste auf dem Schreibtisch mit Haarlinie, Inhalt zentriert
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
   gap: var(--va-space-lg);
+  height: var(--va-appbar-height);
+  padding: 0 var(--va-space-lg);
+  border-bottom: var(--va-divider);
+  background-color: var(--mat-sys-surface);
 }
 
 .brand {
-  font-weight: var(--va-weight-emphasis);
+  display: flex;
+  align-items: center;
+  gap: var(--va-space-sm);
+  font: var(--mat-sys-title-large);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand-mark {
+  width: var(--va-icon-lg);
+  height: var(--va-icon-lg);
+
+  rect {
+    fill: var(--mat-sys-primary);
+  }
+
+  path {
+    fill: none;
+    stroke: var(--mat-sys-on-primary);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
 }
 
 nav {
   display: flex;
   gap: var(--va-space-xs);
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--va-space-sm);
+    height: var(--va-size-control);
+    padding: 0 var(--va-space-md);
+    border-radius: var(--mat-sys-corner-full);
+    color: var(--mat-sys-on-surface-variant);
+    font: var(--mat-sys-label-large);
+    text-decoration: none;
+
+    &:hover {
+      background-color: var(--mat-sys-surface-container-low);
+      color: var(--mat-sys-on-surface);
+    }
+
+    // Aktiver Bereich: Vertiefung 3 als Pille, Schrift stärker
+    &.active {
+      background-color: var(--mat-sys-surface-container-high);
+      color: var(--mat-sys-on-surface);
+      font-weight: var(--va-weight-strong);
+    }
+  }
 }
 
-.active {
-  background-color: var(--mat-sys-secondary-container);
+.spacer {
+  flex: 1;
 }
 
 main {
-  padding: var(--va-space-lg);
+  flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--va-content-max);
+  margin: 0 auto;
+  padding: var(--va-space-lg) var(--va-space-lg) var(--va-space-2xl);
 }
 
-// P4.6: Verbindungsstatus des WebSockets, sichtbar nur offline; Farbe und Größe von .hint
-.realtime {
-  margin-left: auto;
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--va-space-xs) var(--va-space-md);
+  padding: var(--va-space-md) var(--va-space-lg);
+  border-top: var(--va-divider);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+// Handys: Navigation nur mit Icons (Name über aria-label und Tooltip), Marke ohne Namen
+@media (max-width: breakpoints.$compact) {
+  .appbar {
+    gap: var(--va-space-sm);
+    padding: 0 var(--va-space-md);
+  }
+
+  .brand span,
+  nav a span {
+    display: none;
+  }
+
+  nav a {
+    padding: 0 var(--va-space-sm);
+  }
+
+  main {
+    padding: var(--va-space-md) var(--va-space-md) var(--va-space-2xl);
+  }
 }

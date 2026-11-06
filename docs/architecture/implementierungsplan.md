@@ -2901,8 +2901,10 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   - Neue Tokens, `breakpoints.$compact`, Fokusring, Links in Tinte. Muster-Klassen für G4 bis G7:
     `.num`, `.card-grid`, `.stat-grid`, `.sticky-bar`, `.badge--muted`. `.badge` und `.notice`
     nehmen die Stufen der Palette.
-  - `MAT_TOOLTIP_DEFAULT_OPTIONS` und Formularfelder mit Rand (`appearance: 'outline'`) in
-    `app.config.ts`.
+  - `MAT_TOOLTIP_DEFAULT_OPTIONS` in `app.config.ts`. Formularfelder mit Rand
+    (`FORM_FIELD_DEFAULTS`) nehmen die Ansichten mit Feldern in ihre `providers`: In
+    `app.config.ts` holte der Import Formularfeld und Angular Forms ins Start-Bundle (587 statt
+    453 kB).
   - `app-icon`, `app-section` und `app-state` unter `shared/ui/`.
   - App-Hülle: Marke, Navigation mit Icons (unter `$compact` nur Icons), Offline-Chip, Fußzeile,
     Inhalt höchstens `--va-content-max` breit. „Läufe“ statt „Runs“, auch im Titel des Tabs.

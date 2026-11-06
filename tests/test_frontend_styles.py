@@ -118,6 +118,10 @@ def test_palette_has_only_greys() -> None:
 
 def test_palette_sets_every_role_light_and_dark() -> None:
     text = _without_comments(PAPER.read_text(encoding="utf-8"))
-    pairs = dict(re.findall(r"^\s*([a-z-]+):\s*light-dark\((#[0-9a-f]{6}),\s*#[0-9a-f]{6}\)", text, re.MULTILINE))
+    pairs = dict(
+        re.findall(
+            r"^\s*([a-z-]+):\s*light-dark\((#[0-9a-f]{6}),\s*#[0-9a-f]{6}\)", text, re.MULTILINE
+        )
+    )
     missing = [role for role in ROLES if role not in pairs]
     assert missing == [], "jede Rolle der Palette braucht light-dark(hell, dunkel)"

@@ -1,14 +1,32 @@
 // Gemeinsame Muster-Klassen (docs/architecture/styleguide.md). Seiten-SCSS enthält nur, was
 // es genau auf einer Seite gibt; alles, was zweimal vorkommt, gehört hierher.
+@use 'breakpoints';
 
-// Überschriften: Schriftstufen aus dem Material-Theme statt Browser-Standard
+// Überschriften: Schriftstufen aus dem Material-Theme, h1 bis Kartentitel in Serifen
 h1 {
   font: var(--mat-sys-headline-small);
 }
 
 h2 {
-  margin: var(--va-space-lg) 0 var(--va-space-sm);
+  margin: var(--va-space-xl) 0 var(--va-space-md);
   font: var(--mat-sys-title-large);
+}
+
+// Links in Tinte, unterstrichen mit dem Rand-Ton; Buttons als Link setzen Material selbst
+a {
+  color: inherit;
+  text-decoration-color: var(--mat-sys-outline);
+  text-underline-offset: var(--va-space-2xs);
+
+  &:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+// Fokusring für alles ohne eigenen Fokus-Indikator von Material
+:is(a, summary, [tabindex]):not(.mat-focus-indicator):focus-visible {
+  outline: var(--va-focus-ring);
+  outline-offset: var(--va-focus-offset);
 }
 
 // Text
@@ -28,13 +46,22 @@ h2 {
   font-size: var(--va-text-sm);
 }
 
-// Badge: neutral als Standard, --error nur für Warnungen, die zum Handeln auffordern
+// Zahlen in Tabellen und Karten rechtsbündig
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+// Badge: Vertiefung 2 als Standard, --muted für Hinweise, --error (volle Tinte) für Warnungen,
+// die zum Handeln auffordern. Ein Icon darf vorne stehen.
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--va-space-xs);
   padding: var(--va-space-2xs) var(--va-space-sm);
   border-radius: var(--va-radius-pill);
-  background-color: var(--mat-sys-tertiary-container);
-  color: var(--mat-sys-on-tertiary-container);
+  background-color: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface);
   font: var(--mat-sys-label-medium);
   vertical-align: middle;
   white-space: nowrap;
@@ -50,21 +77,25 @@ h2 {
   margin-left: 0;
 }
 
+.badge--muted {
+  background-color: var(--mat-sys-surface-container-highest);
+}
+
 .badge--error {
   background-color: var(--mat-sys-error);
   color: var(--mat-sys-on-error);
 }
 
-// Hinweis-Box: neutral als Standard, --error für Konflikte und Fehler
+// Hinweis-Box: Vertiefung 3 als Standard, --error (gedämpfte Warnung) für Konflikte und Fehler
 .notice {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--va-space-md);
+  gap: var(--va-space-sm) var(--va-space-md);
   align-items: center;
   padding: var(--va-space-sm) var(--va-space-md);
   border-radius: var(--va-radius-box);
-  background-color: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
+  background-color: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
 }
 
 .notice--error {
@@ -79,6 +110,49 @@ h2 {
   align-items: center;
   gap: var(--va-space-md);
   margin-bottom: var(--va-space-md);
+}
+
+// Raster aus Karten (drei Spalten) und aus Kennzahlkarten (vier Spalten)
+.card-grid,
+.stat-grid {
+  display: grid;
+  gap: var(--va-space-md);
+}
+
+.card-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: var(--va-space-lg) 0;
+}
+
+@media (max-width: breakpoints.$narrow) {
+  .card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// Leiste, die unten klebt, sobald es etwas zu speichern gibt
+.sticky-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--va-space-md);
+  margin-top: var(--va-space-lg);
+  padding: var(--va-space-md) var(--va-space-lg);
+  border: var(--va-divider);
+  border-top: var(--va-rule);
+  border-radius: var(--va-radius-card) var(--va-radius-card) 0 0;
+  background-color: var(--mat-sys-surface-container-lowest);
 }
 
 // Schlüssel/Wert-Liste: zweispaltig; --grid für viele kurze Kennzahlen, je Paar ein <div>
@@ -125,10 +199,36 @@ h2 {
   }
 }
 
-// Tabellen: immer volle Breite; .data-table für schlichte HTML-Tabellen ohne mat-table
+// Tabellen im Buchsatz: volle Breite, Linie in Tinte unter dem Kopf, Haarlinien zwischen den
+// Zeilen, unter dem Zeiger Vertiefung 1. .table-sheet legt eine Tabelle als Blatt auf den Tisch,
+// .data-table ist die schlichte HTML-Tabelle ohne mat-table.
 table {
   width: 100%;
   font-variant-numeric: tabular-nums;
+}
+
+.mat-mdc-header-row .mat-mdc-header-cell,
+.data-table th {
+  border-bottom: var(--va-rule);
+  font: var(--mat-sys-label-large);
+}
+
+.mat-mdc-row:hover .mat-mdc-cell,
+.data-table tbody tr:hover td {
+  background-color: var(--mat-sys-surface-container-low);
+}
+
+.table-sheet {
+  overflow: hidden;
+  border: var(--va-divider);
+  border-radius: var(--va-radius-card);
+  background-color: var(--mat-sys-surface-container-lowest);
+}
+
+@media (max-width: breakpoints.$narrow) {
+  .table-sheet {
+    overflow-x: auto;
+  }
 }
 
 .data-table {
@@ -140,4 +240,15 @@ table {
     border-bottom: var(--va-divider);
     text-align: left;
   }
+
+  th {
+    border-bottom: var(--va-rule);
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+// Tooltips: mehrzeilig, höchstens --va-tooltip-max breit (Overlay außerhalb der Komponenten)
+.mat-mdc-tooltip .mdc-tooltip__surface {
+  max-width: var(--va-tooltip-max);
+  white-space: pre-line;
 }

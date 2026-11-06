@@ -4,7 +4,6 @@
 import { HttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_TOOLTIP_DEFAULT_OPTIONS, MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -30,6 +29,16 @@ function tooltipOf(fixture: ComponentFixture<App>, host: Element): string | unde
   return match?.injector.get(MatTooltip).message;
 }
 
+/** Zeichnet die Hülle und beantwortet die Frage nach der Version, ohne auf whenStable zu warten. */
+async function render(): Promise<ComponentFixture<App>> {
+  const fixture = TestBed.createComponent(App);
+  fixture.detectChanges();
+  TestBed.tick();
+  TestBed.inject(HttpTestingController).expectOne(HEALTH).flush({ status: 'ok', version: '1.4.0' });
+  await settle(fixture);
+  return fixture;
+}
+
 async function settle(fixture: ComponentFixture<App>): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve));
   TestBed.tick();
@@ -42,23 +51,25 @@ describe('App', () => {
     await TestBed.configureTestingModule({
       imports: [App],
       // P4.6: kein echter WebSocket im Test; Antworten des web-api aus dem HttpTestingController
-      providers: [...appConfig.providers, ...realtimeTestingProviders(), provideHttpClientTesting()],
+      providers: [
+        ...appConfig.providers,
+        ...realtimeTestingProviders(),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
   });
 
   afterEach(() => TestBed.inject(RealtimeService).stop());
 
   it('shows the app bar with the brand linking to the ranking', async () => {
-    const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
+    const fixture = await render();
     const brand = element(fixture).querySelector<HTMLAnchorElement>('header a[data-brand]');
     expect(brand?.textContent).toContain('Value-Analyzer');
     expect(brand?.getAttribute('href')).toBe('/ranking');
   });
 
   it('links to ranking, runs and profiles with icon, German label and tooltip', async () => {
-    const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
+    const fixture = await render();
     const links = Array.from(element(fixture).querySelectorAll<HTMLAnchorElement>('nav a'));
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['/ranking', '/runs', '/profiles']);
     expect(links.map((a) => a.textContent?.trim())).toEqual(['Ranking', 'Läufe', 'Profile']);
@@ -72,12 +83,19 @@ describe('App', () => {
     );
   });
 
-  it('marks the active section', async () => {
+  it('marks the active section, the title detail belongs to the ranking', async () => {
     const fixture = TestBed.createComponent(App);
+    const active = () =>
+      Array.from(element(fixture).querySelectorAll('nav a[aria-current="page"]')).map((a) =>
+        a.textContent?.trim(),
+      );
     await TestBed.inject(Router).navigateByUrl('/runs/3');
     fixture.detectChanges();
-    const active = element(fixture).querySelectorAll('nav a[aria-current="page"]');
-    expect(Array.from(active).map((a) => a.textContent?.trim())).toEqual(['Läufe']);
+    expect(active()).toEqual(['Läufe']);
+
+    await TestBed.inject(Router).navigateByUrl('/instruments/SAP.DE');
+    fixture.detectChanges();
+    expect(active()).toEqual(['Ranking']);
   });
 
   it('calls runs "Läufe" in every tab title', () => {
@@ -94,7 +112,9 @@ describe('App', () => {
     expect(footer()).not.toContain('Version');
 
     TestBed.tick();
-    TestBed.inject(HttpTestingController).expectOne(HEALTH).flush({ status: 'ok', version: '1.4.0' });
+    TestBed.inject(HttpTestingController)
+      .expectOne(HEALTH)
+      .flush({ status: 'ok', version: '1.4.0' });
     await settle(fixture);
     expect(footer()).toContain('Version 1.4.0');
   });
@@ -118,19 +138,17 @@ describe('App', () => {
     expect(typeof listRunsResource).toBe('function');
   });
 
-  it('sets the defaults for tooltips and form fields once', () => {
+  it('sets the defaults for tooltips once', () => {
     expect(TestBed.inject(MAT_TOOLTIP_DEFAULT_OPTIONS)).toEqual({
       showDelay: 400,
       hideDelay: 0,
       touchendHideDelay: 2500,
       position: 'above',
     });
-    expect(TestBed.inject(MAT_FORM_FIELD_DEFAULT_OPTIONS).appearance).toBe('outline');
   });
 
   it('connects the realtime service at start', async () => {
-    const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
+    await render();
     expect(FakeWebSocket.instances.length).toBe(1);
   });
 

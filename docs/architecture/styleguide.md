@@ -1,15 +1,18 @@
 # Styleguide Frontend
 
 > **Status:** verbindlich seit 03.11.2026, ergänzt am 04.11.2026 (Bausteine für Status, Value-Trap
-> und Rückmeldungen, Formate für Datum und fehlende Werte, Lade-Helfer). Gilt für jede Ansicht
-> unter `frontend/`. Wer etwas braucht, das hier nicht steht, ergänzt zuerst diesen Styleguide und
-> dann den Code. Technischer Rahmen: [frontend.md](frontend.md).
+> und Rückmeldungen, Formate für Datum und fehlende Werte, Lade-Helfer) und am 06.11.2026 mit G1
+> der [Neugestaltung](ui-neugestaltung.md): Papier-Design, Serifen für Überschriften, Icons,
+> App-Hülle, `app-icon`, `app-section`, `app-state`. Gilt für jede Ansicht unter `frontend/`. Wer
+> etwas braucht, das hier nicht steht, ergänzt zuerst diesen Styleguide und dann den Code.
+> Technischer Rahmen: [frontend.md](frontend.md).
 
 ## Grundsätze
 
-1. **Farben nur aus `--mat-sys-*`.** Angular Material erzeugt sie in `styles.scss` aus der
-   Azure-Palette. Keine Farbliterale im Code; einzige Ausnahme ist der weiße Hintergrund der
-   Mail-Vorschau, weil die Mail ihr eigenes helles Layout mitbringt.
+1. **Farben nur aus `--mat-sys-*`.** Die Werte setzt allein die Papier-Palette in
+   `src/styles/_paper.scss`: nur Grautöne und Papierfarbe, hell und dunkel. Sonst gibt es kein
+   Farbliteral, einzige Ausnahme ist der weiße Hintergrund der Mail-Vorschau, weil die Mail ihr
+   eigenes helles Layout mitbringt. `tests/test_frontend_styles.py` prüft beides.
 2. **Abstände, Schrift, Radien und wiederkehrende Maße nur aus `--va-*`.** Die Tokens stehen in
    `src/styles/_tokens.scss`, Breakpoints in `src/styles/_breakpoints.scss`. Maße, die nur das
    Layout einer einzigen Seite betreffen (Spaltenbreiten des Profil-Editors, Höhe der
@@ -19,61 +22,88 @@
    Seite enthält nur, was es genau auf dieser Seite gibt. Eine Komponente lohnt sich, sobald
    Markup, Text oder Logik mitwandern (Status, Value-Trap); reines Aussehen bleibt eine Klasse.
 4. **Angular Material zuerst.** Tabellen sind `mat-table`, Buttons `matButton`, Eingaben
-   `mat-form-field`. Eigene Bausteine nur, wo Material nichts anbietet.
+   `mat-form-field`, Karten `mat-card`. Eigene Bausteine nur, wo Material nichts anbietet.
 5. **Hell und dunkel ohne Zusatzaufwand.** Das UI folgt der Systemeinstellung
-   (`color-scheme: light dark`). Wer nur Tokens benutzt, ist in beiden Modi richtig.
+   (`color-scheme: light dark`, die Palette nutzt `light-dark()`). Wer nur Tokens benutzt, ist in
+   beiden Modi richtig.
 6. **Tests hängen an `data-*` und Rollen, nie an Stilklassen.** So bleibt ein Umbau der Optik
    ohne Teständerung möglich.
+7. **Das Start-Bundle bleibt unter 500 kB**, darüber bricht der Build. Was nur eine Ansicht
+   braucht, importiert die Ansicht, nicht `app.config.ts` (Beispiel: `FORM_FIELD_DEFAULTS`).
 
 ## Dateien
 
 | Datei | Inhalt |
 |---|---|
-| `src/styles.scss` | Material-Theme, `body`, Einbinden von Tokens und Mustern |
-| `src/styles/_tokens.scss` | Abstände, Schriftgröße und -stärke, Radien, Maße, Trennlinie |
+| `src/styles.scss` | Material-Theme für Schrift und Dichte, Fokusringe, `body`, Einbinden der Dateien unten |
+| `src/styles/_paper.scss` | Papier-Palette und Overrides für Karte, Dialog, Menü, Tooltip, Tabelle |
+| `src/styles/_tokens.scss` | Abstände, Schrift, Radien, Maße, Linien, Fokusring |
 | `src/styles/_breakpoints.scss` | Breakpoints als Sass-Variablen (erzeugt kein CSS) |
-| `src/styles/_patterns.scss` | Überschriften und alle Muster-Klassen |
+| `src/styles/_patterns.scss` | Überschriften, Links, Fokus und alle Muster-Klassen |
 | `src/app/shared/ui/` | gemeinsame Komponenten, siehe [Komponenten](#komponenten) |
 | `src/app/shared/format.ts` | Pipes für Zahlen, Prozent, Milliarden, Datum, fehlende Werte, Status |
 | `src/app/shared/resource.ts` | `loaded` und `loadError` für den Lade- und Fehlerzustand |
 
 ## Farben
 
-Bedeutung entscheidet über die Farbe, nicht der Geschmack.
+Das UI sieht aus wie ein gut gesetzter Bericht: Papier als Untergrund, Inhalte auf hellen
+Blättern, Text in Tinte, Nebensachen in Bleistift. Es gibt nur Grautöne. Bedeutung entsteht durch
+Fläche, Icon und Text, nicht durch Farbe. Die Werte stehen in der
+[Spec](ui-neugestaltung.md#palette).
 
 | Rolle | Token | Wofür |
 |---|---|---|
-| Primär | `primary` | Links, Hauptaktion |
-| Sekundär | `secondary-container` | aktiver Navigationseintrag, neutrale Hinweis-Box |
-| Tertiär | `tertiary-container` | neutrale Badges: Dry-Run, aktive Version |
-| Fehler | `error`, `error-container` | Value-Trap, fehlgeschlagener Lauf, Konflikt |
-| Fläche | `surface`, `on-surface` | Hintergrund und Text |
-| Gedämpft | `on-surface-variant` | Metazeilen, Lade- und Leertexte, Hinweise |
-| Linie | `outline-variant` | Trennlinien in Listen und Tabellen |
+| Schreibtisch | `surface` | Hintergrund der Seite, App-Leiste |
+| Blatt | `surface-container-lowest` | Karten, Tabellen, Dialoge, Menüs |
+| Vertiefung 1 | `surface-container-low` | Zeile unter dem Zeiger, Hover |
+| Vertiefung 2 | `surface-container` | neutrale Badges |
+| Vertiefung 3 | `surface-container-high` | aktiver Navigationseintrag, Hinweis-Box |
+| Vertiefung 4 | `surface-container-highest` | Spur der Balken, Badge `--muted` |
+| Haarlinie | `outline-variant` | Trennlinien, Rand der Blätter |
+| Rand | `outline` | Eingabefelder, Outlined-Buttons, Unterstreichung von Links |
+| Bleistift | `on-surface-variant` | Metazeilen, Labels, Hinweise, Lade- und Leertexte |
+| Tinte | `on-surface` | Text und Zahlen |
+| Volle Tinte | `primary`, `error` | Hauptaktion, Warnungen, die zum Handeln auffordern |
+| Gedämpfte Warnung | `error-container` | Konflikt, Fehler einer Anfrage, „keine Daten“ |
+| Tooltip | `inverse-surface` | Tooltips, Snackbar |
 
-Rot (`error`) bedeutet immer: Hier muss jemand hinsehen. Für reine Information ist es tabu.
+Volle Tinte als Fläche (`error`) heißt immer: Hier muss jemand hinsehen. Für reine Information ist
+sie tabu. `secondary` und `tertiary` zeigen auf dieselben Stufen, neue Stellen nehmen die Rollen
+oben.
 
 ## Abstände, Größen, Radien
 
 | Token | Wert | Wofür |
 |---|---|---|
-| `--va-space-2xs` | 0,125 rem | innen oben und unten in Badges |
+| `--va-space-2xs` | 0,125 rem | innen oben und unten in Badges, Unterstreichung von Links |
 | `--va-space-xs` | 0,25 rem | innerhalb kleiner Elemente, Navigationsabstand |
 | `--va-space-sm` | 0,5 rem | Listenzeilen, Abstand unter dem Seitenkopf |
 | `--va-space-md` | 1 rem | Standard-`gap` in Zeilen, Listen und Rastern |
-| `--va-space-lg` | 1,5 rem | Seitenrand, Abstand vor einer h2 |
-| `--va-space-xl` | 2 rem | Spalten großer Raster |
+| `--va-space-lg` | 1,5 rem | Seitenrand, Innenabstand einer Karte |
+| `--va-space-xl` | 2 rem | Spalten großer Raster, Abstand vor einer h2 |
+| `--va-space-2xl` | 3 rem | Abstand zwischen großen Abschnitten, unter dem Inhalt |
 | `--va-text-sm` | 0,8125 rem | Hinweise, Feldfehler, Kürzel |
-| `--va-weight-emphasis` | 500 | Hervorhebung ohne Fettdruck: Werte im Raster, roter Status, Betreff |
+| `--va-weight-emphasis` | 500 | Hervorhebung ohne Fettdruck: Werte im Raster, Status, Betreff |
+| `--va-weight-strong` | 600 | Ausgewählt: aktiver Navigationseintrag, gewähltes Segment |
+| `--va-font-figures` | Systemschrift | große Zahlen, nie in Serifen |
 | `--va-radius-pill` | 0,75 rem | Badges |
 | `--va-radius-box` | 0,5 rem | Hinweis-Boxen |
+| `--va-radius-card` | `corner-small` | Karten und Tabellen-Blätter: kleine Ecken wie bei Papier |
 | `--va-size-figure` | 11 rem | Mindestbreite einer Kennzahl in `.kv-list--grid` |
-| `--va-size-control` | 2,5 rem | Breite des Bedienfelds einer Checkbox; Text darunter rückt so weit ein |
-| `--va-divider` | 1 px `outline-variant` | Trennlinien |
+| `--va-size-control` | 2,5 rem | Bedienfeld einer Checkbox (Text darunter rückt so weit ein), Höhe der Navigations-Pille |
+| `--va-content-max` | 90 rem | höchste Breite des Inhalts, zentriert |
+| `--va-appbar-height` | 3,5 rem | App-Leiste; klebende Tabellenköpfe beginnen darunter |
+| `--va-tooltip-max` | 20 rem | höchste Breite eines Tooltips |
+| `--va-bar-height` | 0,375 rem | Score-Balken |
+| `--va-icon-sm`, `--va-icon-md`, `--va-icon-lg` | 1,125 / 1,5 / 1,75 rem | Icons; `lg` nur für die Marke |
+| `--va-divider` | 1 px `outline-variant` | Haarlinie |
+| `--va-rule` | 1 px `on-surface` | Linie in Tinte unter Tabellenköpfen und über der Speichern-Leiste |
+| `--va-focus-ring`, `--va-focus-width`, `--va-focus-offset` | 2 px `primary`, 2 px Abstand | Fokus jedes Bedienelements |
 
 | Breakpoint | Wert | Wofür |
 |---|---|---|
-| `breakpoints.$narrow` | 900 px | darunter stehen zweispaltige Layouts untereinander |
+| `breakpoints.$narrow` | 900 px | darunter stehen zweispaltige Layouts untereinander, Tabellen-Blätter scrollen |
+| `breakpoints.$compact` | 600 px | Handys: Navigation nur mit Icons, Kennzahlkarten 2 × 2 |
 
 CSS-Variablen gelten in Media Queries nicht, deshalb sind Breakpoints Sass-Variablen:
 
@@ -89,17 +119,47 @@ Abstände zwischen Geschwistern entstehen mit `gap` in Flex oder Grid, nicht mit
 
 ## Typografie
 
-Systemschrift (`system-ui`), weil das UI im LAN läuft und nichts von außen lädt.
+Schriften aus dem System, geladen wird nichts, weil das UI im LAN läuft. Überschriften stehen in
+Serifen (`brand-family`: Iowan Old Style, Palatino Linotype, Palatino, Book Antiqua, Georgia),
+alles andere in `system-ui` (`plain-family`).
 
-| Stufe | Quelle | Verwendung |
-|---|---|---|
-| h1 | `--mat-sys-headline-small` | genau eine je Seite, immer über `app-page-header` |
-| h2 | `--mat-sys-title-large` | Abschnitte einer Seite |
-| Fließtext | `--mat-sys-body-medium` (am `body`) | alles Übrige |
-| Badge | `--mat-sys-label-medium` | Badges |
+| Stufe | Quelle | Schrift | Verwendung |
+|---|---|---|---|
+| h1 | `--mat-sys-headline-small` | Serif | genau eine je Seite, immer über `app-page-header` |
+| h2 | `--mat-sys-title-large` | Serif | Abschnitte einer Seite |
+| Kartentitel | `--mat-sys-title-medium` | Serif | Überschrift in `app-section` |
+| Kennzahl | `--va-font-figures` | System | große Werte, etwa in Kennzahlkarten |
+| Label | `--mat-sys-label-large` | System | Spaltenköpfe, Navigation |
+| Fließtext | `--mat-sys-body-medium` (am `body`) | System | alles Übrige |
+| Klein | `--mat-sys-body-small` | System | Fußzeile, Nebenzeilen |
+| Badge | `--mat-sys-label-medium` | System | Badges |
 
-Ziffern in Tabellen sind tabellarisch (`font-variant-numeric: tabular-nums`), das setzt
-`_patterns.scss` für jede Tabelle.
+Zahlen stehen nie in Serifen: Georgia setzt Mediävalziffern, die in Spalten springen. Ziffern in
+Tabellen sind tabellarisch, das setzt `_patterns.scss` für jede Tabelle, `.num` dazu rechtsbündig.
+
+## Icons
+
+- Kein Icon-Font. `app-icon` zeichnet SVG-Pfade aus einer festen Liste (`ICONS` in
+  `shared/ui/icon.ts`, Material Icons, Apache 2.0) in `currentColor`.
+- Liste: `leaderboard`, `history`, `tune`, `help`, `info`, `warning`, `error`, `check_circle`,
+  `progress_activity`, `play_arrow`, `download`, `content_copy`, `search`, `view_column`,
+  `arrow_back`, `arrow_upward`, `arrow_downward`, `cloud_off`, `close`, `expand_more`, `edit`.
+  Ein neues Icon kommt zuerst in diese Liste.
+- Icons sind Schmuck (`aria-hidden`). Steht eins allein in einem Icon-Button, braucht der Button
+  `aria-label` und Tooltip mit demselben Text.
+
+## App-Hülle
+
+Die Hülle (`app.html`) setzt jede Ansicht in denselben Rahmen:
+
+- **App-Leiste** auf dem Schreibtisch mit Haarlinie, klebt oben: Marke (führt zum Ranking),
+  Navigation mit Icon, Text und Tooltip, der aktive Bereich als Pille in Vertiefung 3. Das
+  Titel-Detail gehört zum Bereich Ranking. Rechts der Chip „offline“, nur wenn der WebSocket
+  getrennt ist. Unter `$compact` nur Icons.
+- **Inhalt** höchstens `--va-content-max` breit, zentriert.
+- **Fußzeile:** „Quantitative Vorauswahl, keine Anlageempfehlung.“ und die Version aus
+  `GET /api/v1/health`.
+- „Läufe“ heißt überall „Läufe“, auch im Titel des Tabs; die Route bleibt `/runs`.
 
 ## Seitenaufbau
 
@@ -115,12 +175,10 @@ Jede Ansicht folgt diesem Gerüst:
 </app-page-header>
 <p class="meta">Stand, Quelle, Kennung …</p>
 
-@if (error(); as message) {
-  <p class="message">{{ message }}</p>
-} @else if (data(); as data) {
+@if (data(); as data) {
   <!-- Inhalt -->
 } @else {
-  <p class="message">Lade … </p>
+  <app-state [error]="error()" loading="Lade … " />
 }
 ```
 
@@ -134,7 +192,8 @@ protected readonly error = computed(() => loadError(this.resource, 'Lauf nicht g
 ```
 
 Steht der Titel erst nach dem Laden fest (Titel-Detail, Lauf, Profil), kommt
-`app-page-header` in den Zweig mit den Daten.
+`app-page-header` in den Zweig mit den Daten. Die Ansichten zeigen Laden und Fehler heute noch mit
+`.message`; sie wechseln mit ihrem Paket der Neugestaltung (G4 bis G7) zu `app-state`.
 
 ## Komponenten
 
@@ -161,11 +220,55 @@ das Ziel, nicht „Zurück“.
 <app-back-link to="/runs">Alle Läufe</app-back-link>
 ```
 
+### `app-section`
+
+Abschnitt als Blatt (`mat-card` outlined): ein Bereich, den Screenreader über seine Überschrift
+ansagen. Neben dem Titel ist Platz für ein ⓘ (`sectionInfo`), rechts für Aktionen
+(`sectionActions`). `[level]="3"` für Abschnitte innerhalb eines Abschnitts.
+
+```html
+<app-section heading="Kennzahlen">
+  <button sectionActions matButton type="button">ISIN kopieren</button>
+  <dl class="kv-list">…</dl>
+</app-section>
+```
+
+### `app-state`
+
+Was eine Ansicht zeigt, solange sie keine Daten zeigen kann: einen Fehler sofort als
+`.notice--error` mit `role="alert"`, den leeren Zustand mit Icon, Satz und nächstem Schritt
+(projizierter Inhalt), sonst nach 300 ms den Ladebalken mit Text. Schnelle Antworten flackern so
+nicht.
+
+```html
+@if (runs(); as runs) {
+  @if (runs.length === 0) {
+    <app-state empty="Noch keine Läufe." emptyIcon="history">
+      <button matButton="filled" type="button">Lauf starten</button>
+    </app-state>
+  } @else {
+    <!-- Tabelle -->
+  }
+} @else {
+  <app-state [error]="error()" loading="Lade die Läufe …" />
+}
+```
+
+### `app-icon`
+
+SVG-Icon aus der festen Liste, siehe [Icons](#icons). `size="md"` für 1,5 rem, `spin` dreht es
+(nicht bei `prefers-reduced-motion`).
+
+```html
+<app-icon name="warning" />
+<app-icon name="progress_activity" size="md" spin />
+```
+
 ### `app-run-status`
 
-Status eines Laufs auf Deutsch, `failed` und `no_data` in Rot. Das Element trägt
-`data-status`. Während eines Abrufs steht der Fortschritt daneben (`data-progress`, das Symbol
-des letzten Titels im Tooltip).
+Status eines Laufs auf Deutsch, `failed` und `no_data` in der Warnfarbe (`error`, volle Tinte).
+Das Element trägt `data-status`. Während eines Abrufs steht der Fortschritt daneben
+(`data-progress`, das Symbol des letzten Titels im Tooltip).
 
 ```html
 <app-run-status [status]="run.status" [progress]="progress()[run.id]" />
@@ -173,8 +276,8 @@ des letzten Titels im Tooltip).
 
 ### `app-value-trap-badge`
 
-Rote Badge „Value-Trap?“ für Titel mit Value-Trap-Flag, sonst nichts. Das Fragezeichen steht
-wie in der Mail: Das Flag ist ein Hinweis, genauer hinzusehen, kein Urteil.
+Badge „Value-Trap?“ in voller Tinte für Titel mit Value-Trap-Flag, sonst nichts. Das Fragezeichen
+steht wie in der Mail: Das Flag ist ein Hinweis, genauer hinzusehen, kein Urteil.
 
 ```html
 <app-value-trap-badge [flagged]="row.value_trap_flag" />
@@ -183,7 +286,8 @@ wie in der Mail: Das Flag ist ein Hinweis, genauer hinzusehen, kein Urteil.
 ### `app-notice`
 
 Rückmeldung nach einer Aktion. `{ text }` erscheint neutral mit `role="status"`,
-`{ text, error: true }` rot mit `role="alert"`. Ohne Rückmeldung zeigt sie nichts.
+`{ text, error: true }` als gedämpfte Warnung mit `role="alert"`. Ohne Rückmeldung zeigt sie
+nichts.
 
 ```html
 <app-notice [notice]="notice()" />
@@ -197,41 +301,60 @@ this.notice.set({ text: 'Der Lauf konnte nicht gestartet werden.', error: true }
 Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird sie direkt mit
 `.notice.notice--error` gebaut.
 
+### Voreinstellungen
+
+- **Tooltips:** `MAT_TOOLTIP_DEFAULT_OPTIONS` in `app.config.ts`: `showDelay` 400 ms,
+  `hideDelay` 0 ms, `touchendHideDelay` 2500 ms, Position oben. Aussehen über die Palette,
+  mehrzeilig und höchstens `--va-tooltip-max` breit.
+- **Formularfelder mit Rand:** Ansichten mit `mat-form-field` nehmen `FORM_FIELD_DEFAULTS` aus
+  `shared/ui/form-field.ts` in ihre `providers`. In `app.config.ts` stünde es auch richtig, käme
+  dann aber mit Angular Forms ins Start-Bundle.
+
 ## Muster-Klassen
 
 | Klasse | Wofür | Beispiel |
 |---|---|---|
 | `.meta` | gedämpfte Metazeile oder Nebenangabe | „Abruf vom 30.10.2026 · Quelle iShares“ |
-| `.message` | Lade-, Leer- und Fehlertext anstelle von Inhalt | „Lade die Läufe …“ |
+| `.message` | Lade-, Leer- und Fehlertext anstelle von Inhalt (bis zum Wechsel auf `app-state`) | „Lade die Läufe …“ |
 | `.hint` | erklärender Nebentext oder Kürzel, klein und gedämpft | „Aktivieren wirkt ab dem nächsten Lauf.“, Symbol im Ranking |
 | `.field-error` | Fehler direkt unter einem Formularfeld | „Wert zwischen 0 und 1“ |
-| `.badge` | kurzer neutraler Zustand | Dry-Run, aktiv: v3 |
-| `.badge.badge--error` | Warnung, die zum Handeln auffordert | nur über `app-value-trap-badge` |
-| `.notice` | Rückmeldung nach einer Aktion | über `app-notice` |
-| `.notice.notice--error` | Konflikt oder gescheiterte Aktion | über `app-notice`, mit Schaltfläche direkt |
+| `.num` | Zahl rechtsbündig mit tabellarischen Ziffern | Spalten mit Scores |
+| `.badge` | kurzer neutraler Zustand, Vertiefung 2, Icon vorne erlaubt | Dry-Run, aktiv: v3 |
+| `.badge.badge--muted` | Hinweis, Vertiefung 4 | offline, teilweise |
+| `.badge.badge--error` | Warnung, die zum Handeln auffordert, volle Tinte | nur über `app-value-trap-badge` |
+| `.notice` | Rückmeldung nach einer Aktion, Vertiefung 3 | über `app-notice` |
+| `.notice.notice--error` | Konflikt oder gescheiterte Aktion, gedämpfte Warnung | über `app-notice` oder `app-state`, mit Schaltfläche direkt |
 | `.cluster` | Zeile aus Bedienelementen oder Links, bricht um | Filter über dem Ranking, Lauf starten |
+| `.card-grid` | Karten in drei Spalten, unter `$narrow` untereinander | Abschnitte im Titel-Detail |
+| `.stat-grid` | Kennzahlkarten in vier Spalten, unter `$narrow` zwei | Kopf des Rankings |
+| `.sticky-bar` | Leiste, die unten klebt, mit Linie in Tinte | Speichern im Profil-Editor |
 | `.kv-list` | Schlüssel/Wert-Liste (`dl`), zweispaltig | Kopfdaten eines Laufs |
 | `.kv-list.kv-list--grid` | viele kurze Kennzahlen im Raster | Kennzahlen eines Titels |
 | `.divided-list` | Liste (`ul`) mit Trennlinien | Profile, Versionen |
+| `.table-sheet` | legt eine Tabelle als Blatt auf den Tisch, scrollt unter `$narrow` waagrecht | Ranking |
 | `.data-table` | schlichte HTML-Tabelle ohne `mat-table` | Vorschau im Profil-Editor |
 
-Tabellen nehmen immer die volle Breite ein.
+Tabellen nehmen immer die volle Breite ein und stehen im Buchsatz: eine Linie in Tinte unter dem
+Kopf, Haarlinien zwischen den Zeilen, keine senkrechten Linien, unter dem Zeiger Vertiefung 1. Das
+regeln Palette und Muster für jede `mat-table`.
 
 ## Buttons
 
 | Art | Variante | Beispiel |
 |---|---|---|
-| Hauptaktion einer Seite | `matButton="filled"`, höchstens einer je Ansicht | Lauf starten, Als neue Version speichern |
+| Hauptaktion einer Seite | `matButton="filled"` (volle Tinte), höchstens einer je Ansicht | Lauf starten, Als neue Version speichern |
 | Nebenaktion | `matButton="outlined"` | Neu laden |
 | Aktion in einer Liste | `matButton` (Text) | Aktivieren |
 
 Jeder Button hat `type="button"`, außer er schickt wirklich ein Formular ab. Während eine
-Aktion läuft, ist er deaktiviert und sagt, was passiert („Startet …“, „Speichert …“).
+Aktion läuft, ist er deaktiviert und sagt, was passiert („Startet …“, „Speichert …“). Den Fokus
+zeigt ein Ring in Tinte (`mat.strong-focus-indicators`), Links und fokussierbare Elemente ohne
+Material bekommen denselben Ring aus `_patterns.scss`.
 
 ## Sprache, Zahlen, Daten
 
 - Deutsch, kurze Sätze, aus Sicht des Nutzers. Meldungen sagen, was passiert ist und was
-  zu tun ist.
+  zu tun ist. Technische Namen wie „web-api“ stehen nicht im UI, es heißt „der Server“.
 - Werte nur über die Pipes aus `format.ts`, nicht über Angulars `date` oder `percent`:
 
   | Pipe | Wofür | Beispiel |
@@ -251,11 +374,14 @@ Aktion läuft, ist er deaktiviert und sagt, was passiert („Startet …“, „
 ## Checkliste für eine neue Ansicht
 
 - [ ] Gerüst aus [Seitenaufbau](#seitenaufbau): `app-page-header`, bei Detailseiten
-      `app-back-link`, Lade-, Fehler- und Leerzustand mit `.message`, Signale über `loaded`
+      `app-back-link`, Laden, Fehler und leer über `app-state`, Signale über `loaded`
       und `loadError`
-- [ ] Status, Value-Trap und Rückmeldungen über die [Komponenten](#komponenten)
+- [ ] Abschnitte als `app-section`, Status, Value-Trap und Rückmeldungen über die
+      [Komponenten](#komponenten)
 - [ ] Keine Farbliterale, keine festen Abstände; nur `--mat-sys-*`, `--va-*` und Breakpoints
 - [ ] Nichts in der Seiten-SCSS, das es schon als Muster-Klasse gibt
 - [ ] Werte über die Pipes aus [Sprache, Zahlen, Daten](#sprache-zahlen-daten)
+- [ ] Icon-Buttons mit `aria-label` und Tooltip
 - [ ] Testbare Stellen mit `data-*` markiert
-- [ ] In hell und dunkel angesehen
+- [ ] In hell und dunkel und bei 375 px Breite angesehen
+- [ ] Start-Bundle unter 500 kB (`npm run build`)

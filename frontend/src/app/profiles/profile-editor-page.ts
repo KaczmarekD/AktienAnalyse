@@ -33,6 +33,7 @@ import { optionalNumber } from '../shared/api-error';
 import { DayPipe, DayTimePipe, MISSING, MrdPipe, NumPipe, PctPipe } from '../shared/format';
 import { loaded, loadError } from '../shared/resource';
 import { BackLink } from '../shared/ui/back-link';
+import { FORM_FIELD_DEFAULTS } from '../shared/ui/form-field';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
 import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
@@ -95,6 +96,7 @@ function validationMessage(error: HttpErrorResponse): string {
     PctPipe,
     ValueTrapBadge,
   ],
+  providers: [FORM_FIELD_DEFAULTS],
   templateUrl: './profile-editor-page.html',
   styleUrl: './profile-editor-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

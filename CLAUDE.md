@@ -179,13 +179,16 @@ Protokoll-Typen dort sind von Hand gespiegelt, das Golden-Schema `tests/golden/r
 und `protocol.ts` ändern sich im selben Commit.
 
 **Gestaltung des UI nach dem Styleguide** ([docs/architecture/styleguide.md](docs/architecture/styleguide.md)):
-Farben nur aus `--mat-sys-*`, Abstände, Schrift und wiederkehrende Maße nur aus `--va-*`
+Farben nur aus `--mat-sys-*`, ihre Werte stehen allein in der Papier-Palette
+`frontend/src/styles/_paper.scss` (nur Grautöne, Track G; `tests/test_frontend_styles.py` prüft das).
+Abstände, Schrift und wiederkehrende Maße nur aus `--va-*`
 (Maße eines einzelnen Layouts stehen kommentiert in dessen SCSS). Was auf zwei Seiten
 vorkommt, ist eine Muster-Klasse in `frontend/src/styles/_patterns.scss` oder eine Komponente in
 `frontend/src/app/shared/ui/` (Seitenkopf, Status, Value-Trap, Rückmeldung); die SCSS einer Seite
 enthält nur Einmaliges. Werte zeigen die Pipes aus `shared/format.ts` (auch Datum und „–“), den
-Lade- und Fehlerzustand `loaded`/`loadError` aus `shared/resource.ts`. Fehlt ein Baustein,
-kommt er zuerst in den Styleguide.
+Lade- und Fehlerzustand `loaded`/`loadError` aus `shared/resource.ts`. Das Start-Bundle bleibt
+unter 500 kB (sonst bricht der Build): Was nur Ansichten brauchen, importieren die Ansichten. Fehlt
+ein Baustein, kommt er zuerst in den Styleguide.
 
 **yfinance-Feldnamen** stehen ausschließlich in den Tabellen am Kopf von
 `services/market-data/src/va_market_data/adapters/yahoo.py`:

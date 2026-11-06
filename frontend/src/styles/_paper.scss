@@ -1,0 +1,109 @@
+// Papier-Design (docs/architecture/ui-neugestaltung.md, Visuelle Sprache). Einzige Stelle mit
+// Farbwerten: nur Grautöne und Papierfarbe, hell und dunkel über light-dark(). Komponenten und
+// Seiten nehmen --mat-sys-*; wer primary oder error schreibt, bekommt Tinte.
+// tests/test_frontend_styles.py prüft, dass jeder Wert ein Grauton ist.
+@use '@angular/material' as mat;
+
+$palette: (
+  // Schreibtisch, Blatt und Vertiefungen
+  surface: light-dark(#f5f4f0, #100f0d),
+  surface-dim: light-dark(#f5f4f0, #100f0d),
+  surface-bright: light-dark(#fdfcfa, #191816),
+  background: light-dark(#f5f4f0, #100f0d),
+  surface-container-lowest: light-dark(#fdfcfa, #191816),
+  surface-container-low: light-dark(#f3f1ec, #1d1c19),
+  surface-container: light-dark(#efede8, #22211e),
+  surface-container-high: light-dark(#e7e4dd, #2a2925),
+  surface-container-highest: light-dark(#dcd8cf, #34322e),
+  surface-variant: light-dark(#dcd8cf, #34322e),
+  surface-tint: light-dark(#f5f4f0, #100f0d),
+  // Linien
+  outline-variant: light-dark(#e2dfd7, #2e2c28),
+  outline: light-dark(#8a847a, #77726a),
+  // Bleistift und Tinte
+  on-surface-variant: light-dark(#67625a, #a39e94),
+  on-surface: light-dark(#1d1b18, #f0eee8),
+  on-background: light-dark(#1d1b18, #f0eee8),
+  // Volle Tinte: Hauptaktion, Balken; secondary und tertiary zeigen auf dieselben Stufen
+  primary: light-dark(#24221e, #f0eee8),
+  on-primary: light-dark(#fdfcfa, #100f0d),
+  primary-container: light-dark(#e7e4dd, #2a2925),
+  on-primary-container: light-dark(#1d1b18, #f0eee8),
+  inverse-primary: light-dark(#f5f4f0, #24221e),
+  secondary: light-dark(#24221e, #f0eee8),
+  on-secondary: light-dark(#fdfcfa, #100f0d),
+  secondary-container: light-dark(#e7e4dd, #2a2925),
+  on-secondary-container: light-dark(#1d1b18, #f0eee8),
+  tertiary: light-dark(#24221e, #f0eee8),
+  on-tertiary: light-dark(#fdfcfa, #100f0d),
+  tertiary-container: light-dark(#efede8, #22211e),
+  on-tertiary-container: light-dark(#1d1b18, #f0eee8),
+  // Warnung in voller Tinte, gedämpfte Warnung
+  error: light-dark(#12110f, #fdfcfa),
+  on-error: light-dark(#fdfcfa, #100f0d),
+  error-container: light-dark(#cbc7bd, #3f3c37),
+  on-error-container: light-dark(#12110f, #ffffff),
+  // Tooltip und Snackbar
+  inverse-surface: light-dark(#24221e, #f0eee8),
+  inverse-on-surface: light-dark(#f5f4f0, #100f0d),
+  inverse-secondary: light-dark(#f5f4f0, #24221e),
+  inverse-error: light-dark(#f5f4f0, #12110f),
+  // Feste Rollen, die gleich bleiben (kaum genutzt): dieselben Stufen
+  primary-fixed: light-dark(#e7e4dd, #e7e4dd),
+  primary-fixed-dim: light-dark(#dcd8cf, #dcd8cf),
+  on-primary-fixed: light-dark(#1d1b18, #1d1b18),
+  on-primary-fixed-variant: light-dark(#67625a, #67625a),
+  secondary-fixed: light-dark(#e7e4dd, #e7e4dd),
+  secondary-fixed-dim: light-dark(#dcd8cf, #dcd8cf),
+  on-secondary-fixed: light-dark(#1d1b18, #1d1b18),
+  on-secondary-fixed-variant: light-dark(#67625a, #67625a),
+  tertiary-fixed: light-dark(#e7e4dd, #e7e4dd),
+  tertiary-fixed-dim: light-dark(#dcd8cf, #dcd8cf),
+  on-tertiary-fixed: light-dark(#1d1b18, #1d1b18),
+  on-tertiary-fixed-variant: light-dark(#67625a, #67625a),
+  scrim: light-dark(#000000, #000000),
+  shadow: light-dark(#000000, #000000)
+);
+
+// Ins html nach mat.theme(): Palette, Blätter ohne Schatten, Tabellen im Buchsatz, Tooltip
+@mixin theme {
+  @include mat.theme-overrides($palette);
+
+  // Karten, Dialoge und Menüs liegen als Blatt auf dem Schreibtisch
+  @include mat.card-overrides(
+    (
+      outlined-container-color: var(--mat-sys-surface-container-lowest),
+      outlined-outline-color: var(--mat-sys-outline-variant),
+      outlined-container-shape: var(--va-radius-card),
+      outlined-container-elevation: none,
+    )
+  );
+  @include mat.dialog-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-lowest),
+      container-shape: var(--mat-sys-corner-large),
+      container-elevation-shadow: none,
+    )
+  );
+  @include mat.menu-overrides(
+    (
+      container-color: var(--mat-sys-surface-container-lowest),
+      container-shape: var(--mat-sys-corner-extra-small),
+      container-elevation-shadow: none,
+    )
+  );
+  @include mat.tooltip-overrides(
+    (
+      container-color: var(--mat-sys-inverse-surface),
+      supporting-text-color: var(--mat-sys-inverse-on-surface),
+      container-shape: var(--mat-sys-corner-extra-small),
+    )
+  );
+  @include mat.table-overrides(
+    (
+      background-color: var(--mat-sys-surface-container-lowest),
+      header-headline-color: var(--mat-sys-on-surface-variant),
+      row-item-outline-color: var(--mat-sys-outline-variant),
+    )
+  );
+}

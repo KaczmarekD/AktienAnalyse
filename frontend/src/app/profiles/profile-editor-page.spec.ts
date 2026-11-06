@@ -2,6 +2,7 @@
 // If-Match, Konflikt (409), Aktivieren. Die Vorschau wartet hier nicht (PREVIEW_DEBOUNCE_MS = 0).
 import { HttpTestingController, TestRequest } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { FACTORS, PARAMS, PREVIEW, PROFILE } from '../testing/fixtures';
@@ -59,6 +60,13 @@ function expectRequest(url: string, method: string): TestRequest {
 }
 
 describe('ProfileEditorPage', () => {
+  it('uses form fields with an outline (G1, not in the start bundle)', async () => {
+    const fixture = await render();
+    expect(fixture.debugElement.injector.get(MAT_FORM_FIELD_DEFAULT_OPTIONS).appearance).toBe(
+      'outline',
+    );
+  });
+
   it('loads the newest version into the form', async () => {
     const fixture = await render();
     expect(input(fixture, 'value_weight').value).toBe('0.5');

@@ -1,16 +1,47 @@
-<mat-toolbar>
-  <span class="brand">Value-Analyzer</span>
-  <nav>
-    <a matButton routerLink="/ranking" routerLinkActive="active">Ranking</a>
-    <a matButton routerLink="/runs" routerLinkActive="active">Runs</a>
-    <a matButton routerLink="/profiles" routerLinkActive="active">Profile</a>
+<header class="appbar">
+  <a
+    class="brand"
+    data-brand
+    routerLink="/ranking"
+    aria-label="Value-Analyzer, zum Ranking"
+    matTooltip="Zum Ranking"
+  >
+    <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <rect x="1" y="1" width="26" height="26" rx="5" />
+      <path d="M8.5 19v-4M14 19V9M19.5 19v-7" />
+    </svg>
+    <span>Value-Analyzer</span>
+  </a>
+  <nav aria-label="Hauptnavigation">
+    @for (item of nav; track item.path) {
+      <a
+        [routerLink]="item.path"
+        [class.active]="section() === item.path"
+        [attr.aria-current]="section() === item.path ? 'page' : null"
+        [attr.aria-label]="item.label"
+        [matTooltip]="item.tip"
+      >
+        <app-icon [name]="item.icon" />
+        <span>{{ item.label }}</span>
+      </a>
+    }
   </nav>
-  <span class="realtime hint" [attr.data-realtime]="realtime.status()">
+  <span class="spacer"></span>
+  <span class="realtime" [attr.data-realtime]="realtime.status()">
     @if (realtime.status() === 'offline') {
-      offline
+      <span class="badge badge--muted" tabindex="0" [matTooltip]="offlineTip">
+        <app-icon name="cloud_off" />
+        offline
+      </span>
     }
   </span>
-</mat-toolbar>
+</header>
 <main>
   <router-outlet />
 </main>
+<footer>
+  <span>Quantitative Vorauswahl, keine Anlageempfehlung.</span>
+  @if (version(); as version) {
+    <span>Version {{ version }}</span>
+  }
+</footer>

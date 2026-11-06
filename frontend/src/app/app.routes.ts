@@ -15,7 +15,7 @@ export const routes: Routes = [
   },
   {
     path: 'runs',
-    title: 'Runs · Value-Analyzer',
+    title: 'Läufe · Value-Analyzer',
     loadComponent: () => import('./runs/runs-page').then((m) => m.RunsPage),
   },
   {
