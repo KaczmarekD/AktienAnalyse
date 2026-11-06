@@ -52,6 +52,11 @@ def test_params_of_todays_defaults():
             "operating_margin",
             "roic",
         ],
+        # F2.4 (ADR-0011, Punkt 3 und Ergänzungen bei der Annahme): abgeschaltet
+        "industry_rules": False,
+        "industry_prefixes": ["Banks", "Insurance", "Capital Markets", "Real Estate", "REIT"],
+        "cost_of_capital": 0.08,
+        "terminal_growth": 0.02,
     }
 
 
@@ -141,6 +146,10 @@ class TestRules:
             ("value_trap_value_threshold", 2),
             ("value_trap_quality_threshold", -1),
             ("min_factor_count", 0),
+            ("cost_of_capital", 0),
+            ("cost_of_capital", 0.6),
+            ("terminal_growth", -0.1),
+            ("terminal_growth", 0.2),
         ],
     )
     def test_bounds(self, field: str, value: Any):
@@ -166,6 +175,15 @@ class TestRules:
         # Sonst entstuende nie ein Score
         with pytest.raises(ValidationError, match="min_factor_count"):
             _params(min_factor_count=3, value_factors={"ev_ebit", "pb"})
+
+    def test_cost_of_capital_above_terminal_growth(self):
+        # Sonst ist das gerechtfertigte KBV (ROE - g) / (r - g) nicht definiert
+        with pytest.raises(ValidationError, match="cost_of_capital"):
+            _params(cost_of_capital=0.03, terminal_growth=0.03)
+
+    def test_industry_prefixes_are_not_empty(self):
+        with pytest.raises(ValidationError, match="industry_prefixes"):
+            ScoringProfileParams.model_validate({"industry_prefixes": ["Banks", ""]})
 
     def test_is_immutable(self):
         params = ScoringProfileParams()
@@ -241,3 +259,31 @@ def test_params_are_the_shared_contract():
     assert issubclass(ScoringProfileParams, ProfileParamsV1)
     stored = ProfileParamsV1().model_dump(mode="json")
     assert ScoringProfileParams.model_validate(stored).to_config() == ScoringConfig()
+
+
+class TestIndustryRuleParams:
+    """F2.4: Branchenregel, Präfixe und die Parameter des gerechtfertigten KBV."""
+
+    def test_stored_params_without_them_get_the_defaults(self):
+        # Profile, die vor F2.4 gespeichert wurden, rechnen weiter wie bisher
+        stored = {"value_weight": 0.6, "min_market_cap": 300_000_000.0}
+        params = ScoringProfileParams.model_validate(stored)
+        assert params.industry_rules is False
+        assert params.cost_of_capital == 0.08
+        assert params.terminal_growth == 0.02
+
+    def test_are_passed_to_score(self):
+        cfg = _params(
+            industry_rules=True,
+            industry_prefixes=["Banks", "REIT"],
+            cost_of_capital=0.09,
+            terminal_growth=0.01,
+        ).to_config()
+        assert cfg.industry_rules is True
+        assert cfg.industry_prefixes == ("Banks", "REIT")
+        assert cfg.cost_of_capital == 0.09
+        assert cfg.terminal_growth == 0.01
+
+    def test_round_trip_from_config(self):
+        cfg = ScoringConfig(industry_rules=True, industry_prefixes=("Insurance",))
+        assert ScoringProfileParams.model_validate(profile_params(cfg)).to_config() == cfg

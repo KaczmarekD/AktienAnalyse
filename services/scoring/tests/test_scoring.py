@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,9 +11,11 @@ import pytest
 from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
     DEFAULT_VALUE_FACTORS,
+    INDUSTRY_RULE_EXCLUDED,
     ScoringConfig,
     _composite_mean,
     _percentile_rank,
+    industry_rule_applies,
     score,
 )
 
@@ -260,3 +264,89 @@ class TestDefaultFactors:
         assert "roic" in DEFAULT_QUALITY_FACTORS
         for col, direction in DEFAULT_QUALITY_FACTORS.values():
             assert direction in ("low", "high")
+
+
+class TestIndustryRules:
+    """F2.4 (ADR-0011, Punkt 3, angenommen am 06.11.2026): Bei Banken, Versicherern, „Capital
+    Markets“ und Immobilien zählen EV-, FCF- und Margen-Kennzahlen nicht. Die Titel fallen unter
+    den Mindestanteil und bekommen keinen Composite. Alle Ränge bleiben global."""
+
+    PREFIXES = ScoringConfig().industry_prefixes
+    INSURER: ClassVar[dict[str, object]] = {
+        "industry": "Insurance - Diversified",
+        "ev_ebit": 4.0,
+        "pb_ratio": 2.6,
+        "p_fcf": 5.0,
+        "shareholder_yield": 0.06,
+        **_FULL_QUALITY,
+    }
+
+    def _universe(self) -> pd.DataFrame:
+        frame = _frame(_UNIVERSE | {"INS.DE": self.INSURER})
+        frame["industry"] = frame["industry"].fillna("Specialty Chemicals")
+        return frame
+
+    @pytest.mark.parametrize(
+        ("industry", "applies"),
+        [
+            ("Banks - Regional", True),
+            ("Insurance - Reinsurance", True),
+            ("Capital Markets", True),
+            ("Real Estate Services", True),
+            ("Real Estate - Diversified", True),
+            ("REIT - Residential", True),
+            ("Financial Data & Stock Exchanges", False),
+            ("Asset Management", False),
+            ("Specialty Chemicals", False),
+            (None, False),
+            ("", False),
+        ],
+    )
+    def test_industry_prefixes(self, industry: str | None, applies: bool):
+        assert industry_rule_applies(industry, self.PREFIXES) is applies
+
+    def test_excluded_factors_follow_adr_0011(self):
+        assert {
+            "ev_ebit",
+            "p_fcf",
+            "fcf_margin",
+            "net_debt_ebitda",
+            "operating_margin",
+            "roic",
+        } == (INDUSTRY_RULE_EXCLUDED)
+
+    def test_off_by_default(self):
+        out = score(self._universe(), ScoringConfig()).set_index("symbol")
+        assert not out["industry_rule"].any()
+        assert pd.notna(out.loc["INS.DE", "rank_ev_ebit"])
+
+    def test_excluded_factors_are_not_ranked(self):
+        out = score(self._universe(), ScoringConfig(industry_rules=True)).set_index("symbol")
+        insurer = out.loc["INS.DE"]
+        assert bool(insurer["industry_rule"]) is True
+        for key in INDUSTRY_RULE_EXCLUDED:
+            assert pd.isna(insurer[f"rank_{key}"]), key
+        # KBV und Shareholder Yield bleiben, Gewinnstabilität auch
+        assert pd.notna(insurer["rank_pb"])
+        assert pd.notna(insurer["rank_shareholder_yield"])
+        assert pd.notna(insurer["rank_earnings_stability"])
+        # Nur ein Quality-Faktor: kein Quality-Score, also kein Composite (M1)
+        assert pd.isna(insurer["quality_score"])
+        assert pd.isna(insurer["composite_score"])
+        assert out.index[-1] == "INS.DE"  # hinter allen bewerteten Titeln, nach Symbol
+        assert not out.drop(index="INS.DE")["industry_rule"].any()
+
+    def test_others_only_lose_them_from_the_cross_section(self):
+        frame = self._universe()
+        ruled = score(frame, ScoringConfig(industry_rules=True)).set_index("symbol")
+        without = score(frame[frame["symbol"] != "INS.DE"], ScoringConfig()).set_index("symbol")
+        unruled = score(frame, ScoringConfig()).set_index("symbol")
+        others = [s for s in ruled.index if s != "INS.DE" and pd.notna(ruled.loc[s, "rank_roic"])]
+        assert others
+        for symbol in others:
+            # Ausgeschlossene Faktoren: gerankt, als gäbe es den Versicherer nicht
+            assert ruled.loc[symbol, "rank_ev_ebit"] == pytest.approx(
+                without.loc[symbol, "rank_ev_ebit"]
+            )
+            # Übrige Faktoren: unverändert, der Versicherer zählt dort weiter mit
+            assert ruled.loc[symbol, "rank_pb"] == pytest.approx(unruled.loc[symbol, "rank_pb"])

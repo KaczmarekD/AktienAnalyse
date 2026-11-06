@@ -166,3 +166,44 @@ def test_fallback_source_is_the_same_in_both_services():
     from va_notification.domain.report import FALLBACK_SOURCE as REPORT_FALLBACK
 
     assert REPORT_FALLBACK == FALLBACK_SOURCE
+
+
+class TestFinancialsSection:
+    """F2.4 (ADR-0011, Punkt 3): Titel unter der Branchenregel stehen in einem eigenen Abschnitt
+    mit KBV, KGV, ROE und dem gerechtfertigten KBV (ROE - g) / (r - g). Der ROE folgt aus KBV und
+    KGV (Gewinn je Buchwert = KBV / KGV)."""
+
+    def _scored(self, mock_universe_df, pe: float | None = 10.0) -> pd.DataFrame:
+        df = mock_universe_df.copy()
+        df["industry"] = "Specialty Chemicals"
+        df.loc[df["symbol"] == "MID.DE", ["industry", "pb_ratio", "pe_ratio"]] = [
+            "Insurance - Diversified",
+            2.0,
+            pe,
+        ]
+        return score(df, ScoringConfig(industry_rules=True))
+
+    def _section(self, html: str) -> str:
+        assert "Finanzwerte" in html
+        return html.split("Finanzwerte", 1)[1]
+
+    def test_lists_the_titles_with_their_figures(self, mock_universe_df):
+        scored = self._scored(mock_universe_df)
+        html = build_report(
+            scored, universe_size=8, cost_of_capital=0.08, terminal_growth=0.02
+        ).html
+        section = self._section(html)
+        assert "Mid Co" in section
+        assert "20.0 %" in section  # ROE = 2,0 / 10
+        assert "3.00" in section  # (0,20 - 0,02) / (0,08 - 0,02)
+        # Nicht in Top und Flop: Der Titel hat keinen Composite
+        assert "Mid Co" not in html.split("Finanzwerte", 1)[0]
+
+    def test_without_earnings_no_roe(self, mock_universe_df):
+        html = build_report(self._scored(mock_universe_df, pe=None), universe_size=8).html
+        row = self._section(html).split("Mid Co", 1)[1].split("</tr>", 1)[0]
+        assert "%" not in row  # kein ROE, kein gerechtfertigtes KBV
+
+    def test_missing_without_affected_titles(self, mock_universe_df):
+        html = build_report(score(mock_universe_df, ScoringConfig()), universe_size=8).html
+        assert "Finanzwerte" not in html

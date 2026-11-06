@@ -524,3 +524,23 @@ class TestJsonSchemas:
 
 def _schema_bytes(schema: dict[str, Any]) -> bytes:
     return (json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode()
+
+
+def test_ranking_row_carries_the_industry_rule():
+    """F2.4: scoring sagt, welche Titel unter die Branchenregel fallen; notification zeigt
+    sie im Abschnitt „Finanzwerte“. Fehlt das Feld (ältere Events), gilt es als nicht gesetzt."""
+    from va_contracts.events.v1.ranking import RankingRowV1
+
+    flat = {
+        "symbol": "ALV.DE",
+        "name": "Allianz",
+        "industry": "Insurance - Diversified",
+        "rank_overall": 88,
+        "industry_rule": True,
+        "rank_pb": 0.4,
+    }
+    row = RankingRowV1.from_flat(flat)
+    assert row.industry_rule is True
+    assert row.to_flat()["industry_rule"] is True
+    flat.pop("industry_rule")
+    assert RankingRowV1.from_flat(flat).industry_rule is False

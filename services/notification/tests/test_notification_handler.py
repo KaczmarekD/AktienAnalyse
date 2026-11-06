@@ -29,7 +29,9 @@ from va_contracts.events.v1 import (
     ScoringRunCompletedV1,
     UniverseInfoV1,
     UniverseMemberV1,
+    ValueMetricsV1,
 )
+from va_contracts.profile import ProfileParamsV1
 from va_notification.domain.errors import ERROR_SUBJECT, error_mail_html
 from va_notification.entrypoints.handlers import (
     NotificationConfig,
@@ -365,3 +367,38 @@ class TestAlreadyDelivered:
         completed = _completed(dry_run=True)
         setup.bus.publish(new_envelope(SCORING_RUN_COMPLETED, completed, source="va/test"))
         assert len(setup.store.reports) == 1
+
+
+class TestFinancialsInTheMail:
+    """F2.4: Den Abschnitt „Finanzwerte“ füllt die Mail aus den Zeilen mit ``industry_rule``,
+    gerechnet mit Kapitalkosten und Endwachstum aus den Parametern des Laufs."""
+
+    def _insurer(self) -> RankingRowV1:
+        return RankingRowV1(
+            fundamentals=FundamentalsV1(
+                identity=IdentityV1(
+                    symbol="INS.DE", name="Versicherung AG", industry="Insurance - Diversified"
+                ),
+                market=MarketDataV1(market_cap=5e9, price=10.0),
+                value=ValueMetricsV1(pb_ratio=2.0, pe_ratio=10.0),
+            ),
+            rank_overall=4,
+            value_score=0.6,
+            industry_rule=True,
+        )
+
+    def test_section_uses_the_parameters_of_the_run(self, setup):
+        event = _completed()
+        params = ProfileParamsV1(industry_rules=True, cost_of_capital=0.10, terminal_growth=0.0)
+        event = event.model_copy(
+            update={"params": params, "ranking": [*event.ranking, self._insurer()]}
+        )
+        _publish(setup, event)
+        html = setup.store.reports[0][2].html
+        section = html.split("Finanzwerte", 1)[1]
+        assert "Versicherung AG" in section
+        assert "2.00" in section  # (0,20 - 0) / (0,10 - 0)
+
+    def test_without_flagged_titles_no_section(self, setup):
+        _publish(setup, _completed())
+        assert "Finanzwerte" not in setup.store.reports[0][2].html
