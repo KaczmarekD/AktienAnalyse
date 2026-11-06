@@ -26,6 +26,11 @@ gespeicherten Abrufen:
    Entscheidung)
 3. bei Bedarf eine aktualisierte JKP-Auswertung
 
+**Vorprüfung erledigt (06.11.2026):** Die Punkte 1 und 2 stehen im
+[Bericht zur Vorprüfung](../research/adr-0011-vorpruefung/bericht.md), Punkt 3 war nicht nötig. Das
+EBIT der Immobilienwerte enthält Bewertungsergebnisse, die Bedingung aus Punkt 4 ist also
+erfüllt.
+
 Mit 90 Titeln lässt sich eine Faktorprämie auch nach Jahren nicht statistisch nachweisen. Die
 Entscheidung wird sich deshalb weiter vor allem auf die externe Evidenz stützen. Bis zur Annahme
 gilt die Methodik aus CLAUDE.md unverändert.

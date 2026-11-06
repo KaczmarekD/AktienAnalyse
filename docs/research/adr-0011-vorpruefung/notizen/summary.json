@@ -1,0 +1,328 @@
+{
+  "reproduced_v1_max_abs_diff": 1.1102230246251565e-16,
+  "coverage_non_financials": {
+    "f_score": "82/84",
+    "operating_accruals": "84/84",
+    "cfo_assets": "84/84",
+    "net_share_issuance": "83/84",
+    "momentum_12_1": "84/84"
+  },
+  "f_score_missing_signals": {
+    "margin_up": 7,
+    "liquidity_up": 6
+  },
+  "nsi_sources": {
+    "bilanz": 67,
+    "serie": 22,
+    "NaN": 1
+  },
+  "notes": {},
+  "compare_a": {
+    "variant": "A: Banken und Versicherer",
+    "ranked_v1": 88,
+    "ranked_v2": 79,
+    "top_overlap": 9,
+    "top_entered": [
+      "TUI1.DE",
+      "DHL.DE",
+      "IOS.DE",
+      "ZAL.DE",
+      "TKMS.DE",
+      "FTK.DE",
+      "NEM.DE",
+      "NDX1.DE",
+      "UTDI.DE",
+      "KBX.DE",
+      "MBG.DE"
+    ],
+    "top_left": [
+      "ALV.DE",
+      "PAH3.DE",
+      "TLX.DE",
+      "HNR1.DE",
+      "MUV2.DE",
+      "LEG.DE",
+      "AT1.DE",
+      "LHA.DE",
+      "BMW.DE",
+      "TEG.DE",
+      "VNA.DE"
+    ],
+    "flop_overlap": 5,
+    "spearman_common": 0.6943281402142162,
+    "common": 79,
+    "biggest_up": [
+      [
+        "TKMS.DE",
+        51,
+        12
+      ],
+      [
+        "NDX1.DE",
+        54,
+        16
+      ],
+      [
+        "NEM.DE",
+        52,
+        14
+      ],
+      [
+        "ZAL.DE",
+        45,
+        8
+      ],
+      [
+        "IOS.DE",
+        43,
+        7
+      ],
+      [
+        "BAYN.DE",
+        70,
+        37
+      ],
+      [
+        "ADS.DE",
+        78,
+        46
+      ],
+      [
+        "MTX.DE",
+        61,
+        29
+      ]
+    ],
+    "biggest_down": [
+      [
+        "RWE.DE",
+        26,
+        70
+      ],
+      [
+        "LEG.DE",
+        8,
+        42
+      ],
+      [
+        "VNA.DE",
+        18,
+        50
+      ],
+      [
+        "RRTL.DE",
+        35,
+        66
+      ],
+      [
+        "AT1.DE",
+        11,
+        39
+      ],
+      [
+        "8TRA.DE",
+        41,
+        68
+      ],
+      [
+        "TEG.DE",
+        17,
+        41
+      ],
+      [
+        "PAH3.DE",
+        2,
+        24
+      ]
+    ],
+    "traps_v1": [
+      "BMW.DE"
+    ],
+    "traps_v2_quality": [
+      "BMW.DE"
+    ],
+    "traps_v2_momentum": []
+  },
+  "compare_b": {
+    "variant": "B: dazu Immobilien",
+    "ranked_v1": 88,
+    "ranked_v2": 75,
+    "top_overlap": 9,
+    "top_entered": [
+      "TUI1.DE",
+      "DHL.DE",
+      "IOS.DE",
+      "ZAL.DE",
+      "TKMS.DE",
+      "FTK.DE",
+      "NEM.DE",
+      "NDX1.DE",
+      "UTDI.DE",
+      "KBX.DE",
+      "G1A.DE"
+    ],
+    "top_left": [
+      "ALV.DE",
+      "PAH3.DE",
+      "TLX.DE",
+      "HNR1.DE",
+      "MUV2.DE",
+      "LEG.DE",
+      "AT1.DE",
+      "LHA.DE",
+      "BMW.DE",
+      "TEG.DE",
+      "VNA.DE"
+    ],
+    "flop_overlap": 5,
+    "spearman_common": 0.7342532005689901,
+    "common": 75,
+    "biggest_up": [
+      [
+        "TKMS.DE",
+        51,
+        12
+      ],
+      [
+        "NDX1.DE",
+        54,
+        16
+      ],
+      [
+        "NEM.DE",
+        52,
+        14
+      ],
+      [
+        "ZAL.DE",
+        45,
+        8
+      ],
+      [
+        "IOS.DE",
+        43,
+        7
+      ],
+      [
+        "ADS.DE",
+        78,
+        43
+      ],
+      [
+        "BAYN.DE",
+        70,
+        37
+      ],
+      [
+        "MTX.DE",
+        61,
+        30
+      ]
+    ],
+    "biggest_down": [
+      [
+        "RWE.DE",
+        26,
+        67
+      ],
+      [
+        "RRTL.DE",
+        35,
+        61
+      ],
+      [
+        "8TRA.DE",
+        41,
+        64
+      ],
+      [
+        "PAH3.DE",
+        2,
+        24
+      ],
+      [
+        "LHA.DE",
+        15,
+        36
+      ],
+      [
+        "FRA.DE",
+        22,
+        42
+      ],
+      [
+        "EOAN.DE",
+        46,
+        62
+      ],
+      [
+        "SHL.DE",
+        38,
+        54
+      ]
+    ],
+    "traps_v1": [
+      "BMW.DE"
+    ],
+    "traps_v2_quality": [
+      "BMW.DE"
+    ],
+    "traps_v2_momentum": []
+  },
+  "finanzwerte_a": [
+    {
+      "symbol": "ALV.DE",
+      "name": "Allianz",
+      "industry": "Insurance - Diversified",
+      "pb_ratio": 2.6375,
+      "pe_ratio": 14.3836,
+      "roe": 0.1718,
+      "justified_pb": 2.5298
+    },
+    {
+      "symbol": "CBK.DE",
+      "name": "Commerzbank",
+      "industry": "Banks - Regional",
+      "pb_ratio": 1.2093,
+      "pe_ratio": 14.4751,
+      "roe": 0.0776,
+      "justified_pb": 0.9599
+    },
+    {
+      "symbol": "DBK.DE",
+      "name": "Deutsche Bank",
+      "industry": "Banks - Regional",
+      "pb_ratio": 0.7118,
+      "pe_ratio": 9.3707,
+      "roe": 0.0881,
+      "justified_pb": 1.1356
+    },
+    {
+      "symbol": "HNR1.DE",
+      "name": "Hannover Rück",
+      "industry": "Insurance - Reinsurance",
+      "pb_ratio": 2.6363,
+      "pe_ratio": 12.7922,
+      "roe": 0.2043,
+      "justified_pb": 3.0719
+    },
+    {
+      "symbol": "MUV2.DE",
+      "name": "Münchener Rück",
+      "industry": "Insurance - Reinsurance",
+      "pb_ratio": 2.1256,
+      "pe_ratio": 10.6719,
+      "roe": 0.184,
+      "justified_pb": 2.7336
+    },
+    {
+      "symbol": "TLX.DE",
+      "name": "Talanx",
+      "industry": "Insurance - Diversified",
+      "pb_ratio": 2.3001,
+      "pe_ratio": 12.7381,
+      "roe": 0.1841,
+      "justified_pb": 2.7357
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+﻿symbol;name;v1;v2A;v2B
+ALV.DE;Allianz;1;;
+PAH3.DE;Porsche SE;2;24,0;24,0
+FNTN.DE;freenet;3;5,0;6,0
+TLX.DE;Talanx;4;;
+HNR1.DE;Hannover Rück;5;;
+MUV2.DE;Münchener Rück;6;;
+GBF.DE;Bilfinger;7;3,0;4,0
+LEG.DE;LEG Immobilien;8;42,0;
+FME.DE;Fresenius Medical Care;9;1,0;2,0
+DTE.DE;Deutsche Telekom;10;2,0;1,0
+AT1.DE;Aroundtown;11;39,0;
+HEI.DE;Heidelberg Materials;12;11,0;11,0
+KRN.DE;Krones;13;15,0;15,0
+HEN3.DE;Henkel;14;10,0;10,0
+LHA.DE;Deutsche Lufthansa;15;35,0;36,0
+BMW.DE;BMW;16;25,0;26,0
+TEG.DE;TAG Immobilien;17;41,0;
+VNA.DE;Vonovia;18;50,0;
+SAX.DE;Ströer;19;9,0;9,0
+FPE3.DE;Fuchs;20;18,0;19,0
+TUI1.DE;TUI;21;4,0;3,0
+FRA.DE;Fraport;22;44,0;42,0
+MBG.DE;Mercedes-Benz Group;23;20,0;22,0
+DHL.DE;DHL;24;6,0;5,0
+BEI.DE;Beiersdorf;25;32,0;33,0
+RWE.DE;RWE;26;70,0;67,0
+DTG.DE;Daimler Truck;27;26,0;25,0
+FTK.DE;flatexDEGIRO;28;13,0;13,0
+KBX.DE;Knorr-Bremse;29;19,0;18,0
+G24.DE;Scout24;30;22,0;21,0
+UTDI.DE;United Internet;31;17,0;17,0
+KGX.DE;Kion Group;32;27,0;27,0
+G1A.DE;GEA Group;33;21,0;20,0
+NDA.DE;Aurubis;34;23,0;23,0
+RRTL.DE;RTL Group;35;66,0;61,0
+EVD.DE;CTS Eventim;36;36,0;35,0
+RAA.DE;Rational;37;45,0;41,0
+SHL.DE;Siemens Healthineers;38;58,0;54,0
+BC8.DE;Bechtle;39;49,0;47,0
+DB1.DE;Deutsche Börse;40;30,0;29,0
+8TRA.DE;Traton;41;68,0;64,0
+DWS.DE;DWS Group;42;57,0;53,0
+IOS.DE;Ionos Group;43;7,0;7,0
+QIA.DE;Qiagen;44;34,0;34,0
+ZAL.DE;Zalando;45;8,0;8,0
+EOAN.DE;E.ON;46;65,0;62,0
+ELG.DE;Elmos Semiconductor;47;62,0;57,0
+SIE.DE;Siemens;48;28,0;28,0
+EVK.DE;Evonik Industries;49;38,0;38,0
+BNR.DE;Brenntag;50;31,0;31,0
+TKMS.DE;TKMS;51;12,0;12,0
+NEM.DE;Nemetschek;52;14,0;14,0
+FRE.DE;Fresenius;53;40,0;39,0
+NDX1.DE;Nordex;54;16,0;16,0
+MRK.DE;Merck;55;64,0;60,0
+SAP.DE;SAP;56;51,0;45,0
+AIXA.DE;Aixtron;57;53,0;48,0
+TKA.DE;Thyssenkrupp;58;47,0;50,0
+JEN.DE;Jenoptik;59;43,0;40,0
+SMHN.DE;Suss Microtec;60;48,0;44,0
+MTX.DE;MTU Aero Engines;61;29,0;30,0
+HOT.DE;Hochtief;62;33,0;32,0
+RHM.DE;Rheinmetall;63;67,0;63,0
+BAS.DE;BASF;64;63,0;59,0
+P911.DE;Porsche AG;65;60,0;56,0
+AIR.DE;Airbus;66;52,0;49,0
+DEZ.DE;Deutz;67;76,0;72,0
+LXS.DE;Lanxess;68;;
+SY1.DE;Symrise;69;55,0;51,0
+BAYN.DE;Bayer;70;37,0;37,0
+SHA0.DE;Schaeffler;71;59,0;55,0
+VOW3.DE;Volkswagen;72;74,0;70,0
+CON.DE;Continental;73;54,0;46,0
+SZG.DE;Salzgitter;74;78,0;74,0
+R3NK.DE;Renk Group;75;61,0;58,0
+AMV0.DE;Aumovio;76;73,0;69,0
+HLE.DE;Hella;77;56,0;52,0
+ADS.DE;Adidas;78;46,0;43,0
+WAF.DE;Siltronic;79;;
+SDF.DE;K+S;80;75,0;71,0
+ENR.DE;Siemens Energy;81;69,0;65,0
+IFX.DE;Infineon;82;77,0;73,0
+PUM.DE;Puma;83;;
+WCH.DE;Wacker Chemie;84;;
+HAG.DE;Hensoldt;85;72,0;68,0
+SRT3.DE;Sartorius VZ;86;71,0;66,0
+AG1.DE;Auto1 Group;87;79,0;75,0
+DHER.DE;Delivery Hero;88;;
