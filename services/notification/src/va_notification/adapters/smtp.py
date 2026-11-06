@@ -72,4 +72,5 @@ class SmtpSender:
             with smtplib.SMTP_SSL(cfg.host, cfg.port, context=context, timeout=30) as s:
                 s.login(cfg.user, cfg.password)
                 s.send_message(msg)
-        log.info("Mail an %s versendet: %s", cfg.mail_to, full_subject)
+        # D1.2: ohne Empfaenger, Mail-Adressen gehoeren nicht ins Log
+        log.info("Mail versendet: %s", full_subject)

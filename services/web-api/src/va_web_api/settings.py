@@ -42,6 +42,8 @@ class WebApiSettings(BaseSettings):
     projections_database_url: SecretStr | None = None
     # P4.5: erlaubte Herkunft fuer den WebSocket, durch Komma getrennt (kein JSON), etwa
     # "http://nas:8080, http://nas.fritz.box:8080". Leer: nur dieselbe Herkunft wie der Host.
+    # Seit D1.2 gilt die Liste auch fuer jede schreibende REST-Anfrage: alle Namen eintragen, unter
+    # denen das UI aufgerufen wird.
     allowed_origins: str = ""
     # P4.7: Cron-Ausdruck fuer geplante Runs, ausgewertet in schedule_timezone. Leer: aus. Bis
     # P5.4 startet der Cron im Batch-Container die Wochenlaeufe; beides zugleich gaebe zwei Runs.
@@ -62,6 +64,9 @@ class WebApiSettings(BaseSettings):
     # D1.1: Sitzung endet nach so vielen Stunden ohne Aktivitaet, spaetestens nach so vielen Tagen
     session_idle_hours: float = Field(default=12, gt=0)
     session_max_days: float = Field(default=30, gt=0)
+    # D1.2: Jeder Endpunkt verlangt eine Sitzung. False nur als Uebergang, bis es die Login-Seite
+    # (D1.4) und HTTPS (D1.5) gibt: Dann gilt ADR-0007, als waere ein Admin angemeldet
+    auth_required: bool = True
 
     @model_validator(mode="after")
     def _schedule_is_valid(self) -> Self:

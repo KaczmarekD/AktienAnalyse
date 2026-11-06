@@ -198,6 +198,8 @@ services:
       WEB_API_PROJECTIONS_DATABASE_URL: postgresql+psycopg://va_web:${VA_WEB_PASSWORD:?VA_WEB_PASSWORD in .env setzen}@db:5432/value_analyzer
       # D1.1: Konten und Sitzungen. Das Cookie ist Secure: anmelden erst mit HTTPS (D1.5)
       WEB_API_IDENTITY_DATABASE_URL: postgresql+psycopg://va_identity:${VA_IDENTITY_PASSWORD:?VA_IDENTITY_PASSWORD in .env setzen}@db:5432/value_analyzer
+      # D1.2: Uebergang. Ohne HTTPS geht kein Login, bis D1.5 ohne Sitzungspflicht wie bisher
+      WEB_API_AUTH_REQUIRED: "false"
       WEB_API_SCHEDULE: ${CRON_SCHEDULE:-30 7 * * 6}
       WEB_API_OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
 

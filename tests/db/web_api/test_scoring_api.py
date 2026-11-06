@@ -33,7 +33,10 @@ def _client(db_url: str, nats_url: str | None = None) -> TestClient:
     read = _url_for(database, "va_read", ROLE_PASSWORDS["va_read"])
     write = _url_for(database, "va_profiles", ROLE_PASSWORDS["va_profiles"])
     settings = WebApiSettings(
-        database_url=SecretStr(read), profiles_database_url=SecretStr(write), nats_url=nats_url
+        auth_required=False,  # D1.2: Endpunkte, nicht Anmeldung
+        database_url=SecretStr(read),
+        profiles_database_url=SecretStr(write),
+        nats_url=nats_url,
     )
     return TestClient(create_app(settings))
 

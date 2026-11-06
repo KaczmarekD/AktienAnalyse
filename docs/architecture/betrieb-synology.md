@@ -119,7 +119,8 @@ docker compose exec web-api python -m va_web_api.admin create-user <name> --admi
 ```
 
 Weitere Konten ohne `--admin`. Anmelden im Browser geht erst mit HTTPS (D1.5), denn das
-Sitzungs-Cookie ist `Secure`. Bis dahin bleiben alle bisherigen Ansichten ohne Anmeldung nutzbar.
+Sitzungs-Cookie ist `Secure`. Bis dahin bleiben alle bisherigen Ansichten ohne Anmeldung nutzbar:
+`docker-compose.yml` setzt dafür `WEB_API_AUTH_REQUIRED=false` (seit D1.2, entfällt mit D1.5).
 
 ## Umstellung vom Batch mit Cron (einmalig)
 

@@ -38,6 +38,7 @@ from ..ports import (
     UnknownProfile,
     UnknownVersion,
 )
+from .auth import FORBIDDEN, require_admin
 from .deps import NOT_FOUND, Reader, not_found
 
 router = APIRouter(tags=["scoring"])
@@ -93,7 +94,8 @@ def get_profile(profile_id: int, reader: Reader, response: Response) -> ProfileD
 @router.put(
     "/scoring/profiles/{profile_id}",
     status_code=201,
-    responses={**NOT_FOUND, **CONFLICT, **UNAVAILABLE},
+    responses={**NOT_FOUND, **CONFLICT, **UNAVAILABLE, **FORBIDDEN},
+    dependencies=[Depends(require_admin)],  # D1.2: vor Body und Ports, also 403 vor 422/503
 )
 def save_profile_version(
     profile_id: int,
@@ -117,7 +119,11 @@ def save_profile_version(
     return SavedProfileVersion(profile_id=profile_id, version=version, parent_version=based_on)
 
 
-@router.post("/scoring/profiles/{profile_id}/activate", responses={**NOT_FOUND, **UNAVAILABLE})
+@router.post(
+    "/scoring/profiles/{profile_id}/activate",
+    responses={**NOT_FOUND, **UNAVAILABLE, **FORBIDDEN},
+    dependencies=[Depends(require_admin)],
+)
 def activate_profile_version(
     profile_id: int, body: ActivateProfileVersion, commands: CommandsPort
 ) -> ActivatedProfile:

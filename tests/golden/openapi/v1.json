@@ -2092,6 +2092,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2155,6 +2158,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           }
@@ -2189,6 +2195,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2235,6 +2244,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2275,6 +2287,9 @@
               "text/csv": {}
             },
             "description": "Die CSV der Mail"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2340,6 +2355,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2379,6 +2397,12 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
           },
           "409": {
             "description": "Es laeuft schon ein Run"
@@ -2428,6 +2452,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2466,6 +2493,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "503": {
             "description": "Scoring nicht verfuegbar"
@@ -2516,6 +2546,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2556,6 +2589,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           }
         },
         "summary": "List Profiles",
@@ -2589,6 +2625,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2660,6 +2699,12 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2724,6 +2769,12 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
           },
           "404": {
             "description": "Nicht gefunden"

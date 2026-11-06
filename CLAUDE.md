@@ -77,7 +77,16 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   `POST /auth/logout`, `GET /me`. Passwort-Hash mit `hashlib.scrypt`, Sperre nach 5 Fehlversuchen
   je Konto oder IP, alles im Schema `identity`. Ohne `WEB_API_IDENTITY_DATABASE_URL` antworten
   diese Endpunkte mit 503. Den ersten Admin legt `python -m va_web_api.admin create-user <name>
-  --admin` an. Die übrigen Endpunkte verlangen erst ab D1.2 eine Sitzung (`CurrentUser`).
+  --admin` an.
+- Seit D1.2 verlangen alle übrigen Endpunkte eine Sitzung (`current_user` beim Einbinden der
+  Router in `main.create_app`), Run-Start, Profil speichern und aktivieren die Rolle Admin
+  (`require_admin`). Übergang: Bis Login-Seite (D1.4) und HTTPS (D1.5) da sind, setzen die
+  Compose-Dateien `WEB_API_AUTH_REQUIRED=false`, dann gilt das Verhalten von ADR-0007
+  (`LAN_USER`). Jede schreibende Anfrage mit fremdem `Origin` ergibt 403
+  (`OriginCheckMiddleware`). `va_platform.redaction` schwärzt Mail-Adressen und Geheimnisse in
+  den Logs von Services, Batch und web-api. Ein neuer Endpunkt braucht einen Eintrag in den
+  Tabellen von `services/web-api/tests/test_authz.py`, falls er offen sein oder nur Admins
+  zustehen soll.
 - Ohne NATS (`make api` aus der `.venv`) startet es über `src.web:create_app`. Diese Composition
   Root rechnet Vorschau und Profil-Befehle mit dem Code von scoring im selben Prozess
   (`LocalCaller`, Rolle `va_profiles`), denn `va_web_api` darf `va_scoring` nicht importieren.

@@ -36,7 +36,7 @@ from functools import partial
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -45,6 +45,7 @@ from sqlalchemy.exc import OperationalError
 from va_platform import tracing
 from va_platform.db import create_db_engine
 from va_platform.nats import NatsBus
+from va_platform.redaction import install_redaction
 
 from .adapters.postgres.identity_store import PostgresIdentityStore
 from .api import auth, health, instruments, ranking, reports, runs, scoring
@@ -57,7 +58,7 @@ from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
 from .rpc import RemoteReads, RemoteScoring
 from .runs import RunManager
-from .security import JsonOnlyMiddleware
+from .security import JsonOnlyMiddleware, OriginCheckMiddleware
 from .settings import WebApiSettings
 
 if TYPE_CHECKING:
@@ -148,6 +149,8 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         tracing.configure("va-web-api", settings.otel_traces_exporter)  # Runs beginnen hier
+        # D1.2: keine Geheimnisse und Mail-Adressen in den Logs von uvicorn und der App
+        install_redaction("uvicorn", "uvicorn.error", "uvicorn.access")
         app.state.engine = create_db_engine(
             settings.database_url.get_secret_value(), read_only=True
         )
@@ -250,8 +253,19 @@ def create_app(
     )
     # Kein CORSMiddleware: CORS bleibt bewusst aus (ADR-0007)
     app.add_middleware(JsonOnlyMiddleware)
-    for module in (health, auth, runs, ranking, instruments, reports, scoring):
+    # D1.2: Mit dem Sitzungs-Cookie pruefen schreibende Anfragen auch die Herkunft
+    app.add_middleware(OriginCheckMiddleware, allowed=settings.origins)
+    # Ohne Sitzung: Health, Anmelden, Abmelden (NUT-09)
+    for module in (health, auth):
         app.include_router(module.router, prefix=API_PREFIX)
+    # D1.2: alle anderen nur mit Sitzung, bis D1.4/D1.5 abschaltbar (WEB_API_AUTH_REQUIRED)
+    for module in (runs, ranking, instruments, reports, scoring):
+        app.include_router(
+            module.router,
+            prefix=API_PREFIX,
+            dependencies=[Depends(auth.current_user)],
+            responses=auth.UNAUTHORIZED,
+        )
     # P4.5: WebSocket unter /ws, nginx reicht ihn neben /api/ weiter
     app.include_router(endpoint.router)
 

@@ -2978,6 +2978,40 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   (`make ui-api`). Klären, ob `oasdiff breaking` die neuen Sicherheitsangaben als Bruch meldet;
   wenn ja, als bewusst begründete Ausnahme im Review, nicht als `/api/v2`.
 - **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (06.11.2026):**
+  - **Übergang `WEB_API_AUTH_REQUIRED`** (Standard `true`): Ohne Login-Seite (D1.4) und ohne
+    HTTPS (D1.5) wäre das UI sonst unbenutzbar. Die Compose-Dateien setzen den Schalter bis dahin
+    auf `false`. Dann gilt das Verhalten von ADR-0007 weiter: Alle Endpunkte antworten ohne
+    Sitzung, als wäre ein Admin angemeldet (`LAN_USER`). `GET /me` verlangt immer eine echte
+    Sitzung. D1.4 schaltet lokal und im E2E-Stack um, D1.5 auf der NAS.
+  - **Ohne Sitzung erreichbar:** Health, Login, Logout (löscht nur das Cookie), OpenAPI und
+    Swagger (keine Daten). NUT-09 wird entsprechend ergänzt.
+  - **Schutz je Router:** `current_user` als Abhängigkeit beim Einbinden von `runs`, `ranking`,
+    `instruments`, `reports` und `scoring`, `require_admin` an Run-Start, Profil speichern und
+    aktivieren. Die Vorschau bleibt für Nutzer offen. Kein Sicherheitsschema in OpenAPI (Cookie
+    wird von Hand gelesen), nur zusätzliche Antworten 401 und 403: So meldet `oasdiff` keinen
+    Bruch.
+  - **`Origin`-Prüfung** für jede schreibende Anfrage als Middleware, dieselbe Regel wie am
+    WebSocket (`origin_allowed` zieht dafür nach `va_web_api.security`). Ohne `Origin` (kein
+    Browser) erlaubt.
+  - **Log-Filter** in `va_platform.redaction`: schwärzt Mail-Adressen und Werte hinter
+    `password`, `passwort`, `pin`, `tan`, `token`, `secret`, `session` in jeder Log-Zeile. Er
+    hängt an den Handlern von Services, Batch und web-api. `va_notification.adapters.smtp` loggt
+    den Empfänger nicht mehr.
+- **Umgesetzt (06.11.2026, Branch `feat/d1-2-rollen`):**
+  - **Code:** `current_user`, `session_user`, `require_admin` und `LAN_USER` in `api/auth.py`,
+    `OriginCheckMiddleware` und `origin_allowed` in `va_web_api.security`,
+    `va_platform.redaction`, Schalter `WEB_API_AUTH_REQUIRED` (Compose: `false`).
+  - **Vorgezogen aus D1.3:** Mit Sitzungspflicht lehnt auch der WebSocket einen Handshake ohne
+    Sitzung ab. Sonst hätte er Runs und Rankings an Unangemeldete gemeldet. Topics je Nutzer und
+    Trennen beim Abmelden bleiben in D1.3.
+  - **Tests:** Die Routentabelle kommt aus der OpenAPI-Beschreibung, weil FastAPI eingebundene
+    Router verzögert auflöst (`app.routes` enthält sie nicht direkt). Bestehende Endpunkt-Tests
+    laufen mit `auth_required=False`.
+  - **Review:** Tracebacks und Passwörter in URLs werden ebenfalls geschwärzt. Bewusst
+    unverändert: Ist `WEB_API_ALLOWED_ORIGINS` gesetzt, gilt nur die Liste, jetzt auch für
+    REST (Hinweis an der Einstellung). Die Sicherheitsprüfung fand nichts mit hoher Sicherheit.
+  - **NAS:** nichts zu tun; `docker-compose.yml` hält die Sitzungspflicht bis D1.5 aus.
 
 **D1.3 WebSocket mit Sitzung 🔒** (NUT-08)
 - **Test:** Handshake ohne Sitzung abgelehnt; Topic `user:<id>` nur für diesen Nutzer; Abmelden

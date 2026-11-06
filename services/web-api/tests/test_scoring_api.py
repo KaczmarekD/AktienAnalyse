@@ -33,7 +33,10 @@ from va_web_api.settings import WebApiSettings
 
 # Port 1: Diese Tests brauchen keine Verbindung
 NO_DB = "postgresql+psycopg://x:x@127.0.0.1:1/none"
-SETTINGS = WebApiSettings(database_url=SecretStr(NO_DB), profiles_database_url=SecretStr(NO_DB))
+# D1.2: Die Tests pruefen die Endpunkte, nicht die Anmeldung (Uebergang bis D1.4)
+SETTINGS = WebApiSettings(
+    database_url=SecretStr(NO_DB), profiles_database_url=SecretStr(NO_DB), auth_required=False
+)
 PARAMS = ProfileParamsV1().model_dump(mode="json")
 
 
@@ -256,7 +259,11 @@ class TestWithoutBackend:
 
     def test_without_profiles_url_saving_is_503(self, preview, commands):
         # Ausdruecklich None: eine lokale .env mit WEB_API_PROFILES_DATABASE_URL zaehlt nicht
-        settings = WebApiSettings(database_url=SecretStr(NO_DB), profiles_database_url=None)
+        settings = WebApiSettings(
+            auth_required=False,  # D1.2: Endpunkte, nicht Anmeldung
+            database_url=SecretStr(NO_DB),
+            profiles_database_url=None,
+        )
         app = create_app(settings, preview=lambda engine: preview, commands=lambda engine: commands)
         with TestClient(app) as c:
             assert _put(c, '"3"').status_code == 503

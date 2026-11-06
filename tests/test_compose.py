@@ -229,6 +229,7 @@ class TestLocalWebApi:
             "WEB_API_SCHEDULE",
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
             "WEB_API_COOKIE_SECURE",
+            "WEB_API_AUTH_REQUIRED",  # D1.2: bis zur Login-Seite (D1.4) aus
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
@@ -236,6 +237,7 @@ class TestLocalWebApi:
         assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
         assert env["WEB_API_SCHEDULE"] == ""  # lokal keine Wochenlaeufe von selbst
         assert env["WEB_API_COOKIE_SECURE"] == "false"
+        assert env["WEB_API_AUTH_REQUIRED"] == "false"
 
     def test_e2e_cookie_without_https(self, e2e):
         """D1.1: Der E2E-Stack spricht HTTP mit nginx, das Cookie darf dort nicht Secure sein."""
@@ -370,6 +372,7 @@ class TestNasDefinition:
             "WEB_API_IDENTITY_DATABASE_URL",  # D1.1: Konten und Sitzungen
             "WEB_API_SCHEDULE",
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
+            "WEB_API_AUTH_REQUIRED",  # D1.2: bis HTTPS (D1.5) aus, dann entfaellt der Eintrag
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
@@ -377,6 +380,8 @@ class TestNasDefinition:
         assert env["WEB_API_OTEL_TRACES_EXPORTER"] == "none"
         # Auf der NAS mit HTTPS (D1.5): Das Cookie ist Secure, das ist der Standard
         assert "WEB_API_COOKIE_SECURE" not in env
+        # Ohne HTTPS geht kein Login: bis D1.5 ohne Sitzungspflicht wie unter ADR-0007
+        assert env["WEB_API_AUTH_REQUIRED"] == "false"
 
     def test_tracing_is_one_switch_for_all_services(self, nas):
         """P5.5: OTEL_TRACES_EXPORTER aus der .env gilt fuer jeden Dienst, der einen Run sieht."""

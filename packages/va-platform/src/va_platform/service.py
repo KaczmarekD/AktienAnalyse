@@ -27,6 +27,7 @@ from . import tracing
 from .bus import follow_up
 from .db import create_db_engine
 from .nats import MAX_DELIVER, NatsBus, RpcUnavailable, answer_request
+from .redaction import install_redaction
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -148,6 +149,7 @@ def service_main(
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(name)-22s | %(message)s"
     )
+    install_redaction()  # D1.2: keine Geheimnisse und Mail-Adressen im Log
     tracing.configure(f"va-{name}", settings.otel_traces_exporter)
     stop = threading.Event()
 

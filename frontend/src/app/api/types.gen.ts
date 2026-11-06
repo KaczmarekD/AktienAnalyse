@@ -1098,6 +1098,10 @@ export type GetInstrumentData = {
 
 export type GetInstrumentErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1154,6 +1158,10 @@ export type LatestRankingData = {
 
 export type LatestRankingErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1181,6 +1189,10 @@ export type GetRankingData = {
 };
 
 export type GetRankingErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1216,6 +1228,10 @@ export type GetReportData = {
 
 export type GetReportErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1249,6 +1265,10 @@ export type GetReportCsvData = {
 };
 
 export type GetReportCsvErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1286,6 +1306,10 @@ export type ListRunsData = {
 
 export type ListRunsErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Validation Error
    */
   422: HttpValidationError;
@@ -1312,6 +1336,14 @@ export type StartRunData = {
 };
 
 export type StartRunErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
   /**
    * Es laeuft schon ein Run
    */
@@ -1351,6 +1383,10 @@ export type GetRunData = {
 
 export type GetRunErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1379,6 +1415,10 @@ export type ListFactorsData = {
 };
 
 export type ListFactorsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Scoring nicht verfuegbar
    */
@@ -1409,6 +1449,10 @@ export type PreviewProfileData = {
 };
 
 export type PreviewProfileErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1441,6 +1485,13 @@ export type ListProfilesData = {
   url: '/api/v1/scoring/profiles';
 };
 
+export type ListProfilesErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+};
+
 export type ListProfilesResponses = {
   /**
    * Response List Profiles
@@ -1465,6 +1516,10 @@ export type GetProfileData = {
 };
 
 export type GetProfileErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1505,6 +1560,14 @@ export type SaveProfileVersionData = {
 };
 
 export type SaveProfileVersionErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
   /**
    * Nicht gefunden
    */
@@ -1552,6 +1615,14 @@ export type ActivateProfileVersionData = {
 };
 
 export type ActivateProfileVersionErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
   /**
    * Nicht gefunden
    */

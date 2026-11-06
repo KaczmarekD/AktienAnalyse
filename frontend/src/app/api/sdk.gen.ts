@@ -35,6 +35,7 @@ import type {
   ListFactorsErrors,
   ListFactorsResponses,
   ListProfilesData,
+  ListProfilesErrors,
   ListProfilesResponses,
   ListRunsData,
   ListRunsErrors,
@@ -426,8 +427,8 @@ export const previewProfile = <ThrowOnError extends boolean = false>(
  */
 export const listProfiles = <ThrowOnError extends boolean = false>(
   options?: Options<ListProfilesData, ThrowOnError>,
-): RequestResult<ListProfilesResponses, unknown, ThrowOnError> =>
-  (options?.client ?? client).get<ListProfilesResponses, unknown, ThrowOnError>({
+): RequestResult<ListProfilesResponses, ListProfilesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListProfilesResponses, ListProfilesErrors, ThrowOnError>({
     requestValidator: async (data) =>
       await z
         .object({

@@ -243,6 +243,17 @@ Adressen im Heimnetz schicken. Diese Regeln verhindern Missbrauch
 
 Secrets (SMTP-Passwort, DB-Passwörter) sind nie über die API lesbar oder änderbar.
 
+**Seit D1.2** ([ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md),
+[nutzer.md](depot/nutzer.md#sicherheitsregeln)) kommen dazu:
+
+- Jeder Endpunkt außer Health, Anmelden, Abmelden und der API-Beschreibung verlangt eine
+  Sitzung. Run-Start, Profil speichern und aktivieren dürfen nur Admins. Übergang bis D1.4/D1.5:
+  `WEB_API_AUTH_REQUIRED=false`.
+- Jede schreibende Anfrage mit fremdem `Origin` ergibt 403, mit derselben Regel wie am WebSocket.
+  Mit dem Sitzungs-Cookie reicht der Preflight allein nicht mehr gegen CSRF.
+- Logs enthalten keine Passwörter, Tokens, Sitzungs-IDs oder Mail-Adressen
+  (`va_platform.redaction`).
+
 ## Warum WebSocket und nicht SSE
 
 SSE (in FastAPI eingebaut seit 0.135) wäre schlanker, weil die Daten fast nur vom Server zum

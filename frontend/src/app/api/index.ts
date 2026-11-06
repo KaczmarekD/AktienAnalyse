@@ -76,6 +76,7 @@ export type {
   ListFactorsResponse,
   ListFactorsResponses,
   ListProfilesData,
+  ListProfilesErrors,
   ListProfilesResponse,
   ListProfilesResponses,
   ListRunsData,

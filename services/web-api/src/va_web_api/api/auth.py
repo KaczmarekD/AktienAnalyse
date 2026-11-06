@@ -2,8 +2,10 @@
 
 Das Cookie enthaelt nur eine zufaellige Sitzungs-ID (``HttpOnly``, ``SameSite=Strict``, mit HTTPS
 ``Secure`` und Name ``__Host-va_session``). Die Datenbank kennt nur ihren SHA-256. Ohne
-``WEB_API_IDENTITY_DATABASE_URL`` antworten die Endpunkte mit 503. Die Sitzungspflicht fuer die
-uebrigen Endpunkte kommt mit D1.2; ``CurrentUser`` ist die Abhaengigkeit dafuer.
+``WEB_API_IDENTITY_DATABASE_URL`` antworten die Endpunkte mit 503.
+
+Seit D1.2 verlangen die uebrigen Router eine Sitzung (``current_user``, eingebunden in
+``main.create_app``), Run-Start und Profil-Befehle zusaetzlich die Rolle Admin (``Admin``).
 """
 
 from __future__ import annotations
@@ -47,15 +49,42 @@ Identity = Annotated[IdentityService, Depends(_identity)]
 Settings = Annotated[WebApiSettings, Depends(_settings)]
 
 
-def current_user(request: Request, identity: Identity, settings: Settings) -> User:
-    """Der angemeldete Nutzer, sonst 401."""
+UNAUTHORIZED: dict[int | str, dict[str, Any]] = {401: {"description": "Nicht angemeldet"}}
+FORBIDDEN: dict[int | str, dict[str, Any]] = {403: {"description": "Nur fuer Admins"}}
+
+# D1.2, Uebergang bis D1.4/D1.5 (WEB_API_AUTH_REQUIRED=false): wie unter ADR-0007 darf jeder im
+# LAN alles, als waere ein Admin angemeldet
+LAN_USER = User(id=0, username="lan", role="admin", display_name=None, email=None)
+
+
+def _authenticated(request: Request, identity: IdentityService, settings: WebApiSettings) -> User:
     user = identity.authenticate(request.cookies.get(settings.cookie_name))
     if user is None:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     return user
 
 
+def session_user(request: Request, identity: Identity, settings: Settings) -> User:
+    """Der Nutzer einer echten Sitzung, sonst 401; auch im Uebergang (``/me``)."""
+    return _authenticated(request, identity, settings)
+
+
+def current_user(request: Request, settings: Settings) -> User:
+    """Wer eine Anfrage stellt (D1.2). Ohne Sitzungspflicht ``LAN_USER``, sonst 401 ohne Sitzung."""
+    if not settings.auth_required:
+        return LAN_USER
+    return _authenticated(request, _identity(request), settings)
+
+
+def require_admin(user: Annotated[User, Depends(current_user)]) -> User:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Nur fuer Admins")
+    return user
+
+
+SessionUser = Annotated[User, Depends(session_user)]
 CurrentUser = Annotated[User, Depends(current_user)]
+Admin = Annotated[User, Depends(require_admin)]
 
 
 @router.post("/auth/login", status_code=204, responses=LOGIN_RESPONSES)
@@ -104,7 +133,7 @@ def logout(request: Request, response: Response, identity: Identity, settings: S
 
 
 @router.get("/me", responses=ME_RESPONSES)
-def me(user: CurrentUser) -> Me:
+def me(user: SessionUser) -> Me:
     """Das eigene Konto."""
     return Me(
         id=user.id,
