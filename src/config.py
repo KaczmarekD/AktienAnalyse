@@ -44,6 +44,8 @@ class DatabaseSettings(_OwnerUrl):
     va_market_data_password: SecretStr | None = None
     va_scoring_password: SecretStr | None = None
     va_notification_password: SecretStr | None = None
+    # D1.1: Passwort der Rolle va_identity (Konten und Sitzungen des web-api), ebenso
+    va_identity_password: SecretStr | None = None
 
 
 class Settings(MarketDataSettings, ScoringSettings, NotificationSettings, _OwnerUrl):

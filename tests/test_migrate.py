@@ -99,6 +99,19 @@ class TestMigrateMain:
             "postgresql://va_owner:pw@db/va", "bewerten", role="va_scoring"
         )
 
+    def test_identity_role_is_ensured_with_the_password_from_the_env(self, no_db_env, monkeypatch):
+        # D1.1: va_identity besitzt Konten und Sitzungen des web-api (Schema identity)
+        monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
+        monkeypatch.setenv("VA_IDENTITY_PASSWORD", "konten")
+        monkeypatch.delenv("VA_PROFILES_PASSWORD", raising=False)
+        monkeypatch.delenv("VA_WEB_PASSWORD", raising=False)
+        with (
+            patch("src.db.migrate.upgrade"),
+            patch("src.db.migrate.ensure_identity_role") as ensure,
+        ):
+            assert migrate.main() == 0
+        ensure.assert_called_once_with("postgresql://va_owner:pw@db/va", "konten")
+
     def test_web_role_failure_does_not_stop_the_batch(self, no_db_env, monkeypatch):
         monkeypatch.setenv("DATABASE_OWNER_URL", "postgresql://va_owner:pw@db/va")
         monkeypatch.setenv("VA_WEB_PASSWORD", "projektionen")

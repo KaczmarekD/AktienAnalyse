@@ -53,6 +53,8 @@ FastAPI gestartet und gestoppt, ebenso der Takt von Scheduler und Watchdog.
 | `POST /api/v1/scoring/profiles/{id}/activate` | Version aktivieren | `rpc.va.scoring.profiles.activate` |
 | `POST /api/v1/scoring/preview` | Live-Vorschau | `rpc.va.scoring.preview` |
 | `GET /api/v1/health` | Healthcheck | – |
+| `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` | Anmelden (Sitzungs-Cookie), abmelden (seit D1.1) | Schema `identity`, Rolle `va_identity` |
+| `GET /api/v1/me` | eigenes Konto (seit D1.1) | Schema `identity` |
 
 Schreibende Endpunkte akzeptieren ausschließlich JSON (siehe Sicherheitsregeln).
 

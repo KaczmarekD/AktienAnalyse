@@ -15,7 +15,7 @@ from sqlalchemy.exc import DBAPIError
 from tests.db.conftest import _role_engine
 from va_platform.db.ddl import SERVICE_ROLES
 
-SCHEMAS = ("batch", "market_data", "scoring", "reporting", "web")
+SCHEMAS = ("batch", "market_data", "scoring", "reporting", "web", "identity")
 
 
 def _tables(engine: Engine) -> list[tuple[str, str]]:

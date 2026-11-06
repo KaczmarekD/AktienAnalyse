@@ -2914,6 +2914,57 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   in `src.db.migrate`. Hash mit `argon2-cffi`, sofern `make check-j4125` grün ist, sonst
   `hashlib.scrypt`.
 - **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (06.11.2026):**
+  - **Hash:** `hashlib.scrypt` aus der Standardbibliothek (N = 2¹⁷, r = 8, p = 1, 128 MiB), nicht
+    argon2-cffi. Keine neue native Abhängigkeit, also kein Risiko auf dem J4125. Die Parameter
+    stehen im Hash (`scrypt$n$r$p$salt$hash`), ein späterer Wechsel geht beim nächsten Login.
+  - **Schema:** `identity` kommt in `APP_SCHEMAS` (Löschschutz, Outbox-Prüfung, Alembic), aber
+    nicht in `SCHEMAS`: `va_read` und `va_app` bekommen dort nichts. Eigene Grants
+    (`identity_grant_statements`) nur für `va_identity`.
+  - **Tabellen in D1.1:** alle aus [nutzer.md](depot/nutzer.md#datenmodell) außer
+    `email_confirmation` und `erasure_log` (D1.6). Outbox und Inbox gleich mit, wie in jedem
+    Schema.
+  - **Sperre:** gezählt aus `login_event`, übersteht also einen Neustart. Je Konto die
+    Fehlversuche seit seinem letzten Erfolg, je IP die seit dem letzten Erfolg von dort, beides
+    höchstens 15 Minuten zurück. Es zählen nur falsches Passwort und unbekannter Name, nicht die
+    abgewiesenen Versuche während der Sperre.
+  - **Unbekannter Name:** Der Dienst prüft trotzdem einen Hash, damit die Antwortzeit nichts
+    verrät. Deaktiviertes Konto und falsches Passwort ergeben dieselbe Antwort 401.
+  - **Cookie:** `__Host-va_session` mit `Secure`; lokal und im E2E-Stack
+    `WEB_API_COOKIE_SECURE=false`, dann `va_session` ohne `Secure`.
+  - **Settings:** `WEB_API_IDENTITY_DATABASE_URL` (ohne: 503 auf den neuen Endpunkten),
+    `WEB_API_COOKIE_SECURE`, `WEB_API_SESSION_IDLE_HOURS` (12), `WEB_API_SESSION_MAX_DAYS` (30).
+    Compose: `VA_IDENTITY_PASSWORD` ist für `migrate` und das web-api Pflicht.
+  - **Kommando:** `python -m va_web_api.admin create-user <name> [--admin] [--email …]
+    [--display-name …] [--password-stdin]`. Ohne `--password-stdin` fragt es zweimal per
+    `getpass`.
+  - **Bestehende Endpunkte** bleiben bis D1.2 offen. D1.1 fügt nur `auth` und `me` hinzu.
+- **Umgesetzt (06.11.2026, Branch `feat/d1-1-konten`, noch nicht auf `main`):**
+  - **Code:** `va_web_api.identity` (`domain`, `ports`, `service`, `memory`), Postgres-Speicher
+    und Modelle unter `va_web_api.adapters.postgres.identity_*`, Router `api/auth.py`,
+    Kommando `va_web_api.admin`, Migration `0015_identity`, Rolle `va_identity` in
+    `src.db.migrate` und `db/init/01_roles.sh`.
+  - **Tests:** Fachregeln und API ohne Datenbank; gemeinsame Speicher-Tests für den Speicher im
+    Prozess und Postgres; Rechte im Schema `identity`, auch nach erneutem Lauf aller Grants.
+    Migration und Modelle per `alembic compare_metadata` ohne Unterschied.
+  - **Abweichung beim Schreiben der Tests:** „Seit dem letzten Erfolg“ zählt nach
+    Einfügereihenfolge, nicht nach Zeitstempel. Sonst zählte die Sperre bei gleichen Zeitstempeln
+    falsch.
+  - **Geändert:** Der Sicherheitstest aus P3.4 verbot „password“ in der ganzen API-Beschreibung.
+    Jetzt ist die Login-Anfrage die einzige Ausnahme, ein zweiter Test prüft genau das.
+  - **Review (`/code-review high`, `/security-review`):** behoben, dass ein 422 der Anmeldung
+    die Eingaben samt Passwort zurückschickt (eigene Antwort für `/api/v1/auth/*`), dass
+    `create_user` einen ungetrimmten Anzeigenamen zurückgab und dass das Kommando ohne
+    `WEB_API_DATABASE_URL` mit Traceback abbrach. Höchstens zwei scrypt-Berechnungen laufen
+    zugleich (je 128 MiB). Offen gelassen: `Retry-After` nennt immer 900 s statt der Restzeit
+    (mit D1.4), die vier `ensure_*_role` in `src.db.migrate` sind fast gleich (eigenes Aufräumen).
+    Die Sicherheitsprüfung fand nichts mit hoher Sicherheit.
+  - **Bekannte Grenze bis D1.5:** Hinter nginx sieht das web-api nur die Adresse von nginx, weil
+    uvicorn `X-Forwarded-For` noch nicht vertraut. Die Sperre je IP zählt dann für alle
+    gemeinsam: Fünf Fehlversuche von irgendwem sperren 15 Minuten jede Anmeldung. Auf der NAS
+    wirkt das erst mit HTTPS (D1.5), das dieselbe Stufe mit der Vertrauenskette behebt.
+  - **NAS:** `VA_IDENTITY_PASSWORD` in die `.env` (Pflicht für `migrate` und das web-api), danach
+    den ersten Admin anlegen ([Runbook](betrieb-synology.md)).
 
 **D1.2 Rollen und Schutz der bestehenden Endpunkte 🔒** (NUT-02, 03, 09, Regeln 6 und 7)
 - **Test:**

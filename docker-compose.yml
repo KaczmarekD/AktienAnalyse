@@ -21,6 +21,8 @@ services:
       VA_MARKET_DATA_PASSWORD: ${VA_MARKET_DATA_PASSWORD:-}
       VA_SCORING_PASSWORD: ${VA_SCORING_PASSWORD:-}
       VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:-}
+      # D1.1: Konten und Sitzungen des web-api (Schema identity)
+      VA_IDENTITY_PASSWORD: ${VA_IDENTITY_PASSWORD:-}
     volumes:
       # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
       # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,
@@ -71,6 +73,7 @@ services:
       VA_MARKET_DATA_PASSWORD: ${VA_MARKET_DATA_PASSWORD:?VA_MARKET_DATA_PASSWORD in .env setzen}
       VA_SCORING_PASSWORD: ${VA_SCORING_PASSWORD:?VA_SCORING_PASSWORD in .env setzen}
       VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:?VA_NOTIFICATION_PASSWORD in .env setzen}
+      VA_IDENTITY_PASSWORD: ${VA_IDENTITY_PASSWORD:?VA_IDENTITY_PASSWORD in .env setzen}
 
   value-analyzer:
     # Fertiges Image aus der CI (P0.6b, ADR-0008) - die NAS baut nicht selbst.
@@ -193,6 +196,8 @@ services:
       WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
       WEB_API_NATS_URL: nats://nats:4222
       WEB_API_PROJECTIONS_DATABASE_URL: postgresql+psycopg://va_web:${VA_WEB_PASSWORD:?VA_WEB_PASSWORD in .env setzen}@db:5432/value_analyzer
+      # D1.1: Konten und Sitzungen. Das Cookie ist Secure: anmelden erst mit HTTPS (D1.5)
+      WEB_API_IDENTITY_DATABASE_URL: postgresql+psycopg://va_identity:${VA_IDENTITY_PASSWORD:?VA_IDENTITY_PASSWORD in .env setzen}@db:5432/value_analyzer
       WEB_API_SCHEDULE: ${CRON_SCHEDULE:-30 7 * * 6}
       WEB_API_OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
 

@@ -134,6 +134,48 @@ export type Instrument = {
 };
 
 /**
+ * LoginRequest
+ */
+export type LoginRequest = {
+  /**
+   * Password
+   */
+  password: string;
+  /**
+   * Username
+   */
+  username: string;
+};
+
+/**
+ * Me
+ *
+ * Das eigene Konto, ohne Anmeldedaten.
+ */
+export type Me = {
+  /**
+   * Display Name
+   */
+  display_name: string | null;
+  /**
+   * Email
+   */
+  email: string | null;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Role
+   */
+  role: 'admin' | 'user';
+  /**
+   * Username
+   */
+  username: string;
+};
+
+/**
  * Preview
  */
 export type Preview = {
@@ -966,6 +1008,66 @@ export type ValidationError = {
   type: string;
 };
 
+export type LoginData = {
+  body: LoginRequest;
+  path?: never;
+  query?: never;
+  url: '/api/v1/auth/login';
+};
+
+export type LoginErrors = {
+  /**
+   * Benutzername oder Passwort falsch
+   */
+  401: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Zu viele Fehlversuche, voruebergehend gesperrt
+   */
+  429: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type LoginError = LoginErrors[keyof LoginErrors];
+
+export type LoginResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type LoginResponse = LoginResponses[keyof LoginResponses];
+
+export type LogoutData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/auth/logout';
+};
+
+export type LogoutErrors = {
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type LogoutResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
 export type HealthData = {
   body?: never;
   path?: never;
@@ -1015,6 +1117,33 @@ export type GetInstrumentResponses = {
 };
 
 export type GetInstrumentResponse = GetInstrumentResponses[keyof GetInstrumentResponses];
+
+export type MeData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me';
+};
+
+export type MeErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type MeResponses = {
+  /**
+   * Successful Response
+   */
+  200: Me;
+};
+
+export type MeResponse = MeResponses[keyof MeResponses];
 
 export type LatestRankingData = {
   body?: never;

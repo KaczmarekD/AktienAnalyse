@@ -8,6 +8,8 @@ Formulare, ``text/plain`` und ein ``fetch`` ohne Body kaemen sonst ohne Vorabpru
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
@@ -78,6 +80,17 @@ class TestNoCors:
 
 class TestNoSecrets:
     def test_api_description_mentions_no_secrets(self, client):
-        description = client.get("/api/v1/openapi.json").text.lower()
+        schema = client.get("/api/v1/openapi.json").json()
+        # D1.1: Nur die Anmeldung nimmt ein Passwort entgegen; keine Antwort enthaelt eins
+        schema["paths"].pop("/api/v1/auth/login")
+        schema["components"]["schemas"].pop("LoginRequest")
+        description = json.dumps(schema, ensure_ascii=False).lower()
         for word in ("password", "passwort", "secret", "database_url", "smtp", "settings"):
             assert word not in description, word
+
+    def test_the_password_is_only_part_of_the_login_request(self, client):
+        schemas = client.get("/api/v1/openapi.json").json()["components"]["schemas"]
+        with_password = sorted(
+            n for n, s in schemas.items() if "password" in s.get("properties", {})
+        )
+        assert with_password == ["LoginRequest"]

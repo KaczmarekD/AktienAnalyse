@@ -12,6 +12,8 @@ Rollen (legt ``db/init/01_roles.sh`` an, bzw. der DBA bei fremdem Postgres):
   Schema (``SERVICE_ROLES``).
 - ``va_profiles`` (P3.3) und ``va_web`` (P4.4): Rollen des web-api, siehe unten. ``va_web``
   legt seit P4.7 auch Runs in ``batch.run`` an und schliesst sie ab.
+- ``va_identity`` (D1.1): Konten und Sitzungen des web-api im Schema ``identity``. Das Schema
+  steht bewusst nicht in ``SCHEMAS``: Persoenliche Daten liest weder ``va_read`` noch ``va_app``.
 """
 
 from __future__ import annotations
@@ -245,6 +247,29 @@ BEGIN
         GRANT UPDATE ({columns}) ON batch.run TO {WEB_ROLE};
         EXECUTE format('GRANT USAGE ON SEQUENCE %s TO {WEB_ROLE}',
                        pg_get_serial_sequence('batch.run', 'id'));
+    END IF;
+END
+$$;
+"""
+
+
+# D1.1: Konten und Sitzungen des web-api, persoenliche Daten (docs/architecture/depot/nutzer.md)
+IDENTITY_ROLE = "va_identity"
+
+
+def identity_grant_statements() -> str:
+    """Rechte im Schema ``identity``: nur ``va_identity`` liest und fuegt an, in der Outbox setzt
+    sie nur ``published_at``. Keine ``DEFAULT PRIVILEGES``: Eine Migration mit neuen Tabellen in
+    ``identity`` ruft diese Funktion erneut auf. Nur, wenn es die Rolle gibt (idempotent).
+    """
+    return f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{IDENTITY_ROLE}') THEN
+        GRANT USAGE ON SCHEMA identity TO {IDENTITY_ROLE};
+        GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA identity TO {IDENTITY_ROLE};
+        GRANT USAGE ON ALL SEQUENCES IN SCHEMA identity TO {IDENTITY_ROLE};
+        GRANT UPDATE (published_at) ON identity.outbox TO {IDENTITY_ROLE};
     END IF;
 END
 $$;
