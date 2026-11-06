@@ -1,47 +1,65 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog } from '@angular/material/dialog';
 import { MatTableModule } from '@angular/material/table';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 
-import { listRunsResource } from '../api/@angular/common.gen';
-import { startRun } from '../api/sdk.gen';
-import type { RunStart } from '../api/types.gen';
-import { DayTimePipe, OrDashPipe } from '../shared/format';
+import { getRunResource, listRunsResource } from '../api/@angular/common.gen';
+import type { RunSummary } from '../api/types.gen';
+import { DayTimePipe, DurationPipe, RunKindPipe } from '../shared/format';
+import { CONTROLS } from '../shared/glossary/controls';
+import { ENTRIES, termTip } from '../shared/glossary/glossary';
 import { LiveStore } from '../shared/realtime/live.store';
 import { loaded, loadError } from '../shared/resource';
+import { AppIcon } from '../shared/ui/icon';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
 import { RunStatus } from '../shared/ui/run-status';
-
-/** Optionen eines Runs aus dem UI (P4.7), wie RunOptionsV1 im Event. */
-type RunOptions = Required<RunStart>;
-
-const DEFAULT_OPTIONS: RunOptions = { force_refresh: false, dry_run: false, notify: true };
+import { AppSection } from '../shared/ui/section';
+import { AppState } from '../shared/ui/state';
+import { Term } from '../shared/ui/term';
+import { scoredText } from './run-text';
+import { StartRunDialog } from './start-run-dialog';
 
 /**
- * Die letzten Laeufe, neueste zuerst; live aktualisiert ueber den WebSocket (P4.6). Mit NATS
- * startet das Formular einen Run (P4.7); er erscheint ueber das Run-Event in der Liste.
+ * Läufe (/runs, Track G, G6): Lief der letzte Lauf sauber? Oben der letzte abgeschlossene Lauf,
+ * darunter alle, neueste zuerst; live über den WebSocket (P4.6). „Lauf starten“ öffnet den
+ * Dialog (P4.7, E3); der neue Lauf erscheint über sein Event in der Liste.
  */
 @Component({
   selector: 'app-runs-page',
   imports: [
+    AppIcon,
+    AppSection,
+    AppState,
     DayTimePipe,
+    DurationPipe,
     MatButtonModule,
-    MatCheckboxModule,
     MatTableModule,
+    MatTooltipModule,
     NoticeBox,
-    OrDashPipe,
     PageHeader,
     RouterLink,
+    RunKindPipe,
     RunStatus,
+    Term,
   ],
   templateUrl: './runs-page.html',
+  styleUrl: './runs-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RunsPage {
   private readonly live = inject(LiveStore);
-  // Liest die Version der Runs mit: Ein Run-Event oder resync laedt die Liste neu
+  private readonly dialog = inject(MatDialog);
+  protected readonly controls = CONTROLS;
+  protected readonly tips = {
+    dry_run: termTip(ENTRIES.dry_run),
+    force_refresh: termTip(ENTRIES.force_refresh),
+  };
+  protected readonly scoredText = scoredText;
+
+  // Liest die Version der Runs mit: Ein Run-Event oder resync lädt die Liste neu
   private readonly resource = listRunsResource(() => {
     this.live.runsVersion();
     return { query: { limit: 50 } };
@@ -53,37 +71,48 @@ export class RunsPage {
   protected readonly runs = computed(() => loaded(this.resource));
   protected readonly error = computed(() => loadError(this.resource, 'Keine Läufe gefunden.'));
 
-  protected readonly columns = ['id', 'started_at', 'kind', 'status', 'scored', 'exit_code'];
+  /** Der laufende Lauf; solange es ihn gibt, ist der Start gesperrt. */
+  protected readonly active = computed(() => this.runs()?.find((run) => run.status === 'running'));
+  /** Der neueste abgeschlossene Lauf für die Karte oben. */
+  protected readonly last = computed(() => this.runs()?.find((run) => run.status !== 'running'));
+  // Die Liste kennt den Bewertungslauf nicht, das Detail des letzten Laufs schon
+  private readonly lastDetail = getRunResource(() => {
+    const id = this.last()?.id;
+    return id === undefined ? undefined : { path: { run_id: id } };
+  });
+  protected readonly lastRanking = computed(
+    () => loaded(this.lastDetail)?.scoring_run_id ?? undefined,
+  );
 
-  protected readonly options = signal<RunOptions>({ ...DEFAULT_OPTIONS });
-  protected readonly starting = signal(false);
+  protected readonly startTip = computed(() => {
+    const active = this.active();
+    return active ? CONTROLS['runs.startBlocked'](active.id) : CONTROLS['runs.start'];
+  });
+
+  protected readonly columns = ['id', 'started_at', 'duration', 'status', 'scored', 'kind'];
   protected readonly notice = signal<Notice | undefined>(undefined);
 
-  protected setOption(name: keyof RunOptions, value: boolean): void {
-    this.options.update((options) => ({ ...options, [name]: value }));
-  }
-
-  protected async start(): Promise<void> {
-    this.starting.set(true);
-    this.notice.set(undefined);
-    const result = await startRun({ body: this.options() });
-    this.starting.set(false);
-    if (result.data) {
-      this.notice.set({ text: `Lauf #${result.data.id} gestartet.` });
+  protected openStart(): void {
+    // disabledInteractive: Der Button bleibt fokussierbar, ein Klick darf dann nichts tun
+    if (this.active()) {
       return;
     }
-    this.notice.set({ text: startFailure(result.response?.status, result.error), error: true });
+    this.notice.set(undefined);
+    this.dialog
+      .open<StartRunDialog, unknown, number>(StartRunDialog, { width: '32rem', maxWidth: '100%' })
+      .afterClosed()
+      .subscribe((id) => {
+        if (id !== undefined) {
+          this.notice.set({
+            text: `Lauf #${id} gestartet. Fortschritt und Ergebnis stehen unten.`,
+          });
+        }
+      });
   }
-}
 
-/** Meldung, wenn der Start scheitert: 409 mit dem Grund des web-api, 503 ohne NATS. */
-function startFailure(status: number | undefined, error: unknown): string {
-  if (status === 409) {
-    const detail = (error as { detail?: unknown } | undefined)?.detail;
-    return typeof detail === 'string' ? detail : 'Es läuft schon ein Lauf.';
+  protected failedTip(run: RunSummary): string {
+    return run.failed_count
+      ? `${run.failed_count} Titel ließen sich nicht abrufen.`
+      : 'Alle Titel ließen sich abrufen.';
   }
-  if (status === 503) {
-    return 'Hier lassen sich keine Läufe starten: Das web-api läuft ohne NATS.';
-  }
-  return 'Der Lauf konnte nicht gestartet werden.';
 }

@@ -1,15 +1,40 @@
-.error {
-  padding: var(--va-space-md);
-  overflow-x: auto;
-  background-color: var(--mat-sys-error-container);
-  color: var(--mat-sys-on-error-container);
+// Status und Badge stehen in der h1, aber in der Größe der übrigen Bausteine
+app-page-header app-run-status {
+  margin-left: var(--va-space-sm);
+  font: var(--mat-sys-label-large);
+  vertical-align: middle;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-sm);
+}
+
+app-section,
+app-notice,
+.tech {
+  display: block;
+  margin-bottom: var(--va-space-lg);
 }
 
 .subject {
+  margin-top: 0;
   font-weight: var(--va-weight-emphasis);
 }
 
-// Die Mail bringt ihr eigenes helles Layout mit. Die Höhe gilt nur für diese Vorschau.
+.error {
+  margin: var(--va-space-md) 0 0;
+  padding: var(--va-space-md);
+  overflow-x: auto;
+  border-radius: var(--va-radius-box);
+  background-color: var(--mat-sys-surface-container-high);
+  font: var(--mat-sys-body-small);
+  white-space: pre-wrap;
+}
+
+// Die Mail bleibt weiß: ein eigenes Dokument, als Blatt im Blatt (Spec, Flächen und Linien).
+// Die Höhe gilt nur für diese Vorschau.
 iframe {
   width: 100%;
   height: 70vh;

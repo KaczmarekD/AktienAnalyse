@@ -1,86 +1,109 @@
-<app-page-header>Läufe</app-page-header>
-
-<section class="cluster" aria-label="Lauf starten">
-  <mat-checkbox
-    data-option="dry_run"
-    [checked]="options().dry_run"
-    (change)="setOption('dry_run', $event.checked)"
-    >Dry-Run (Mail nur speichern)</mat-checkbox
-  >
-  <mat-checkbox
-    data-option="notify"
-    [checked]="options().notify"
-    (change)="setOption('notify', $event.checked)"
-    >Mail verschicken</mat-checkbox
-  >
-  <mat-checkbox
-    data-option="force_refresh"
-    [checked]="options().force_refresh"
-    (change)="setOption('force_refresh', $event.checked)"
-    >Neu abrufen (Abruf von heute ignorieren)</mat-checkbox
-  >
+<app-page-header>
+  Läufe
   <button
+    pageAction
     matButton="filled"
     type="button"
-    data-action="start"
-    [disabled]="starting()"
-    (click)="start()"
+    data-action="open-start"
+    disabledInteractive
+    [disabled]="active() !== undefined"
+    [matTooltip]="startTip()"
+    (click)="openStart()"
   >
-    {{ starting() ? 'Startet …' : 'Lauf starten' }}
+    <app-icon name="play_arrow" />
+    Lauf starten
   </button>
-</section>
+</app-page-header>
 <app-notice [notice]="notice()" />
 
-@if (error(); as message) {
-  <p class="message">{{ message }}</p>
-} @else if (runs(); as runs) {
-  @if (runs.length === 0) {
-    <p class="message">
-      Noch keine Läufe. Starte den ersten oben (mit NATS) oder mit <code>make local-run</code>.
-    </p>
-  } @else {
-    <table mat-table [dataSource]="runs">
-      <ng-container matColumnDef="id">
-        <th mat-header-cell *matHeaderCellDef>Lauf</th>
-        <td mat-cell *matCellDef="let run">
-          <a [routerLink]="['/runs', run.id]">#{{ run.id }}</a>
-          @if (run.dry_run) {
-            <span class="badge">Dry-Run</span>
-          }
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="started_at">
-        <th mat-header-cell *matHeaderCellDef>Start</th>
-        <td mat-cell *matCellDef="let run">{{ run.started_at | dayTime }}</td>
-      </ng-container>
-      <ng-container matColumnDef="kind">
-        <th mat-header-cell *matHeaderCellDef>Art</th>
-        <td mat-cell *matCellDef="let run">{{ run.kind }}</td>
-      </ng-container>
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>Status</th>
-        <td mat-cell *matCellDef="let run">
-          <app-run-status
-            [status]="run.status"
-            [progress]="run.status === 'running' ? progress()[run.id] : undefined"
-          />
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="scored">
-        <th mat-header-cell *matHeaderCellDef>Bewertet</th>
-        <td mat-cell *matCellDef="let run">
-          {{ run.scored_count | orDash }}/{{ run.universe_size | orDash }}
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="exit_code">
-        <th mat-header-cell *matHeaderCellDef>Exit</th>
-        <td mat-cell *matCellDef="let run">{{ run.exit_code | orDash }}</td>
-      </ng-container>
+@if (runs(); as runs) {
+  @if (last(); as last) {
+    <app-section heading="Letzter Lauf" data-card="last-run">
+      @if (lastRanking(); as ranking) {
+        <a
+          sectionActions
+          matButton
+          data-action="ranking"
+          [routerLink]="['/ranking', ranking]"
+          [matTooltip]="controls['run.ranking']"
+          >Ranking ansehen</a
+        >
+      }
+      <p class="last">
+        <app-run-status [status]="last.status" />
+        <span>
+          #{{ last.id }} · {{ last.started_at | dayTime }} ·
+          {{ last.started_at | duration: last.finished_at }} · {{ scoredText(last, 'bewertet') }}
+        </span>
+      </p>
+    </app-section>
+  }
 
-      <tr mat-header-row *matHeaderRowDef="columns"></tr>
-      <tr mat-row *matRowDef="let run; columns: columns" [attr.data-run]="run.id"></tr>
-    </table>
+  @if (runs.length === 0) {
+    <app-state
+      empty="Noch keine Läufe. Der erste startet mit „Lauf starten“ oder zum geplanten Termin."
+      emptyIcon="history"
+    />
+  } @else {
+    <div class="table-sheet">
+      <table mat-table [dataSource]="runs">
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef><app-term key="run" /></th>
+          <td mat-cell *matCellDef="let run">
+            <a [routerLink]="['/runs', run.id]">#{{ run.id }}</a>
+            @if (run.dry_run) {
+              <span class="badge badge--muted" tabindex="0" [matTooltip]="tips.dry_run"
+                ><app-icon name="info" />Probelauf</span
+              >
+            }
+            @if (run.force_refresh) {
+              <span class="badge" tabindex="0" [matTooltip]="tips.force_refresh"
+                >neu abgerufen</span
+              >
+            }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="started_at">
+          <th mat-header-cell *matHeaderCellDef><app-term key="started" /></th>
+          <td mat-cell *matCellDef="let run">{{ run.started_at | dayTime }}</td>
+        </ng-container>
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef class="num"><app-term key="duration" /></th>
+          <td mat-cell *matCellDef="let run" class="num">
+            {{ run.started_at | duration: run.finished_at }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef><app-term key="status" /></th>
+          <td mat-cell *matCellDef="let run">
+            <app-run-status
+              [status]="run.status"
+              [progress]="run.status === 'running' ? progress()[run.id] : undefined"
+            />
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="scored">
+          <th mat-header-cell *matHeaderCellDef class="num"><app-term key="scored" /></th>
+          <td mat-cell *matCellDef="let run" class="num">
+            @if (run.scored_count === null) {
+              –
+            } @else {
+              <span tabindex="0" [matTooltip]="failedTip(run)"
+                >{{ run.scored_count }}/{{ run.universe_size ?? '–' }}</span
+              >
+            }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="kind">
+          <th mat-header-cell *matHeaderCellDef><app-term key="kind" /></th>
+          <td mat-cell *matCellDef="let run">{{ run.kind | runKind }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let run; columns: columns" [attr.data-run]="run.id"></tr>
+      </table>
+    </div>
   }
 } @else {
-  <p class="message">Lade die Läufe …</p>
+  <app-state [error]="error()" loading="Lade die Läufe …" />
 }

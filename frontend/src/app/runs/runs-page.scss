@@ -1,0 +1,12 @@
+app-section {
+  margin-bottom: var(--va-space-lg);
+}
+
+.last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--va-space-sm) var(--va-space-md);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

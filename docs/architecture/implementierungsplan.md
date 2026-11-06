@@ -3004,3 +3004,25 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   unvollständiger Abruf, Sparkline und Verlauf, Value-Trap im Kopf, Tests 1 und 2.
 - **Implementierung:** Ansicht `instruments/`, Baustein `app-sparkline`, Muster `.bar`.
 - **Review:** hell und dunkel, 375 px. **NAS (du):** nichts Eigenes.
+
+#### G6 Läufe und Lauf-Detail
+
+- **Voraussetzung:** G1, G2.
+- **Test** (`runs-page.spec.ts`, `run-detail-page.spec.ts`, `ui.spec.ts`):
+  - Liste mit Gestartet, Dauer, Status, Bewertet und Art (deutsch), Badges „Probelauf“ und „neu
+    abgerufen“, ohne Spalte Exit-Code; leer mit dem nächsten Schritt.
+  - Karte „Letzter Lauf“: neuester abgeschlossener Lauf mit Zählern und Link zu seinem Ranking.
+  - Start über den Dialog (E3): „verschicken“ ist Standard, „Probelauf“ und „Daten neu abrufen“
+    ändern den Body; 409 und 503 bleiben im Dialog, Erfolg schließt ihn mit Rückmeldung.
+  - Start gesperrt, solange ein Lauf läuft (`disabledInteractive`, Tooltip nennt ihn).
+  - Fortschritt aus dem LiveStore, Tooltip mit dem letzten Titel, ohne Nachladen der Liste.
+  - Lauf-Detail: „Lauf #n“ mit Status und Badge im Kopf, Überblick, erste Fehlerzeile als
+    Alarm, Exit-Code, Version und volle Meldung unter „Technische Details“ (geschlossen), Mail mit
+    Betreff im iframe.
+  - `app-run-status` mit Icon und Tooltip aus dem Glossar, Fortschritt als Balken mit Tooltip
+    statt `title`; `app-notice` mit Icon. Tests 1 und 2 der Spec.
+- **Implementierung:** Ansichten `runs/`, Dialog `start-run-dialog.ts`, Texte `run-text.ts`,
+  Bausteine `app-run-status` und `app-notice` erweitert, Theme für `mat-expansion-panel`. Wörtlich
+  zitierter Text (`[data-verbatim]`, der Betreff) zählt in Test 2 nicht als Beschriftung.
+- **Review:** hell und dunkel, 375 px, Start-Bundle unter 500 kB.
+- **NAS (du):** nichts Eigenes.

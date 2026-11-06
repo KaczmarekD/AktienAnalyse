@@ -85,6 +85,14 @@ $palette: (
       container-elevation-shadow: none,
     )
   );
+  // Aufklappbare Abschnitte wie ein Blatt: Haarlinie statt Schatten
+  @include mat.expansion-overrides(
+    (
+      container-background-color: var(--mat-sys-surface-container-lowest),
+      container-shape: var(--va-radius-card),
+      container-elevation-shadow: 0 0 0 1px var(--mat-sys-outline-variant),
+    )
+  );
   @include mat.menu-overrides(
     (
       container-color: var(--mat-sys-surface-container-lowest),

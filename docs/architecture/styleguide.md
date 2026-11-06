@@ -37,7 +37,7 @@
 | Datei | Inhalt |
 |---|---|
 | `src/styles.scss` | Material-Theme für Schrift und Dichte, Fokusringe, `body`, Einbinden der Dateien unten |
-| `src/styles/_paper.scss` | Papier-Palette und Overrides für Karte, Dialog, Menü, Tooltip, Tabelle |
+| `src/styles/_paper.scss` | Papier-Palette und Overrides für Karte, Dialog, Menü, Tooltip, Tabelle, aufklappbaren Abschnitt |
 | `src/styles/_tokens.scss` | Abstände, Schrift, Radien, Maße, Linien, Fokusring |
 | `src/styles/_breakpoints.scss` | Breakpoints als Sass-Variablen (erzeugt kein CSS) |
 | `src/styles/_patterns.scss` | Überschriften, Links, Fokus und alle Muster-Klassen |
@@ -183,6 +183,8 @@ deren Text das Ziel nennt, bekommen keinen.
   je Begriff (`/glossary#roic`) und Suche.
 - **Tests 1 und 2:** `controlsWithoutTooltip` und `abbreviationsWithoutExplanation` aus
   `testing/tooltips.ts` laufen im Test jeder Ansicht; Ausnahmen stehen mit Grund im Test.
+  Wörtlich zitierter Text aus den Daten, etwa der Betreff einer Mail, steht in einem Element mit
+  `data-verbatim` und zählt nicht als Beschriftung.
 
 ## Seitenaufbau
 
@@ -351,9 +353,12 @@ SVG-Icon aus der festen Liste, siehe [Icons](#icons). `size="md"` für 1,5 rem, 
 
 ### `app-run-status`
 
-Status eines Laufs auf Deutsch, `failed` und `no_data` in der Warnfarbe (`error`, volle Tinte).
-Das Element trägt `data-status`. Während eines Abrufs steht der Fortschritt daneben
-(`data-progress`, das Symbol des letzten Titels im Tooltip).
+Status eines Laufs auf Deutsch mit Icon und Fläche je Status (Spec, „Bedeutung ohne Farbe“):
+läuft mit drehendem Icon auf Blatt mit Rand, erfolgreich nur mit Häkchen, teilweise auf
+Vertiefung 4, keine Daten auf `error-container`, fehlgeschlagen in voller Tinte. Der Tooltip kommt
+aus dem Glossar (`status.*`), das Element trägt `data-status`. Während eines Abrufs steht der
+Fortschritt daneben (`data-progress`): Balken und „57/90“, der zuletzt abgerufene Titel im
+Tooltip.
 
 ```html
 <app-run-status [status]="run.status" [progress]="progress()[run.id]" />
@@ -371,9 +376,10 @@ Tooltip nennt die Schwellen des Profils, wenn die Ansicht sie mitgibt.
 
 ### `app-notice`
 
-Rückmeldung nach einer Aktion. `{ text }` erscheint neutral mit `role="status"`,
-`{ text, error: true }` als gedämpfte Warnung mit `role="alert"`. Ohne Rückmeldung zeigt sie
-nichts.
+Rückmeldung nach einer Aktion. `{ text }` erscheint neutral mit Häkchen und `role="status"`,
+`{ text, error: true }` als gedämpfte Warnung mit Fehler-Icon und `role="alert"`. Ohne
+Rückmeldung zeigt sie nichts. Auch der Fehler im Lauf-Detail und die Meldungen des Start-Dialogs
+laufen darüber.
 
 ```html
 <app-notice [notice]="notice()" />
@@ -438,6 +444,10 @@ regeln Palette und Muster für jede `mat-table`.
 | Hauptaktion einer Seite | `matButton="filled"` (volle Tinte), höchstens einer je Ansicht | Lauf starten, Als neue Version speichern |
 | Nebenaktion | `matButton="outlined"` | Neu laden |
 | Aktion in einer Liste | `matButton` (Text) | Aktivieren |
+
+Ein Dialog (`MatDialog`, z. B. „Lauf starten“) hat den Titel als `h2 mat-dialog-title`, die
+Aktionen rechts: „Abbrechen“ als Text, die Aktion des Dialogs `filled`. Er erledigt seine Aktion
+selbst, zeigt Fehler über `app-notice` und schließt sich erst bei Erfolg.
 
 Jeder Button hat `type="button"`, außer er schickt wirklich ein Formular ab. Während eine
 Aktion läuft, ist er deaktiviert und sagt, was passiert („Startet …“, „Speichert …“). Den Fokus

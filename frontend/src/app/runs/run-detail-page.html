@@ -1,54 +1,89 @@
 <app-back-link to="/runs">Alle Läufe</app-back-link>
 
-@if (error(); as message) {
-  <p class="message">{{ message }}</p>
-} @else if (run(); as run) {
+@if (run(); as run) {
   <app-page-header>
-    Lauf {{ run.id }}
+    Lauf #{{ run.id }}
+    <app-run-status [status]="run.status" />
     @if (run.dry_run) {
-      <span class="badge">Dry-Run</span>
+      <span class="badge badge--muted" tabindex="0" [matTooltip]="dryRunTip"
+        ><app-icon name="info" />Probelauf</span
+      >
     }
+    <span pageAction class="actions">
+      @if (run.scoring_run_id !== null) {
+        <a
+          matButton="outlined"
+          data-action="ranking"
+          [routerLink]="['/ranking', run.scoring_run_id]"
+          [matTooltip]="controls['run.ranking']"
+          >Ranking ansehen</a
+        >
+      }
+      @if (run.report_id !== null) {
+        <a
+          matButton="outlined"
+          data-action="csv"
+          download
+          [href]="'/api/v1/reports/' + run.report_id + '/csv'"
+          [matTooltip]="controls['run.csv']"
+          ><app-icon name="download" />CSV herunterladen</a
+        >
+      }
+    </span>
   </app-page-header>
 
-  <dl class="kv-list">
-    <dt>Status</dt>
-    <dd><app-run-status [status]="run.status" /></dd>
-    <dt>Art</dt>
-    <dd>{{ run.kind }}{{ run.force_refresh ? ', neu abgerufen' : '' }}</dd>
-    <dt>Start</dt>
-    <dd>{{ run.started_at | dayTime }}</dd>
-    <dt>Ende</dt>
-    <dd>{{ run.finished_at | dayTime }}</dd>
-    <dt>Bewertet</dt>
-    <dd>
-      {{ run.scored_count | orDash }} von {{ run.universe_size | orDash }}, fehlgeschlagen
-      {{ run.failed_count | orDash }}
-    </dd>
-    <dt>Exit-Code</dt>
-    <dd>{{ run.exit_code | orDash }}</dd>
-    <dt>Version</dt>
-    <dd>{{ run.app_version }}</dd>
-  </dl>
+  <app-section heading="Überblick" data-section="overview">
+    <dl class="kv-list">
+      <dt><app-term key="started" /></dt>
+      <dd>{{ run.started_at | dayTime }}</dd>
+      <dt><app-term key="finished" /></dt>
+      <dd>{{ run.finished_at | dayTime }}</dd>
+      <dt><app-term key="duration" /></dt>
+      <dd>{{ run.started_at | duration: run.finished_at }}</dd>
+      <dt><app-term key="scored" /></dt>
+      <dd>{{ scored() }}</dd>
+      <dt><app-term key="kind" /></dt>
+      <dd>{{ run.kind | runKind }}{{ run.force_refresh ? ', neu abgerufen' : '' }}</dd>
+    </dl>
+  </app-section>
 
-  @if (run.error) {
-    <h2>Fehler</h2>
-    <pre class="error">{{ run.error }}</pre>
-  }
+  <app-notice [notice]="failure()" />
 
-  <p class="cluster">
-    @if (run.scoring_run_id !== null) {
-      <a [routerLink]="['/ranking', run.scoring_run_id]">Ranking dieses Laufs</a>
+  <mat-expansion-panel class="tech">
+    <mat-expansion-panel-header [matTooltip]="controls['run.details']">
+      <mat-panel-title>Technische Details</mat-panel-title>
+    </mat-expansion-panel-header>
+    <dl class="kv-list">
+      <dt><app-term key="exit_code" /></dt>
+      <dd>{{ run.exit_code | orDash }}</dd>
+      <dt><app-term key="app_version" /></dt>
+      <dd>{{ run.app_version }}</dd>
+      <dt><app-term key="fetch_run">Nummer des Abrufs</app-term></dt>
+      <dd>{{ run.fetch_run_id | orDash }}</dd>
+      <dt><app-term key="scoring_run">Nummer des Bewertungslaufs</app-term></dt>
+      <dd>{{ run.scoring_run_id | orDash }}</dd>
+    </dl>
+    @if (run.error) {
+      <pre class="error">{{ run.error }}</pre>
     }
-    @if (run.report_id !== null) {
-      <a [href]="'/api/v1/reports/' + run.report_id + '/csv'" download>CSV herunterladen</a>
-    }
-  </p>
+  </mat-expansion-panel>
 
   @if (report(); as report) {
-    <h2>Mail</h2>
-    <p class="subject">{{ report.subject }}</p>
-    <iframe sandbox="" title="Mail des Laufs" [attr.srcdoc]="mail()"></iframe>
+    <app-section heading="Mail">
+      <p class="subject">
+        Betreff: <span data-subject data-verbatim>{{ report.subject }}</span>
+      </p>
+      <p class="meta">
+        So sah die Mail aus.
+        {{
+          run.dry_run
+            ? 'Bei einem Probelauf wurde sie nur gespeichert.'
+            : 'Sie ging an den eingestellten Empfänger.'
+        }}
+      </p>
+      <iframe sandbox="" title="Mail des Laufs" [attr.srcdoc]="mail()"></iframe>
+    </app-section>
   }
 } @else {
-  <p class="message">Lade den Lauf …</p>
+  <app-state [error]="error()" loading="Lade den Lauf …" />
 }
