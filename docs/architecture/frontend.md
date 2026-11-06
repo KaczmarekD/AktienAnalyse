@@ -1,6 +1,7 @@
 # Frontend
 
-> **Status:** Umgesetzt in Phase 3, Echtzeit seit P4.6, siehe [Roadmap](roadmap.md). Entscheidung:
+> **Status:** Umgesetzt in Phase 3, Echtzeit seit P4.6, neu gestaltet mit Track G (Papier-Design,
+> [Spec](ui-neugestaltung.md)), siehe [Roadmap](roadmap.md). Entscheidung:
 > [ADR-0005](../adr/0005-angular-frontend-eigener-container.md).
 
 ## Stack
@@ -13,20 +14,23 @@
 | API-Client | @hey-api/openapi-ts: Angular-Plugin (`httpResource`) + Zod-v4-Plugin | aus der OpenAPI-Beschreibung des web-api generiert |
 | WebSocket-Typen | aus den Pydantic-Modellen in `va-contracts` (JSON-Schema → TypeScript) | eine Quelle für Python und TypeScript |
 | UI-Bibliothek | Angular Material (entschieden am 31.10.2026) | vom Angular-Team, zieht mit jeder Angular-Version mit; die Tabelle mit Sortierung und Filtern reicht für 90 Titel, ein Grid wie AG Grid ist nicht nötig |
-| Gestaltung | [Styleguide](styleguide.md), verbindlich | zentrale Tokens und Muster-Klassen unter `src/styles/`, gemeinsame Komponenten unter `src/app/shared/ui/` |
-| Bundle | Start-Bundle höchstens 500 kB, darüber bricht der Build (`angular.json`, Budget `initial`) | Seiten laden einzeln (`loadComponent`). zod lädt nur mit den Seiten, die den erzeugten Client mit Prüfung nutzen (Profil-Editor, Läufe); die deutschen Meldungen setzt `shared/zod-de.ts`, nur die Ansichten mit Formular importieren es. Stand 06.11.2026: 424 kB |
+| Gestaltung | [Styleguide](styleguide.md), verbindlich; Papier-Design nach [ui-neugestaltung.md](ui-neugestaltung.md) | Graustufen nur in `src/styles/_paper.scss`, Tokens und Muster-Klassen unter `src/styles/`, gemeinsame Komponenten unter `src/app/shared/ui/`, Begriffe und Tooltips aus `src/app/shared/glossary/` |
+| Bundle | Start-Bundle höchstens 500 kB, darüber bricht der Build (`angular.json`, Budget `initial`) | Seiten laden einzeln (`loadComponent`). zod lädt nur mit den Seiten, die den erzeugten Client mit Prüfung nutzen (Profil-Editor, Läufe); die deutschen Meldungen setzt `shared/zod-de.ts`, nur die Ansichten mit Formular importieren es. Stand 06.11.2026 nach Track G: 489 kB |
 
 ## Ansichten
 
-Seit P3.7 (U4) gibt es Ranking, Runs und Titel-Detail ohne Echtzeit: Sie laden beim Öffnen. Live-Updates,
-Fortschritt und „Run starten“ kommen mit Phase 4, der Profil-Editor nach Phase 2b.
+Seit P3.7 (U4) gibt es die Ansichten, seit P4.6 mit Echtzeit. Track G hat sie neu gestaltet: Jede
+beantwortet eine Frage, jedes Bedienelement, jeder Spaltenkopf und jedes Kürzel hat einen Tooltip
+aus dem Glossar.
 
-| Ansicht | Inhalt |
-|---|---|
-| Ranking | Top/Flop, Filter nach Index und Sektor, Value-Trap-Markierungen, Live-Update bei neuem Ranking |
-| Runs | Historie, Live-Fortschritt, Run starten (Optionen: neu laden, Dry-Run, ohne Mail), gerenderte Mail ansehen |
-| Titel-Detail | Kennzahlen, Score-Verlauf, Rohdaten-Hinweise (z. B. Restatements) |
-| Scoring-Profile | Editor mit Live-Vorschau, Versionen, Aktivieren ([scoring-profile.md](scoring-profile.md)) |
+| Ansicht | Frage | Inhalt |
+|---|---|---|
+| Ranking (`/ranking`) | Welche Titel sind günstig und solide? | Kennzahlkarten als Filter, Index und Suche, Spaltenwahl nach Faktorgruppen, Composite mit Balken, Value-Trap als Badge mit den Schwellen des Profils, Live-Update bei neuem Ranking |
+| Titel-Detail (`/instruments/:symbol`) | Warum steht er dort? | Rang „von N“ mit Veränderung, Scores mit Abdeckung, Kennzahlen mit Perzentil je Faktor, Sparkline und Verlauf |
+| Läufe (`/runs`) | Lief der letzte Lauf sauber? | Karte „Letzter Lauf“, Historie mit Live-Fortschritt, „Lauf starten“ als Dialog (verschicken oder Probelauf, Daten neu abrufen) |
+| Lauf-Detail (`/runs/:runId`) | Was ist passiert? | Überblick, erste Fehlerzeile, technische Details eingeklappt, Mail im abgeschotteten iframe |
+| Scoring-Profile (`/profiles`, `/profiles/:id`) | Womit rechnet der nächste Lauf? | Karten mit aktiver und neuester Version; Editor in Prozent und Mio. € mit Live-Vorschau, Speichern-Leiste, Versionen, Aktivieren ([scoring-profile.md](scoring-profile.md)) |
+| Begriffe (`/glossary`) | Was heißt das? | Alle Einträge des Glossars nach Gruppen, mit Anker und Suche |
 
 ## Datenzugriff und Echtzeit
 
@@ -158,8 +162,15 @@ Seit P3.5 (Code unter `frontend/`, Befehle in [frontend/README.md](../../fronten
 - Die Operation-IDs der API sind die Funktionsnamen des web-api, daraus entstehen die Namen im
   Client.
 - Profil-Editor (seit P3.7, `/profiles`): Signal Forms (`form`, `[formField]`), geprüft mit
-  `validateStandardSchema` und dem erzeugten `zProfileParamsV1Input`, Meldungen auf Deutsch. Die
-  Live-Vorschau wartet 300 ms (`PREVIEW_DEBOUNCE_MS`). Speichern schickt `If-Match`, eine 409
-  bietet „Neu laden“ an.
+  `validateStandardSchema` und dem erzeugten `zProfileParamsV1Input`. Seit G7 zeigt er Anteile in
+  Prozent und die Größenschwelle in Mio. €, das Modell bleibt bei 0 bis 1 und Euro; Feldfehler
+  nennen den Bereich in dieser Einheit. Die Live-Vorschau wartet 300 ms (`PREVIEW_DEBOUNCE_MS`).
+  Speichern schickt `If-Match`, eine 409 bietet „Neu laden“ an.
+- Tests: Vitest je Ansicht mit den Daten aus `testing/fixtures.ts`, dazu die Prüfungen aus
+  `testing/tooltips.ts` (Tooltip an jedem Bedienelement, kein Kürzel ohne Erklärung, Spaltenköpfe
+  mit `scope`). Die Browser-Tests unter `frontend/e2e/` laufen gegen einen Stack
+  (`make local-e2e`, CI): `ui.spec.ts` für die Abläufe, `design.spec.ts` für Tooltips bei Hover
+  und Tastaturfokus und axe (`@axe-core/playwright`) auf jeder Route, hell und dunkel, ohne Befund
+  der Stufen „serious“ und „critical“.
 - Keine Ressourcen aus dem Internet: Systemschrift statt Roboto von Google Fonts, keine Icon-Fonts
   von außen. Das UI läuft im LAN, und jeder Aufruf ginge sonst an Google.

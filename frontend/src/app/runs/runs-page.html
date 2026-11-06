@@ -48,7 +48,7 @@
     <div class="table-sheet">
       <table mat-table [dataSource]="runs">
         <ng-container matColumnDef="id">
-          <th mat-header-cell *matHeaderCellDef><app-term key="run" /></th>
+          <th scope="col" mat-header-cell *matHeaderCellDef><app-term key="run" /></th>
           <td mat-cell *matCellDef="let run">
             <a [routerLink]="['/runs', run.id]">#{{ run.id }}</a>
             @if (run.dry_run) {
@@ -64,17 +64,19 @@
           </td>
         </ng-container>
         <ng-container matColumnDef="started_at">
-          <th mat-header-cell *matHeaderCellDef><app-term key="started" /></th>
+          <th scope="col" mat-header-cell *matHeaderCellDef><app-term key="started" /></th>
           <td mat-cell *matCellDef="let run">{{ run.started_at | dayTime }}</td>
         </ng-container>
         <ng-container matColumnDef="duration">
-          <th mat-header-cell *matHeaderCellDef class="num"><app-term key="duration" /></th>
+          <th scope="col" mat-header-cell *matHeaderCellDef class="num">
+            <app-term key="duration" />
+          </th>
           <td mat-cell *matCellDef="let run" class="num">
             {{ run.started_at | duration: run.finished_at }}
           </td>
         </ng-container>
         <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef><app-term key="status" /></th>
+          <th scope="col" mat-header-cell *matHeaderCellDef><app-term key="status" /></th>
           <td mat-cell *matCellDef="let run">
             <app-run-status
               [status]="run.status"
@@ -83,7 +85,9 @@
           </td>
         </ng-container>
         <ng-container matColumnDef="scored">
-          <th mat-header-cell *matHeaderCellDef class="num"><app-term key="scored" /></th>
+          <th scope="col" mat-header-cell *matHeaderCellDef class="num">
+            <app-term key="scored" />
+          </th>
           <td mat-cell *matCellDef="let run" class="num">
             @if (run.scored_count === null) {
               –
@@ -95,7 +99,7 @@
           </td>
         </ng-container>
         <ng-container matColumnDef="kind">
-          <th mat-header-cell *matHeaderCellDef><app-term key="kind" /></th>
+          <th scope="col" mat-header-cell *matHeaderCellDef><app-term key="kind" /></th>
           <td mat-cell *matCellDef="let run">{{ run.kind | runKind }}</td>
         </ng-container>
 

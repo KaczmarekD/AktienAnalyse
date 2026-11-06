@@ -3047,3 +3047,18 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   ist. Der Browser-Test setzt die Gewichtung in Prozent.
 - **Review:** hell und dunkel, 375 px, Tastatur am Schieberegler.
 - **NAS (du):** nichts Eigenes.
+
+#### G8 Abschluss
+
+- **Voraussetzung:** G4 bis G7.
+- **Test:**
+  - Browser (`frontend/e2e/design.spec.ts`): Tooltip auf „EV/EBIT“ bei Hover und nach Tab, die
+    Seite „Begriffe“ über die App-Leiste, axe (`@axe-core/playwright`, devDependency) auf jeder
+    Route hell und dunkel ohne „serious“ und „critical“, die Mail im iframe ausgenommen; die
+    Konsole bleibt leer.
+  - Vitest: `headersWithoutScope` in den Tests der Ansichten mit Tabelle.
+- **Implementierung:** `scope="col"` an allen Spaltenköpfen; Doku in `frontend.md` und im
+  Styleguide (Checkliste).
+- **Review des Ganzen:** `make ui-check`, `make check`, `make test-db`; E2E in der CI;
+  Screenshots hell und dunkel bei 1366 × 768 und 375 px für die Abnahme; Start-Bundle 489 kB.
+- **NAS (du):** nichts Eigenes; mit dem nächsten Deployment kommen alle G-Pakete zusammen.

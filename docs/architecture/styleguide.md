@@ -497,6 +497,8 @@ Material bekommen denselben Ring aus `_patterns.scss`.
 - [ ] Jedes Bedienelement, Label und Kürzel mit Tooltip aus dem Glossar; Tests 1 und 2 im Test
       der Ansicht
 - [ ] Icon-Buttons mit `aria-label` und Tooltip
+- [ ] Spaltenköpfe mit `scope="col"` (`headersWithoutScope` im Test der Ansicht)
+- [ ] Neue Route in die axe-Prüfung von `frontend/e2e/design.spec.ts` aufnehmen
 - [ ] Testbare Stellen mit `data-*` markiert
 - [ ] In hell und dunkel und bei 375 px Breite angesehen
 - [ ] Start-Bundle unter 500 kB (`npm run build`)
