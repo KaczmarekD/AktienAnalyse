@@ -18,7 +18,7 @@
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | ✅ im Code erledigt (P4.1–P4.9): NATS, Outbox/Inbox, idempotente Handler, Eventmanager mit Projektionen, WebSocket-Hub, Echtzeit im UI, Runs aus dem UI mit Scheduler und Watchdog, Request/Reply, REST aus Projektionen |
 | 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
-| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; F2/F3 warten auf ADR-0011 |
+| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), angenommen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; ADR-0011 angenommen (06.11.2026), F2 beginnt mit F2.4 |
 | G | Gestaltung des UI: klar, ruhig, jeder Begriff erklärt ([Spec](ui-neugestaltung.md)) | ✅ G0 bis G8 umgesetzt und abgenommen (06.11.2026); NAS: mit dem nächsten Deployment |
 | D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 🚧 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1.1 (Konten, Anmeldung, Sitzungen), D1.2 (Sitzungspflicht, Rollen), D1.3 (WebSocket je Nutzer) und D1.4 (Anmeldung und Nutzerverwaltung im UI) im Code erledigt |
 
@@ -217,15 +217,16 @@ beschlossen, vorgezogen):
 Mail unverändert ist.
 
 **F2/F3 – Auswertung** ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md),
-vorgeschlagen, erst nach Annahme):
+angenommen am 06.11.2026):
 
 - [x] Vorprüfung: Rescore-Vergleich v1/v2 und Prüfung des Immobilien-EBIT
       ([Bericht](../research/adr-0011-vorpruefung/bericht.md), `f6daa2b`)
-- [ ] Entscheidung (du) über ADR-0011; P1.5 und P2b.2 sind erledigt, die Vorprüfung liegt vor
+- [x] Entscheidung (du): ADR-0011 angenommen, dazu Immobilien und „Capital Markets“ in der
+      Branchenregel, F2.4 zuerst (06.11.2026)
+- [ ] F2.4 Branchenregeln und Abschnitt „Finanzwerte“ (vorgezogen)
 - [ ] F2.1 Bilanzqualität: F-Score, Accruals, CFO/Bilanzsumme
 - [ ] F2.2 Netto-Aktienemission
 - [ ] F2.3 Momentum und Value-Trap-Regel
-- [ ] F2.4 Branchenregeln und Abschnitt „Finanzwerte“
 - [ ] F2.5 Standardprofil v2 aktivieren
 - [ ] F3.1 Ertragskraftwert und implizites Wachstum
 - [ ] F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung

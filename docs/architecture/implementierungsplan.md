@@ -2807,7 +2807,10 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
 
 #### F2.4 Branchenregeln und Abschnitt „Finanzwerte“
 
-- **Voraussetzung:** P2b.2, F2.1.
+- **Voraussetzung:** P2b.2. Seit der Annahme von ADR-0011 (06.11.2026) kommt F2.4 vor F2.1;
+  F2.1 nimmt seine neuen Faktoren dann in die Ausschlussliste auf.
+- **Präfixe** (Yahoo-`industry`, Ergänzungen bei der Annahme): „Banks“, „Insurance“,
+  „Capital Markets“, „Real Estate“ sowie „REIT“ irgendwo im Namen.
 - **Test:**
   - Bei Banken und Versicherern werden die ausgeschlossenen Faktoren nicht gerankt. Die Titel
     fallen unter den Mindestanteil und erscheinen in der Liste „Finanzwerte“ mit P/B, P/E, ROE und

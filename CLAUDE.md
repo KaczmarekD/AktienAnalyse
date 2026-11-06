@@ -124,13 +124,15 @@ App-Image enthält außerdem Migration, Regression und Altdaten-Import. Einen Cr
 
 ## Methodik-Entscheidungen
 
-> **Stand der Entscheidungen (30.09.2026):**
+> **Stand der Entscheidungen (06.11.2026):**
 > - ADR-0010 (`docs/adr/`) beschließt, zusätzlich Konsensschätzungen, Quartalsabschlüsse,
 >   Aktienanzahl und Kurse zu speichern (Track F1). Das ist ohne Einfluss auf das Ranking.
-> - ADR-0011 schlägt Änderungen an Faktoren und Value-Trap-Flag sowie Branchenregeln für
->   Finanzwerte vor. Es ist nur *vorgeschlagen*.
+> - ADR-0011 ist seit 06.11.2026 angenommen: neue Faktoren, Momentum im Value-Trap-Flag,
+>   Branchenregeln für Banken, Versicherer, „Capital Markets“ und Immobilien
+>   ([Vorprüfung](docs/research/adr-0011-vorpruefung/bericht.md)). Umgesetzt wird in Track
+>   F2/F3, alles zunächst abgeschaltet.
 >
-> Bis ADR-0011 angenommen und F2.5 umgesetzt ist, gilt die Methodik unten unverändert. Grundlage ist
+> Bis F2.5 das Profil v2 aktiviert, gilt die Methodik unten unverändert. Grundlage ist
 > die Recherche unter `docs/research/fundamentalanalyse-sota/`.
 
 **Scoring-Profile (ADR-0009, seit P2b.3):** Gewichte und Schwellen kommen aus dem aktiven Profil
@@ -342,7 +344,7 @@ Der Umbau zu ereignisgetriebenen Services ist umgesetzt (Phasen 0 bis 5 der
 [Roadmap](docs/architecture/roadmap.md)). Track G hat das UI neu gestaltet (Papier-Design,
 Tooltips aus dem Glossar, [Spec](docs/architecture/ui-neugestaltung.md), abgenommen am
 06.11.2026). Offen ist Track F: ADR-0010 sammelt Daten,
-ADR-0011 ist nur vorgeschlagen. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
+ADR-0011 ist angenommen und wird in F2/F3 umgesetzt. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
 als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
 bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt sind D1.1 bis
 D1.4 (Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI). Auf der

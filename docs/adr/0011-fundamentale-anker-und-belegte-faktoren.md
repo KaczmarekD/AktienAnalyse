@@ -1,16 +1,34 @@
 # ADR-0011: Fundamentale Anker und belegte Faktoren im Scoring
 
-- **Status:** vorgeschlagen
-- **Datum:** 2026-09-30
+- **Status:** angenommen am 2026-11-06, mit den Ergänzungen unten
+- **Datum:** 2026-09-30 (Vorschlag), 2026-11-06 (Annahme)
 - **Grundlage:** [Recherche: Langfristige Fundamentalanalyse](../research/fundamentalanalyse-sota/bericht.md)
 - **Setzt voraus:** [ADR-0010](0010-stichtagsdaten-konsens-quartale-kurse.md), also die
   Datensammlung aus F1
-- **Würde ändern (bei Annahme):**
+- **Ändert (mit F2.5):**
   - die Methodik in [CLAUDE.md](../../CLAUDE.md): Faktorkatalog, Value-Trap-Flag, Umgang mit
     Finanzwerten
   - die Parameter in [scoring-profile.md](../architecture/scoring-profile.md)
 
-## Warum noch „vorgeschlagen“
+## Ergänzungen bei der Annahme (06.11.2026)
+
+Grundlage ist der [Bericht zur Vorprüfung](../research/adr-0011-vorpruefung/bericht.md).
+
+1. **Immobilien fest in der Branchenregel:** Das EBIT von Vonovia, LEG, TAG und Aroundtown
+   enthält Bewertungsergebnisse nach IAS 40, die Bedingung aus Punkt 4 ist erfüllt. Für
+   Titel, deren Yahoo-`industry` mit „Real Estate“ beginnt oder „REIT“ enthält, gilt Punkt 3.
+2. **„Capital Markets“ in der Branchenregel:** flatexDEGIRO ist eine Bank, Yahoo führt es als
+   „Capital Markets“. Ohne die Regel ginge sein negativer Unternehmenswert (Kundengelder) und
+   ein Free Cashflow mit Kundeneinlagen in das Ranking ein.
+3. **Reihenfolge:** Die Branchenregeln (F2.4) kommen als erstes Paket, weil sie heute wirkende
+   Verzerrungen beheben. F2.1 nimmt seine neuen Faktoren danach in die Ausschlussliste auf.
+4. **Gerechtfertigtes KBV:** Es rechnet mit `cost_of_capital` und `terminal_growth` aus
+   Punkt 6. Beide Parameter kommen deshalb schon mit F2.4.
+
+Wie bisher wird jede Regel zunächst abgeschaltet umgesetzt. Erst F2.5 aktiviert das Profil v2
+und braucht deine Abnahme. Bis dahin gilt die Methodik aus CLAUDE.md unverändert.
+
+## Weg zur Entscheidung
 
 Zuerst werden nur Daten gesammelt (ADR-0010), abgeleitet wird noch nichts. Die Rohdaten werden
 gespeichert, also kann jede spätere Methodik rückwirkend auf alle Abrufe angewendet werden. Durch
