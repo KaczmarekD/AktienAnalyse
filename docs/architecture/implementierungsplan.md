@@ -3354,7 +3354,7 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   - **Tests:** nginx-Regeln statisch, Compose-Werte, NATS-Rechte gegen einen zweiten NATS mit
     der echten Konfiguration (`TEST_NATS_AUTH_URL`, in der CI ein eigener Container), im E2E die
     ganze Kette mit Anmeldung bei NATS und die Sperre je weitergereichter IP.
-- **Umgesetzt (07.11.2026, Branch `feat/d1-5-betrieb`):** wie im Entwurf, dazu:
+- **Umgesetzt (07.11.2026, auf `main` als `36e5e86`, CI grün):** wie im Entwurf, dazu:
   - **`src.worker`** startet alle drei Services in einem Prozess und legt deshalb weiter alle
     Consumer an (`run_service(..., all_consumers=True)`, Nutzer `batch`).
   - **Inbox aus der URL:** Kein neues Setting; der Nutzername in `NATS_URL` bestimmt die Inbox.
@@ -3364,6 +3364,17 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
     nginx-Konfiguration.
   - **Zertifikat:** weiter offen beim User; das Runbook beschreibt Let's Encrypt mit eigener
     Domain und eine eigene CA in DSM.
+  - **Review (`/code-review high`, `/security-review`):** behoben, dass jeder Dienst den Stream
+    umstellen durfte (jetzt nur `batch`; ein Dienst meldet eine Abweichung und läuft weiter), dass
+    `make nats-provision` das Passwort nicht fand, dass `FORWARDED_ALLOW_IPS` nicht einstellbar
+    war; das Runbook verlangt jetzt, `UI_LAN_BIND` zu entfernen, und prüft die Geräteadresse im
+    Log von nginx. Die Sicherheitsprüfung fand nichts mit hoher Sicherheit.
+  - **Offen für D8 (Bank-RPC):** NATS prüft die Antwortadresse einer Anfrage nicht. Ein
+    kompromittierter Dienst könnte JetStream über `CONSUMER.MSG.NEXT` mit fremder Antwortadresse
+    eine Nachricht an `rpc.va.<anderer>.…` zustellen lassen, und ein Dienst kann den Filter seines
+    eigenen Consumers ändern. Heute ohne Gewicht (keine persönlichen Daten in `VA_EVENTS`, die
+    Dienste beeinflussen das Ranking ohnehin). Vor `rpc.va.bank.>` und `VA_PRIVATE`: RPC in einem
+    eigenen NATS-Account oder Anfragen signieren.
 
 **D1.6 Mail-Bestätigung, Datenexport, Löschkommando** (NUT-10, 12, Löschkommando aus ADR-0012)
 - **Test:** Token einmalig und 24 h gültig; `confirm-email` ohne Sitzung; Export enthält alle
