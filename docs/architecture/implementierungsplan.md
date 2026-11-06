@@ -3228,7 +3228,7 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
     offener Tab hält die Sitzung also nicht künstlich am Leben.
   - **Frontend unverändert:** Nach 4401 verbindet es sich mit wachsender Pause neu und scheitert,
     bis D1.4 zur Anmeldung führt.
-- **Umgesetzt (06.11.2026, Branch `feat/d1-3-websocket`):**
+- **Umgesetzt (06.11.2026, auf `main` als `253fcda`, CI grün):**
   - **Code:** `topic_owner` und `CLOSE_SESSION_ENDED` im Protokoll, `Client.user_id`/`session`,
     `WebSocketHub.close`/`close_session` und `HubBroadcaster.close_session`, im Endpunkt
     `_session_user`, `_watch_session` und `_forbidden`. `LAN_USER` zog nach
