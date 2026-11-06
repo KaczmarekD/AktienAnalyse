@@ -227,7 +227,8 @@ table {
 }
 
 .table-sheet {
-  overflow: hidden;
+  // clip statt hidden: schneidet die Ecken ab, ohne Scroll-Container zu sein (klebender Kopf)
+  overflow: clip;
   border: var(--va-divider);
   border-radius: var(--va-radius-card);
   background-color: var(--mat-sys-surface-container-lowest);

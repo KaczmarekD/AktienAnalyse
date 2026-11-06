@@ -31,6 +31,8 @@
   --va-appbar-height: 3.5rem;
   --va-tooltip-max: 20rem;
   --va-bar-height: 0.375rem;
+  // Breite eines Score-Balkens in Tabellen
+  --va-size-bar: 4.5rem;
   --va-icon-sm: 1.125rem;
   --va-icon-md: 1.5rem;
   // Marke in der App-Leiste
@@ -38,6 +40,8 @@
 
   // Haarlinie, Linie in Tinte unter Tabellenköpfen, Fokusring
   --va-divider: 1px solid var(--mat-sys-outline-variant);
+  // Rand von Eingaben und Chips
+  --va-outline: 1px solid var(--mat-sys-outline);
   --va-rule: 1px solid var(--mat-sys-on-surface);
   --va-focus-width: 2px;
   --va-focus-ring: var(--va-focus-width) solid var(--mat-sys-primary);

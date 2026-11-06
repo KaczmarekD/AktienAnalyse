@@ -1,114 +1,304 @@
 <app-page-header>Ranking</app-page-header>
 
-@if (error(); as message) {
-  <p class="message">{{ message }}</p>
-} @else if (ranking(); as run) {
+@if (ranking(); as run) {
   <p class="meta">
-    Bewertungslauf {{ run.scoring_run_id }}
     @if (run.fetched_on) {
-      · Abruf vom {{ run.fetched_on | day }}
+      <app-term key="fetched_on" /> {{ run.fetched_on | day }} ·
     }
-    · Quelle {{ run.universe_source ?? 'unbekannt' }}
+    @if (run.profile; as profile) {
+      <app-term key="scoring_profile" /> {{ profile.name ?? 'ohne Namen' }} v{{ profile.version }}
+    }
     @if (run.value_weight !== null && run.quality_weight !== null) {
-      · {{ run.value_weight | pct: '1.0-0' }} Value, {{ run.quality_weight | pct: '1.0-0' }} Quality
+      ({{ run.value_weight | pct: '1.0-0' }} Value, {{ run.quality_weight | pct: '1.0-0' }}
+      Quality)
     }
+    · <app-term key="universe_source" /> {{ run.universe_source | indexSource }} ·
+    <app-term key="scoring_run">Bewertungslauf #{{ run.scoring_run_id }}</app-term>
   </p>
 
-  <div class="cluster">
+  @if (isOld()) {
+    <div class="notice" role="status">
+      <app-icon name="info" />
+      <span class="grow">Bewertungslauf vom {{ run.created_at | day }}, nicht der aktuelle.</span>
+      <a
+        matButton="outlined"
+        routerLink="/ranking"
+        data-action="latest"
+        [matTooltip]="controls['ranking.toLatest']"
+        >Zum aktuellen Ranking</a
+      >
+    </div>
+  }
+
+  <div class="stat-grid">
+    @let sum = summary();
+    <app-stat-card
+      data-card="scored"
+      label="Bewertet"
+      tip="Titel mit Value- und Quality-Score, von allen Titeln der Indexliste."
+    >
+      {{ sum.withComposite }} <span class="hint">von {{ sum.total }}</span>
+      <span statSub>mit Composite</span>
+    </app-stat-card>
+    @if (sum.leader; as leader) {
+      <app-stat-card
+        data-card="leader"
+        label="Spitzenreiter"
+        [link]="'/instruments/' + leader.symbol"
+        [tip]="
+          (leader.name ?? leader.symbol) +
+          ' hat den höchsten Composite. Öffnet Kennzahlen und Verlauf.'
+        "
+      >
+        <span class="text-value">{{ leader.name ?? leader.symbol }}</span>
+        <span statSub>Composite {{ leader.composite_score | num }}</span>
+      </app-stat-card>
+    }
+    <app-stat-card
+      data-card="traps"
+      label="Value-Traps"
+      [tip]="controls['ranking.cardTraps']"
+      [pressed]="focus() === 'traps'"
+      (toggled)="toggleFocus('traps')"
+    >
+      {{ sum.traps }}
+      <span statSub><app-icon name="warning" />günstig, aber schwache Quality</span>
+    </app-stat-card>
+    <app-stat-card
+      data-card="no-composite"
+      label="Ohne Composite"
+      [tip]="controls['ranking.cardNoComposite']"
+      [pressed]="focus() === 'no-composite'"
+      (toggled)="toggleFocus('no-composite')"
+    >
+      {{ sum.noComposite }}
+      <span statSub>Teilscore fehlt, stehen am Ende</span>
+    </app-stat-card>
+  </div>
+
+  <div class="cluster filters">
     <mat-button-toggle-group
       aria-label="Index"
       [value]="index()"
       (change)="index.set($event.value)"
     >
-      <mat-button-toggle value="all">Alle</mat-button-toggle>
-      <mat-button-toggle value="DAX">DAX</mat-button-toggle>
-      <mat-button-toggle value="MDAX">MDAX</mat-button-toggle>
+      <mat-button-toggle value="all" [matTooltip]="controls['ranking.all']">Alle</mat-button-toggle>
+      <mat-button-toggle value="DAX" [matTooltip]="glossary.tip('DAX')">DAX</mat-button-toggle>
+      <mat-button-toggle value="MDAX" [matTooltip]="glossary.tip('MDAX')">MDAX</mat-button-toggle>
     </mat-button-toggle-group>
 
-    <mat-form-field subscriptSizing="dynamic">
-      <mat-label>Suche nach Name oder Symbol</mat-label>
-      <input matInput name="search" [value]="search()" (input)="onSearch($event)" />
+    <mat-form-field class="search" subscriptSizing="dynamic">
+      <app-icon matPrefix name="search" />
+      <mat-label>Name oder Symbol</mat-label>
+      <input matInput type="search" name="search" [value]="search()" (input)="onSearch($event)" />
     </mat-form-field>
 
-    <mat-slide-toggle [checked]="showFiltered()" (change)="showFiltered.set($event.checked)">
-      Titel unter der Größenschwelle zeigen
+    <mat-slide-toggle
+      [checked]="showFiltered()"
+      [matTooltip]="controls['ranking.showFiltered']"
+      (change)="showFiltered.set($event.checked)"
+    >
+      Unter Größenschwelle zeigen
     </mat-slide-toggle>
+
+    @if (focus(); as current) {
+      <span class="chip">
+        {{ current === 'traps' ? 'Nur Value-Traps' : 'Nur ohne Composite' }}
+        <button
+          matIconButton
+          type="button"
+          data-action="clear-focus"
+          aria-label="Filter entfernen"
+          matTooltip="Filter entfernen und alle Titel zeigen."
+          (click)="focus.set(undefined)"
+        >
+          <app-icon name="close" />
+        </button>
+      </span>
+    }
+
+    <span class="spacer"></span>
+    <app-column-picker [groups]="columnGroups()" [(selected)]="selected" />
   </div>
 
-  <table
-    mat-table
-    [dataSource]="rows()"
-    matSort
-    matSortActive="rank"
-    matSortDirection="asc"
-    (matSortChange)="sort.set($event)"
-  >
-    <ng-container matColumnDef="rank">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Rang</th>
-      <td mat-cell *matCellDef="let row">{{ row.rank | orDash }}</td>
-    </ng-container>
-    <ng-container matColumnDef="title">
-      <th mat-header-cell *matHeaderCellDef>Titel</th>
-      <td mat-cell *matCellDef="let row">
-        <a [routerLink]="['/instruments', row.symbol]">{{ row.name ?? row.symbol }}</a>
-        <span class="hint symbol">{{ row.symbol }}</span>
-      </td>
-    </ng-container>
-    <ng-container matColumnDef="index">
-      <th mat-header-cell *matHeaderCellDef>Index</th>
-      <td mat-cell *matCellDef="let row">{{ row.index | orDash }}</td>
-    </ng-container>
-    <ng-container matColumnDef="sector">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Sektor</th>
-      <td mat-cell *matCellDef="let row">{{ row.sector | orDash }}</td>
-    </ng-container>
-    <ng-container matColumnDef="composite_score">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header start="desc">Composite</th>
-      <td mat-cell *matCellDef="let row">{{ row.composite_score | num }}</td>
-    </ng-container>
-    <ng-container matColumnDef="value_score">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header start="desc">Value</th>
-      <td mat-cell *matCellDef="let row">{{ row.value_score | num }}</td>
-    </ng-container>
-    <ng-container matColumnDef="quality_score">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header start="desc">Quality</th>
-      <td mat-cell *matCellDef="let row">{{ row.quality_score | num }}</td>
-    </ng-container>
-    <ng-container matColumnDef="value_trap_flag">
-      <th mat-header-cell *matHeaderCellDef>Hinweis</th>
-      <td mat-cell *matCellDef="let row">
-        <app-value-trap-badge [flagged]="row.value_trap_flag" />
-      </td>
-    </ng-container>
-    <ng-container matColumnDef="market_cap">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header start="desc">Marktkap.</th>
-      <td mat-cell *matCellDef="let row">{{ row.market_cap | mrd }}</td>
-    </ng-container>
-    <ng-container matColumnDef="ev_ebit">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>EV/EBIT</th>
-      <td mat-cell *matCellDef="let row">{{ row.ev_ebit | num: '1.1-1' }}</td>
-    </ng-container>
-    <ng-container matColumnDef="pb_ratio">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>KBV</th>
-      <td mat-cell *matCellDef="let row">{{ row.pb_ratio | num: '1.1-1' }}</td>
-    </ng-container>
-    <ng-container matColumnDef="roic">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header start="desc">ROIC</th>
-      <td mat-cell *matCellDef="let row">{{ row.roic | pct }}</td>
-    </ng-container>
+  <div class="table-sheet">
+    <table
+      mat-table
+      [dataSource]="rows()"
+      matSort
+      matSortActive="rank"
+      matSortDirection="asc"
+      (matSortChange)="sort.set($event)"
+    >
+      <ng-container matColumnDef="rank" sticky>
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          arrowPosition="before"
+          class="num"
+          [matTooltip]="headTip('rank')"
+        >
+          {{ glossary.label('rank') }}
+        </th>
+        <td mat-cell *matCellDef="let row" class="num">{{ row.rank | orDash }}</td>
+      </ng-container>
+      <ng-container matColumnDef="title" sticky>
+        <th mat-header-cell *matHeaderCellDef><app-term key="title" /></th>
+        <td mat-cell *matCellDef="let row" class="title-cell">
+          <a [routerLink]="['/instruments', row.symbol]">{{ row.name ?? row.symbol }}</a>
+          <span class="sub"
+            >{{ row.symbol }} ·
+            @if (row.index === 'DAX' || row.index === 'MDAX') {
+              <app-term [key]="row.index" [focusable]="false" />
+            } @else {
+              {{ row.index | orDash }}
+            }
+          </span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="sector">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header [matTooltip]="headTip('sector')">
+          {{ glossary.label('sector') }}
+        </th>
+        <td mat-cell *matCellDef="let row">{{ row.sector | sector }}</td>
+      </ng-container>
+      <ng-container matColumnDef="composite_score">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          start="desc"
+          arrowPosition="before"
+          class="num"
+          [matTooltip]="headTip('composite')"
+        >
+          {{ glossary.label('composite') }}
+        </th>
+        <td mat-cell *matCellDef="let row" class="num">
+          <app-score [value]="row.composite_score" bar />
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="value_score">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          start="desc"
+          arrowPosition="before"
+          class="num"
+          [matTooltip]="headTip('value_score')"
+        >
+          {{ glossary.label('value_score') }}
+        </th>
+        <td mat-cell *matCellDef="let row" class="num">
+          <app-score [value]="row.value_score" />
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="quality_score">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          start="desc"
+          arrowPosition="before"
+          class="num"
+          [matTooltip]="headTip('quality_score')"
+        >
+          {{ glossary.label('quality_score') }}
+        </th>
+        <td mat-cell *matCellDef="let row" class="num">
+          <app-score [value]="row.quality_score" />
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="hint">
+        <th mat-header-cell *matHeaderCellDef><app-term key="hint" /></th>
+        <td mat-cell *matCellDef="let row">
+          <span class="badges">
+            <app-value-trap-badge [flagged]="row.value_trap_flag" [params]="params()" />
+            @if (!row.passed_filter) {
+              <span
+                class="badge"
+                tabindex="0"
+                [matTooltip]="glossary.tip('below_threshold', params())"
+                >unter Größenschwelle</span
+              >
+            } @else if (row.composite_score === null) {
+              <span
+                class="badge badge--muted"
+                tabindex="0"
+                [matTooltip]="glossary.tip('no_composite')"
+                >ohne Composite</span
+              >
+            }
+          </span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="market_cap">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          start="desc"
+          arrowPosition="before"
+          class="num"
+          [matTooltip]="headTip('market_cap')"
+        >
+          {{ glossary.label('market_cap') }}
+        </th>
+        <td mat-cell *matCellDef="let row" class="num">{{ row.market_cap | mrd }}</td>
+      </ng-container>
+      @for (column of factorColumns; track column.key) {
+        <ng-container [matColumnDef]="column.key">
+          <th
+            mat-header-cell
+            *matHeaderCellDef
+            mat-sort-header
+            arrowPosition="before"
+            class="num"
+            [start]="start(column.key)"
+            [matTooltip]="headTip(column.term)"
+          >
+            {{ glossary.label(column.term) }}
+          </th>
+          <td mat-cell *matCellDef="let row" class="num">
+            @switch (column.format) {
+              @case ('pct') {
+                {{ factorValue(row, column.key) | pct }}
+              }
+              @case ('num2') {
+                {{ factorValue(row, column.key) | num }}
+              }
+              @default {
+                {{ factorValue(row, column.key) | num: '1.1-1' }}
+              }
+            }
+          </td>
+        </ng-container>
+      }
 
-    <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
-    <tr
-      mat-row
-      *matRowDef="let row; columns: columns"
-      [attr.data-symbol]="row.symbol"
-      [class.value-trap]="row.value_trap_flag"
-      [class.filtered]="!row.passed_filter"
-    ></tr>
-    <tr class="mat-row" *matNoDataRow>
-      <td class="mat-cell" [attr.colspan]="columns.length">Kein Titel passt zum Filter.</td>
-    </tr>
-  </table>
+      <tr mat-header-row *matHeaderRowDef="columns(); sticky: true"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns()" [attr.data-symbol]="row.symbol"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell empty" [attr.colspan]="columns().length">
+          <p>Kein Titel passt zum Filter.</p>
+          <button
+            matButton="outlined"
+            type="button"
+            data-action="reset"
+            [matTooltip]="controls['ranking.resetFilter']"
+            (click)="resetFilter()"
+          >
+            Filter zurücksetzen
+          </button>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <p class="hint footnote">
+    Was bedeuten die Spalten? <a routerLink="/glossary">Begriffe</a>. Scores sind Perzentile: 1 ist
+    das Beste, 0,5 die Mitte.
+  </p>
 } @else {
-  <p class="message">Lade das Ranking …</p>
+  <app-state [error]="error()" loading="Lade das Ranking …" />
 }

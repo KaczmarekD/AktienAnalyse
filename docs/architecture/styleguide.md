@@ -281,6 +281,8 @@ nicht.
 
 Begriff mit Tooltip aus dem Glossar, gepunktet unterstrichen und mit der Tastatur erreichbar. Eigener
 Text ersetzt das Label, `variant="short"` nimmt das Kurzlabel, `[params]` setzt Werte ein.
+`[focusable]="false"` nimmt den Tab-Stopp weg, wo der Begriff in jeder Zeile steht (Index unter dem
+Namen eines Titels); erklärt wird er dann auch an einem fokussierbaren Element der Seite.
 
 ```html
 <th mat-header-cell *matHeaderCellDef><app-term key="ev_ebit" /></th>
@@ -295,6 +297,36 @@ Größenschwelle?“) und Tooltip. Text aus dem Glossar (`key`) oder direkt (`te
 
 ```html
 <app-info-tip key="min_market_cap" />
+```
+
+### `app-score`
+
+Score als Zahl, auf Wunsch mit Balken in Tinte (`bar`, nur beim Composite); der Tooltip ordnet ihn
+ein („besser als etwa 78 % der bewerteten Titel“), ohne Wert steht ein Strich mit dem Grund.
+
+```html
+<app-score [value]="row.composite_score" bar />
+```
+
+### `app-stat-card`
+
+Kennzahlkarte über einer Tabelle: Label, großer Wert (Inhalt), Nebenzeile (`statSub`) und
+Tooltip. Mit `link` führt sie zu einer Ansicht, mit `pressed` ist sie ein Schalter, der filtert.
+
+```html
+<app-stat-card label="Value-Traps" [tip]="text" [pressed]="focus() === 'traps'" (toggled)="…">
+  {{ traps }}
+  <span statSub>günstig, aber schwache Quality</span>
+</app-stat-card>
+```
+
+### `app-column-picker`
+
+Spaltenwahl einer Tabelle (Button „Spalten“ mit Menü, Checkboxen nach Gruppen). Die Ansicht hält
+die gewählten Schlüssel und merkt sie sich im `localStorage` (Lesen und Schreiben in try/catch).
+
+```html
+<app-column-picker [groups]="columnGroups()" [(selected)]="selected" />
 ```
 
 ### `app-icon`
@@ -319,11 +351,12 @@ Das Element trägt `data-status`. Während eines Abrufs steht der Fortschritt da
 
 ### `app-value-trap-badge`
 
-Badge „Value-Trap?“ in voller Tinte für Titel mit Value-Trap-Flag, sonst nichts. Das Fragezeichen
-steht wie in der Mail: Das Flag ist ein Hinweis, genauer hinzusehen, kein Urteil.
+Badge „Value-Trap?“ in voller Tinte mit Warn-Icon für Titel mit Value-Trap-Flag, sonst nichts. Das
+Fragezeichen steht wie in der Mail: Das Flag ist ein Hinweis, genauer hinzusehen, kein Urteil. Der
+Tooltip nennt die Schwellen des Profils, wenn die Ansicht sie mitgibt.
 
 ```html
-<app-value-trap-badge [flagged]="row.value_trap_flag" />
+<app-value-trap-badge [flagged]="row.value_trap_flag" [params]="params()" />
 ```
 
 ### `app-notice`
@@ -377,6 +410,11 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 | `.divided-list` | Liste (`ul`) mit Trennlinien | Profile, Versionen |
 | `.table-sheet` | legt eine Tabelle als Blatt auf den Tisch, scrollt unter `$narrow` waagrecht | Ranking |
 | `.data-table` | schlichte HTML-Tabelle ohne `mat-table` | Vorschau im Profil-Editor |
+
+Sortierbare Spaltenköpfe tragen den Tooltip am Kopf selbst (Text aus dem Glossar plus „Klick
+sortiert.“), nicht sortierbare ein `app-term`. Zahlenspalten sind `.num`. Klebt der Kopf, beginnt er
+unter der App-Leiste (`--va-appbar-height`); `.table-sheet` schneidet mit `overflow: clip`, damit
+das Kleben am Fenster bleibt.
 
 Tabellen nehmen immer die volle Breite ein und stehen im Buchsatz: eine Linie in Tinte unter dem
 Kopf, Haarlinien zwischen den Zeilen, keine senkrechten Linien, unter dem Zeiger Vertiefung 1. Das

@@ -1,17 +1,89 @@
+@use '../../styles/breakpoints';
+
+.meta {
+  margin-bottom: var(--va-space-md);
+}
+
+.notice .grow {
+  flex: 1;
+}
+
+// Name eines Titels in der Karte „Spitzenreiter“: Text statt Zahl, deshalb kleiner
+.text-value {
+  font-size: var(--mat-sys-title-large-size);
+  line-height: var(--mat-sys-title-large-line-height);
+}
+
+// Breite des Suchfelds gilt nur hier
+.search {
+  width: 18rem;
+  max-width: 100%;
+}
+
+.spacer {
+  flex: 1;
+}
+
+// Gesetzter Filter einer Kennzahlkarte, mit Knopf zum Entfernen
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--va-space-xs);
+  padding-left: var(--va-space-md);
+  border: var(--va-outline);
+  border-radius: var(--va-radius-box);
+  font: var(--mat-sys-label-large);
+}
+
 td,
 th {
   white-space: nowrap;
 }
 
-// Symbol hinter dem Namen; Farbe und Größe kommen von .hint
-.symbol {
-  margin-left: var(--va-space-sm);
+.title-cell {
+  a {
+    font-weight: var(--va-weight-emphasis);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .sub {
+    display: block;
+    color: var(--mat-sys-on-surface-variant);
+    font: var(--mat-sys-body-small);
+  }
 }
 
-.value-trap {
-  background-color: var(--mat-sys-error-container);
+.badges {
+  display: inline-flex;
+  gap: var(--va-space-xs);
 }
 
-.filtered {
-  opacity: 0.6;
+.empty {
+  padding: var(--va-space-xl);
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+
+  p {
+    margin: 0 0 var(--va-space-sm);
+  }
+}
+
+.footnote {
+  margin-top: var(--va-space-md);
+}
+
+// Der Kopf klebt unter der App-Leiste, nicht dahinter. Material setzt top inline auf 0.
+.mat-mdc-header-row .mat-mdc-table-sticky {
+  top: var(--va-appbar-height) !important;
+}
+
+@media (max-width: breakpoints.$narrow) {
+  // Das Tabellen-Blatt scrollt waagrecht; der Kopf klebt dann nicht mehr
+  .mat-mdc-header-row .mat-mdc-table-sticky {
+    top: 0 !important;
+  }
 }

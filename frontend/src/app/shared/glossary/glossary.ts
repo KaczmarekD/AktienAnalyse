@@ -456,3 +456,16 @@ export const ROLES: Record<ScoreRole, { label: string; tip: string }> = {
   quality: { label: 'Quality-Faktor', tip: 'Geht in den Quality-Score ein.' },
   info: { label: 'nur zur Information', tip: 'Wird angezeigt, geht aber nicht in den Score ein.' },
 };
+
+/** Einordnung eines Scores für seinen Tooltip; ohne Wert der Grund, warum er fehlt. */
+export function scoreTip(value: number | null | undefined): string {
+  return value == null
+    ? (ENTRIES.no_composite.tip as string)
+    : `Im Schnitt seiner Faktoren besser als etwa ${Math.round(value * 100)}${NBSP}% der bewerteten Titel.`;
+}
+
+/** Tooltip eines Begriffs, der kein Faktor ist; Faktortexte setzt der GlossaryStore zusammen. */
+export function termTip(entry: GlossaryEntry, params: TipParams = {}): string {
+  const text = typeof entry.tip === 'function' ? entry.tip(params) : (entry.tip ?? '');
+  return entry.role === 'info' && !text.includes('Score') ? `${text} Nicht im Score.` : text;
+}

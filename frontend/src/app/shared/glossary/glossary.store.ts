@@ -5,6 +5,7 @@ import type { Factor } from '../../api/types.gen';
 import { loaded } from '../resource';
 import {
   GLOSSARY,
+  termTip,
   GlossaryEntry,
   GlossaryGroup,
   GROUPS,
@@ -50,8 +51,7 @@ export class GlossaryStore {
       const role = entry.role === 'value' ? 'Value' : 'Quality';
       return `${factor.hint} ${direction} ist besser. ${role}-Faktor.`;
     }
-    const text = typeof entry.tip === 'function' ? entry.tip(params) : (entry.tip ?? '');
-    return entry.role === 'info' && !text.includes('Score') ? `${text} Nicht im Score.` : text;
+    return termTip(entry, params);
   }
 
   /** Alle Begriffe nach Gruppen, gefiltert nach dem Suchtext (Label, Tooltip, Erklärung). */
