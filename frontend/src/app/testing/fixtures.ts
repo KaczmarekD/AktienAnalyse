@@ -176,6 +176,7 @@ function point(values: Partial<ScorePoint> & Pick<ScorePoint, 'scoring_run_id'>)
     value_score: 0.7,
     quality_score: 0.9,
     value_trap_flag: false,
+    ranked_count: 84, // G3: Titel mit Rang im selben Lauf
     ...values,
   };
 }
@@ -197,6 +198,20 @@ export const INSTRUMENT: Instrument = {
     }),
     point({ scoring_run_id: 2 }),
   ],
+  // G3: Perzentile im jüngsten Lauf; EV/EBIT ohne Daten, Net Debt/EBITDA im Profil nicht aktiv
+  factor_ranks: {
+    scoring_run_id: 2,
+    ranks: {
+      ev_ebit: null,
+      pb: 0.37,
+      p_fcf: 0.9,
+      shareholder_yield: 0.87,
+      roic: 0.66,
+      fcf_margin: 0.84,
+      operating_margin: 0.5,
+      earnings_stability: 0.81,
+    },
+  },
 };
 
 // --- Scoring-Profile (P3.3, Editor in P3.7) --------------------------------------------------

@@ -21,6 +21,7 @@ import { PageHeader } from './page-header';
 import { RunStatus } from './run-status';
 import { AppSection } from './section';
 import { Score } from './score';
+import { Sparkline, SparkPoint } from './sparkline';
 import { StatCard } from './stat-card';
 import { AppState } from './state';
 import { Term } from './term';
@@ -187,6 +188,19 @@ class ColumnPickerHost {
     },
   ];
   readonly selected = signal<string[]>(['sector']);
+}
+
+@Component({
+  imports: [Sparkline],
+  template: `<app-sparkline [points]="points()" label="Composite" />`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class SparklineHost {
+  readonly points = signal<SparkPoint[]>([
+    { label: '23.10.2026', value: 0.71, detail: 'Rang 3' },
+    { label: '30.10.2026', value: null, detail: 'ohne Composite' },
+    { label: '06.11.2026', value: 0.78, detail: 'Rang 1' },
+  ]);
 }
 
 /** Mit Antwort auf die Faktortexte, die der GlossaryStore beim ersten Gebrauch lädt. */
@@ -494,5 +508,27 @@ describe('ColumnPicker', () => {
     sector?.click();
     fixture.detectChanges();
     expect(fixture.componentInstance.selected()).toEqual(['pb_ratio']);
+  });
+});
+
+describe('Sparkline', () => {
+  it('draws the values as a line with a dot each and describes the change', () => {
+    const { fixture, element } = render(SparklineHost);
+    const svg = element.querySelector('app-sparkline svg');
+    expect(svg?.getAttribute('role')).toBe('img');
+    expect(svg?.getAttribute('aria-label')).toBe('Verlauf des Composite von 0,71 auf 0,78');
+    // Punkte ohne Wert fehlen in der Linie
+    expect(svg?.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(2);
+    const dots = Array.from(svg?.querySelectorAll('circle') ?? []);
+    expect(dots).toHaveLength(2);
+    expect(tooltip(fixture, dots[1])).toBe('06.11.2026: Composite 0,78, Rang 1');
+  });
+
+  it('says when there are too few values for a line', () => {
+    const { fixture, element } = render(SparklineHost);
+    fixture.componentInstance.points.set([{ label: '30.10.2026', value: 0.78, detail: 'Rang 1' }]);
+    fixture.detectChanges();
+    expect(element.querySelector('app-sparkline svg')).toBeNull();
+    expect(element.textContent).toContain('Zu wenige Bewertungen für einen Verlauf.');
   });
 });
