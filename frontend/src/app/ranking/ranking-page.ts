@@ -34,7 +34,7 @@ import { CONTROLS } from '../shared/glossary/controls';
 import { ENTRIES, FIELD_FACTOR, TermKey, TipParams } from '../shared/glossary/glossary';
 import { GlossaryStore } from '../shared/glossary/glossary.store';
 import { LiveStore } from '../shared/realtime/live.store';
-import { loaded, loadError } from '../shared/resource';
+import { keptValue, loaded, loadError } from '../shared/resource';
 import { ColumnGroup, ColumnPicker } from '../shared/ui/column-picker';
 import { FORM_FIELD_DEFAULTS } from '../shared/ui/form-field';
 import { AppIcon } from '../shared/ui/icon';
@@ -171,7 +171,8 @@ export class RankingPage {
   private readonly resource = computed(() =>
     this.scoringRunId() === undefined ? this.latest : this.byId,
   );
-  protected readonly ranking = computed(() => loaded(this.resource()));
+  // Beim Nachladen nach einem Ereignis bleibt die alte Tabelle stehen
+  protected readonly ranking = keptValue(() => this.resource());
   protected readonly error = computed(() =>
     loadError(this.resource(), 'Noch kein Bewertungslauf. Er entsteht mit dem ersten Lauf.'),
   );

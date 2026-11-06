@@ -43,7 +43,7 @@
 | `src/styles/_patterns.scss` | Überschriften, Links, Fokus und alle Muster-Klassen |
 | `src/app/shared/ui/` | gemeinsame Komponenten, siehe [Komponenten](#komponenten) |
 | `src/app/shared/format.ts` | Pipes für Zahlen, Prozent, Milliarden, Datum, fehlende Werte, Status |
-| `src/app/shared/resource.ts` | `loaded` und `loadError` für den Lade- und Fehlerzustand |
+| `src/app/shared/resource.ts` | `loaded`, `keptValue` und `loadError` für den Lade- und Fehlerzustand |
 | `src/app/shared/glossary/` | alle Texte: Begriffe (`glossary.ts`), Bedienelemente (`controls.ts`), `GlossaryStore` |
 
 ## Farben
@@ -216,9 +216,12 @@ protected readonly data = computed(() => loaded(this.resource));
 protected readonly error = computed(() => loadError(this.resource, 'Lauf nicht gefunden.'));
 ```
 
+Lädt eine Ansicht live nach (Ranking und Läufe nach einem Ereignis über den WebSocket), nimmt sie
+`keptValue(() => this.resource)` statt `loaded`: Der bisherige Wert bleibt stehen, bis der neue da
+ist, nach einem Fehler gilt der Fehler.
+
 Steht der Titel erst nach dem Laden fest (Titel-Detail, Lauf, Profil), kommt
-`app-page-header` in den Zweig mit den Daten. Die Ansichten zeigen Laden und Fehler heute noch mit
-`.message`; sie wechseln mit ihrem Paket der Neugestaltung (G4 bis G7) zu `app-state`.
+`app-page-header` in den Zweig mit den Daten. Laden, Fehler und leer zeigt `app-state`.
 
 ## Komponenten
 

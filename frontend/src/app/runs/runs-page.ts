@@ -11,7 +11,7 @@ import { DayTimePipe, DurationPipe, RunKindPipe } from '../shared/format';
 import { CONTROLS } from '../shared/glossary/controls';
 import { ENTRIES, termTip } from '../shared/glossary/glossary';
 import { LiveStore } from '../shared/realtime/live.store';
-import { loaded, loadError } from '../shared/resource';
+import { keptValue, loaded, loadError } from '../shared/resource';
 import { AppIcon } from '../shared/ui/icon';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
@@ -68,16 +68,20 @@ export class RunsPage {
   /** Fortschritt laufender Abrufe je Run (marketdata.fetch.progressed). */
   protected readonly progress = this.live.progress;
 
-  protected readonly runs = computed(() => loaded(this.resource));
+  // Beim Nachladen nach einem Ereignis bleibt die alte Liste stehen
+  protected readonly runs = keptValue(() => this.resource);
   protected readonly error = computed(() => loadError(this.resource, 'Keine Läufe gefunden.'));
 
   /** Der laufende Lauf; solange es ihn gibt, ist der Start gesperrt. */
   protected readonly active = computed(() => this.runs()?.find((run) => run.status === 'running'));
   /** Der neueste abgeschlossene Lauf für die Karte oben. */
   protected readonly last = computed(() => this.runs()?.find((run) => run.status !== 'running'));
+  // Die Nummer als eigenes Signal: Lädt die Liste neu und bleibt der letzte Lauf derselbe, ändert
+  // sie sich nicht, und das Detail lädt nicht noch einmal
+  private readonly lastId = computed(() => this.last()?.id);
   // Die Liste kennt den Bewertungslauf nicht, das Detail des letzten Laufs schon
   private readonly lastDetail = getRunResource(() => {
-    const id = this.last()?.id;
+    const id = this.lastId();
     return id === undefined ? undefined : { path: { run_id: id } };
   });
   protected readonly lastRanking = computed(

@@ -141,6 +141,35 @@ describe('RunsPage', () => {
     expect(query(fixture, '[role="alert"]')[0]?.textContent).toContain('nicht erreichbar');
   });
 
+  it('loads the detail of the latest run once while it stays the latest', async () => {
+    const fixture = render();
+    await respond(fixture, RUNS, [run({ id: 2 })]);
+    await respond(fixture, '/api/v1/runs/2', run({ id: 2, scoring_run_id: 7 }));
+    TestBed.inject(Dispatcher).dispatch(
+      serverEvents.event({
+        op: 'event',
+        topic: 'runs',
+        type: 'screening.run.requested',
+        seq: 8,
+        data: { runId: 3 },
+      }),
+    );
+    // Während die Liste nachlädt, bleibt die alte stehen (Spec, Zustände)
+    TestBed.tick();
+    expect(query(fixture, 'tr[data-run]').map((r) => r.getAttribute('data-run'))).toEqual(['2']);
+    await respond(fixture, RUNS, [
+      run({ id: 3, status: 'running', finished_at: null }),
+      run({ id: 2 }),
+    ]);
+    await settle(fixture);
+    TestBed.inject(HttpTestingController).expectNone((r) => r.urlWithParams === '/api/v1/runs/2');
+    const link = query<HTMLAnchorElement>(
+      fixture,
+      '[data-card="last-run"] a[data-action="ranking"]',
+    );
+    expect(link[0]?.getAttribute('href')).toBe('/ranking/7');
+  });
+
   // P4.6: Echtzeit über den LiveStore
   it('reloads when a run event arrives', async () => {
     const fixture = render();

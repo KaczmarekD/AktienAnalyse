@@ -265,6 +265,10 @@ describe('RankingPage', () => {
         data: { scoringRunId: 21, rankingSize: 90 },
       }),
     );
+    // Während es nachlädt, bleibt die Tabelle stehen (Spec, Zustände)
+    const before = symbols(fixture);
+    TestBed.tick();
+    expect(symbols(fixture)).toEqual(before);
     await respond(fixture, LATEST, RANKING);
     expect(symbols(fixture).length).toBeGreaterThan(0);
   });
