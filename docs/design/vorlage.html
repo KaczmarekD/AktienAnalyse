@@ -1,0 +1,1417 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Designvorlage · Value-Analyzer</title>
+<!--
+  Designvorlage G0 (docs/architecture/ui-neugestaltung.md): Papier-Design, nur Graustufen.
+  Statische Seite ohne externe Ressourcen. Die Variablen heißen wie im Angular-UI
+  (--mat-sys-*, --va-*), damit die Werte 1:1 nach src/styles/_paper.scss und _tokens.scss
+  wandern. Daten: vorlage-daten.js (echte Werte vom 30.10.2026).
+-->
+<style>
+/* ---------- Papier-Palette: später src/styles/_paper.scss (mat.theme-overrides) ---------- */
+:root {
+  color-scheme: light dark;
+  --mat-sys-surface: light-dark(#f5f4f0, #100f0d);
+  --mat-sys-surface-container-lowest: light-dark(#fdfcfa, #191816);
+  --mat-sys-surface-container-low: light-dark(#f3f1ec, #1d1c19);
+  --mat-sys-surface-container: light-dark(#efede8, #22211e);
+  --mat-sys-surface-container-high: light-dark(#e7e4dd, #2a2925);
+  --mat-sys-surface-container-highest: light-dark(#dcd8cf, #34322e);
+  --mat-sys-outline-variant: light-dark(#e2dfd7, #2e2c28);
+  --mat-sys-outline: light-dark(#8a847a, #77726a);
+  --mat-sys-on-surface-variant: light-dark(#67625a, #a39e94);
+  --mat-sys-on-surface: light-dark(#1d1b18, #f0eee8);
+  --mat-sys-primary: light-dark(#24221e, #f0eee8);
+  --mat-sys-on-primary: light-dark(#fdfcfa, #100f0d);
+  --mat-sys-error: light-dark(#12110f, #fdfcfa);
+  --mat-sys-on-error: light-dark(#fdfcfa, #100f0d);
+  --mat-sys-error-container: light-dark(#cbc7bd, #3f3c37);
+  --mat-sys-on-error-container: light-dark(#12110f, #ffffff);
+  --mat-sys-inverse-surface: light-dark(#24221e, #f0eee8);
+  --mat-sys-inverse-on-surface: light-dark(#f5f4f0, #100f0d);
+  --mat-sys-scrim: #000000;
+
+  /* Formen wie Material 3 */
+  --mat-sys-corner-extra-small: 4px;
+  --mat-sys-corner-small: 8px;
+  --mat-sys-corner-large: 16px;
+  --mat-sys-corner-full: 9999px;
+
+  /* Schrift: brand-family (Serif) für Überschriften, plain-family (System) für alles andere */
+  --va-font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --va-font-sans: system-ui, sans-serif;
+  --mat-sys-headline-small: 400 1.5rem/2rem var(--va-font-serif);
+  --mat-sys-title-large: 400 1.375rem/1.75rem var(--va-font-serif);
+  --mat-sys-title-medium: 500 1rem/1.5rem var(--va-font-serif);
+  --mat-sys-body-large: 400 1rem/1.5rem var(--va-font-sans);
+  --mat-sys-body-medium: 400 0.875rem/1.25rem var(--va-font-sans);
+  --mat-sys-body-small: 400 0.75rem/1rem var(--va-font-sans);
+  --mat-sys-label-large: 500 0.875rem/1.25rem var(--va-font-sans);
+  --mat-sys-label-medium: 500 0.75rem/1rem var(--va-font-sans);
+
+  /* ---------- Tokens: später src/styles/_tokens.scss ---------- */
+  --va-space-2xs: 0.125rem;
+  --va-space-xs: 0.25rem;
+  --va-space-sm: 0.5rem;
+  --va-space-md: 1rem;
+  --va-space-lg: 1.5rem;
+  --va-space-xl: 2rem;
+  --va-space-2xl: 3rem;
+  --va-text-sm: 0.8125rem;
+  --va-weight-emphasis: 500;
+  --va-radius-pill: 0.75rem;
+  --va-radius-box: 0.5rem;
+  --va-radius-card: var(--mat-sys-corner-small);
+  --va-divider: 1px solid var(--mat-sys-outline-variant);
+  --va-rule: 1px solid var(--mat-sys-on-surface);
+  --va-content-max: 90rem;
+  --va-tooltip-max: 20rem;
+  --va-bar-height: 0.375rem;
+  --va-icon-sm: 1.125rem;
+  --va-icon-md: 1.5rem;
+  --va-font-figures: var(--va-font-sans);
+  --va-appbar-h: 3.5rem;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* ---------- Grundlage ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { height: 100%; }
+body {
+  margin: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: underline; text-decoration-color: var(--mat-sys-outline); text-underline-offset: 0.2em; }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: 2px; border-radius: 2px; }
+h1 { font: var(--mat-sys-headline-small); margin: 0; }
+h2 { font: var(--mat-sys-title-large); margin: var(--va-space-xl) 0 var(--va-space-md); }
+h3 { font: var(--mat-sys-title-medium); margin: 0; }
+p { margin: 0; }
+svg.icon { width: var(--va-icon-sm); height: var(--va-icon-sm); fill: currentColor; flex: none; }
+svg.icon--md { width: var(--va-icon-md); height: var(--va-icon-md); }
+.spin { animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } * { transition: none !important; } }
+
+/* ---------- App-Hülle ---------- */
+.appbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: var(--va-space-lg);
+  height: var(--va-appbar-h);
+  padding: 0 var(--va-space-lg);
+  background: var(--mat-sys-surface);
+  border-bottom: var(--va-divider);
+}
+.brand { display: flex; align-items: center; gap: var(--va-space-sm); font: var(--mat-sys-title-large); text-decoration: none; white-space: nowrap; }
+.brand-mark { width: 1.75rem; height: 1.75rem; }
+.brand-mark rect { fill: var(--mat-sys-primary); }
+.brand-mark path { stroke: var(--mat-sys-on-primary); stroke-width: 2; stroke-linecap: round; fill: none; }
+.nav { display: flex; gap: var(--va-space-xs); }
+.nav a {
+  display: inline-flex; align-items: center; gap: var(--va-space-sm);
+  height: 2.5rem; padding: 0 var(--va-space-md);
+  border-radius: var(--mat-sys-corner-full);
+  color: var(--mat-sys-on-surface-variant); text-decoration: none; font: var(--mat-sys-label-large);
+}
+.nav a:hover { background: var(--mat-sys-surface-container-low); color: var(--mat-sys-on-surface); }
+.nav a[aria-current="page"] { background: var(--mat-sys-surface-container-high); color: var(--mat-sys-on-surface); font-weight: 600; }
+.spacer { flex: 1; }
+main { width: 100%; max-width: var(--va-content-max); margin: 0 auto; padding: var(--va-space-lg) var(--va-space-lg) var(--va-space-2xl); }
+.foot {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--va-space-xs) var(--va-space-md);
+  padding: var(--va-space-md) var(--va-space-lg);
+  border-top: var(--va-divider);
+  color: var(--mat-sys-on-surface-variant); font: var(--mat-sys-body-small);
+}
+
+/* ---------- Seitenaufbau ---------- */
+.back { display: inline-flex; align-items: center; gap: var(--va-space-xs); margin-bottom: var(--va-space-md); color: var(--mat-sys-on-surface-variant); text-decoration: none; font: var(--mat-sys-label-large); }
+.back:hover { color: var(--mat-sys-on-surface); }
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--va-space-md); margin-bottom: var(--va-space-xs); }
+.page-head h1 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-sm); }
+.page-actions { display: flex; flex-wrap: wrap; gap: var(--va-space-sm); }
+.meta { color: var(--mat-sys-on-surface-variant); margin-bottom: var(--va-space-md); }
+.meta .sep { margin: 0 var(--va-space-xs); }
+.lead { max-width: 46rem; color: var(--mat-sys-on-surface-variant); margin-bottom: var(--va-space-lg); }
+.hint { color: var(--mat-sys-on-surface-variant); font-size: var(--va-text-sm); }
+.cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-md); margin: var(--va-space-md) 0; }
+.term { text-decoration: underline dotted; text-decoration-color: var(--mat-sys-outline); text-underline-offset: 0.25em; cursor: help; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Blätter (mat-card appearance="outlined") ---------- */
+.sheet { background: var(--mat-sys-surface-container-lowest); border: var(--va-divider); border-radius: var(--va-radius-card); padding: var(--va-space-lg); }
+.sheet__head { display: flex; align-items: center; gap: var(--va-space-sm); margin-bottom: var(--va-space-md); }
+.sheet__foot { margin-top: var(--va-space-md); }
+.card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--va-space-md); }
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--va-space-md); margin: var(--va-space-lg) 0; }
+.stat {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--va-space-xs);
+  padding: var(--va-space-md) var(--va-space-lg);
+  background: var(--mat-sys-surface-container-lowest); border: var(--va-divider); border-radius: var(--va-radius-card);
+  color: inherit; font: inherit; text-align: left; text-decoration: none;
+}
+button.stat, a.stat { cursor: pointer; }
+button.stat:hover, a.stat:hover { background: var(--mat-sys-surface-container-low); }
+.stat[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--mat-sys-primary); }
+.stat__label { font: var(--mat-sys-label-large); color: var(--mat-sys-on-surface-variant); }
+.stat__value { display: flex; align-items: center; gap: var(--va-space-sm); font-family: var(--va-font-figures); font-size: 1.75rem; line-height: 2.25rem; font-variant-numeric: tabular-nums; }
+.stat__value--text { font-size: 1.375rem; }
+.stat__sub { display: flex; align-items: center; gap: var(--va-space-xs); font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); }
+
+/* ---------- Buttons (Material 3: filled, outlined, text, icon) ---------- */
+.btn {
+  position: relative; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--va-space-sm);
+  height: 2.5rem; padding: 0 var(--va-space-lg);
+  border: 1px solid transparent; border-radius: var(--mat-sys-corner-full);
+  background: none; color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-label-large); white-space: nowrap; text-decoration: none; cursor: pointer;
+}
+.btn::before { content: ""; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.15s; }
+.btn:hover::before { opacity: 0.08; }
+.btn:active::before { opacity: 0.12; }
+.btn--filled { background: var(--mat-sys-primary); color: var(--mat-sys-on-primary); }
+.btn--outlined { border-color: var(--mat-sys-outline); }
+.btn--text { padding: 0 var(--va-space-md); }
+.btn--icon { width: 2.5rem; padding: 0; }
+.btn[aria-disabled="true"] { cursor: not-allowed; color: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent); }
+.btn--filled[aria-disabled="true"] { background: color-mix(in srgb, var(--mat-sys-on-surface) 12%, transparent); }
+.btn--outlined[aria-disabled="true"] { border-color: color-mix(in srgb, var(--mat-sys-on-surface) 12%, transparent); }
+.btn[aria-disabled="true"]::before { display: none; }
+
+/* ---------- Badges, Status, Rückmeldungen ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: var(--va-space-xs);
+  padding: var(--va-space-2xs) var(--va-space-sm);
+  border-radius: var(--va-radius-pill);
+  background: var(--mat-sys-surface-container); color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-label-medium); white-space: nowrap; vertical-align: middle;
+}
+.badge svg.icon { width: 0.875rem; height: 0.875rem; }
+.badge--muted { background: var(--mat-sys-surface-container-highest); }
+.badge--error { background: var(--mat-sys-error); color: var(--mat-sys-on-error); }
+.status {
+  display: inline-flex; align-items: center; gap: var(--va-space-xs);
+  padding: var(--va-space-2xs) var(--va-space-sm) var(--va-space-2xs) var(--va-space-xs);
+  border-radius: var(--va-radius-pill); font: var(--mat-sys-label-large); white-space: nowrap;
+}
+.status[data-status="running"] { background: var(--mat-sys-surface-container-lowest); box-shadow: inset 0 0 0 1px var(--mat-sys-outline); }
+.status[data-status="success"] { padding-left: 0; }
+.status[data-status="partial"] { background: var(--mat-sys-surface-container-highest); }
+.status[data-status="no_data"] { background: var(--mat-sys-error-container); color: var(--mat-sys-on-error-container); }
+.status[data-status="failed"] { background: var(--mat-sys-error); color: var(--mat-sys-on-error); }
+.progress { display: inline-flex; align-items: center; gap: var(--va-space-sm); margin-left: var(--va-space-sm); font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.progress__track { width: 6rem; height: 4px; border-radius: 2px; background: var(--mat-sys-surface-container-highest); overflow: hidden; }
+.progress__track > span { display: block; height: 100%; background: var(--mat-sys-primary); transition: width 0.3s; }
+.notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-sm) var(--va-space-md);
+  margin: var(--va-space-md) 0; padding: var(--va-space-sm) var(--va-space-md);
+  border-radius: var(--va-radius-box);
+  background: var(--mat-sys-surface-container-high); color: var(--mat-sys-on-surface);
+}
+.notice > .grow { flex: 1; min-width: 12rem; display: flex; align-items: center; gap: var(--va-space-sm); }
+.notice--error { background: var(--mat-sys-error-container); color: var(--mat-sys-on-error-container); }
+.chip { display: inline-flex; align-items: center; gap: var(--va-space-xs); height: 2rem; padding: 0 var(--va-space-xs) 0 var(--va-space-md); border: 1px solid var(--mat-sys-outline); border-radius: var(--va-radius-box); font: var(--mat-sys-label-large); }
+.chip .btn--icon { width: 1.75rem; height: 1.75rem; }
+
+/* ---------- Score ---------- */
+.score { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--va-space-sm); font-variant-numeric: tabular-nums; }
+.bar { width: 4.5rem; height: var(--va-bar-height); border-radius: var(--mat-sys-corner-full); background: var(--mat-sys-surface-container-highest); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--mat-sys-primary); }
+.bar--wide { width: 100%; }
+
+/* ---------- Tabellen im Buchsatz ---------- */
+.table-sheet { background: var(--mat-sys-surface-container-lowest); border: var(--va-divider); border-radius: var(--va-radius-card); }
+table.data { width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.data th {
+  position: sticky; top: var(--va-appbar-h); z-index: 2;
+  padding: var(--va-space-sm) var(--va-space-md);
+  background: var(--mat-sys-surface-container-lowest);
+  border-bottom: var(--va-rule);
+  color: var(--mat-sys-on-surface-variant); font: var(--mat-sys-label-large);
+  text-align: left; white-space: nowrap; vertical-align: bottom;
+}
+.data th:first-child { border-top-left-radius: var(--va-radius-card); }
+.data th:last-child { border-top-right-radius: var(--va-radius-card); }
+.data td { padding: var(--va-space-sm) var(--va-space-md); border-bottom: var(--va-divider); white-space: nowrap; vertical-align: middle; }
+.data tbody tr:last-child td { border-bottom: 0; }
+.data tbody tr:hover td { background: var(--mat-sys-surface-container-low); }
+.data th.num { text-align: right; }
+.sort { all: unset; display: inline-flex; align-items: center; gap: var(--va-space-2xs); cursor: pointer; border-radius: 2px; }
+.sort:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: 2px; }
+.sort .icon { opacity: 0; }
+.sort:hover .icon { opacity: 0.4; }
+th[aria-sort] .sort { color: var(--mat-sys-on-surface); }
+th[aria-sort] .sort .icon { opacity: 1; }
+.title-cell a { font-weight: var(--va-weight-emphasis); text-decoration: none; }
+.title-cell a:hover { text-decoration: underline; }
+.title-cell .sub { display: block; font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); }
+.empty-row td { padding: var(--va-space-xl); text-align: center; color: var(--mat-sys-on-surface-variant); white-space: normal; }
+.empty-row .btn { margin-top: var(--va-space-sm); }
+
+/* ---------- Formulare ---------- */
+.input {
+  height: 2.5rem; padding: 0 var(--va-space-md);
+  border: 1px solid var(--mat-sys-outline); border-radius: var(--mat-sys-corner-extra-small);
+  background: var(--mat-sys-surface-container-lowest); color: inherit; font: var(--mat-sys-body-large);
+}
+.input:focus { outline: none; border-color: var(--mat-sys-primary); box-shadow: inset 0 0 0 1px var(--mat-sys-primary); }
+.input[aria-invalid="true"] { border-color: var(--mat-sys-error); box-shadow: inset 0 0 0 1px var(--mat-sys-error); }
+textarea.input { height: auto; min-height: 2.5rem; padding: var(--va-space-sm) var(--va-space-md); resize: vertical; }
+.search { position: relative; display: inline-flex; }
+.search .icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--mat-sys-on-surface-variant); pointer-events: none; }
+.search .input { padding-left: 2.5rem; width: 18rem; max-width: 100%; }
+.field { display: flex; flex-direction: column; gap: var(--va-space-xs); margin-bottom: var(--va-space-md); }
+.field__label { display: flex; align-items: center; gap: var(--va-space-2xs); font: var(--mat-sys-label-large); }
+.field__row { display: flex; align-items: center; gap: var(--va-space-sm); }
+.field__row .input { width: 8rem; }
+.field__hint { font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); }
+.field__error { display: flex; align-items: center; gap: var(--va-space-xs); font: var(--mat-sys-body-small); font-weight: var(--va-weight-emphasis); color: var(--mat-sys-error); }
+.info-tip { width: 1.75rem; height: 1.75rem; color: var(--mat-sys-on-surface-variant); }
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--mat-sys-primary); }
+input[type="checkbox"], input[type="radio"] { width: 1.125rem; height: 1.125rem; margin: 0; flex: none; }
+input[type="range"] { width: 100%; margin: var(--va-space-xs) 0; }
+.check { display: flex; align-items: flex-start; gap: var(--va-space-sm); cursor: pointer; }
+.check > span { display: flex; flex-direction: column; gap: var(--va-space-2xs); }
+.check .dir { font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); }
+.segmented { display: inline-flex; border: 1px solid var(--mat-sys-outline); border-radius: var(--mat-sys-corner-full); overflow: hidden; }
+.segmented button {
+  all: unset; display: inline-flex; align-items: center; gap: var(--va-space-xs);
+  height: 2.5rem; padding: 0 var(--va-space-md);
+  border-left: 1px solid var(--mat-sys-outline); font: var(--mat-sys-label-large); cursor: pointer;
+}
+.segmented button:first-child { border-left: 0; }
+.segmented button:hover { background: var(--mat-sys-surface-container-low); }
+.segmented button[aria-pressed="true"] { background: var(--mat-sys-surface-container-high); font-weight: 600; }
+.segmented button:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: -3px; }
+.switch { display: inline-flex; align-items: center; gap: var(--va-space-sm); cursor: pointer; font: var(--mat-sys-label-large); }
+.switch input {
+  appearance: none; position: relative; width: 3.25rem; height: 2rem; margin: 0; flex: none;
+  border: 2px solid var(--mat-sys-outline); border-radius: var(--mat-sys-corner-full);
+  background: var(--mat-sys-surface-container-highest); cursor: pointer;
+}
+.switch input::before { content: ""; position: absolute; top: 50%; left: 0.375rem; width: 1rem; height: 1rem; border-radius: 50%; background: var(--mat-sys-outline); transform: translateY(-50%); transition: left 0.15s, width 0.15s, height 0.15s; }
+.switch input:checked { background: var(--mat-sys-primary); border-color: var(--mat-sys-primary); }
+.switch input:checked::before { left: 1.375rem; width: 1.5rem; height: 1.5rem; background: var(--mat-sys-on-primary); }
+
+/* ---------- Menü, Dialog, Ausklapper, Tooltip, Snackbar ---------- */
+.menu-anchor { position: relative; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + var(--va-space-xs)); z-index: 20;
+  min-width: 17rem; padding: var(--va-space-sm) 0;
+  background: var(--mat-sys-surface-container-lowest); border: var(--va-divider); border-radius: var(--mat-sys-corner-extra-small);
+}
+.menu__group { padding: var(--va-space-sm) var(--va-space-md) var(--va-space-xs); font: var(--mat-sys-label-medium); color: var(--mat-sys-on-surface-variant); }
+.menu label { display: flex; align-items: center; gap: var(--va-space-sm); padding: var(--va-space-sm) var(--va-space-md); cursor: pointer; }
+.menu label:hover { background: var(--mat-sys-surface-container-low); }
+dialog {
+  width: min(32rem, calc(100vw - 2rem)); padding: var(--va-space-lg);
+  border: var(--va-divider); border-radius: var(--mat-sys-corner-large);
+  background: var(--mat-sys-surface-container-lowest); color: var(--mat-sys-on-surface);
+}
+dialog::backdrop { background: color-mix(in srgb, var(--mat-sys-scrim) 32%, transparent); }
+dialog h2 { margin-top: 0; }
+fieldset { border: 0; margin: 0 0 var(--va-space-md); padding: 0; }
+legend { font: var(--mat-sys-label-large); margin-bottom: var(--va-space-sm); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--va-space-sm); margin-top: var(--va-space-lg); }
+details.expand { margin-top: var(--va-space-md); border: var(--va-divider); border-radius: var(--va-radius-card); background: var(--mat-sys-surface-container-lowest); }
+details.expand > summary { display: flex; align-items: center; gap: var(--va-space-sm); padding: var(--va-space-md) var(--va-space-lg); list-style: none; cursor: pointer; font: var(--mat-sys-title-medium); }
+details.expand > summary::-webkit-details-marker { display: none; }
+details.expand > summary .chev { margin-left: auto; transition: transform 0.15s; }
+details.expand[open] > summary .chev { transform: rotate(180deg); }
+details.expand > .body { padding: 0 var(--va-space-lg) var(--va-space-lg); }
+details.inline > summary { display: inline-flex; align-items: center; gap: var(--va-space-xs); padding: var(--va-space-sm) 0; cursor: pointer; list-style: none; font: var(--mat-sys-label-large); }
+details.inline > summary::-webkit-details-marker { display: none; }
+details.inline[open] > summary .chev { transform: rotate(180deg); }
+.tooltip {
+  position: fixed; z-index: 100; max-width: var(--va-tooltip-max);
+  padding: var(--va-space-xs) var(--va-space-sm);
+  border-radius: var(--mat-sys-corner-extra-small);
+  background: var(--mat-sys-inverse-surface); color: var(--mat-sys-inverse-on-surface);
+  font: var(--mat-sys-body-small); white-space: pre-line; pointer-events: none;
+  opacity: 0; transition: opacity 0.1s;
+}
+.tooltip.show { opacity: 1; }
+.snackbar {
+  position: fixed; left: 50%; bottom: var(--va-space-lg); z-index: 90; transform: translateX(-50%);
+  padding: var(--va-space-md) var(--va-space-lg); border-radius: var(--mat-sys-corner-extra-small);
+  background: var(--mat-sys-inverse-surface); color: var(--mat-sys-inverse-on-surface);
+}
+
+/* ---------- Einzelne Ansichten ---------- */
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: var(--va-space-sm) var(--va-space-xl); margin: 0; }
+.kv dt { color: var(--mat-sys-on-surface-variant); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.fig { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: var(--va-space-2xs) var(--va-space-md); padding: var(--va-space-sm) 0; border-bottom: var(--va-divider); }
+.fig:last-child { border-bottom: 0; }
+.fig__value { text-align: right; font-variant-numeric: tabular-nums; font-weight: var(--va-weight-emphasis); }
+.fig--info .fig__value { font-weight: 400; }
+.fig__rank { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--va-space-sm); font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); }
+.fig__rank .bar { width: 6rem; }
+.fig-sep { margin-top: var(--va-space-md); padding: var(--va-space-sm) 0 var(--va-space-xs); border-top: var(--va-rule); font: var(--mat-sys-label-medium); color: var(--mat-sys-on-surface-variant); }
+.spark { display: block; width: 100%; max-width: 32rem; height: 4.5rem; }
+.spark polyline { fill: none; stroke: var(--mat-sys-primary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark line { stroke: var(--mat-sys-outline-variant); stroke-width: 1; }
+.spark circle { fill: var(--mat-sys-surface-container-lowest); stroke: var(--mat-sys-primary); stroke-width: 2; }
+.spark circle.last { fill: var(--mat-sys-primary); }
+.spark text { fill: var(--mat-sys-on-surface-variant); font: var(--mat-sys-body-small); }
+.history { display: grid; grid-template-columns: minmax(0, 22rem) 1fr; gap: var(--va-space-xl); align-items: start; }
+.profile-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-sm) var(--va-space-md); }
+.profile-row h3 { margin-right: var(--va-space-sm); }
+.profile-row .grow { flex: 1; }
+.editor { display: grid; grid-template-columns: minmax(18rem, 27rem) minmax(0, 1fr); gap: var(--va-space-xl); align-items: start; }
+.editor .preview { position: sticky; top: calc(var(--va-appbar-h) + var(--va-space-md)); }
+.editor h3 { margin: var(--va-space-lg) 0 var(--va-space-sm); }
+.editor h3:first-child { margin-top: 0; }
+.factor { margin-bottom: var(--va-space-md); }
+.factor .hint { margin: var(--va-space-2xs) 0 0 1.75rem; }
+.preview-summary { display: flex; flex-wrap: wrap; gap: var(--va-space-sm); margin: var(--va-space-sm) 0 var(--va-space-md); }
+.preview .data th { top: 0; position: static; }
+.delta { display: inline-flex; align-items: center; gap: var(--va-space-2xs); }
+.savebar {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-md);
+  margin-top: var(--va-space-lg); padding: var(--va-space-md) var(--va-space-lg);
+  background: var(--mat-sys-surface-container-lowest); border: var(--va-divider); border-top: var(--va-rule);
+  border-radius: var(--va-radius-card) var(--va-radius-card) 0 0;
+}
+.savebar .input { flex: 1; min-width: 14rem; }
+.versions { list-style: none; margin: 0; padding: 0; }
+.versions li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--va-space-sm) var(--va-space-md); padding: var(--va-space-md) 0; border-bottom: var(--va-divider); }
+.versions li:last-child { border-bottom: 0; }
+.versions .grow { flex: 1; }
+.versions em { color: var(--mat-sys-on-surface-variant); }
+.mail { width: 100%; height: 34rem; border: var(--va-divider); border-radius: var(--va-radius-card); background: white; }
+pre.error-text { margin: var(--va-space-sm) 0 0; padding: var(--va-space-md); overflow-x: auto; border-radius: var(--va-radius-box); background: var(--mat-sys-surface-container); font-size: var(--va-text-sm); }
+.gloss-group { margin-bottom: var(--va-space-xl); }
+.gloss { display: grid; grid-template-columns: minmax(10rem, 16rem) 1fr; gap: 0 var(--va-space-xl); margin: 0; }
+.gloss dt, .gloss dd { padding: var(--va-space-md) 0; border-bottom: var(--va-divider); margin: 0; }
+.gloss dt { font-weight: 600; scroll-margin-top: calc(var(--va-appbar-h) + var(--va-space-md)); }
+.gloss dt small { display: block; font-weight: 400; color: var(--mat-sys-on-surface-variant); }
+.gloss dd .badge { margin-top: var(--va-space-xs); }
+.method { max-width: 46rem; padding-left: 1.25rem; }
+.method li { margin-bottom: var(--va-space-sm); }
+
+/* ---------- Nur Vorlage: Bedienleiste für die Abnahme ---------- */
+.vorlage { position: relative; font: var(--mat-sys-body-small); color: var(--mat-sys-on-surface-variant); }
+.vorlage > summary {
+  display: inline-flex; align-items: center; height: 2rem; padding: 0 var(--va-space-sm);
+  border: 1px dashed var(--mat-sys-outline); border-radius: var(--va-radius-box);
+  list-style: none; cursor: pointer; font: var(--mat-sys-label-medium); white-space: nowrap;
+}
+.vorlage > summary::-webkit-details-marker { display: none; }
+.vorlage .body {
+  position: absolute; right: 0; top: calc(100% + var(--va-space-xs)); z-index: 30;
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--va-space-sm);
+  width: 17rem; padding: var(--va-space-md);
+  background: var(--mat-sys-surface-container-lowest); border: 1px dashed var(--mat-sys-outline); border-radius: var(--va-radius-box);
+}
+.vorlage select { font: inherit; color: inherit; background: var(--mat-sys-surface-container-lowest); border: 1px solid var(--mat-sys-outline); border-radius: var(--mat-sys-corner-extra-small); padding: var(--va-space-2xs) var(--va-space-xs); }
+.vorlage-tag { display: inline-block; padding: 0 var(--va-space-xs); border: 1px dashed var(--mat-sys-outline); border-radius: var(--mat-sys-corner-extra-small); font: var(--mat-sys-label-medium); color: var(--mat-sys-on-surface-variant); }
+
+/* ---------- Schmale Bildschirme: $narrow 900 px, $compact 600 px ---------- */
+@media (max-width: 900px) {
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-grid, .editor, .history { grid-template-columns: minmax(0, 1fr); }
+  .editor .preview { position: static; }
+  .table-sheet { overflow-x: auto; }
+  .data th { position: static; }
+}
+@media (max-width: 600px) {
+  .appbar { gap: var(--va-space-sm); padding: 0 var(--va-space-md); }
+  .brand span, .nav a span { display: none; }
+  .nav a { padding: 0 var(--va-space-sm); }
+  main { padding: var(--va-space-md) var(--va-space-md) var(--va-space-2xl); }
+  .data .c-rank { position: sticky; left: 0; z-index: 1; min-width: 3rem; background: var(--mat-sys-surface-container-lowest); }
+  .data .c-title { position: sticky; left: 3rem; z-index: 1; background: var(--mat-sys-surface-container-lowest); box-shadow: inset -1px 0 0 var(--mat-sys-outline-variant); }
+  .data th.c-rank, .data th.c-title { top: auto; z-index: 3; }
+  .hide-compact { display: none; }
+  .search .input { width: 100%; }
+  .search { flex: 1 1 100%; }
+  .gloss { grid-template-columns: minmax(0, 1fr); }
+  .gloss dt { border-bottom: 0; padding-bottom: 0; }
+}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <a class="brand" href="#/ranking" data-tip="Zum Ranking">
+    <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="5"/><path d="M8.5 19v-4M14 19V9M19.5 19v-7"/></svg>
+    <span>Value-Analyzer</span>
+  </a>
+  <nav class="nav" id="nav" aria-label="Hauptnavigation"></nav>
+  <span class="spacer"></span>
+  <span id="offline"></span>
+  <details class="vorlage">
+    <summary>Vorlage G0</summary>
+    <div class="body">
+      <span>Nur zur Abnahme, gehört nicht zum UI. Echte Daten vom 30.10.2026; Läufe, Profile und Verlauf sind erfunden.</span>
+      <label>Modus
+        <select id="theme">
+          <option value="">wie das System</option>
+          <option value="light">hell</option>
+          <option value="dark">dunkel</option>
+        </select>
+      </label>
+      <label class="check" style="align-items:center"><input type="checkbox" id="toggle-offline"> offline zeigen</label>
+    </div>
+  </details>
+  <a class="btn btn--icon" href="#/begriffe" id="help" aria-label="Begriffe" data-tip="Alle Begriffe und Abkürzungen erklärt"></a>
+</header>
+<main id="main" tabindex="-1"></main>
+<footer class="foot">
+  <span>Quantitative Vorauswahl, keine Anlageempfehlung.</span>
+  <span>Version 0.0.0-vorlage</span>
+</footer>
+
+<div class="tooltip" id="tooltip" role="tooltip"></div>
+<dialog id="start-dialog" aria-labelledby="start-title">
+  <form method="dialog" id="start-form">
+    <h2 id="start-title">Lauf starten</h2>
+    <fieldset>
+      <legend>Mail</legend>
+      <label class="check" data-tip="Die Mail mit dem Ranking geht an den eingestellten Empfänger."><input type="radio" name="mail" value="send" checked><span>verschicken</span></label>
+      <label class="check" style="margin-top:var(--va-space-sm)" data-tip="Die Mail wird erstellt und gespeichert, aber nicht verschickt."><input type="radio" name="mail" value="dry"><span>Probelauf: Mail nur erstellen und speichern</span></label>
+    </fieldset>
+    <label class="check"><input type="checkbox" name="force"><span>Daten neu abrufen</span>
+      <button type="button" class="btn btn--icon info-tip" aria-label="Was heißt Daten neu abrufen?" data-tip="Holt die Daten neu von Yahoo, auch wenn es heute schon einen Abruf gab. Dauert länger."></button>
+    </label>
+    <div class="dialog-actions">
+      <button class="btn btn--text" value="cancel" data-tip="Schließt den Dialog, ohne einen Lauf zu starten.">Abbrechen</button>
+      <button class="btn btn--filled" value="start" id="start-confirm" data-tip="Startet den Lauf. Fortschritt und Ergebnis erscheinen in der Liste.">Lauf starten</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="vorlage-daten.js"></script>
+<script>
+'use strict';
+const D = window.VORLAGE;
+
+/* ================= Icons (Material Icons, Apache 2.0) ================= */
+const ICONS = {
+  leaderboard: 'M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z',
+  history: 'M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z',
+  tune: 'M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z',
+  help: 'M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z',
+  info: 'M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z',
+  warning: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
+  error: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z',
+  check_circle: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
+  progress: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z',
+  play: 'M8 5v14l11-7z',
+  download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
+  copy: 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
+  search: 'M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
+  columns: 'M10 18h5V5h-5v13zm-6 0h5V5H4v13zM16 5v13h5V5h-5z',
+  back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
+  up: 'M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z',
+  down: 'M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z',
+  offline: 'M19.35 10.04C18.67 6.59 15.64 4 12 4c-1.48 0-2.85.43-4.01 1.17l1.46 1.46C10.21 6.23 11.08 6 12 6c3.04 0 5.5 2.46 5.5 5.5v.5H19c1.66 0 3 1.34 3 3 0 1.13-.64 2.11-1.56 2.62l1.45 1.45C23.16 18.16 24 16.68 24 15c0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.75 2.74C2.56 8.15 0 10.77 0 14c0 3.31 2.69 6 6 6h11.73l2 2L21 20.73 4.27 4 3 5.27zM7.73 10l8 8H6c-2.21 0-4-1.79-4-4s1.79-4 4-4h1.73z',
+  close: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+  expand: 'M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z',
+  edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+};
+function icon(name, cls = '') {
+  return `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
+}
+
+/* ================= Formate (wie shared/format.ts) ================= */
+const MISSING = '–';
+const NBSP = ' ';
+const nfCache = {};
+const nf = (d) => (nfCache[d] ??= new Intl.NumberFormat('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }));
+const fmt = {
+  num: (v, d = 2) => (v == null || Number.isNaN(v) ? MISSING : nf(d).format(v)),
+  pct: (v, d = 1) => (v == null ? MISSING : nf(d).format(v * 100) + NBSP + '%'),
+  mrd: (v) => (v == null ? MISSING : nf(1).format(v / 1e9) + NBSP + 'Mrd'),
+  mio: (v) => nf(0).format(v / 1e6) + NBSP + 'Mio.' + NBSP + '€',
+  day: (s) => { const [y, m, d] = s.slice(0, 10).split('-'); return `${d}.${m}.${y}`; },
+  dayTime: (s) => `${fmt.day(s)} ${s.slice(11, 16)}`,
+  duration: (a, b) => {
+    if (!b) return MISSING;
+    const min = Math.round((new Date(b) - new Date(a)) / 60000);
+    return min < 60 ? `${min}${NBSP}min` : `${Math.floor(min / 60)}${NBSP}h ${min % 60}${NBSP}min`;
+  },
+};
+const SECTORS = {
+  'Basic Materials': 'Grundstoffe', 'Communication Services': 'Kommunikation', 'Consumer Cyclical': 'Zyklischer Konsum',
+  'Consumer Defensive': 'Basiskonsum', Energy: 'Energie', 'Financial Services': 'Finanzen', Healthcare: 'Gesundheit',
+  Industrials: 'Industrie', 'Real Estate': 'Immobilien', Technology: 'Technologie', Utilities: 'Versorger',
+};
+const sector = (s) => (s ? SECTORS[s] ?? s : MISSING);
+const indexSource = (s) => (s === 'Deka' || s === 'iShares' ? s : 'Ersatzliste');
+const RUN_STATUS = { running: 'läuft', success: 'erfolgreich', partial: 'teilweise', no_data: 'keine Daten', failed: 'fehlgeschlagen' };
+const RUN_KIND = { batch: 'Abruf und Bewertung', rescore: 'Neu bewertet', import: 'Import' };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ================= Glossar: eine Quelle für alle Texte (später glossary.ts) ================= */
+// Faktortexte kämen aus GET /api/v1/scoring/factors (FACTOR_INFO); die Richtung hängt der Store an.
+const P = () => D.params;
+const G = {
+  rank: { group: 'Scores und Ranking', label: 'Rang', tip: 'Platz nach Composite unter allen bewerteten Titeln. Bei Gleichstand entscheidet das Symbol. Titel ohne Composite stehen am Ende.' },
+  composite: { group: 'Scores und Ranking', label: 'Composite', tip: () => `Gesamtscore aus ${fmt.pct(P().value_weight, 0)} Value und ${fmt.pct(P().quality_weight, 0)} Quality. 0 bis 1, höher ist besser. Nur Titel mit beiden Teilscores bekommen ihn.`,
+    long: 'Der Composite fasst beide Teilscores nach den Gewichten des Profils zusammen. Ein Titel ohne Value- oder Quality-Score bekommt keinen, sonst stünde ein Titel ohne Quality-Daten besser da als einer mit mittelmäßiger Quality.' },
+  value_score: { group: 'Scores und Ranking', label: 'Value', tip: 'Wie günstig der Titel im Vergleich zu den anderen ist, gemessen an den Value-Faktoren. 0 bis 1, höher heißt günstiger.' },
+  quality_score: { group: 'Scores und Ranking', label: 'Quality', tip: 'Wie solide das Geschäft im Vergleich ist, gemessen an den Quality-Faktoren. 0 bis 1, höher ist besser.',
+    long: 'Quality soll Value-Fallen aussortieren: Die billigsten Aktien sind oft zu Recht billig.' },
+  value_trap: { group: 'Scores und Ranking', label: 'Value-Trap?', tip: () => `Verdacht auf eine Value-Falle: günstig (Value ≥ ${fmt.num(P().value_trap_value_threshold)}), aber schwache Qualität (Quality ≤ ${fmt.num(P().value_trap_quality_threshold)}). Solche Titel sind oft zu Recht billig.` },
+  no_composite: { group: 'Scores und Ranking', label: 'ohne Composite', tip: 'Kein Composite, weil der Value- oder der Quality-Score fehlt. Meist liefert Yahoo keine Margen oder keinen ROIC, etwa bei Banken. Der Titel steht deshalb am Ende.' },
+  below_threshold: { group: 'Scores und Ranking', label: 'unter Größenschwelle', tip: () => `Börsenwert unter ${fmt.mio(P().min_market_cap)}, deshalb nicht bewertet. Bei kleinen Werten sind die Yahoo-Daten oft lückenhaft.` },
+  percentile: { group: 'Scores und Ranking', label: 'Perzentil', tip: 'Anteil der bewerteten Titel, die bei dieser Kennzahl schlechter abschneiden. 0,81 heißt: besser als 81 % der Titel.' },
+  scoring_run: { group: 'Scores und Ranking', label: 'Bewertungslauf', tip: 'Eine Berechnung des Rankings auf einem Datenabruf. Jede Neuberechnung bekommt eine eigene Nummer.' },
+  fetched_on: { group: 'Scores und Ranking', label: 'Abruf', tip: 'Tag, an dem die Daten bei Yahoo Finance abgerufen wurden.' },
+  universe_source: { group: 'Scores und Ranking', label: 'Indexliste', tip: 'Woher die Zusammensetzung von DAX und MDAX stammt: iShares, Deka oder die geprüfte Ersatzliste.' },
+  scoring_profile: { group: 'Scores und Ranking', label: 'Profil', tip: 'Gewichte, Faktoren und Schwellen, mit denen dieses Ranking gerechnet wurde.' },
+  hint: { group: 'Scores und Ranking', label: 'Hinweis', tip: 'Value-Trap-Verdacht oder fehlender Composite. Leer heißt: nichts Auffälliges.' },
+
+  ev_ebit: { group: 'Value-Faktoren', label: 'EV/EBIT', abbr: true, role: 'value', better: 'low', long: 'Enterprise Value zu Earnings Before Interest and Taxes. Greenblatt-Logik: unabhängig davon, wie ein Unternehmen finanziert ist.',
+    tip: 'Unternehmenswert (Börsenwert plus Nettoschulden) geteilt durch den operativen Gewinn. Negative Werte zählen nicht.' },
+  pb: { group: 'Value-Faktoren', label: 'KBV', abbr: true, role: 'value', better: 'low', tip: 'Kurs-Buchwert-Verhältnis: Börsenwert geteilt durch das Eigenkapital laut Bilanz. Negative Werte zählen nicht.' },
+  p_fcf: { group: 'Value-Faktoren', label: 'Kurs/FCF', abbr: true, role: 'value', better: 'low', tip: 'Börsenwert geteilt durch den Free Cashflow, also das Geld, das nach Investitionen übrig bleibt. Schwerer zu schönen als der Gewinn.' },
+  shareholder_yield: { group: 'Value-Faktoren', label: 'Shareholder Yield', role: 'value', better: 'high', tip: 'Dividenden plus Aktienrückkäufe im Verhältnis zum Börsenwert: Wie viel fließt an die Aktionäre zurück?' },
+  roic: { group: 'Quality-Faktoren', label: 'ROIC', abbr: true, role: 'quality', better: 'high', tip: 'Return on Invested Capital: Rendite nach Steuern auf das eingesetzte Eigen- und Fremdkapital.' },
+  fcf_margin: { group: 'Quality-Faktoren', label: 'FCF-Marge', abbr: true, role: 'quality', better: 'high', tip: 'Free Cashflow je Euro Umsatz.' },
+  operating_margin: { group: 'Quality-Faktoren', label: 'Operative Marge', role: 'quality', better: 'high', tip: 'Operativer Gewinn (EBIT) je Euro Umsatz.' },
+  net_debt_ebitda: { group: 'Quality-Faktoren', label: 'Net Debt/EBITDA', abbr: true, role: 'quality', better: 'low', tip: 'Nettoschulden geteilt durch den Gewinn vor Zinsen, Steuern und Abschreibungen: in wie vielen Jahren die Schulden getilgt wären.' },
+  earnings_stability: { group: 'Quality-Faktoren', label: 'Gewinnstabilität', role: 'quality', better: 'high', tip: 'Wie wenig der Nettogewinn über die letzten fünf Geschäftsjahre schwankt. 1 heißt sehr stabil.' },
+
+  price: { group: 'Nur zur Information', label: 'Kurs', role: 'info', tip: 'Letzter Kurs beim Abruf, in Handelswährung.' },
+  market_cap: { group: 'Nur zur Information', label: 'Marktkap.', abbr: true, role: 'info', tip: 'Marktkapitalisierung: Börsenwert aller Aktien. Entscheidet über die Größenschwelle.' },
+  pe_ratio: { group: 'Nur zur Information', label: 'KGV', abbr: true, role: 'info', tip: 'Kurs-Gewinn-Verhältnis. Nicht im Score, weil Einmaleffekte den Gewinn stark verzerren.' },
+  dividend_yield: { group: 'Nur zur Information', label: 'Dividendenrendite', role: 'info', tip: 'Dividende je Aktie im Verhältnis zum Kurs. Im Score steckt sie im Shareholder Yield.' },
+  revenue_growth_5y: { group: 'Nur zur Information', label: 'Umsatzwachstum 5 J.', role: 'info', tip: 'Durchschnittliches jährliches Wachstum des Umsatzes (CAGR) über die verfügbaren Geschäftsjahre, höchstens fünf.' },
+  eps_growth_5y: { group: 'Nur zur Information', label: 'EPS-Wachstum 5 J.', abbr: true, role: 'info', tip: 'Wachstum des Gewinns je Aktie (Earnings per Share), berechnet wie das Umsatzwachstum.' },
+
+  symbol: { group: 'Stammdaten', label: 'Symbol', tip: 'Kürzel bei Yahoo Finance. „.DE“ steht für den Handel auf Xetra.' },
+  isin: { group: 'Stammdaten', label: 'ISIN', abbr: true, tip: 'Internationale Wertpapierkennnummer, weltweit eindeutig je Aktie.' },
+  DAX: { group: 'Stammdaten', label: 'DAX', abbr: true, tip: 'Die 40 größten Aktiengesellschaften an der Frankfurter Börse.' },
+  MDAX: { group: 'Stammdaten', label: 'MDAX', abbr: true, tip: 'Die 50 nächstgrößeren Werte nach dem DAX.' },
+  sector: { group: 'Stammdaten', label: 'Sektor', tip: 'Branche laut Yahoo Finance, ins Deutsche übersetzt.' },
+  industry: { group: 'Stammdaten', label: 'Branche', tip: 'Genauere Einordnung laut Yahoo Finance, wie geliefert.' },
+  title: { group: 'Stammdaten', label: 'Titel', tip: 'Die Aktie eines Unternehmens, darunter Symbol und Index. Der Name führt zu Kennzahlen und Verlauf.' },
+  fetch_run: { group: 'Läufe', label: 'Abruf', tip: 'Ein Herunterladen der Daten bei Yahoo für alle Titel. Ein Abruf kann mehrfach bewertet werden, etwa mit einem anderen Profil.' },
+
+  run: { group: 'Läufe', label: 'Lauf', tip: 'Ein Durchgang: Indexliste laden, Daten abrufen, bewerten, Mail erstellen.' },
+  'status.running': { group: 'Läufe', label: 'läuft', tip: 'Der Lauf arbeitet noch. Der Balken zeigt, wie viele Titel schon abgerufen sind.' },
+  'status.success': { group: 'Läufe', label: 'erfolgreich', tip: 'Alle Titel abgerufen und bewertet, die Mail ist erstellt.' },
+  'status.partial': { group: 'Läufe', label: 'teilweise', tip: 'Fertig, aber einzelne Titel ließen sich nicht abrufen. Das Ranking gilt für die übrigen.' },
+  'status.no_data': { group: 'Läufe', label: 'keine Daten', tip: 'Kein Titel war bewertbar, es gibt kein Ranking. Meist war Yahoo nicht erreichbar.' },
+  'status.failed': { group: 'Läufe', label: 'fehlgeschlagen', tip: 'Der Lauf ist abgebrochen. Den Grund zeigt das Lauf-Detail.' },
+  dry_run: { group: 'Läufe', label: 'Probelauf', tip: 'Die Mail wurde erstellt und gespeichert, aber nicht verschickt.' },
+  force_refresh: { group: 'Läufe', label: 'neu abgerufen', tip: 'Die Daten wurden neu geholt, obwohl es vom selben Tag schon einen Abruf gab.' },
+  'kind.batch': { group: 'Läufe', label: 'Abruf und Bewertung', tip: 'Normaler Lauf: Daten abrufen und bewerten.' },
+  'kind.rescore': { group: 'Läufe', label: 'Neu bewertet', tip: 'Ein vorhandener Abruf, mit einem Profil neu berechnet. Ohne Mail.' },
+  'kind.import': { group: 'Läufe', label: 'Import', tip: 'Altdaten aus dem früheren Batch übernommen.' },
+  kind: { group: 'Läufe', label: 'Art', tip: 'Abruf und Bewertung, Neu bewertet oder Import.' },
+  started: { group: 'Läufe', label: 'Gestartet', tip: 'Zeitpunkt, zu dem der Lauf begann.' },
+  finished: { group: 'Läufe', label: 'Beendet', tip: 'Zeitpunkt, zu dem der Lauf fertig war oder abbrach.' },
+  scored: { group: 'Läufe', label: 'Bewertet', tip: 'Titel mit Score, von allen Titeln der Indexliste.' },
+  failed_count: { group: 'Läufe', label: 'Fehlgeschlagen', tip: 'Titel, deren Abruf scheiterte.' },
+  duration: { group: 'Läufe', label: 'Dauer', tip: 'Zeit vom Start bis zum Ende des Laufs.' },
+  status: { group: 'Läufe', label: 'Status', tip: 'Wie der Lauf ausging: läuft, erfolgreich, teilweise, keine Daten oder fehlgeschlagen.' },
+  exit_code: { group: 'Läufe', label: 'Exit-Code', tip: 'Technischer Rückgabewert: 0 in Ordnung, 1 Fehler im Lauf, 2 Konfiguration, 3 keine bewertbaren Daten, 4 Datenbank nicht erreichbar.' },
+  app_version: { group: 'Läufe', label: 'Programmversion', tip: 'Version des Value-Analyzers, mit der der Lauf lief.' },
+
+  profile: { group: 'Profile', label: 'Profil', tip: 'Legt fest, welche Faktoren zählen und wie Value und Quality gewichtet werden.' },
+  version: { group: 'Profile', label: 'Version', tip: 'Jedes Speichern legt eine neue Version an. Alte Versionen bleiben erhalten.' },
+  active: { group: 'Profile', label: 'aktiv', tip: 'Mit dieser Version rechnet der nächste Lauf.' },
+  value_weight: { group: 'Profile', label: 'Gewichtung', tip: 'Anteil von Value am Composite. Der Rest ist Quality.' },
+  min_market_cap: { group: 'Profile', label: 'Größenschwelle', tip: 'Titel mit kleinerem Börsenwert werden nicht bewertet.' },
+  min_value_factor_share: { group: 'Profile', label: 'Mindestabdeckung Value', tip: 'Anteil der aktiven Value-Faktoren, für die Daten vorliegen müssen, damit ein Titel einen Value-Score bekommt.' },
+  min_quality_factor_share: { group: 'Profile', label: 'Mindestabdeckung Quality', tip: 'Anteil der aktiven Quality-Faktoren, für die Daten vorliegen müssen, damit ein Titel einen Quality-Score bekommt.' },
+  value_trap_value_threshold: { group: 'Profile', label: 'Value-Trap ab Value', tip: 'Ab diesem Value-Score kann ein Titel als Value-Trap gelten.' },
+  value_trap_quality_threshold: { group: 'Profile', label: 'Value-Trap bis Quality', tip: 'Bis zu diesem Quality-Score gilt ein günstiger Titel als Value-Trap.' },
+  drop_negative_value_metrics: { group: 'Profile', label: 'Negative Multiples ausschließen', tip: 'Negatives EV/EBIT, KBV oder Kurs/FCF entsteht durch Verluste. Solche Werte zählen bei dem Faktor nicht, statt als Schnäppchen zu erscheinen.' },
+  preview: { group: 'Profile', label: 'Vorschau', tip: 'Rechnet den letzten Abruf mit deinen Änderungen neu, ohne etwas zu speichern.' },
+  rank_delta: { group: 'Profile', label: 'Δ', tip: 'Veränderung des Rangs gegenüber dem aktiven Profil. ↑ 2: zwei Plätze besser. „neu“: vorher nicht in den Top 20.' },
+};
+function tipOf(key) {
+  const e = G[key];
+  if (!e) return '';
+  let t = typeof e.tip === 'function' ? e.tip() : e.tip;
+  if (e.better) t += ` ${e.better === 'low' ? 'Niedriger' : 'Höher'} ist besser. ${e.role === 'value' ? 'Value' : 'Quality'}-Faktor.`;
+  if (e.role === 'info' && !/Score/.test(t)) t += ' Nicht im Score.';
+  return t;
+}
+const labelOf = (key) => G[key]?.label ?? key;
+const tip = (text) => `data-tip="${esc(text)}"`;
+function term(key, label = labelOf(key), focusable = true) {
+  return `<span class="term"${focusable ? ' tabindex="0"' : ''} ${tip(tipOf(key))}>${esc(label)}</span>`;
+}
+// Feld einer Zeile → Faktor-Schlüssel des Scorings (pb_ratio ↔ pb)
+const FIELD_FACTOR = { ev_ebit: 'ev_ebit', pb_ratio: 'pb', p_fcf: 'p_fcf', shareholder_yield: 'shareholder_yield', roic: 'roic', fcf_margin: 'fcf_margin', operating_margin: 'operating_margin', net_debt_ebitda: 'net_debt_ebitda', earnings_stability: 'earnings_stability' };
+const FIELD_FORMAT = { ev_ebit: (v) => fmt.num(v, 1), pb_ratio: (v) => fmt.num(v, 1), p_fcf: (v) => fmt.num(v, 1), shareholder_yield: fmt.pct, roic: fmt.pct, fcf_margin: fmt.pct, operating_margin: fmt.pct, net_debt_ebitda: (v) => fmt.num(v, 1), earnings_stability: (v) => fmt.num(v, 2), pe_ratio: (v) => fmt.num(v, 1), dividend_yield: fmt.pct, revenue_growth_5y: fmt.pct, eps_growth_5y: fmt.pct, market_cap: fmt.mrd };
+
+/* ================= Bausteine (später shared/ui/) ================= */
+function scoreTip(v) {
+  return v == null ? tipOf('no_composite') : `Im Schnitt seiner Faktoren besser als etwa ${Math.round(v * 100)} % der bewerteten Titel.`;
+}
+function score(v, withBar = false) {
+  if (v == null) return `<span ${tip(tipOf('no_composite'))}>${MISSING}</span>`;
+  const bar = withBar ? `<span class="bar" aria-hidden="true"><span style="width:${Math.round(v * 100)}%"></span></span>` : '';
+  return `<span class="score" ${tip(scoreTip(v))}>${fmt.num(v)}${bar}</span>`;
+}
+function trapBadge(flagged) {
+  return flagged ? `<span class="badge badge--error" tabindex="0" ${tip(tipOf('value_trap'))}>${icon('warning')}Value-Trap?</span>` : '';
+}
+const STATUS_ICON = { running: 'progress', success: 'check_circle', partial: 'info', no_data: 'error', failed: 'error' };
+function runStatus(run) {
+  const ic = icon(STATUS_ICON[run.status], run.status === 'running' ? 'spin' : '');
+  let html = `<span class="status" data-status="${run.status}" tabindex="0" ${tip(tipOf('status.' + run.status))}>${ic}${RUN_STATUS[run.status]}</span>`;
+  if (run.status === 'running' && run.progress) {
+    const p = run.progress;
+    html += `<span class="progress" ${tip(`${p.done} von ${p.total} Titeln abgerufen, zuletzt ${p.symbol}.`)}><span class="progress__track"><span style="width:${(p.done / p.total) * 100}%"></span></span>${p.done}/${p.total}</span>`;
+  }
+  return html;
+}
+function notice(n) {
+  if (!n) return '';
+  return `<p class="notice${n.error ? ' notice--error' : ''}" role="${n.error ? 'alert' : 'status'}"><span class="grow">${icon(n.error ? 'error' : 'info')}${esc(n.text)}</span>${n.action ?? ''}</p>`;
+}
+function stat({ label, value, sub = '', tipText = '', act = '', pressed = null, href = '', id = '', valueClass = '' }) {
+  const tag = href ? 'a' : act ? 'button' : 'div';
+  const attrs = [href ? `href="${href}"` : '', act ? `type="button" data-act="${act}"` : '', pressed != null ? `aria-pressed="${pressed}"` : '', id ? `id="${id}"` : '', tipText ? tip(tipText) : '', !href && !act && tipText ? 'tabindex="0"' : ''].join(' ');
+  return `<${tag} class="stat" ${attrs}><span class="stat__label">${label}</span><span class="stat__value ${valueClass}">${value}</span>${sub ? `<span class="stat__sub">${sub}</span>` : ''}</${tag}>`;
+}
+const pageHead = (title, actions = '') => `<div class="page-head"><h1>${title}</h1>${actions ? `<div class="page-actions">${actions}</div>` : ''}</div>`;
+const backLink = (href, text) => `<a class="back" href="${href}">${icon('back')}${esc(text)}</a>`;
+function infoTip(text, label) { return `<button type="button" class="btn btn--icon info-tip" aria-label="${esc(label)}" ${tip(text)}>${icon('info')}</button>`; }
+
+/* ================= Erfundene Läufe, Profile, Verlauf ================= */
+// Ortszeit als yyyy-MM-ddTHH:mm, wie die API sie liefert
+const localIso = (t = Date.now()) => new Date(t - new Date(t).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const DEFAULT_COLS = ['sector', 'value_score', 'quality_score', 'market_cap'];
+const realParams = { ...D.params, value_factors: [...D.value_factors], quality_factors: [...D.quality_factors] };
+const S = {
+  route: [], offline: false, notice: null, snack: null,
+  rank: { sort: { key: 'rank', dir: 'asc' }, index: 'all', search: '', showBelow: false, focus: null, cols: loadCols(), menu: false },
+  runs: [
+    { id: 58, kind: 'batch', status: 'running', started: localIso(Date.now() - 6 * 60000), finished: null, size: 90, scored: null, failed: null, dry_run: false, force_refresh: true, exit: null, progress: { done: 41, total: 90, symbol: 'PAH3.DE' } },
+    { id: 57, kind: 'batch', status: 'success', started: '2026-10-30T21:00', finished: '2026-10-30T21:09', size: 90, scored: 90, failed: 0, dry_run: false, force_refresh: false, exit: 0, scoring_run: 1, report: true },
+    { id: 56, kind: 'batch', status: 'partial', started: '2026-10-30T18:40', finished: '2026-10-30T18:52', size: 90, scored: 88, failed: 2, dry_run: true, force_refresh: true, exit: 0, scoring_run: 0, report: true },
+    { id: 55, kind: 'batch', status: 'failed', started: '2026-10-29T06:00', finished: '2026-10-29T06:03', size: 90, scored: null, failed: null, dry_run: false, force_refresh: false, exit: 1,
+      error: 'Datenabruf abgebrochen: Yahoo Finance antwortet mit HTTP 429 (zu viele Anfragen).\nTraceback (most recent call last):\n  File "va_market_data/adapters/yahoo.py", line 412, in fetch_one\n    raise RateLimited(response.status)\nva_market_data.adapters.yahoo.RateLimited: 429' },
+    { id: 54, kind: 'batch', status: 'no_data', started: '2026-10-28T06:00', finished: '2026-10-28T06:05', size: 90, scored: 0, failed: 90, dry_run: false, force_refresh: false, exit: 3 },
+    { id: 53, kind: 'rescore', status: 'success', started: '2026-10-25T14:20', finished: '2026-10-25T14:20', size: 90, scored: 90, failed: 0, dry_run: false, force_refresh: false, exit: 0 },
+    { id: 52, kind: 'batch', status: 'success', started: '2026-10-24T06:00', finished: '2026-10-24T06:11', size: 90, scored: 90, failed: 0, dry_run: false, force_refresh: false, exit: 0, report: true },
+    { id: 51, kind: 'import', status: 'success', started: '2026-10-20T20:15', finished: '2026-10-20T20:16', size: 90, scored: 90, failed: 0, dry_run: false, force_refresh: false, exit: 0 },
+  ],
+  profile: {
+    id: 1, name: 'Standard', created: '2026-10-20T20:15', active: 3,
+    versions: [
+      { version: 4, created: '2026-11-03T21:10', parent: 3, comment: 'Quality stärker gewichtet', params: { ...realParams, value_weight: 0.5, quality_weight: 0.5 } },
+      { version: 3, created: '2026-11-01T18:02', parent: 2, comment: 'Zurück auf 60/40', params: { ...realParams } },
+      { version: 2, created: '2026-10-31T09:30', parent: 1, comment: 'Value stärker', params: { ...realParams, value_weight: 0.7, quality_weight: 0.3 } },
+      { version: 1, created: '2026-10-20T20:15', parent: null, comment: 'Startwerte aus der Konfiguration', params: { ...realParams } },
+    ],
+  },
+  editor: null,
+};
+const RANK_COLS = [
+  { key: 'rank', term: 'rank', num: true, start: 'asc', fixed: true, cls: 'c-rank' },
+  { key: 'title', term: 'title', fixed: true, cls: 'c-title' },
+  { key: 'sector', term: 'sector', start: 'asc', cls: 'hide-compact' },
+  { key: 'composite_score', term: 'composite', num: true, start: 'desc', fixed: true },
+  { key: 'value_score', term: 'value_score', num: true, start: 'desc' },
+  { key: 'quality_score', term: 'quality_score', num: true, start: 'desc' },
+  { key: 'hint', term: 'hint', fixed: true },
+  { key: 'market_cap', term: 'market_cap', num: true, start: 'desc', cls: 'hide-compact' },
+  ...Object.entries(FIELD_FACTOR).map(([field, factor]) => ({ key: field, term: factor, num: true, start: G[factor].better === 'low' ? 'asc' : 'desc', factor: true })),
+];
+function loadCols() {
+  try { const v = JSON.parse(localStorage.getItem('va.ranking.columns')); if (Array.isArray(v)) return v; } catch { /* privat oder gesperrt */ }
+  return [...DEFAULT_COLS];
+}
+function saveCols() { try { localStorage.setItem('va.ranking.columns', JSON.stringify(S.rank.cols)); } catch { /* egal */ } }
+function hash(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+function history(row) {
+  // Verlauf ist erfunden: acht Wochen bis zum echten Wert vom 30.10.2026
+  let seed = hash(row.symbol);
+  const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 15), 2246822507) >>> 0) / 4294967296) - 0.5;
+  const pts = [];
+  let c = row.composite_score, v = row.value_score, q = row.quality_score, r = row.rank;
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(Date.UTC(2026, 9, 30) - i * 7 * 864e5).toISOString().slice(0, 10);
+    pts.push({ day: d, rank: r, c, v, q, trap: i === 0 ? row.value_trap_flag : false, id: 1 - i });
+    const clamp = (x) => (x == null ? null : Math.min(0.98, Math.max(0.02, x + rnd() * 0.08)));
+    c = clamp(c); v = clamp(v); q = clamp(q);
+    r = Math.min(90, Math.max(1, r + Math.round(rnd() * 8)));
+  }
+  return pts; // neueste zuerst
+}
+
+/* ================= Scoring wie va_scoring (aus den gespeicherten Perzentilen) ================= */
+function scoreAll(params) {
+  const w = params.value_weight;
+  const group = (r, keys, share) => {
+    const vals = keys.map((k) => r.factors[k]).filter((x) => x != null);
+    return vals.length >= 2 && keys.length > 0 && vals.length / keys.length >= share ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  const out = D.rows.map((r) => {
+    const passed = r.market_cap != null && r.market_cap >= params.min_market_cap;
+    const v = passed ? group(r, params.value_factors, params.min_value_factor_share) : null;
+    const q = passed ? group(r, params.quality_factors, params.min_quality_factor_share) : null;
+    const c = v != null && q != null ? w * v + (1 - w) * q : null;
+    const trap = (v ?? 0) >= params.value_trap_value_threshold && (q ?? 1) <= params.value_trap_quality_threshold;
+    return { symbol: r.symbol, name: r.name, passed, v, q, c, trap, rank: null };
+  });
+  out.filter((x) => x.passed)
+    .sort((a, b) => (a.c == null) - (b.c == null) || (b.c ?? 0) - (a.c ?? 0) || (a.symbol < b.symbol ? -1 : 1))
+    .forEach((x, i) => { x.rank = i + 1; });
+  return out;
+}
+
+/* ================= Ansichten ================= */
+const VIEWS = {};
+
+VIEWS.ranking = (id) => {
+  const st = S.rank;
+  const old = id !== undefined && Number(id) !== D.scoring_run_id;
+  const rows = D.rows;
+  const withComposite = rows.filter((r) => r.composite_score != null).length;
+  const traps = rows.filter((r) => r.value_trap_flag).length;
+  const noComp = rows.filter((r) => r.passed_filter && r.composite_score == null).length;
+  const top = rows.find((r) => r.rank === 1);
+  const p = D.params;
+  const meta = [
+    `${term('fetched_on')} ${fmt.day(D.fetched_on)}`,
+    `${term('scoring_profile')} Standard v3 (${fmt.pct(p.value_weight, 0)} Value, ${fmt.pct(p.quality_weight, 0)} Quality) <span class="vorlage-tag" ${tip('Name und Version des Profils brauchen die API-Ergänzung G3.')}>G3</span>`,
+    `${term('universe_source')} ${esc(indexSource(D.universe_source))}`,
+    `${term('scoring_run')} #${D.scoring_run_id}`,
+  ].join('<span class="sep">·</span>');
+  const visible = RANK_COLS.filter((c) => c.fixed || st.cols.includes(c.key));
+  const segBtn = (v, label, t) => `<button type="button" id="idx-${v}" data-act="index" data-value="${v}" aria-pressed="${st.index === v}" ${tip(t)}>${st.index === v ? icon('check_circle') : ''}${label}</button>`;
+  const focusChip = st.focus ? `<span class="chip">${st.focus === 'trap' ? 'Nur Value-Traps' : 'Nur ohne Composite'}<button type="button" class="btn btn--icon" id="focus-clear" data-act="focus" data-value="" aria-label="Filter entfernen" ${tip('Filter entfernen und alle Titel zeigen')}>${icon('close')}</button></span>` : '';
+  const menu = st.menu ? `<div class="menu" role="menu" aria-label="Spalten">
+      <div class="menu__group">Allgemein</div>
+      ${RANK_COLS.filter((c) => !c.fixed && !c.factor).map(menuItem).join('')}
+      <div class="menu__group">Value-Faktoren</div>
+      ${RANK_COLS.filter((c) => c.factor && G[c.term].role === 'value').map(menuItem).join('')}
+      <div class="menu__group">Quality-Faktoren</div>
+      ${RANK_COLS.filter((c) => c.factor && G[c.term].role === 'quality').map(menuItem).join('')}
+    </div>` : '';
+  return `
+    ${pageHead('Ranking')}
+    <p class="meta">${meta}</p>
+    ${old ? notice({ text: 'Bewertungslauf vom 23.10.2026, nicht der aktuelle.', action: `<a class="btn btn--outlined" href="#/ranking" ${tip('Wechselt zum jüngsten Bewertungslauf.')}>Zum aktuellen Ranking</a>` }) : ''}
+    <div class="stat-grid">
+      ${stat({ label: term('scored', 'Bewertet', false), value: `${withComposite} <span class="hint">von ${rows.length}</span>`, sub: 'mit Composite', tipText: 'Titel mit Value- und Quality-Score, von allen Titeln der Indexliste.' })}
+      ${stat({ label: 'Spitzenreiter', value: esc(top.name), valueClass: 'stat__value--text', sub: `Composite ${fmt.num(top.composite_score)}`, href: `#/titel/${encodeURIComponent(top.symbol)}`, tipText: `${top.name} hat den höchsten Composite. Öffnet Kennzahlen und Verlauf.` })}
+      ${stat({ label: 'Value-Traps', value: traps, sub: `${icon('warning')}günstig, aber schwache Quality`, act: 'focus-trap', pressed: st.focus === 'trap', id: 'card-trap', tipText: 'Zeigt nur die Titel mit Value-Trap-Verdacht.' })}
+      ${stat({ label: 'Ohne Composite', value: noComp, sub: 'Teilscore fehlt, stehen am Ende', act: 'focus-nocomp', pressed: st.focus === 'nocomp', id: 'card-nocomp', tipText: 'Zeigt nur die Titel, denen der Value- oder der Quality-Score fehlt.' })}
+    </div>
+    <div class="cluster">
+      <div class="segmented" role="group" aria-label="Index">
+        ${segBtn('all', 'Alle', 'Alle Titel aus DAX und MDAX.')}${segBtn('DAX', 'DAX', tipOf('DAX'))}${segBtn('MDAX', 'MDAX', tipOf('MDAX'))}
+      </div>
+      <label class="search">${icon('search')}<input class="input" id="search" type="search" placeholder="Name oder Symbol" aria-label="Suche nach Name oder Symbol" value="${esc(st.search)}" data-input="search"></label>
+      <label class="switch" ${tip('Zeigt auch Titel mit zu kleinem Börsenwert. Sie haben keinen Rang und stehen am Ende.')}><input type="checkbox" id="below" data-change="below" ${st.showBelow ? 'checked' : ''}>Unter Größenschwelle zeigen</label>
+      ${focusChip}
+      <span class="spacer"></span>
+      <span class="menu-anchor">
+        <button type="button" class="btn btn--outlined" id="cols-btn" data-act="menu" aria-expanded="${st.menu}" ${tip('Weitere Faktoren ein- oder ausblenden.')}>${icon('columns')}Spalten</button>
+        ${menu}
+      </span>
+    </div>
+    <div class="table-sheet">
+      <table class="data">
+        <thead><tr>${visible.map(headCell).join('')}</tr></thead>
+        <tbody>${rankRows(visible)}</tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:var(--va-space-md)">Was bedeuten die Spalten? <a href="#/begriffe">Begriffe</a>. Scores sind Perzentile: 1 ist das Beste, 0,5 die Mitte.</p>`;
+};
+function menuItem(c) {
+  return `<label ${tip(tipOf(c.term))}><input type="checkbox" id="col-${c.key}" data-change="col" data-value="${c.key}" ${S.rank.cols.includes(c.key) ? 'checked' : ''}>${esc(labelOf(c.term))}</label>`;
+}
+function headCell(c) {
+  const st = S.rank.sort;
+  const label = c.term ? labelOf(c.term) : c.label;
+  if (!c.start) return `<th class="${c.num ? 'num ' : ''}${c.cls ?? ''}">${c.term ? term(c.term) : esc(label)}</th>`;
+  const active = st.key === c.key;
+  const aria = active ? ` aria-sort="${st.dir === 'asc' ? 'ascending' : 'descending'}"` : '';
+  const arrow = icon(active && st.dir === 'desc' ? 'down' : active ? 'up' : c.start === 'desc' ? 'down' : 'up');
+  return `<th class="${c.num ? 'num ' : ''}${c.cls ?? ''}"${aria}><button type="button" class="sort" id="sort-${c.key}" data-act="sort" data-value="${c.key}" ${tip(tipOf(c.term) + '\nKlick sortiert.')}>${c.num ? arrow : ''}<span class="term">${esc(label)}</span>${c.num ? '' : arrow}</button></th>`;
+}
+function rankRows(visible) {
+  const st = S.rank;
+  const needle = st.search.trim().toLowerCase();
+  let rows = D.rows.filter((r) => (st.index === 'all' || r.index === st.index) && (!needle || r.symbol.toLowerCase().includes(needle) || (r.name ?? '').toLowerCase().includes(needle)));
+  if (st.focus === 'trap') rows = rows.filter((r) => r.value_trap_flag);
+  if (st.focus === 'nocomp') rows = rows.filter((r) => r.passed_filter && r.composite_score == null);
+  const key = st.sort.key === 'title' ? 'name' : st.sort.key;
+  const dir = st.sort.dir === 'desc' ? -1 : 1;
+  const cmp = (a, b) => {
+    let x = a[key], y = b[key];
+    if (key === 'sector') { x = a.sector && sector(a.sector); y = b.sector && sector(b.sector); }
+    if (x == null || y == null) return x == null && y == null ? 0 : x == null ? 1 : -1;
+    return (typeof x === 'string' ? x.localeCompare(y, 'de') : x - y) * dir;
+  };
+  const ranked = rows.filter((r) => r.passed_filter).sort(cmp);
+  const below = st.showBelow ? rows.filter((r) => !r.passed_filter) : [];
+  const all = [...ranked, ...below];
+  if (all.length === 0) {
+    const text = st.showBelow && !needle && !st.focus && st.index === 'all' ? 'Im Abruf vom 30.10.2026 liegt kein Titel unter der Größenschwelle.' : 'Kein Titel passt zum Filter.';
+    return `<tr class="empty-row"><td colspan="${visible.length}">${text}<br><button type="button" class="btn btn--outlined" id="reset" data-act="reset" ${tip('Index auf „Alle“, Suche leeren, Filter entfernen.')}>Filter zurücksetzen</button></td></tr>`;
+  }
+  return all.map((r) => `<tr data-symbol="${esc(r.symbol)}">${visible.map((c) => cell(c, r)).join('')}</tr>`).join('');
+}
+function cell(c, r) {
+  const cls = `${c.num ? 'num ' : ''}${c.cls ?? ''}`;
+  switch (c.key) {
+    case 'rank': return `<td class="${cls}">${r.passed_filter ? r.rank : MISSING}</td>`;
+    case 'title': return `<td class="title-cell ${cls}"><a href="#/titel/${encodeURIComponent(r.symbol)}">${esc(r.name ?? r.symbol)}</a><span class="sub">${esc(r.symbol)} · ${esc(r.index ?? MISSING)}</span></td>`;
+    case 'sector': return `<td class="${cls}">${esc(sector(r.sector))}</td>`;
+    case 'composite_score': return `<td class="${cls}">${score(r.composite_score, true)}</td>`;
+    case 'value_score': return `<td class="${cls}">${score(r.value_score)}</td>`;
+    case 'quality_score': return `<td class="${cls}">${score(r.quality_score)}</td>`;
+    case 'hint': {
+      const b = [];
+      if (r.value_trap_flag) b.push(trapBadge(true));
+      if (!r.passed_filter) b.push(`<span class="badge" tabindex="0" ${tip(tipOf('below_threshold'))}>unter Größenschwelle</span>`);
+      else if (r.composite_score == null) b.push(`<span class="badge badge--muted" tabindex="0" ${tip(tipOf('no_composite'))}>ohne Composite</span>`);
+      return `<td class="${cls}">${b.join(' ')}</td>`;
+    }
+    default: return `<td class="${cls}">${(FIELD_FORMAT[c.key] ?? fmt.num)(r[c.key])}</td>`;
+  }
+}
+
+VIEWS.titel = (symbol) => {
+  const r = D.rows.find((x) => x.symbol === decodeURIComponent(symbol ?? ''));
+  if (!r) return `${backLink('#/ranking', 'Ranking')}<p class="notice notice--error" role="alert">${icon('error')}Titel nicht gefunden.</p>`;
+  const h = history(r);
+  const prev = h[1];
+  const moved = prev ? prev.rank - r.rank : 0;
+  const delta = moved === 0 ? 'unverändert' : `${icon(moved > 0 ? 'up' : 'down')}${Math.abs(moved)} seit ${fmt.day(prev.day)}`;
+  const deltaTip = moved === 0 ? 'Gleicher Rang wie in der Woche davor.' : `${Math.abs(moved)} ${Math.abs(moved) === 1 ? 'Platz' : 'Plätze'} ${moved > 0 ? 'besser' : 'schlechter'} als am ${fmt.day(prev.day)}.`;
+  const vCount = D.value_factors.filter((k) => r.factors[k] != null).length;
+  const qCount = D.quality_factors.filter((k) => r.factors[k] != null).length;
+  const meta = [
+    `${term('symbol')} ${esc(r.symbol)}`,
+    `${term('isin')} ${esc(r.isin ?? MISSING)} <button type="button" class="btn btn--icon" id="copy-isin" data-act="copy" data-value="${esc(r.isin ?? '')}" aria-label="ISIN kopieren" ${tip('ISIN in die Zwischenablage kopieren.')} style="width:2rem;height:2rem;vertical-align:middle">${icon('copy')}</button>`,
+    term(r.index, r.index),
+    `${term('sector', sector(r.sector))}`,
+    `${term('industry', r.industry ?? MISSING)}`,
+  ].join('<span class="sep">·</span>');
+  const figure = (field, info = false) => {
+    const factor = FIELD_FACTOR[field];
+    const key = factor ?? field;
+    const value = (FIELD_FORMAT[field] ?? ((v) => fmt.num(v)))(r[field]);
+    let rank = '';
+    if (factor && !info) {
+      const pct = r.factors[factor];
+      rank = pct == null
+        ? `<span class="fig__rank" ${tip('Für diese Kennzahl fehlen Daten. Sie zählt bei diesem Titel nicht mit.')}>keine Daten, zählt nicht</span>`
+        : `<span class="fig__rank" ${tip(`Perzentil ${fmt.num(pct)}: besser als ${Math.round(pct * 100)} % der bewerteten Titel bei dieser Kennzahl.`)}><span class="bar" aria-hidden="true"><span style="width:${Math.round(pct * 100)}%"></span></span>besser als ${Math.round(pct * 100)} %</span>`;
+    }
+    return `<div class="fig${info ? ' fig--info' : ''}"><span>${term(key)}</span><span class="fig__value">${value}</span>${rank}</div>`;
+  };
+  const price = `<div class="fig fig--info"><span>${term('price')}</span><span class="fig__value">${fmt.num(r.price)} ${esc(r.currency ?? '')}</span></div>`;
+  return `
+    ${backLink('#/ranking', 'Ranking')}
+    ${pageHead(`${esc(r.name)}${trapBadge(r.value_trap_flag)}`)}
+    <p class="meta">${meta}</p>
+    <div class="stat-grid">
+      ${stat({ label: term('rank', 'Rang', false), value: `${r.rank} <span class="hint">von ${D.rows.length}</span>`, sub: `<span class="delta" ${tip(deltaTip)}>${delta}</span>`, tipText: tipOf('rank') })}
+      ${stat({ label: term('composite', 'Composite', false), value: score(r.composite_score, true), sub: `${fmt.pct(D.params.value_weight, 0)} Value, ${fmt.pct(D.params.quality_weight, 0)} Quality`, tipText: tipOf('composite') })}
+      ${stat({ label: term('value_score', 'Value', false), value: score(r.value_score), sub: `aus ${vCount} von ${D.value_factors.length} Value-Faktoren`, tipText: tipOf('value_score') })}
+      ${stat({ label: term('quality_score', 'Quality', false), value: score(r.quality_score), sub: `aus ${qCount} von ${D.quality_factors.length} Quality-Faktoren`, tipText: tipOf('quality_score') + (qCount < D.quality_factors.length ? ' Fehlende Faktoren zählen nicht mit.' : '') })}
+    </div>
+    <h2>Kennzahlen</h2>
+    <p class="meta">Stand ${fmt.day(D.fetched_on)} · Abruf ${r.fetch_ok ? 'vollständig' : 'unvollständig'} · Balken: Perzentil im Bewertungslauf <span class="vorlage-tag" ${tip('Die Perzentile je Faktor liefert die API erst mit G3.')}>G3</span></p>
+    ${r.errors ? notice({ text: `Hinweise vom Abruf: ${r.errors}` }) : ''}
+    <div class="card-grid">
+      <section class="sheet" aria-labelledby="k-value"><div class="sheet__head"><h3 id="k-value">Bewertung (Value)</h3>${infoTip('Günstig im Vergleich zu den anderen Titeln. Diese Kennzahlen ergeben den Value-Score.', 'Was zeigt Bewertung?')}</div>
+        ${['ev_ebit', 'pb_ratio', 'p_fcf', 'shareholder_yield'].map((f) => figure(f)).join('')}
+        <div class="fig-sep">Nur zur Information, nicht im Score</div>
+        ${figure('pe_ratio', true)}${figure('dividend_yield', true)}
+      </section>
+      <section class="sheet" aria-labelledby="k-quality"><div class="sheet__head"><h3 id="k-quality">Qualität (Quality)</h3>${infoTip('Wie solide das Geschäft ist. Diese Kennzahlen ergeben den Quality-Score.', 'Was zeigt Qualität?')}</div>
+        ${['roic', 'fcf_margin', 'operating_margin', 'net_debt_ebitda', 'earnings_stability'].map((f) => figure(f)).join('')}
+      </section>
+      <section class="sheet" aria-labelledby="k-market"><div class="sheet__head"><h3 id="k-market">Markt und Wachstum</h3>${infoTip('Zur Einordnung. Keine dieser Kennzahlen geht in den Score ein.', 'Was zeigt Markt und Wachstum?')}</div>
+        ${price}${figure('market_cap', true)}${figure('revenue_growth_5y', true)}${figure('eps_growth_5y', true)}
+      </section>
+    </div>
+    <h2>Score-Verlauf</h2>
+    <div class="sheet history">
+      <div>${sparkline(h)}<p class="hint">Composite der letzten acht Wochen, rechts der neueste Wert. <span class="vorlage-tag">Verlauf erfunden</span></p></div>
+      <div class="table-sheet" style="border:0">
+        <table class="data">
+          <thead><tr><th>${term('scoring_run', 'Bewertet')}</th><th class="num">${term('rank')}</th><th class="num">${term('composite')}</th><th class="num">${term('value_score')}</th><th class="num">${term('quality_score')}</th><th>${term('hint')}</th></tr></thead>
+          <tbody>${h.map((pt) => `<tr><td><a href="#/ranking/${pt.id}" ${tip('Öffnet das Ranking dieses Bewertungslaufs.')}>${fmt.day(pt.day)}</a></td><td class="num">${pt.rank}</td><td class="num">${score(pt.c)}</td><td class="num">${score(pt.v)}</td><td class="num">${score(pt.q)}</td><td>${trapBadge(pt.trap)}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+};
+function sparkline(h) {
+  const pts = [...h].reverse().filter((p) => p.c != null);
+  if (pts.length < 2) return '<p class="hint">Zu wenige Bewertungen für einen Verlauf.</p>';
+  // Skala auf den Wertebereich, sonst wirkt eine Woche-zu-Woche-Bewegung flach
+  const W = 320, H = 72, pad = 8, left = 34;
+  const vals = pts.map((p) => p.c);
+  const lo = Math.max(0, Math.min(...vals) - 0.03), hi = Math.min(1, Math.max(...vals) + 0.03);
+  const x = (i) => left + (i * (W - left - pad)) / (pts.length - 1);
+  const y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad);
+  const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.c).toFixed(1)}`).join(' ');
+  const dots = pts.map((p, i) => `<circle class="${i === pts.length - 1 ? 'last' : ''}" cx="${x(i).toFixed(1)}" cy="${y(p.c).toFixed(1)}" r="3.5" ${tip(`${fmt.day(p.day)}: Composite ${fmt.num(p.c)}, Rang ${p.rank}`)}/>`).join('');
+  const axis = [hi, lo].map((v) => `<line x1="${left}" x2="${W - pad}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text x="0" y="${(y(v) + 4).toFixed(1)}">${fmt.num(v)}</text>`).join('');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf des Composite von ${fmt.num(pts[0].c)} auf ${fmt.num(pts.at(-1).c)}">${axis}<polyline points="${line}"/>${dots}</svg>`;
+}
+
+VIEWS.laeufe = () => {
+  const running = S.runs.find((r) => r.status === 'running');
+  const last = S.runs.find((r) => r.status !== 'running' && r.kind === 'batch');
+  const startBtn = running
+    ? `<button type="button" class="btn btn--filled" id="btn-start" aria-disabled="true" ${tip(`Es läuft schon ein Lauf (#${running.id}). Es läuft immer nur einer.`)}>${icon('play')}Lauf starten</button>`
+    : `<button type="button" class="btn btn--filled" id="btn-start" data-act="start" ${tip('Startet einen Lauf mit den Optionen, die du im nächsten Schritt wählst. Es läuft immer nur einer.')}>${icon('play')}Lauf starten</button>`;
+  return `
+    ${pageHead('Läufe', startBtn)}
+    <p class="lead">Jede Woche ruft ein Lauf die Daten ab, bewertet alle Titel und verschickt die Mail. Hier siehst du, ob das geklappt hat.</p>
+    ${notice(S.notice)}
+    ${last ? `<section class="sheet" aria-labelledby="last-run">
+      <div class="sheet__head"><h3 id="last-run">Letzter Lauf</h3></div>
+      <div class="profile-row">
+        ${runStatus(last)}
+        <a href="#/lauf/${last.id}">#${last.id}</a>
+        <span>${fmt.dayTime(last.started)}</span>
+        <span ${tip(tipOf('duration'))}>${fmt.duration(last.started, last.finished)}</span>
+        <span ${tip(tipOf('scored'))}>${last.scored ?? MISSING} von ${last.size} bewertet${last.failed ? `, ${last.failed} fehlgeschlagen` : ''}</span>
+        <span>${last.dry_run ? 'Mail nur gespeichert' : last.report ? 'Mail verschickt' : 'keine Mail'}</span>
+        <span class="grow"></span>
+        ${last.scoring_run !== undefined ? `<a class="btn btn--outlined" href="#/ranking${last.scoring_run === D.scoring_run_id ? '' : '/' + last.scoring_run}" ${tip('Das Ranking, das dieser Lauf berechnet hat.')}>Ranking ansehen</a>` : ''}
+      </div>
+    </section>` : ''}
+    <h2>Alle Läufe</h2>
+    <div class="table-sheet">
+      <table class="data">
+        <thead><tr><th>${term('run')}</th><th>${term('started')}</th><th class="num hide-compact">${term('duration')}</th><th>${term('status')}</th><th class="num">${term('scored')}</th><th class="hide-compact">${term('kind')}</th></tr></thead>
+        <tbody>${S.runs.map((r) => `<tr data-run="${r.id}">
+          <td><a href="#/lauf/${r.id}">#${r.id}</a> ${r.dry_run ? `<span class="badge badge--muted" tabindex="0" ${tip(tipOf('dry_run'))}>Probelauf</span>` : ''} ${r.force_refresh ? `<span class="badge" tabindex="0" ${tip(tipOf('force_refresh'))}>neu abgerufen</span>` : ''}</td>
+          <td>${fmt.dayTime(r.started)}</td>
+          <td class="num hide-compact">${fmt.duration(r.started, r.finished)}</td>
+          <td>${runStatus(r)}</td>
+          <td class="num" ${r.failed ? tip(`${r.failed} Titel fehlgeschlagen.`) : ''}>${r.scored ?? MISSING}/${r.size}</td>
+          <td class="hide-compact"><span ${tip(tipOf('kind.' + r.kind))}>${RUN_KIND[r.kind]}</span></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+};
+
+VIEWS.lauf = (id) => {
+  const r = S.runs.find((x) => x.id === Number(id));
+  if (!r) return `${backLink('#/laeufe', 'Alle Läufe')}${notice({ text: 'Lauf nicht gefunden.', error: true })}`;
+  const actions = [
+    r.scoring_run !== undefined ? `<a class="btn btn--outlined" href="#/ranking${r.scoring_run === D.scoring_run_id ? '' : '/' + r.scoring_run}" ${tip('Das Ranking, das dieser Lauf berechnet hat.')}>Ranking ansehen</a>` : '',
+    r.report ? `<button type="button" class="btn btn--outlined" id="csv" data-act="csv" ${tip('Alle Titel mit Scores und Kennzahlen als CSV mit Semikolon und Dezimalkomma, öffnet direkt in Excel.')}>${icon('download')}CSV herunterladen</button>` : '',
+  ].join('');
+  const badges = `${r.dry_run ? `<span class="badge badge--muted" tabindex="0" ${tip(tipOf('dry_run'))}>Probelauf</span>` : ''}`;
+  const subject = `[${r.scored === r.size ? 'ok' : 'partial'} ${r.scored}/${r.size}] DAX/MDAX Value-Screening ${r.started.slice(0, 10)} - Top: ${D.rows[0].name}`;
+  return `
+    ${backLink('#/laeufe', 'Alle Läufe')}
+    ${pageHead(`Lauf #${r.id} ${runStatus(r)} ${badges}`, actions)}
+    <p class="meta">${term('kind.' + r.kind, RUN_KIND[r.kind])}${r.force_refresh ? ` · ${term('force_refresh')}` : ''}</p>
+    ${r.error ? notice({ text: `Fehler: ${r.error.split('\n')[0]}`, error: true }) : ''}
+    <section class="sheet" aria-labelledby="ov"><div class="sheet__head"><h3 id="ov">Überblick</h3></div>
+      <dl class="kv">
+        <dt>${term('started')}</dt><dd>${fmt.dayTime(r.started)}</dd>
+        <dt>${term('finished')}</dt><dd>${r.finished ? fmt.dayTime(r.finished) : MISSING}</dd>
+        <dt>${term('duration')}</dt><dd>${fmt.duration(r.started, r.finished)}</dd>
+        <dt>${term('scored')}</dt><dd>${r.scored ?? MISSING} von ${r.size}</dd>
+        <dt>${term('failed_count')}</dt><dd>${r.failed ?? MISSING}</dd>
+      </dl>
+    </section>
+    <details class="expand"><summary>Technische Details ${infoTip('Exit-Code, Programmversion, Nummern von Abruf und Bewertungslauf, vollständige Fehlermeldung.', 'Was steht in den technischen Details?')}${icon('expand', 'chev')}</summary>
+      <div class="body"><dl class="kv">
+        <dt>${term('exit_code')}</dt><dd>${r.exit ?? MISSING}</dd>
+        <dt>${term('app_version')}</dt><dd>0.0.0-vorlage</dd>
+        <dt>${term('fetch_run')}</dt><dd>#${r.id - 56 > 0 ? r.id - 56 : 1}</dd>
+        <dt>${term('scoring_run')}</dt><dd>${r.scoring_run !== undefined ? '#' + r.scoring_run : MISSING}</dd>
+      </dl>${r.error ? `<pre class="error-text">${esc(r.error)}</pre>` : ''}</div>
+    </details>
+    ${r.report ? `<h2>Mail</h2>
+      <p><strong>${esc(subject)}</strong></p>
+      <p class="hint" style="margin:var(--va-space-xs) 0 var(--va-space-md)">So sah die Mail aus. ${r.dry_run ? 'Bei diesem Probelauf wurde sie nur gespeichert.' : 'Sie ging an den eingestellten Empfänger.'}</p>
+      <iframe class="mail" sandbox="" title="Mail des Laufs" srcdoc="${esc(mailHtml())}"></iframe>` : ''}`;
+};
+function mailHtml() {
+  const rows = D.rows.slice(0, 10).map((r) => `<tr><td>${r.rank}</td><td>${esc(r.name)}</td><td>${esc(r.symbol)}</td><td><b>${r.composite_score.toFixed(2)}</b></td><td>${r.value_score.toFixed(2)}</td><td>${r.quality_score?.toFixed(2) ?? '-'}</td></tr>`).join('');
+  return `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#222;margin:24px"><h1 style="font-size:20px">Value-Screening DAX &amp; MDAX</h1><p>Sortiert nach Composite Score (Gewichtung: 60 % Value, 40 % Quality).</p><h2 style="font-size:16px">Top 10 Value-Kandidaten</h2><table cellpadding="6" style="border-collapse:collapse;font-size:13px"><tr style="background:#eee"><th>#</th><th>Name</th><th>Symbol</th><th>Score</th><th>Value</th><th>Quality</th></tr>${rows}</table><p style="color:#666;font-size:12px">Vereinfachte Nachbildung für die Vorlage.</p></body></html>`;
+}
+
+VIEWS.profile = () => {
+  const p = S.profile;
+  const newest = p.versions[0].version;
+  return `
+    ${pageHead('Scoring-Profile')}
+    <p class="lead">Ein Profil legt fest, welche Faktoren zählen und wie Value und Quality gewichtet werden. Der nächste Lauf rechnet mit der aktiven Version.</p>
+    ${notice(S.notice)}
+    <section class="sheet"><div class="profile-row">
+      <h3><a href="#/profil/${p.id}">${esc(p.name)}</a></h3>
+      <span class="badge" tabindex="0" ${tip(tipOf('active'))}>${icon('check_circle')}aktiv: Version ${p.active}</span>
+      ${newest !== p.active ? `<span class="badge badge--muted" tabindex="0" ${tip(`Version ${newest} ist gespeichert, zählt aber erst mit „Aktivieren“.`)}>neueste: Version ${newest}, nicht aktiv</span>` : ''}
+      <span class="hint">angelegt am ${fmt.day(p.created)}</span>
+      <span class="grow"></span>
+      <a class="btn btn--outlined" href="#/profil/${p.id}" ${tip('Parameter ändern und als neue Version speichern. Aktiv wird sie erst mit „Aktivieren“.')}>${icon('edit')}Bearbeiten</a>
+    </div></section>`;
+};
+
+function editorState() {
+  if (!S.editor) {
+    const base = S.profile.versions[0];
+    S.editor = { base: base.version, model: structuredClone(base.params), comment: '' };
+  }
+  return S.editor;
+}
+function validate(m) {
+  const e = {};
+  if (!(m.value_weight >= 0 && m.value_weight <= 1)) e.value_weight = 'Wert zwischen 0 und 100 %';
+  if (!(m.min_market_cap >= 0)) e.min_market_cap = 'Wert ab 0';
+  for (const k of ['min_value_factor_share', 'min_quality_factor_share']) if (!(m[k] >= 0 && m[k] <= 1)) e[k] = 'Wert zwischen 0 und 100 %';
+  for (const k of ['value_trap_value_threshold', 'value_trap_quality_threshold']) if (!(m[k] >= 0 && m[k] <= 1)) e[k] = 'Wert zwischen 0 und 1';
+  const rule = [];
+  if (m.value_factors.length < 2) rule.push(`Value: ${m.value_factors.length} aktiver Faktor, mindestens 2 nötig, sonst entstünde nie ein Score.`);
+  if (m.quality_factors.length < 2) rule.push(`Quality: ${m.quality_factors.length} aktiver Faktor, mindestens 2 nötig, sonst entstünde nie ein Score.`);
+  return { fields: e, rule: rule.join(' ') };
+}
+VIEWS.profil = () => {
+  const p = S.profile, ed = editorState(), m = ed.model;
+  const base = p.versions.find((v) => v.version === ed.base);
+  const dirty = JSON.stringify(m) !== JSON.stringify(base.params);
+  const val = validate(m);
+  const valid = Object.keys(val.fields).length === 0 && !val.rule;
+  const next = p.versions[0].version + 1;
+  const err = (k) => (val.fields[k] ? `<span class="field__error">${icon('error')}${val.fields[k]}</span>` : '');
+  const fieldPct = (k, step = 5) => `<div class="field"><span class="field__label"><label for="f-${k}">${labelOf(k)}</label>${infoTip(tipOf(k), `Was heißt ${labelOf(k)}?`)}</span>
+      <span class="field__row"><input class="input" id="f-${k}" type="number" min="0" max="100" step="${step}" value="${Math.round(m[k] * 100)}" data-input="pct" data-value="${k}" aria-invalid="${!!val.fields[k]}"> %</span>${err(k)}</div>`;
+  const fieldDec = (k) => `<div class="field"><span class="field__label"><label for="f-${k}">${labelOf(k)}</label>${infoTip(tipOf(k), `Was heißt ${labelOf(k)}?`)}</span>
+      <span class="field__row"><input class="input" id="f-${k}" type="number" min="0" max="1" step="0.05" value="${m[k]}" data-input="dec" data-value="${k}" aria-invalid="${!!val.fields[k]}"></span>${err(k)}</div>`;
+  const factorBox = (group) => (group === 'value' ? ['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield'] : ['roic', 'fcf_margin', 'operating_margin', 'net_debt_ebitda', 'earnings_stability']).map((k) => {
+    const on = m[group + '_factors'].includes(k);
+    return `<div class="factor"><label class="check" ${tip(`Mit Haken zählt ${labelOf(k)} für den ${group === 'value' ? 'Value' : 'Quality'}-Score. Ohne Haken bleibt die Kennzahl nur Information.`)}><input type="checkbox" id="fac-${k}" data-change="factor" data-group="${group}" data-value="${k}" ${on ? 'checked' : ''}><span><span>${esc(labelOf(k))}</span><span class="dir">${G[k].better === 'low' ? 'niedriger ist besser' : 'höher ist besser'}</span></span></label><p class="hint">${esc(G[k].tip)}</p></div>`;
+  }).join('');
+  const saveReason = !dirty ? 'Noch nichts geändert.' : !valid ? 'Erst speichern, wenn alle Felder gültig sind und jede Gruppe mindestens zwei Faktoren hat.' : '';
+  return `
+    ${backLink('#/profile', 'Alle Profile')}
+    ${pageHead(`${esc(p.name)} <span class="badge" tabindex="0" ${tip(tipOf('active'))}>${icon('check_circle')}aktiv: Version ${p.active}</span>`)}
+    <p class="meta">Grundlage: Version ${ed.base}. Speichern legt Version ${next} an.</p>
+    ${notice(S.notice)}
+    <div class="editor">
+      <section class="sheet" aria-labelledby="ed-params">
+        <h3 id="ed-params">Gewichtung</h3>
+        <div class="field"><span class="field__label"><label for="f-weight">Anteil Value am Composite</label>${infoTip(tipOf('value_weight'), 'Was heißt Gewichtung?')}</span>
+          <input type="range" id="f-weight" min="0" max="100" step="5" value="${Math.round(m.value_weight * 100)}" data-input="weight" aria-valuetext="${Math.round(m.value_weight * 100)} % Value">
+          <span class="field__row" style="justify-content:space-between"><span>${fmt.pct(m.value_weight, 0)} Value</span><span>${fmt.pct(1 - m.value_weight, 0)} Quality</span></span>
+        </div>
+        <h3>Größenschwelle</h3>
+        <div class="field"><span class="field__label"><label for="f-cap">Mindest-Börsenwert</label>${infoTip(tipOf('min_market_cap'), 'Was heißt Größenschwelle?')}</span>
+          <span class="field__row"><input class="input" id="f-cap" type="number" min="0" step="50" value="${Math.round(m.min_market_cap / 1e6)}" data-input="cap" aria-invalid="${!!val.fields.min_market_cap}"> Mio. €</span>${err('min_market_cap')}
+          <span class="field__hint">In der Vorlage bleiben die Perzentile dabei gleich; das echte Scoring rechnet sie für die kleinere Auswahl neu.</span></div>
+        <details class="inline"><summary ${tip('Selten geänderte Einstellungen: Mindestabdeckung, Value-Trap-Schwellen und negative Multiples.')}>Erweitert ${icon('expand', 'chev')}</summary>
+          ${fieldPct('min_value_factor_share')}${fieldPct('min_quality_factor_share')}${fieldDec('value_trap_value_threshold')}${fieldDec('value_trap_quality_threshold')}
+          <label class="check" style="margin-bottom:var(--va-space-md)" ${tip(tipOf('drop_negative_value_metrics'))}><input type="checkbox" id="f-neg" data-change="neg" ${m.drop_negative_value_metrics ? 'checked' : ''}><span>${labelOf('drop_negative_value_metrics')}</span></label>
+        </details>
+        <h3>Value-Faktoren</h3>${factorBox('value')}
+        <h3>Quality-Faktoren</h3>${factorBox('quality')}
+        ${val.rule ? `<p class="field__error" role="alert">${icon('error')}${esc(val.rule)}</p>` : ''}
+      </section>
+      <section class="sheet preview" aria-labelledby="ed-preview">${preview(m, valid, val.rule)}</section>
+    </div>
+    ${dirty ? `<div class="savebar">
+      <input class="input" id="comment" placeholder="Kommentar zur neuen Version, z. B. warum" aria-label="Kommentar zur neuen Version" value="${esc(ed.comment)}" data-input="comment">
+      <button type="button" class="btn btn--text" id="discard" data-act="discard" ${tip(`Setzt alle Felder auf Version ${ed.base} zurück.`)}>Verwerfen</button>
+      <button type="button" class="btn btn--filled" id="save" ${saveReason ? `aria-disabled="true" ${tip(saveReason)}` : `data-act="save" ${tip(`Legt Version ${next} an. Aktiv wird sie erst mit „Aktivieren“.`)}`}>Als neue Version speichern</button>
+    </div>` : ''}
+    <h2>Versionen</h2>
+    <p class="hint" style="margin-bottom:var(--va-space-sm)">Aktivieren wirkt ab dem nächsten Lauf. Eine ältere Version zu aktivieren heißt zurückrollen.</p>
+    <section class="sheet" style="padding-block:0"><ul class="versions">${p.versions.map((v) => `<li data-version="${v.version}">
+      <strong>Version ${v.version}</strong><span>${fmt.dayTime(v.created)}</span>
+      ${v.parent ? `<span class="hint">auf Basis von v${v.parent}</span>` : ''}
+      ${v.comment ? `<em>„${esc(v.comment)}“</em>` : ''}
+      <span class="hint">${fmt.pct(v.params.value_weight, 0)} Value</span>
+      <span class="grow"></span>
+      ${v.version === p.active ? `<span class="badge" tabindex="0" ${tip(tipOf('active'))}>${icon('check_circle')}aktiv</span>` : `<button type="button" class="btn btn--text" id="act-${v.version}" data-act="activate" data-value="${v.version}" ${tip(`Ab dem nächsten Lauf rechnet Version ${v.version}.${v.version < p.active ? ' Das ist ein Zurückrollen.' : ''}`)}>Aktivieren</button>`}
+    </li>`).join('')}</ul></section>`;
+};
+function preview(m, valid, rule) {
+  const head = `<div class="sheet__head"><h3 id="ed-preview">Vorschau: Was ändert sich?</h3>${infoTip(tipOf('preview'), 'Was zeigt die Vorschau?')}</div>`;
+  if (!valid) return `${head}${rule ? notice({ text: rule, error: true }) : ''}<p class="hint">Die Vorschau erscheint, sobald die Parameter gültig sind.</p>`;
+  const active = S.profile.versions.find((v) => v.version === S.profile.active).params;
+  const now = scoreAll(m), before = scoreAll(active);
+  const rankBefore = Object.fromEntries(before.map((x) => [x.symbol, x]));
+  const TOP = 20;
+  const topNow = now.filter((x) => x.rank && x.rank <= TOP).sort((a, b) => a.rank - b.rank);
+  const inTop = (x) => x.rank != null && x.rank <= TOP;
+  const entered = topNow.filter((x) => !inTop(rankBefore[x.symbol])).length;
+  const left = before.filter((x) => inTop(x) && !inTop(now.find((y) => y.symbol === x.symbol))).length;
+  const trapChanged = now.filter((x) => x.passed && x.trap !== rankBefore[x.symbol].trap).length;
+  const delta = (x) => {
+    const b = rankBefore[x.symbol];
+    if (!inTop(b)) return `<span class="badge" ${tip(`Vorher nicht in den Top ${TOP}${b.rank ? ` (Rang ${b.rank})` : ''}.`)}>neu</span>`;
+    const d = b.rank - x.rank;
+    if (d === 0) return `<span ${tip('Gleicher Rang wie mit dem aktiven Profil.')}>${MISSING}</span>`;
+    return `<span class="delta" ${tip(`${Math.abs(d)} ${Math.abs(d) === 1 ? 'Platz' : 'Plätze'} ${d > 0 ? 'besser' : 'schlechter'} als mit dem aktiven Profil.`)}>${icon(d > 0 ? 'up' : 'down')}${Math.abs(d)}</span>`;
+  };
+  return `${head}
+    <p class="hint">Abruf vom ${fmt.day(D.fetched_on)}, verglichen mit ${esc(S.profile.name)} v${S.profile.active}.</p>
+    <div class="preview-summary">
+      <span class="badge" tabindex="0" ${tip(`Titel, die mit deinen Änderungen in die Top ${TOP} kommen.`)}>${entered} neu in den Top ${TOP}</span>
+      <span class="badge" tabindex="0" ${tip(`Titel, die aus den Top ${TOP} fallen.`)}>${left} raus</span>
+      <span class="badge${trapChanged ? ' badge--error' : ''}" tabindex="0" ${tip('Titel, bei denen der Value-Trap-Verdacht neu entsteht oder wegfällt.')}>${trapChanged ? icon('warning') : ''}${trapChanged} Value-Trap geändert</span>
+    </div>
+    <div class="table-sheet" style="border:0"><table class="data">
+      <thead><tr><th class="num">${term('rank')}</th><th class="num">${term('rank_delta')}</th><th>${term('title')}</th><th class="num">${term('composite')}</th><th>${term('hint')}</th></tr></thead>
+      <tbody>${topNow.map((x) => `<tr data-symbol="${esc(x.symbol)}"><td class="num">${x.rank}</td><td class="num">${delta(x)}</td><td class="title-cell"><a href="#/titel/${encodeURIComponent(x.symbol)}">${esc(x.name)}</a></td><td class="num">${score(x.c)}</td><td>${trapBadge(x.trap)}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+VIEWS.begriffe = () => {
+  const q = (S.glossSearch ?? '').trim().toLowerCase();
+  const groups = {};
+  for (const [k, e] of Object.entries(G)) {
+    const text = tipOf(k);
+    if (q && !(`${e.label} ${text} ${e.long ?? ''}`.toLowerCase().includes(q))) continue;
+    (groups[e.group] ??= []).push([k, e, text]);
+  }
+  const role = (e) => (e.role === 'value' ? 'Value-Faktor' : e.role === 'quality' ? 'Quality-Faktor' : e.role === 'info' ? 'nur zur Information' : '');
+  return `
+    ${pageHead('Begriffe')}
+    <p class="lead">Jeder Begriff und jede Abkürzung aus dem UI, mit dem Text, den auch der Tooltip zeigt. Die Werte in den Texten stammen aus dem Profil des aktuellen Rankings.</p>
+    <label class="search" style="margin-bottom:var(--va-space-lg)">${icon('search')}<input class="input" id="gloss-search" type="search" placeholder="Begriff suchen" aria-label="Begriff suchen" value="${esc(S.glossSearch ?? '')}" data-input="gloss"></label>
+    ${Object.entries(groups).map(([g, list]) => `<section class="gloss-group"><h2>${esc(g)}</h2><dl class="gloss">${list.map(([k, e, text]) => `
+      <dt id="g-${esc(k)}">${esc(e.label)}</dt><dd>${esc(text)}${e.long ? `<br><span class="hint">${esc(e.long)}</span>` : ''}${role(e) ? `<br><span class="badge">${role(e)}</span>` : ''}</dd>`).join('')}</dl></section>`).join('') || '<p class="hint">Kein Begriff passt zur Suche.</p>'}
+    <h2>So entsteht das Ranking</h2>
+    <ol class="method">
+      <li>Für jede Kennzahl bekommt jeder Titel sein Perzentil: den Anteil der Titel, die schlechter abschneiden. Bei Multiples ist niedriger besser, bei Renditen und Margen höher.</li>
+      <li>Der Value-Score ist der Mittelwert der Value-Perzentile, der Quality-Score der Mittelwert der Quality-Perzentile. Fehlen zu viele Kennzahlen, gibt es keinen Teilscore.</li>
+      <li>Der Composite gewichtet beide, heute ${fmt.pct(D.params.value_weight, 0)} Value und ${fmt.pct(D.params.quality_weight, 0)} Quality. Danach richtet sich der Rang.</li>
+      <li>Ein Titel mit Value ≥ ${fmt.num(D.params.value_trap_value_threshold)} und Quality ≤ ${fmt.num(D.params.value_trap_quality_threshold)} bekommt den Hinweis „Value-Trap?“.</li>
+      <li>Das KGV zählt nicht, weil Einmaleffekte den Gewinn stark verzerren. Das Ranking ist eine quantitative Vorauswahl und keine Anlageempfehlung.</li>
+    </ol>`;
+};
+
+/* ================= Router und Hülle ================= */
+const NAV = [
+  ['ranking', 'Ranking', 'leaderboard', 'Alle Titel nach Composite, mit Filtern und Kennzahlen.'],
+  ['laeufe', 'Läufe', 'history', 'Verlauf aller Läufe, neuen Lauf starten, Mails ansehen.'],
+  ['profile', 'Profile', 'tune', 'Gewichte und Faktoren des Scorings ansehen und ändern.'],
+];
+const SECTION = { ranking: 'ranking', titel: 'ranking', laeufe: 'laeufe', lauf: 'laeufe', profile: 'profile', profil: 'profile', begriffe: '' };
+const TITLES = { ranking: 'Ranking', titel: 'Titel', laeufe: 'Läufe', lauf: 'Lauf', profile: 'Profile', profil: 'Profil', begriffe: 'Begriffe' };
+function render(keepScroll = true) {
+  hideTip();
+  const [view, arg] = S.route;
+  const active = document.activeElement;
+  const focusId = active?.id;
+  const sel = active && 'selectionStart' in active ? [active.selectionStart, active.selectionEnd] : null;
+  const y = window.scrollY;
+  document.getElementById('nav').innerHTML = NAV.map(([k, label, ic, t]) => `<a href="#/${k}" ${SECTION[view] === k ? 'aria-current="page"' : ''} aria-label="${label}" ${tip(t)}>${icon(ic)}<span>${label}</span></a>`).join('');
+  document.getElementById('help').innerHTML = icon('help', 'icon--md');
+  document.getElementById('help').toggleAttribute('aria-current', view === 'begriffe');
+  document.getElementById('offline').innerHTML = S.offline ? `<span class="badge badge--muted" tabindex="0" ${tip('Keine Live-Verbindung zum Server. Die Seite aktualisiert sich erst wieder, wenn er erreichbar ist.')}>${icon('offline')}offline</span>` : '';
+  document.getElementById('main').innerHTML = (VIEWS[view] ?? VIEWS.ranking)(arg);
+  document.title = `${TITLES[view] ?? 'Ranking'} · Value-Analyzer`;
+  if (keepScroll) window.scrollTo(0, y);
+  if (focusId) {
+    const el = document.getElementById(focusId);
+    if (el) { el.focus({ preventScroll: true }); if (sel && 'setSelectionRange' in el) try { el.setSelectionRange(...sel); } catch { /* type=number */ } }
+  }
+}
+function route() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/');
+  S.route = parts[0] ? parts : ['ranking'];
+  if (S.route[0] !== 'profil') S.editor = null;
+  S.notice = null;
+  S.rank.menu = false;
+  render(false);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+
+/* ================= Bedienung ================= */
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-act]');
+  if (!el) { if (S.rank.menu && !ev.target.closest('.menu')) { S.rank.menu = false; render(); } return; }
+  if (el.getAttribute('aria-disabled') === 'true') return;
+  const v = el.dataset.value;
+  const st = S.rank;
+  switch (el.dataset.act) {
+    case 'index': st.index = v; break;
+    case 'sort': {
+      const col = RANK_COLS.find((c) => c.key === v);
+      st.sort = st.sort.key === v ? { key: v, dir: st.sort.dir === 'asc' ? 'desc' : 'asc' } : { key: v, dir: col.start };
+      break;
+    }
+    case 'focus-trap': st.focus = st.focus === 'trap' ? null : 'trap'; break;
+    case 'focus-nocomp': st.focus = st.focus === 'nocomp' ? null : 'nocomp'; break;
+    case 'focus': st.focus = null; break;
+    case 'reset': Object.assign(st, { index: 'all', search: '', focus: null, showBelow: false }); break;
+    case 'menu': st.menu = !st.menu; break;
+    case 'copy': copy(v); return;
+    case 'start': document.getElementById('start-dialog').showModal(); return;
+    case 'csv': downloadCsv(); return;
+    case 'discard': S.editor = null; break;
+    case 'save': {
+      const ed = editorState();
+      const next = S.profile.versions[0].version + 1;
+      S.profile.versions.unshift({ version: next, created: localIso(), parent: ed.base, comment: ed.comment.trim() || null, params: structuredClone(ed.model) });
+      S.editor = null;
+      S.notice = { text: `Version ${next} gespeichert, noch nicht aktiv.` };
+      break;
+    }
+    case 'activate':
+      S.profile.active = Number(v);
+      S.notice = { text: `Version ${v} ist aktiv. Der nächste Lauf rechnet damit.` };
+      break;
+    default: return;
+  }
+  render();
+});
+document.addEventListener('input', (ev) => {
+  const el = ev.target;
+  const kind = el.dataset?.input;
+  if (!kind) return;
+  if (kind === 'search') { S.rank.search = el.value; render(); return; }
+  if (kind === 'gloss') { S.glossSearch = el.value; render(); return; }
+  const ed = editorState(), m = ed.model;
+  if (kind === 'comment') { ed.comment = el.value; return; }
+  const n = el.value === '' ? NaN : Number(el.value);
+  if (kind === 'weight') { m.value_weight = n / 100; m.quality_weight = 1 - m.value_weight; }
+  if (kind === 'cap') m.min_market_cap = n * 1e6;
+  if (kind === 'pct') m[el.dataset.value] = n / 100;
+  if (kind === 'dec') m[el.dataset.value] = n;
+  render();
+});
+document.addEventListener('change', (ev) => {
+  const el = ev.target;
+  const kind = el.dataset?.change;
+  if (!kind) return;
+  if (kind === 'below') S.rank.showBelow = el.checked;
+  if (kind === 'col') { const c = S.rank.cols.filter((k) => k !== el.dataset.value); S.rank.cols = el.checked ? [...c, el.dataset.value] : c; saveCols(); }
+  if (kind === 'neg') editorState().model.drop_negative_value_metrics = el.checked;
+  if (kind === 'factor') {
+    const m = editorState().model, key = el.dataset.group + '_factors';
+    const keys = m[key].filter((k) => k !== el.dataset.value);
+    m[key] = el.checked ? [...keys, el.dataset.value] : keys;
+  }
+  render();
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') { hideTip(); if (S.rank.menu) { S.rank.menu = false; render(); document.getElementById('cols-btn')?.focus(); } }
+});
+document.getElementById('start-dialog').addEventListener('close', (ev) => {
+  const d = ev.target;
+  if (d.returnValue !== 'start') return;
+  const f = new FormData(document.getElementById('start-form'));
+  const id = Math.max(...S.runs.map((r) => r.id)) + 1;
+  const dry = f.get('mail') === 'dry';
+  // Abbildung auf RunStart: verschicken = {dry_run:false, notify:true}, Probelauf = {dry_run:true, notify:false}
+  S.runs.unshift({ id, kind: 'batch', status: 'running', started: localIso(), finished: null, size: 90, scored: null, failed: null, dry_run: dry, force_refresh: f.get('force') === 'on', exit: null, progress: { done: 0, total: 90, symbol: D.rows[0].symbol } });
+  S.notice = { text: `Lauf #${id} gestartet.` };
+  document.getElementById('start-form').reset();
+  render();
+});
+function copy(text) {
+  const done = () => snack('ISIN kopiert');
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  function fallback() { const t = document.createElement('textarea'); t.value = text; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); done(); }
+}
+function snack(text) {
+  document.querySelector('.snackbar')?.remove();
+  const s = document.createElement('div');
+  s.className = 'snackbar'; s.setAttribute('role', 'status'); s.textContent = text;
+  document.body.append(s);
+  setTimeout(() => s.remove(), 3000);
+}
+function downloadCsv() {
+  const dec = (v) => (v == null ? '' : String(v).replace('.', ','));
+  const lines = ['rank_overall;symbol;name;index;sector;composite_score;value_score;quality_score;value_trap_flag', ...D.rows.map((r) => [r.rank, r.symbol, r.name, r.index, r.sector, dec(r.composite_score), dec(r.value_score), dec(r.quality_score), r.value_trap_flag].join(';'))];
+  const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: 'ranking_2026-10-30.csv' });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+// Fortschritt laufender Läufe, wie die Events marketdata.fetch.progressed
+setInterval(() => {
+  let changed = false;
+  for (const r of S.runs) {
+    if (r.status !== 'running') continue;
+    r.progress.done = Math.min(r.progress.total, r.progress.done + 1);
+    r.progress.symbol = D.rows[(r.progress.done * 7) % D.rows.length].symbol;
+    if (r.progress.done === r.progress.total) {
+      Object.assign(r, { status: 'success', finished: localIso(), scored: 90, failed: 0, exit: 0, report: true, scoring_run: D.scoring_run_id });
+    }
+    changed = true;
+  }
+  if (changed && ['laeufe', 'lauf'].includes(S.route[0]) && !document.querySelector('dialog[open]') && !document.activeElement?.matches('input, textarea')) render();
+}, 700);
+
+/* ================= Tooltip (wie matTooltip: Hover, Fokus, langes Drücken) ================= */
+const tt = document.getElementById('tooltip');
+let tipTimer = 0, tipAnchor = null;
+function showTip(el) {
+  const text = el.getAttribute('data-tip');
+  if (!text) return;
+  tipAnchor = el;
+  tt.textContent = text;
+  tt.style.left = '0px'; tt.style.top = '0px';
+  tt.classList.add('show');
+  const a = el.getBoundingClientRect(), t = tt.getBoundingClientRect();
+  let top = a.top - t.height - 8;
+  if (top < 8) top = a.bottom + 8;
+  const left = Math.min(Math.max(8, a.left + a.width / 2 - t.width / 2), window.innerWidth - t.width - 8);
+  tt.style.left = `${left}px`; tt.style.top = `${top}px`;
+  el.setAttribute('aria-describedby', 'tooltip');
+}
+function hideTip() {
+  clearTimeout(tipTimer);
+  tt.classList.remove('show');
+  tipAnchor?.removeAttribute('aria-describedby');
+  tipAnchor = null;
+}
+const later = (el, ms) => { clearTimeout(tipTimer); tipTimer = setTimeout(() => showTip(el), ms); };
+document.addEventListener('pointerover', (ev) => {
+  if (ev.pointerType === 'touch') return;
+  const el = ev.target.closest('[data-tip]');
+  if (el && el !== tipAnchor) later(el, 400);
+});
+document.addEventListener('pointerout', (ev) => {
+  const el = ev.target.closest('[data-tip]');
+  if (el && !el.contains(ev.relatedTarget)) hideTip();
+});
+document.addEventListener('focusin', (ev) => { const el = ev.target.closest('[data-tip]'); if (el && el.matches(':focus-visible')) later(el, 400); });
+document.addEventListener('focusout', hideTip);
+document.addEventListener('pointerdown', (ev) => {
+  hideTip();
+  if (ev.pointerType !== 'touch') return;
+  const el = ev.target.closest('[data-tip]');
+  if (el) later(el, 500);
+});
+document.addEventListener('pointerup', (ev) => { if (ev.pointerType === 'touch' && tipAnchor) setTimeout(hideTip, 2500); else if (ev.pointerType === 'touch') clearTimeout(tipTimer); });
+window.addEventListener('scroll', hideTip, { passive: true });
+
+/* ================= Nur Vorlage: Modus und offline ================= */
+const themeSel = document.getElementById('theme');
+try { themeSel.value = localStorage.getItem('va.vorlage.theme') ?? ''; } catch { /* egal */ }
+const applyTheme = () => { if (themeSel.value) document.documentElement.dataset.theme = themeSel.value; else delete document.documentElement.dataset.theme; };
+themeSel.addEventListener('change', () => { applyTheme(); try { localStorage.setItem('va.vorlage.theme', themeSel.value); } catch { /* egal */ } });
+document.getElementById('toggle-offline').addEventListener('change', (ev) => { S.offline = ev.target.checked; render(); });
+document.querySelectorAll('.info-tip:empty').forEach((b) => { b.innerHTML = icon('info'); });
+applyTheme();
+route();
+</script>
+</body>
+</html>

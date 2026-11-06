@@ -19,6 +19,7 @@
 | 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; F2/F3 warten auf ADR-0011 |
+| G | Gestaltung des UI: klar, ruhig, jeder Begriff erklärt ([Spec](ui-neugestaltung.md)) | 📝 Spec im Entwurf (04.11.2026), wartet auf Abnahme |
 
 **NAS:** Alle offenen NAS-Punkte (unter „Sofort“ und in Phase 0, 2, 3, 5 und F1) erledigt ein
 Durchgang nach dem [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig). Er enthält auch den Altdaten-Import und die Sicherung.
@@ -229,6 +230,24 @@ vorgeschlagen, erst nach Annahme):
 
 **Fertig, wenn:** über ADR-0011 entschieden ist. Wird es angenommen, außerdem: Das Standardprofil v2
 ist aktiv, und das Titel-Detail zeigt die Anker.
+
+## Track G – Gestaltung des UI
+
+Details: [ui-neugestaltung.md](ui-neugestaltung.md)
+
+- [ ] Entscheidung (du): Spec abnehmen, dazu die Vorschläge E1 bis E7
+- [ ] G0 Designvorlage: klickbarer Entwurf, Abnahme der Optik
+- [ ] G1 Fundament und Hülle
+- [ ] G2 Begriffe und Tooltips
+- [ ] G3 API-Ergänzungen (additiv)
+- [ ] G4 Ranking
+- [ ] G5 Titel-Detail
+- [ ] G6 Läufe und Lauf-Detail
+- [ ] G7 Profile und Editor
+- [ ] G8 Abschluss: Barrierefreiheit, hell und dunkel, schmale Bildschirme, Doku
+
+**Fertig, wenn:** jede Ansicht ihre Frage im ersten Bildschirm beantwortet und die Tooltip-Tests
+jeden Button, jedes Kürzel und jeden Status abdecken.
 
 ## Danach (Ideen, nicht beschlossen)
 
