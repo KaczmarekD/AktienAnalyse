@@ -1,6 +1,7 @@
 # Neugestaltung des UI
 
-> **Status:** Entwurf (04.11.2026, Papier-Design seit 06.11.2026), wartet auf deine Abnahme.
+> **Status:** Entwurf (04.11.2026, Papier-Design seit 06.11.2026). Die Designvorlage G0 hast du
+> am 06.11.2026 abgenommen, offen sind die Entscheidungen E1 und E3 bis E7.
 > Gilt für alles unter `frontend/`. Klickbare Vorlage: [docs/design/vorlage.html](../design/vorlage.html).
 > Nach der Abnahme kommen die neuen Bausteine zuerst in den [Styleguide](styleguide.md), dann in
 > den Code, so wie es der Styleguide verlangt. Die Pakete stehen in der Roadmap unter
