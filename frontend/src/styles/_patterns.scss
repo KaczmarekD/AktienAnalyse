@@ -46,6 +46,14 @@ a {
   font-size: var(--va-text-sm);
 }
 
+// Begriff mit Tooltip (app-term): gepunktet unterstrichen, Cursor „Hilfe“
+.term {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--mat-sys-outline);
+  text-underline-offset: var(--va-space-xs);
+  cursor: help;
+}
+
 // Zahlen in Tabellen und Karten rechtsbündig
 .num {
   text-align: right;

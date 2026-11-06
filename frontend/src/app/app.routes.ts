@@ -38,5 +38,10 @@ export const routes: Routes = [
     title: 'Titel · Value-Analyzer',
     loadComponent: () => import('./instruments/instrument-page').then((m) => m.InstrumentPage),
   },
+  {
+    path: 'glossary',
+    title: 'Begriffe · Value-Analyzer',
+    loadComponent: () => import('./glossary/glossary-page').then((m) => m.GlossaryPage),
+  },
   { path: '**', redirectTo: 'ranking' },
 ];

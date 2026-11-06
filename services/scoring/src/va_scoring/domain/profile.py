@@ -34,36 +34,46 @@ __all__ = [
 
 DEFAULT_PROFILE_NAME = "Standard"
 
-# Fuer das UI (P3.3): Name und Methodik-Hinweis je Faktor. Die Richtung steht im Katalog.
+# Fuer das UI (P3.3): Name und Methodik-Hinweis je Faktor. Die Richtung steht im Katalog, das UI
+# haengt sie an. Seit Track G (G2) mit den Texten aus dem Katalog der Spec
+# (docs/architecture/ui-neugestaltung.md) und Labels wie im Glossar des UI; die Mail nutzt sie nicht.
 FACTOR_INFO: dict[str, tuple[str, str]] = {
     "ev_ebit": (
         "EV/EBIT",
-        "Unternehmenswert zu operativem Gewinn, unabhaengig von der Kapitalstruktur "
-        "(Greenblatt). Negative Werte (Verluste) fallen aus dem Ranking.",
+        "Unternehmenswert (Börsenwert plus Nettoschulden) geteilt durch den operativen Gewinn. "
+        "Negative Werte zählen nicht.",
     ),
-    "pb": ("Kurs-Buchwert", "Kurs zu Buchwert je Aktie. Negative Werte fallen aus dem Ranking."),
+    "pb": (
+        "KBV",
+        "Kurs-Buchwert-Verhältnis: Börsenwert geteilt durch das Eigenkapital laut Bilanz. "
+        "Negative Werte zählen nicht.",
+    ),
     "p_fcf": (
-        "Kurs/Free Cashflow",
-        "Free Cashflow ist schwerer zu beschoenigen als der Gewinn. Negative Werte fallen aus "
-        "dem Ranking.",
+        "Kurs/FCF",
+        "Börsenwert geteilt durch den Free Cashflow, also das Geld, das nach Investitionen übrig "
+        "bleibt. Schwerer zu schönen als der Gewinn.",
     ),
     "shareholder_yield": (
         "Shareholder Yield",
-        "Dividende plus Aktienrueckkaeufe im Verhaeltnis zum Boersenwert.",
+        "Dividenden plus Aktienrückkäufe im Verhältnis zum Börsenwert: Wie viel fließt an die "
+        "Aktionäre zurück?",
     ),
     "roic": (
         "ROIC",
-        "Rendite auf das eingesetzte Kapital, mit der effektiven Steuerquote des Unternehmens.",
+        "Return on Invested Capital: Rendite nach Steuern auf das eingesetzte Eigen- und "
+        "Fremdkapital.",
     ),
-    "fcf_margin": ("FCF-Marge", "Free Cashflow im Verhaeltnis zum Umsatz."),
-    "operating_margin": ("Operative Marge", "Operativer Gewinn (EBIT) im Verhaeltnis zum Umsatz."),
+    "fcf_margin": ("FCF-Marge", "Free Cashflow je Euro Umsatz."),
+    "operating_margin": ("Operative Marge", "Operativer Gewinn (EBIT) je Euro Umsatz."),
     "net_debt_ebitda": (
         "Net Debt/EBITDA",
-        "Nettoverschuldung in Jahren operativen Gewinns vor Abschreibungen.",
+        "Nettoschulden geteilt durch den Gewinn vor Zinsen, Steuern und Abschreibungen: in wie "
+        "vielen Jahren die Schulden getilgt wären.",
     ),
     "earnings_stability": (
-        "Gewinnstabilitaet",
-        "Wie wenig der Nettogewinn ueber die letzten fuenf Geschaeftsjahre schwankt.",
+        "Gewinnstabilität",
+        "Wie wenig der Nettogewinn über die letzten fünf Geschäftsjahre schwankt. 1 heißt sehr "
+        "stabil.",
     ),
 }
 

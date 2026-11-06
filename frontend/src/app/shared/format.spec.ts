@@ -88,9 +88,15 @@ describe('RunKindPipe', () => {
 describe('DurationPipe', () => {
   it('gives minutes, from one hour on hours and minutes', () => {
     const duration = pipe(DurationPipe);
-    expect(plain(duration.transform('2026-10-30T06:02:00Z', '2026-10-30T06:14:20Z'))).toBe('12 min');
-    expect(plain(duration.transform('2026-10-30T06:00:00Z', '2026-10-30T07:05:00Z'))).toBe('1 h 5 min');
-    expect(plain(duration.transform('2026-10-30T06:00:00Z', '2026-10-30T06:00:20Z'))).toBe('< 1 min');
+    expect(plain(duration.transform('2026-10-30T06:02:00Z', '2026-10-30T06:14:20Z'))).toBe(
+      '12 min',
+    );
+    expect(plain(duration.transform('2026-10-30T06:00:00Z', '2026-10-30T07:05:00Z'))).toBe(
+      '1 h 5 min',
+    );
+    expect(plain(duration.transform('2026-10-30T06:00:00Z', '2026-10-30T06:00:20Z'))).toBe(
+      '< 1 min',
+    );
     expect(duration.transform('2026-10-30T06:00:00Z', null)).toBe(MISSING);
   });
 });

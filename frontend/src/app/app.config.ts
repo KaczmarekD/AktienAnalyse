@@ -7,7 +7,7 @@ import {
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { MAT_TOOLTIP_DEFAULT_OPTIONS, MatTooltipDefaultOptions } from '@angular/material/tooltip';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 
 import { client } from './api/client.gen';
 import { provideHeyApiClient } from './api/client/client.gen';
@@ -29,7 +29,12 @@ const TOOLTIPS: MatTooltipDefaultOptions = {
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes, withComponentInputBinding()),
+    // Anker wie /glossary#roic springen zum Begriff
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' }),
+    ),
     // Relative Pfade (/api/v1/...): lokal leitet ng serve sie ans web-api weiter, auf der NAS
     // nginx (P3.6). Deshalb gibt es keine API-URL im Build und kein CORS.
     provideHttpClient(withFetch()),

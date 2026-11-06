@@ -90,7 +90,9 @@ describe('App', () => {
     expect(help?.getAttribute('aria-label')).toBe('Begriffe');
     expect(help?.querySelector('app-icon svg')).not.toBeNull();
     expect(tooltipOf(fixture, help as Element)).toBe('Alle Begriffe und Abkürzungen erklärt.');
-    expect(routes.find((route) => route.path === 'glossary')?.title).toBe('Begriffe · Value-Analyzer');
+    expect(routes.find((route) => route.path === 'glossary')?.title).toBe(
+      'Begriffe · Value-Analyzer',
+    );
 
     await TestBed.inject(Router).navigateByUrl('/glossary');
     fixture.detectChanges();

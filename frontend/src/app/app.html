@@ -4,7 +4,7 @@
     data-brand
     routerLink="/ranking"
     aria-label="Value-Analyzer, zum Ranking"
-    matTooltip="Zum Ranking"
+    [matTooltip]="controls.brand"
   >
     <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
       <rect x="1" y="1" width="26" height="26" rx="5" />
@@ -29,12 +29,22 @@
   <span class="spacer"></span>
   <span class="realtime" [attr.data-realtime]="realtime.status()">
     @if (realtime.status() === 'offline') {
-      <span class="badge badge--muted" tabindex="0" [matTooltip]="offlineTip">
+      <span class="badge badge--muted" tabindex="0" [matTooltip]="controls.offline">
         <app-icon name="cloud_off" />
         offline
       </span>
     }
   </span>
+  <a
+    class="help"
+    routerLink="/glossary"
+    aria-label="Begriffe"
+    [attr.aria-current]="onGlossary() ? 'page' : null"
+    [class.active]="onGlossary()"
+    [matTooltip]="controls['nav.glossary']"
+  >
+    <app-icon name="help" size="md" />
+  </a>
 </header>
 <main>
   <router-outlet />

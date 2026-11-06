@@ -1,0 +1,60 @@
+<app-page-header>Begriffe</app-page-header>
+<p class="meta lead">
+  Jeder Begriff und jede Abkürzung aus dem UI, mit dem Text, den auch der Tooltip zeigt.
+</p>
+
+<mat-form-field class="search">
+  <app-icon matPrefix name="search" />
+  <mat-label>Begriff suchen</mat-label>
+  <input matInput type="search" name="search" [value]="search()" (input)="onSearch($event)" />
+</mat-form-field>
+
+@for (group of groups(); track group.name) {
+  <section [attr.aria-labelledby]="'gruppe-' + $index">
+    <h2 [id]="'gruppe-' + $index">{{ group.name }}</h2>
+    <dl class="gloss">
+      @for (item of group.items; track item.key) {
+        <dt [id]="item.key">{{ item.label }}</dt>
+        <dd>
+          <span>{{ item.tip || 'Text folgt, sobald der Server antwortet.' }}</span>
+          @if (item.long) {
+            <span class="hint">{{ item.long }}</span>
+          }
+          @if (item.role; as role) {
+            <span class="badge" tabindex="0" [matTooltip]="role.tip">{{ role.label }}</span>
+          }
+        </dd>
+      }
+    </dl>
+  </section>
+} @empty {
+  <p class="message">Kein Begriff passt zur Suche.</p>
+}
+
+<h2>So entsteht das Ranking</h2>
+<ol class="method">
+  <li>
+    Für jede Kennzahl bekommt jeder Titel sein Perzentil: den Anteil der Titel, die schlechter
+    abschneiden. Bei Multiples ist niedriger besser, bei Renditen und Margen höher.
+  </li>
+  <li>
+    Der Value-Score ist der Mittelwert der Value-Perzentile, der Quality-Score der Mittelwert der
+    Quality-Perzentile. Fehlen zu viele Kennzahlen, gibt es keinen Teilscore.
+  </li>
+  <li>
+    @if (params().value_weight; as weight) {
+      Der Composite gewichtet beide, heute {{ weight | pct: '1.0-0' }} Value und
+      {{ 1 - weight | pct: '1.0-0' }} Quality. Danach richtet sich der Rang.
+    } @else {
+      Der Composite gewichtet beide nach den Gewichten des Profils. Danach richtet sich der Rang.
+    }
+  </li>
+  <li>
+    Ein Titel mit hohem Value- und niedrigem Quality-Score bekommt den Hinweis „Value-Trap?“. Die
+    Schwellen legt das Profil fest.
+  </li>
+  <li>
+    Das KGV zählt nicht, weil Einmaleffekte den Gewinn stark verzerren. Das Ranking ist eine
+    quantitative Vorauswahl und keine Anlageempfehlung.
+  </li>
+</ol>

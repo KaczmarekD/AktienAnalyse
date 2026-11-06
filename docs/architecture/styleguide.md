@@ -3,7 +3,8 @@
 > **Status:** verbindlich seit 03.11.2026, ergänzt am 04.11.2026 (Bausteine für Status, Value-Trap
 > und Rückmeldungen, Formate für Datum und fehlende Werte, Lade-Helfer) und am 06.11.2026 mit G1
 > der [Neugestaltung](ui-neugestaltung.md): Papier-Design, Serifen für Überschriften, Icons,
-> App-Hülle, `app-icon`, `app-section`, `app-state`. Gilt für jede Ansicht unter `frontend/`. Wer
+> App-Hülle, `app-icon`, `app-section`, `app-state`; mit G2 Glossar, Tooltips, `app-term` und
+> `app-info-tip`. Gilt für jede Ansicht unter `frontend/`. Wer
 > etwas braucht, das hier nicht steht, ergänzt zuerst diesen Styleguide und dann den Code.
 > Technischer Rahmen: [frontend.md](frontend.md).
 
@@ -43,6 +44,7 @@
 | `src/app/shared/ui/` | gemeinsame Komponenten, siehe [Komponenten](#komponenten) |
 | `src/app/shared/format.ts` | Pipes für Zahlen, Prozent, Milliarden, Datum, fehlende Werte, Status |
 | `src/app/shared/resource.ts` | `loaded` und `loadError` für den Lade- und Fehlerzustand |
+| `src/app/shared/glossary/` | alle Texte: Begriffe (`glossary.ts`), Bedienelemente (`controls.ts`), `GlossaryStore` |
 
 ## Farben
 
@@ -161,6 +163,27 @@ Die Hülle (`app.html`) setzt jede Ansicht in denselben Rahmen:
   `GET /api/v1/health`.
 - „Läufe“ heißt überall „Läufe“, auch im Titel des Tabs; die Route bleibt `/runs`.
 
+## Tooltips und Begriffe
+
+Nichts bleibt unerklärt: Jeder Button, jede Abkürzung, jeder Status, jeder Spaltenkopf und jedes
+Kennzahl-Label hat einen Tooltip, der sagt, was es ist und wie man es liest. Fließtext und Links,
+deren Text das Ziel nennt, bekommen keinen.
+
+- **Eine Quelle:** Begriffe stehen in `shared/glossary/glossary.ts` (`GLOSSARY`: Label, Kurzlabel,
+  Tooltip, lange Erklärung, Gruppe, Rolle im Score, `abbr` für Kürzel), die Texte der
+  Bedienelemente in `controls.ts` (`CONTROLS`). Die Faktortexte liefert scoring
+  (`FACTOR_INFO`, `GET /api/v1/scoring/factors`); der `GlossaryStore` hängt Richtung und Rolle an.
+- **Werte aus den Daten:** Texte mit Gewichten, Schwellen oder Größenschwelle sind Funktionen von
+  `TipParams` und kommen ohne die Werte allgemein aus.
+- **Texte:** höchstens zwei Sätze (200 Zeichen), erst „Was ist das?“, dann „Wie lesen?“, dann die
+  Rolle im Score. Eine Abkürzung wird zuerst ausgeschrieben. Wichtiges steht nie nur im Tooltip.
+- **Technik:** `matTooltip` mit den Voreinstellungen aus `app.config.ts`; gesperrte Buttons mit
+  `disabledInteractive`, damit der Tooltip den Grund zeigt; keine nativen `title`.
+- **Seite „Begriffe“** (`/glossary`, Icon in der App-Leiste): alle Einträge nach Gruppen, mit Anker
+  je Begriff (`/glossary#roic`) und Suche.
+- **Tests 1 und 2:** `controlsWithoutTooltip` und `abbreviationsWithoutExplanation` aus
+  `testing/tooltips.ts` laufen im Test jeder Ansicht; Ausnahmen stehen mit Grund im Test.
+
 ## Seitenaufbau
 
 Jede Ansicht folgt diesem Gerüst:
@@ -254,6 +277,26 @@ nicht.
 }
 ```
 
+### `app-term`
+
+Begriff mit Tooltip aus dem Glossar, gepunktet unterstrichen und mit der Tastatur erreichbar. Eigener
+Text ersetzt das Label, `variant="short"` nimmt das Kurzlabel, `[params]` setzt Werte ein.
+
+```html
+<th mat-header-cell *matHeaderCellDef><app-term key="ev_ebit" /></th>
+<app-term key="scoring_run">Bewertungslauf #{{ run.scoring_run_id }}</app-term>
+<app-term key="value_trap" [params]="params()" />
+```
+
+### `app-info-tip`
+
+ⓘ als Icon-Button neben Formular-Labels und Abschnittsköpfen, mit `aria-label` („Was heißt
+Größenschwelle?“) und Tooltip. Text aus dem Glossar (`key`) oder direkt (`text`, `label`).
+
+```html
+<app-info-tip key="min_market_cap" />
+```
+
 ### `app-icon`
 
 SVG-Icon aus der festen Liste, siehe [Icons](#icons). `size="md"` für 1,5 rem, `spin` dreht es
@@ -315,6 +358,7 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 | Klasse | Wofür | Beispiel |
 |---|---|---|
 | `.meta` | gedämpfte Metazeile oder Nebenangabe | „Abruf vom 30.10.2026 · Quelle iShares“ |
+| `.term` | Begriff mit Tooltip, gepunktet unterstrichen (setzt `app-term`) | EV/EBIT im Spaltenkopf |
 | `.message` | Lade-, Leer- und Fehlertext anstelle von Inhalt (bis zum Wechsel auf `app-state`) | „Lade die Läufe …“ |
 | `.hint` | erklärender Nebentext oder Kürzel, klein und gedämpft | „Aktivieren wirkt ab dem nächsten Lauf.“, Symbol im Ranking |
 | `.field-error` | Fehler direkt unter einem Formularfeld | „Wert zwischen 0 und 1“ |
@@ -364,7 +408,11 @@ Material bekommen denselben Ring aus `_patterns.scss`.
   | `mrd` | Beträge in Milliarden | 140,0 Mrd |
   | `day` | Datum | 30.10.2026 |
   | `dayTime` | Zeitpunkt | 30.10.2026 06:00 |
-  | `orDash` | sonstige Werte, die fehlen können | Rang, Sektor, Exit-Code |
+  | `orDash` | sonstige Werte, die fehlen können | Rang, Exit-Code |
+  | `sector` | Sektor von Yahoo auf Deutsch | Finanzen |
+  | `runKind` | Art eines Laufs | Abruf und Bewertung |
+  | `duration` | Dauer zwischen zwei Zeitpunkten (`start \| duration: end`) | 12 min |
+  | `indexSource` | Herkunft der Indexliste | Deka, Ersatzliste |
   | `runStatus` | Status auf Deutsch (meist über `app-run-status`) | erfolgreich |
 
 - Ein fehlender Wert ist ein Gedankenstrich „–“ (`MISSING`), nie leer und nie „null“. Alle
@@ -381,6 +429,8 @@ Material bekommen denselben Ring aus `_patterns.scss`.
 - [ ] Keine Farbliterale, keine festen Abstände; nur `--mat-sys-*`, `--va-*` und Breakpoints
 - [ ] Nichts in der Seiten-SCSS, das es schon als Muster-Klasse gibt
 - [ ] Werte über die Pipes aus [Sprache, Zahlen, Daten](#sprache-zahlen-daten)
+- [ ] Jedes Bedienelement, Label und Kürzel mit Tooltip aus dem Glossar; Tests 1 und 2 im Test
+      der Ansicht
 - [ ] Icon-Buttons mit `aria-label` und Tooltip
 - [ ] Testbare Stellen mit `data-*` markiert
 - [ ] In hell und dunkel und bei 375 px Breite angesehen

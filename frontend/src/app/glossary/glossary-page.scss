@@ -1,0 +1,55 @@
+@use '../../styles/breakpoints';
+
+// Die Lesebreite gilt nur für die Texte dieser Seite
+.lead,
+.method {
+  max-width: 46rem;
+}
+
+.search {
+  width: 100%;
+  max-width: 24rem;
+}
+
+// Begriff links, Erklärung rechts, je Paar eine Haarlinie
+.gloss {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) 1fr;
+  gap: 0 var(--va-space-xl);
+  margin: 0;
+
+  dt,
+  dd {
+    margin: 0;
+    padding: var(--va-space-md) 0;
+    border-bottom: var(--va-divider);
+  }
+
+  dt {
+    font-weight: var(--va-weight-strong);
+    // Beim Sprung zum Anker bleibt der Begriff unter der App-Leiste sichtbar
+    scroll-margin-top: calc(var(--va-appbar-height) + var(--va-space-md));
+  }
+
+  dd {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--va-space-xs);
+  }
+}
+
+.method li {
+  margin-bottom: var(--va-space-sm);
+}
+
+@media (max-width: breakpoints.$compact) {
+  .gloss {
+    grid-template-columns: minmax(0, 1fr);
+
+    dt {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+  }
+}

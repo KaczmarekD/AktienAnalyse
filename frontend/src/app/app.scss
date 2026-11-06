@@ -118,3 +118,24 @@ footer {
     padding: var(--va-space-md) var(--va-space-md) var(--va-space-2xl);
   }
 }
+
+// Icon „Begriffe“: runde Fläche wie ein Icon-Button, aktiv wie ein Navigationseintrag
+.help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--va-size-control);
+  height: var(--va-size-control);
+  border-radius: var(--mat-sys-corner-full);
+  color: var(--mat-sys-on-surface-variant);
+
+  &:hover {
+    background-color: var(--mat-sys-surface-container-low);
+    color: var(--mat-sys-on-surface);
+  }
+
+  &.active {
+    background-color: var(--mat-sys-surface-container-high);
+    color: var(--mat-sys-on-surface);
+  }
+}

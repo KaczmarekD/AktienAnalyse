@@ -6,7 +6,7 @@ import { ComponentFixture } from '@angular/core/testing';
 import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 
-import { GLOSSARY } from '../shared/glossary/glossary';
+import { ENTRIES } from '../shared/glossary/glossary';
 
 /** Was einen Tooltip braucht (Spec, „Was einen Tooltip bekommt“). */
 const NEEDS_TOOLTIP = [
@@ -61,7 +61,7 @@ export function controlsWithoutTooltip(
     .map(describeElement);
 }
 
-const ABBREVIATIONS = Object.values(GLOSSARY)
+const ABBREVIATIONS = Object.values(ENTRIES)
   .filter((entry) => entry.abbr)
   .flatMap((entry) => [entry.label, ...(entry.short ? [entry.short] : [])]);
 

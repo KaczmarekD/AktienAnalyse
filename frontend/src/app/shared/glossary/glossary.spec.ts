@@ -6,7 +6,8 @@ import { zProfileParamsV1Input } from '../../api/zod.gen';
 import { apiTestingProviders } from '../../testing/api';
 import { FACTORS, INSTRUMENT, RANKING, row, run } from '../../testing/fixtures';
 import { RUN_KINDS, RUN_STATUSES, SECTORS } from '../format';
-import { CONTROLS, FIELD_FACTOR, GLOSSARY, TermKey, TipParams } from './glossary';
+import { CONTROLS } from './controls';
+import { ENTRIES, FIELD_FACTOR, GLOSSARY, TermKey, TipParams } from './glossary';
 import { GlossaryStore } from './glossary.store';
 
 const FACTORS_URL = '/api/v1/scoring/factors';
@@ -46,7 +47,7 @@ describe('GLOSSARY', () => {
   it('has an entry for every factor key of the generated client, mapped to a ranking field', () => {
     const fields = Object.keys(row({ symbol: 'X.DE' }));
     for (const key of factorKeys()) {
-      expect(GLOSSARY[key as TermKey]?.role, key).toMatch(/^(value|quality)$/);
+      expect(ENTRIES[key as TermKey]?.role, key).toMatch(/^(value|quality)$/);
       const field = Object.entries(FIELD_FACTOR).find(([, factor]) => factor === key)?.[0];
       expect(fields, key).toContain(field);
     }
@@ -90,9 +91,7 @@ describe('GlossaryStore', () => {
   it('adds direction and role to the factor texts of the API', async () => {
     const glossary = await store();
     expect(glossary.label('pb')).toBe('KBV');
-    expect(glossary.tip('pb')).toBe(
-      `${FACTORS[1].hint} Niedriger ist besser. Value-Faktor.`,
-    );
+    expect(glossary.tip('pb')).toBe(`${FACTORS[1].hint} Niedriger ist besser. Value-Faktor.`);
     expect(glossary.tip('roic')).toMatch(/Höher ist besser\. Quality-Faktor\.$/);
   });
 
@@ -105,11 +104,14 @@ describe('GlossaryStore', () => {
 
   it('puts the values of the profile into the text and stays general without them', async () => {
     const glossary = await store();
-    expect(glossary.tip('value_trap', PARAMS)).toContain('Value ≥ 0,70');
-    expect(glossary.tip('value_trap', PARAMS)).toContain('Quality ≤ 0,30');
-    expect(glossary.tip('value_trap')).not.toMatch(/\d/);
-    expect(glossary.tip('composite', PARAMS)).toContain('60 % Value und 40 % Quality');
-    expect(glossary.tip('below_threshold', PARAMS)).toContain('300 Mio. €');
+    // Zahl und Einheit trennt ein geschütztes Leerzeichen
+    const tip = (key: TermKey, params?: TipParams) => glossary.tip(key, params).replace(/\s/g, ' ');
+    expect(tip('value_trap', PARAMS)).toContain('Value ≥ 0,70');
+    expect(tip('value_trap', PARAMS)).toContain('Quality ≤ 0,30');
+    expect(tip('value_trap')).not.toMatch(/\d/);
+    expect(tip('composite', PARAMS)).toContain('60 % Value und 40 % Quality');
+    expect(tip('below_threshold', PARAMS)).toContain('300 Mio. €');
+    expect(tip('rank_delta', PARAMS)).toContain('Top 20');
   });
 
   it('shows factors with their label only while the API does not answer', async () => {
