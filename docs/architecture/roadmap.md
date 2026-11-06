@@ -19,7 +19,7 @@
 | 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), vorgeschlagen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; F2/F3 warten auf ADR-0011 |
-| G | Gestaltung des UI: klar, ruhig, jeder Begriff erklärt ([Spec](ui-neugestaltung.md)) | 🚧 Spec und G0 Designvorlage im Papier-Design abgenommen (06.11.2026); G1 bis G8 umgesetzt (Branch `feat/g-gesamt`), Abnahme offen |
+| G | Gestaltung des UI: klar, ruhig, jeder Begriff erklärt ([Spec](ui-neugestaltung.md)) | ✅ G0 bis G8 umgesetzt und abgenommen (06.11.2026); NAS: mit dem nächsten Deployment |
 | D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 🚧 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1.1 (Konten, Anmeldung, Sitzungen) und D1.2 (Sitzungspflicht, Rollen) im Code erledigt |
 
 **NAS:** Alle offenen NAS-Punkte (unter „Sofort“ und in Phase 0, 2, 3, 5 und F1) erledigt ein
@@ -239,14 +239,18 @@ Details: [ui-neugestaltung.md](ui-neugestaltung.md)
 - [x] Entscheidung (du): E2 Papier-Design, nur Graustufen und Papierfarbe (06.11.2026)
 - [x] Entscheidung (du): Spec abnehmen, dazu die Vorschläge E1 und E3 bis E7 (06.11.2026, alle wie vorgeschlagen)
 - [x] G0 Designvorlage: klickbarer Entwurf, Abnahme der Optik am 06.11.2026 (`7e13fb8`)
-- [ ] G1 Fundament und Hülle
-- [ ] G2 Begriffe und Tooltips
-- [ ] G3 API-Ergänzungen (additiv)
-- [ ] G4 Ranking
-- [ ] G5 Titel-Detail
-- [ ] G6 Läufe und Lauf-Detail
-- [ ] G7 Profile und Editor
-- [ ] G8 Abschluss: Barrierefreiheit, hell und dunkel, schmale Bildschirme, Doku
+- [x] G1 Fundament und Hülle (`57a0fc5`)
+- [x] G2 Begriffe und Tooltips (`bdd9f52`)
+- [x] G3 API-Ergänzungen (additiv, `272935c`; Migration `0016`)
+- [x] G4 Ranking (`f86fefc`)
+- [x] G5 Titel-Detail (`1513f81`)
+- [x] G6 Läufe und Lauf-Detail (`f7610b9`)
+- [x] G7 Profile und Editor (`63444f7`)
+- [x] G8 Abschluss: Barrierefreiheit, hell und dunkel, schmale Bildschirme, Doku (`79a4189`,
+      `642ff85`)
+- [x] Abnahme über den ganzen Stack (du, 06.11.2026)
+- [ ] NAS (du): kommt mit dem nächsten Deployment (`make pull`, `make up`); die Migration `0016`
+      und ihr Backfill laufen beim Start
 
 **Fertig, wenn:** jede Ansicht ihre Frage im ersten Bildschirm beantwortet und die Tooltip-Tests
 jeden Button, jedes Kürzel und jeden Status abdecken.

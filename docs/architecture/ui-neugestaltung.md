@@ -1,7 +1,7 @@
 # Neugestaltung des UI
 
-> **Status:** Abgenommen am 06.11.2026: die Designvorlage G0 und die Entscheidungen E1 bis E7
-> (E1 und E3 bis E7 wie vorgeschlagen). Umsetzung ab G1.
+> **Status:** Umgesetzt (G1 bis G8) und abgenommen am 06.11.2026. Vorher abgenommen: die
+> Designvorlage G0 und die Entscheidungen E1 bis E7 (E1 und E3 bis E7 wie vorgeschlagen).
 > Gilt für alles unter `frontend/`. Klickbare Vorlage: [docs/design/vorlage.html](../design/vorlage.html).
 > Nach der Abnahme kommen die neuen Bausteine zuerst in den [Styleguide](styleguide.md), dann in
 > den Code, so wie es der Styleguide verlangt. Die Pakete stehen in der Roadmap unter
