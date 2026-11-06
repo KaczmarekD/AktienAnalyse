@@ -12,7 +12,10 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
+from va_contracts.profile import params_from_config
+
 from .models import (
+    FactorRanks,
     Instrument,
     ProfileDetail,
     ProfileSummary,
@@ -20,6 +23,7 @@ from .models import (
     RankingRow,
     Report,
     RunDetail,
+    RunProfile,
     RunSummary,
     ScorePoint,
     Snapshot,
@@ -99,9 +103,11 @@ def get_ranking(conn: Connection, scoring_run_id: int) -> Ranking | None:
         conn.execute(
             text("""
                 SELECT sr.id, sr.fetch_run_id, sr.origin, sr.created_at, sr.config,
+                       sr.profile_id, sr.profile_version, p.name AS profile_name,
                        fr.started_at AS fetched_at, fr.universe_source
                 FROM scoring.scoring_run sr
                 LEFT JOIN market_data.fetch_run fr ON fr.id = sr.fetch_run_id
+                LEFT JOIN scoring.profile p ON p.id = sr.profile_id
                 WHERE sr.id = :scoring_run_id
             """),
             {"scoring_run_id": scoring_run_id},
@@ -124,8 +130,56 @@ def get_ranking(conn: Connection, scoring_run_id: int) -> Ranking | None:
         universe_source=head["universe_source"],
         value_weight=config.get("value_weight"),
         quality_weight=config.get("quality_weight"),
+        profile=run_profile(head["profile_id"], head["profile_version"], head["profile_name"]),
+        params=params_from_config(config),
         rows=[RankingRow.model_validate(dict(row)) for row in rows],
     )
+
+
+def run_profile(profile_id: int | None, version: int | None, name: str | None) -> RunProfile | None:
+    """Profil eines Bewertungslaufs; vor P2b.3, bei Importen und im Replay gibt es keins."""
+    if profile_id is None or version is None:
+        return None
+    return RunProfile(id=profile_id, version=version, name=name)
+
+
+def _factor_ranks(conn: Connection, instrument_id: int) -> FactorRanks | None:
+    """Perzentile je Faktor im juengsten Bewertungslauf; die Faktoren nennt seine Konfiguration."""
+    scoring_run_id = latest_scoring_run_id(conn)
+    if scoring_run_id is None:
+        return None
+    rows = (
+        conn.execute(
+            text("""
+            SELECT fs.factor_key, fs.percentile_rank, sr.config
+            FROM scoring.factor_score fs
+            JOIN scoring.scoring_run sr ON sr.id = fs.scoring_run_id
+            WHERE fs.scoring_run_id = :scoring_run_id AND fs.instrument_id = :instrument_id
+        """),
+            {"scoring_run_id": scoring_run_id, "instrument_id": instrument_id},
+        )
+        .mappings()
+        .all()
+    )
+    if not rows:
+        return None
+    return FactorRanks(
+        scoring_run_id=scoring_run_id,
+        ranks=factor_ranks(
+            rows[0]["config"], {r["factor_key"]: r["percentile_rank"] for r in rows}
+        ),
+    )
+
+
+def factor_ranks(config: dict[str, Any] | None, found: dict[str, float | None]) -> dict[str, Any]:
+    """Die Faktoren des Profils eines Laufs mit ihren Perzentilen, fehlende als ``None``.
+
+    ``scoring.factor_score`` laesst Zeilen ohne Wert und Rang weg; das Event traegt alle aktiven
+    Faktoren. So sehen beide Wege gleich aus.
+    """
+    params = params_from_config(config)
+    active = [] if params is None else [*params.value_factors, *params.quality_factors]
+    return dict.fromkeys(sorted(active)) | found
 
 
 def get_instrument(conn: Connection, symbol: str) -> Instrument | None:
@@ -159,7 +213,9 @@ def get_instrument(conn: Connection, symbol: str) -> Instrument | None:
         text("""
             SELECT sr.id AS scoring_run_id, sr.created_at, sr.origin, res.rank_overall AS rank,
                    res.passed_filter, res.composite_score, res.value_score, res.quality_score,
-                   res.value_trap_flag
+                   res.value_trap_flag,
+                   (SELECT count(*) FROM scoring.score_result c
+                    WHERE c.scoring_run_id = sr.id AND c.rank_overall IS NOT NULL) AS ranked_count
             FROM scoring.score_result res
             JOIN scoring.scoring_run sr ON sr.id = res.scoring_run_id
             WHERE res.instrument_id = :instrument_id
@@ -186,6 +242,7 @@ def get_instrument(conn: Connection, symbol: str) -> Instrument | None:
         **identity,
         latest=latest,
         score_history=[ScorePoint.model_validate(dict(row)) for row in history],
+        factor_ranks=_factor_ranks(conn, instrument["id"]),
     )
 
 

@@ -40,6 +40,16 @@ export const zFactor = z.object({
 });
 
 /**
+ * FactorRanks
+ *
+ * Perzentile je Faktor eines Titels im juengsten Bewertungslauf (Track G, G3).
+ */
+export const zFactorRanks = z.object({
+  ranks: z.record(z.string(), z.number().nullable()),
+  scoring_run_id: z.int(),
+});
+
+/**
  * Health
  */
 export const zHealth = z.object({
@@ -190,21 +200,6 @@ export const zRankingRow = z.object({
 });
 
 /**
- * Ranking
- */
-export const zRanking = z.object({
-  created_at: z.iso.datetime(),
-  fetch_run_id: z.int().nullable(),
-  fetched_on: z.iso.date().nullable(),
-  origin: z.string(),
-  quality_weight: z.number().nullable(),
-  rows: z.array(zRankingRow),
-  scoring_run_id: z.int(),
-  universe_source: z.string().nullable(),
-  value_weight: z.number().nullable(),
-});
-
-/**
  * Report
  */
 export const zReport = z.object({
@@ -238,6 +233,34 @@ export const zRunDetail = z.object({
   status: z.string(),
   universe_mode: z.string().nullable(),
   universe_size: z.int().nullable(),
+});
+
+/**
+ * RunProfile
+ *
+ * Profil eines Bewertungslaufs (Track G, G3).
+ */
+export const zRunProfile = z.object({
+  id: z.int(),
+  name: z.string().nullable(),
+  version: z.int(),
+});
+
+/**
+ * Ranking
+ */
+export const zRanking = z.object({
+  created_at: z.iso.datetime(),
+  fetch_run_id: z.int().nullable(),
+  fetched_on: z.iso.date().nullable(),
+  origin: z.string(),
+  params: zProfileParamsV1Output.nullish(),
+  profile: zRunProfile.nullish(),
+  quality_weight: z.number().nullable(),
+  rows: z.array(zRankingRow),
+  scoring_run_id: z.int(),
+  universe_source: z.string().nullable(),
+  value_weight: z.number().nullable(),
 });
 
 /**
@@ -303,6 +326,7 @@ export const zScorePoint = z.object({
   passed_filter: z.boolean(),
   quality_score: z.number().nullable(),
   rank: z.int().nullable(),
+  ranked_count: z.int().nullish(),
   scoring_run_id: z.int(),
   value_score: z.number().nullable(),
   value_trap_flag: z.boolean().nullable(),
@@ -338,6 +362,7 @@ export const zSnapshot = z.object({
  * Instrument
  */
 export const zInstrument = z.object({
+  factor_ranks: zFactorRanks.nullish(),
   index: z.string().nullable(),
   industry: z.string().nullable(),
   isin: z.string().nullable(),

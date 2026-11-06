@@ -8,9 +8,10 @@ bekommt einen Standardwert, gespeicherte Versionen ohne ihn erhalten ihn beim Le
 
 from __future__ import annotations
 
-from typing import Literal, Self, get_args
+from collections.abc import Mapping
+from typing import Any, Literal, Self, get_args
 
-from pydantic import ConfigDict, Field, field_serializer, model_validator
+from pydantic import ConfigDict, Field, ValidationError, field_serializer, model_validator
 
 from .base import Contract
 
@@ -93,3 +94,27 @@ class ProfileParamsV1(Contract):
     @property
     def quality_weight(self) -> float:
         return 1.0 - self.value_weight
+
+
+def params_from_config(config: Mapping[str, Any] | None) -> ProfileParamsV1 | None:
+    """Die Parameter eines Bewertungslaufs aus ``scoring.scoring_run.config`` (Track G, G3).
+
+    Die Konfiguration ist ``asdict(ScoringConfig)``, JSON-sicher gespeichert: dieselben Namen wie
+    hier, die Faktoren als ``{schluessel: [spalte, richtung]}``. Das web-api (ohne NATS) und der
+    Backfill der Projektionen lesen so auch Laeufe, deren Profil-Version unbekannt ist. Fehlt die
+    Konfiguration (importierte Altdaten) oder verletzt sie die Regeln, gibt es ``None``.
+    """
+    if not config or "value_weight" not in config:
+        return None
+    data = {
+        name: config[name]
+        for name in ProfileParamsV1.model_fields
+        if name in config and name not in ("value_factors", "quality_factors")
+    }
+    for name in ("value_factors", "quality_factors"):
+        if name in config:
+            data[name] = list(config[name])  # Schluessel des Katalogs
+    try:
+        return ProfileParamsV1.model_validate(data)
+    except ValidationError:
+        return None

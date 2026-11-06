@@ -8,6 +8,7 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 
 from ...base import Contract, PositiveId
+from ...profile import ProfileParamsV1
 from .fundamentals import FundamentalsV1
 from .ranking import RankingRowV1
 
@@ -127,6 +128,9 @@ class ScoringRunCompletedV1(_RunScoped):
     value_weight: float = Field(ge=0, le=1)
     quality_weight: float = Field(ge=0, le=1)
     profile: ProfileRefV1 | None = None  # bis Phase 2b ohne Profil
+    # Parameter, mit denen gerechnet wurde (additiv seit Track G, G3): das UI nennt Schwellen
+    # und Faktoren des Laufs. Fehlt bei aelteren Events und beim Replay.
+    params: ProfileParamsV1 | None = None
     ranking: list[RankingRowV1] = Field(min_length=1)
 
 

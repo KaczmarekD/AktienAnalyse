@@ -24,9 +24,11 @@ from va_contracts.events.v1 import (
     RunFailedV1,
     ScoringRunCompletedV1,
 )
+from va_contracts.profile import ProfileParamsV1
 from va_platform.bus import follow_up
 
-from ..domain.scoring import score
+from ..domain.profile import ScoringProfileParams
+from ..domain.scoring import ScoringConfig, score
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
@@ -89,6 +91,8 @@ class SnapshotCompletedHandler:
                 value_weight=cfg.value_weight,
                 quality_weight=cfg.quality_weight,
                 profile=_profile_ref(active.ref),
+                # Track G (G3): die Parameter dieses Laufs, fuer Tooltips im UI
+                params=_params(cfg),
                 ranking=[
                     RankingRowV1.from_flat(row, fundamentals=contracts.get(str(row["symbol"])))
                     for row in scored.to_dict("records")
@@ -130,3 +134,8 @@ def _profile_ref(ref: ProfileVersionRef | None) -> ProfileRefV1 | None:
     if ref is None:
         return None
     return ProfileRefV1(profile_id=ref.profile_id, version=ref.version, name=ref.name)
+
+
+def _params(cfg: ScoringConfig) -> ProfileParamsV1:
+    """Die Parameter des Laufs als Vertrag, gleich ob aus einem Profil oder aus den ENV-Werten."""
+    return ProfileParamsV1.model_validate(ScoringProfileParams.from_config(cfg).model_dump())

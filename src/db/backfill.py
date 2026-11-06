@@ -5,7 +5,8 @@ Nachfuellen saehe das web-api mit Projektionen nur die Laeufe seit dem Umstieg a
 werden ``web.snapshot_row``, ``web.ranking_run`` und ``web.ranking_row``, mit denselben Werten wie
 aus den Events. Nur Anfuegen, was fehlt (``ON CONFLICT DO NOTHING``): Ein zweiter Aufruf aendert
 nichts, und was die Events schon geschrieben haben, bleibt. Seit P5.1a auch
-``scoring.input_snapshot``: die Eingangsdaten, aus denen scoring die Vorschau rechnet.
+``scoring.input_snapshot``: die Eingangsdaten, aus denen scoring die Vorschau rechnet. Seit Track G
+(G3) ``web.ranking_profile`` und ``web.ranking_factor``: Profil, Parameter und Perzentile je Faktor.
 
 Laeuft mit der Owner-Rolle, denn es liest fremde Schemas und schreibt in ``web``.
 ``python -m src.db.migrate`` ruft es nach jeder Migration auf. So kommen auch Laeufe im Prozess
@@ -22,11 +23,19 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from va_contracts.profile import params_from_config
 from va_market_data.adapters.postgres.repository import MarketDataRepository
 from va_platform.db import normalize_url
 from va_scoring.adapters.postgres.models import InputSnapshot
 from va_scoring.adapters.postgres.store import input_rows
-from va_web_api.adapters.postgres.models import RankingRow, RankingRun, SnapshotRow
+from va_web_api.adapters.postgres.models import (
+    RankingFactor,
+    RankingProfile,
+    RankingRow,
+    RankingRun,
+    SnapshotRow,
+)
+from va_web_api.read import factor_ranks
 
 if TYPE_CHECKING:
     from datetime import date, datetime
@@ -89,6 +98,26 @@ _ROWS = text("""
                       WHERE r.scoring_run_id = res.scoring_run_id AND r.symbol = i.symbol)
 """)
 
+
+# Track G (G3): Profil und Parameter je Bewertungslauf
+_PROFILES = text("""
+    SELECT sr.id, sr.profile_id, sr.profile_version, p.name AS profile_name, sr.config,
+           sr.created_at
+    FROM scoring.scoring_run sr
+    LEFT JOIN scoring.profile p ON p.id = sr.profile_id
+    WHERE NOT EXISTS (SELECT 1 FROM web.ranking_profile x WHERE x.scoring_run_id = sr.id)
+""")
+
+# G3: Perzentile je Faktor und Titel
+_FACTORS = text("""
+    SELECT fs.scoring_run_id, i.symbol, fs.factor_key, fs.percentile_rank, sr.config, sr.created_at
+    FROM scoring.factor_score fs
+    JOIN scoring.scoring_run sr ON sr.id = fs.scoring_run_id
+    JOIN market_data.instrument i ON i.id = fs.instrument_id
+    WHERE NOT EXISTS (SELECT 1 FROM web.ranking_factor x
+                      WHERE x.scoring_run_id = fs.scoring_run_id AND x.symbol = i.symbol)
+    ORDER BY fs.scoring_run_id, i.symbol
+""")
 
 # P5.1a: Abrufe mit Bewertungslauf, deren Eingangsdaten scoring noch nicht hat
 _INPUT_FETCHES = text("""
@@ -157,6 +186,46 @@ def _ranking_rows(conn: Connection) -> list[dict[str, Any]]:
     return rows
 
 
+def _ranking_profiles(conn: Connection) -> list[dict[str, Any]]:
+    """Wie die Projektion: eine Zeile nur mit Profil oder brauchbaren Parametern."""
+    rows = []
+    for row in conn.execute(_PROFILES).mappings():
+        params = params_from_config(row["config"])
+        if row["profile_id"] is None and params is None:
+            continue
+        rows.append(
+            {
+                "scoring_run_id": row["id"],
+                "profile_id": row["profile_id"],
+                "profile_version": row["profile_version"],
+                "profile_name": row["profile_name"],
+                "params": None if params is None else params.model_dump(mode="json"),
+                "created_at": row["created_at"],
+            }
+        )
+    return rows
+
+
+def _ranking_factors(conn: Connection) -> list[dict[str, Any]]:
+    """Je Bewertungslauf und Titel die Faktoren des Profils, fehlende Werte als ``None``."""
+    grouped: dict[tuple[int, str], dict[str, Any]] = {}
+    for row in conn.execute(_FACTORS).mappings():
+        key = (row["scoring_run_id"], row["symbol"])
+        entry = grouped.setdefault(
+            key, {"config": row["config"], "created_at": row["created_at"], "found": {}}
+        )
+        entry["found"][row["factor_key"]] = row["percentile_rank"]
+    return [
+        {
+            "scoring_run_id": scoring_run_id,
+            "symbol": symbol,
+            "ranks": factor_ranks(entry["config"], entry["found"]),
+            "created_at": entry["created_at"],
+        }
+        for (scoring_run_id, symbol), entry in grouped.items()
+    ]
+
+
 def _input_snapshots(conn: Connection) -> list[dict[str, Any]]:
     """Die flachen Zeilen alter Abrufe, wie scoring sie seit P5.1a selbst speichert."""
     rows: list[dict[str, Any]] = []
@@ -195,6 +264,9 @@ def backfill_projections(engine: Engine) -> dict[str, int]:
             "snapshot_row": _insert(conn, SnapshotRow, _snapshot_rows(conn)),
             "ranking_run": _insert(conn, RankingRun, _ranking_runs(conn)),
             "ranking_row": _insert(conn, RankingRow, _ranking_rows(conn)),
+            # Track G (G3)
+            "ranking_profile": _insert(conn, RankingProfile, _ranking_profiles(conn)),
+            "ranking_factor": _insert(conn, RankingFactor, _ranking_factors(conn)),
             # P5.1a: Eingangsdaten fuer die Vorschau von scoring
             "input_snapshot": _insert(conn, InputSnapshot, _input_snapshots(conn)),
         }

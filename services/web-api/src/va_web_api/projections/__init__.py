@@ -11,6 +11,8 @@ liest nur das Event, keine Tabellen anderer Services.
 - ``snapshot_row`` und ``ranking_run`` (P4.9): je Abruf die Titel mit Kennzahlen, je
   Bewertungslauf der Kopf. Daraus beantwortet das web-api Ranking und Titelseite, ohne die
   Tabellen von market-data und scoring zu lesen. Nur zum Anfuegen, Wiederholungen aendern nichts.
+- ``ranking_profile`` und ``ranking_factor`` (Track G, G3): je Bewertungslauf Profil und
+  Parameter, je Titel die Perzentile der Faktoren. Nur zum Anfuegen.
 - ``batch.run`` (P4.7): Runs, die das web-api angelegt hat (``web.run_request``), schliesst
   ``close_run`` beim ersten Ergebnis ab. Die Regeln sind die des ``RunTracker``. Runs des Batches
   schliesst der Batch selbst ab.
@@ -37,6 +39,8 @@ from va_contracts.events.v1 import (
 
 from ..adapters.postgres.batch_run import BATCH_RUN
 from ..adapters.postgres.models import (
+    RankingFactor,
+    RankingProfile,
     RankingRow,
     RankingRun,
     RunRequest,
@@ -68,6 +72,8 @@ def register(manager: EventManager) -> None:
     manager.projection(SCORING_RUN_COMPLETED)(scored)
     manager.projection(SCORING_RUN_COMPLETED)(ranking)
     manager.projection(SCORING_RUN_COMPLETED)(ranking_run)
+    manager.projection(SCORING_RUN_COMPLETED)(ranking_profile)
+    manager.projection(SCORING_RUN_COMPLETED)(ranking_factor)
     manager.projection(REPORT_SENT)(reported)
     manager.projection(RUN_FAILED)(failed)
     # Nach run_status: close_run liest die Zaehler, die die Projektionen davor gesetzt haben
@@ -202,6 +208,43 @@ def ranking_run(session: Session, env: Envelope[Any]) -> None:
         )
         .on_conflict_do_nothing()
     )
+
+
+def ranking_profile(session: Session, env: Envelope[Any]) -> None:
+    """Profil und Parameter des Bewertungslaufs (G3); aeltere Events tragen keine."""
+    data = env.data
+    if data.profile is None and data.params is None:
+        return
+    profile = data.profile
+    session.execute(
+        insert(RankingProfile)
+        .values(
+            scoring_run_id=data.scoring_run_id,
+            profile_id=None if profile is None else profile.profile_id,
+            profile_version=None if profile is None else profile.version,
+            profile_name=None if profile is None else profile.name,
+            params=None if data.params is None else data.params.model_dump(mode="json"),
+            created_at=env.time,
+        )
+        .on_conflict_do_nothing()
+    )
+
+
+def ranking_factor(session: Session, env: Envelope[Any]) -> None:
+    """Je Titel die Perzentile seiner Faktoren (G3), nur fuer Titel mit Raengen."""
+    data = env.data
+    rows = [
+        {
+            "scoring_run_id": data.scoring_run_id,
+            "symbol": row.fundamentals.identity.symbol,
+            "ranks": dict(row.factor_ranks),
+            "created_at": env.time,
+        }
+        for row in data.ranking
+        if row.factor_ranks
+    ]
+    if rows:
+        session.execute(insert(RankingFactor).values(rows).on_conflict_do_nothing())
 
 
 def reported(session: Session, env: Envelope[Any]) -> None:

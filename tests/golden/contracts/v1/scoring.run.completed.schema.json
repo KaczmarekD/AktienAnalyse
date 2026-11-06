@@ -224,6 +224,105 @@
       "title": "MarketDataV1",
       "type": "object"
     },
+    "ProfileParamsV1": {
+      "additionalProperties": false,
+      "description": "Die Parameter eines Profils mit ihren Regeln.\n\nUnbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten\nparams oder im Formular darf nicht still wegfallen.",
+      "properties": {
+        "drop_negative_value_metrics": {
+          "default": true,
+          "description": "Negative Multiples aus dem Value-Ranking ausschliessen",
+          "title": "Drop Negative Value Metrics",
+          "type": "boolean"
+        },
+        "min_factor_count": {
+          "default": 2,
+          "description": "Mindestzahl vorhandener Faktoren je Gruppe",
+          "minimum": 1,
+          "title": "Min Factor Count",
+          "type": "integer"
+        },
+        "min_market_cap": {
+          "default": 300000000.0,
+          "description": "Mindest-Marktkapitalisierung (EUR)",
+          "minimum": 0,
+          "title": "Min Market Cap",
+          "type": "number"
+        },
+        "min_quality_factor_share": {
+          "default": 0.5,
+          "description": "Mindestanteil vorhandener Quality-Faktoren",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Quality Factor Share",
+          "type": "number"
+        },
+        "min_value_factor_share": {
+          "default": 0.5,
+          "description": "Mindestanteil vorhandener Value-Faktoren",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Value Factor Share",
+          "type": "number"
+        },
+        "quality_factors": {
+          "description": "Aktive Quality-Faktoren, mindestens 2",
+          "items": {
+            "enum": [
+              "roic",
+              "fcf_margin",
+              "operating_margin",
+              "net_debt_ebitda",
+              "earnings_stability"
+            ],
+            "type": "string"
+          },
+          "title": "Quality Factors",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "value_factors": {
+          "description": "Aktive Value-Faktoren, mindestens 2",
+          "items": {
+            "enum": [
+              "ev_ebit",
+              "pb",
+              "p_fcf",
+              "shareholder_yield"
+            ],
+            "type": "string"
+          },
+          "title": "Value Factors",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "value_trap_quality_threshold": {
+          "default": 0.3,
+          "description": "Value-Trap bis zu diesem Quality-Score",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Trap Quality Threshold",
+          "type": "number"
+        },
+        "value_trap_value_threshold": {
+          "default": 0.7,
+          "description": "Value-Trap ab diesem Value-Score",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Trap Value Threshold",
+          "type": "number"
+        },
+        "value_weight": {
+          "default": 0.6,
+          "description": "Gewicht von Value; Quality ist der Rest",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value Weight",
+          "type": "number"
+        }
+      },
+      "title": "ProfileParamsV1",
+      "type": "object"
+    },
     "ProfileRefV1": {
       "description": "Ein Scoring-Profil in einer bestimmten Version (Phase 2b).",
       "properties": {
@@ -687,6 +786,17 @@
     },
     "options": {
       "$ref": "#/$defs/RunOptionsV1"
+    },
+    "params": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProfileParamsV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "profile": {
       "anyOf": [

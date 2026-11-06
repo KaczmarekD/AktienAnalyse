@@ -36,6 +36,8 @@ from va_scoring.adapters.postgres.models import (
     ScoringRun,
 )
 from va_web_api.adapters.postgres.models import (
+    RankingFactor,
+    RankingProfile,
     RankingRow,
     RankingRun,
     RunRequest,
@@ -67,6 +69,8 @@ __all__ = [
     "Profile",
     "ProfileActivation",
     "ProfileVersion",
+    "RankingFactor",
+    "RankingProfile",
     "RankingRow",
     "RankingRun",
     "RawInfo",

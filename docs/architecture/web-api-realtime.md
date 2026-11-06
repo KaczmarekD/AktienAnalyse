@@ -79,7 +79,8 @@ niemand, kommt 503 („Scoring nicht erreichbar“). Nach Speichern und Aktivier
 - Ohne NATS ist es `TableReadModel` mit den Abfragen aus P3.2 (Rolle `va_read`).
 - Mit `WEB_API_NATS_URL` und `WEB_API_PROJECTIONS_DATABASE_URL` ist es `ProjectionReadModel`
   (Rolle `va_web`). Es liest nur `web` und `batch.run`:
-  - Ranking und Titelseite aus `snapshot_row`, `ranking_run` und `ranking_row`;
+  - Ranking und Titelseite aus `snapshot_row`, `ranking_run` und `ranking_row`, seit G3 dazu
+    `ranking_profile` und `ranking_factor`;
   - Profile und Reports per Request/Reply von scoring bzw. notification.
 
 Die Historie füllt `src.db.backfill` beim Start der Migration aus den Tabellen nach. Die Antworten

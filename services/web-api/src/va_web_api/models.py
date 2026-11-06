@@ -80,6 +80,14 @@ class RankingRow(_Model):
     earnings_stability: float | None
 
 
+class RunProfile(_Model):
+    """Profil eines Bewertungslaufs (Track G, G3)."""
+
+    id: int
+    version: int
+    name: str | None
+
+
 class Ranking(_Model):
     scoring_run_id: int
     fetch_run_id: int | None
@@ -89,6 +97,9 @@ class Ranking(_Model):
     universe_source: str | None
     value_weight: float | None  # Import: keine Konfiguration gespeichert
     quality_weight: float | None
+    # Track G (G3), additiv: Profil und Parameter, mit denen gerechnet wurde; leer bei Altdaten
+    profile: RunProfile | None = None
+    params: ProfileParamsV1 | None = None
     rows: list[RankingRow]
 
 
@@ -125,6 +136,17 @@ class ScorePoint(_Model):
     value_score: float | None
     quality_score: float | None
     value_trap_flag: bool | None
+    # Track G (G3), additiv: Titel mit Rang im selben Lauf, fuer "Rang 1 von N"
+    ranked_count: int | None = None
+
+
+class FactorRanks(_Model):
+    """Perzentile je Faktor eines Titels im juengsten Bewertungslauf (Track G, G3)."""
+
+    scoring_run_id: int
+    # Faktor -> Anteil der Titel, die schlechter abschneiden (0 bis 1). Genau die Faktoren des
+    # Profils dieses Laufs; null, wenn Daten fehlten.
+    ranks: dict[str, float | None]
 
 
 class Instrument(_Model):
@@ -136,6 +158,7 @@ class Instrument(_Model):
     industry: str | None
     latest: Snapshot | None  # neuester gueltiger Abruf
     score_history: list[ScorePoint]  # aeltester zuerst
+    factor_ranks: FactorRanks | None = None  # G3; leer ohne Bewertung im juengsten Lauf
 
 
 class Report(_Model):

@@ -75,6 +75,24 @@ export type Factor = {
 };
 
 /**
+ * FactorRanks
+ *
+ * Perzentile je Faktor eines Titels im juengsten Bewertungslauf (Track G, G3).
+ */
+export type FactorRanks = {
+  /**
+   * Ranks
+   */
+  ranks: {
+    [key: string]: number | null;
+  };
+  /**
+   * Scoring Run Id
+   */
+  scoring_run_id: number;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -102,6 +120,7 @@ export type Health = {
  * Instrument
  */
 export type Instrument = {
+  factor_ranks?: FactorRanks | null;
   /**
    * Index
    */
@@ -471,6 +490,8 @@ export type Ranking = {
    * Origin
    */
   origin: string;
+  params?: ProfileParamsV1Output | null;
+  profile?: RunProfile | null;
   /**
    * Quality Weight
    */
@@ -692,6 +713,26 @@ export type RunDetail = {
 };
 
 /**
+ * RunProfile
+ *
+ * Profil eines Bewertungslaufs (Track G, G3).
+ */
+export type RunProfile = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
  * RunStart
  *
  * Ein Run aus dem UI (P4.7); die Optionen wie ``RunOptionsV1`` im Event.
@@ -838,6 +879,10 @@ export type ScorePoint = {
    * Rank
    */
   rank: number | null;
+  /**
+   * Ranked Count
+   */
+  ranked_count?: number | null;
   /**
    * Scoring Run Id
    */

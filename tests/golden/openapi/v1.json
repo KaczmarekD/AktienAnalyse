@@ -102,6 +102,36 @@
         "title": "Factor",
         "type": "object"
       },
+      "FactorRanks": {
+        "additionalProperties": false,
+        "description": "Perzentile je Faktor eines Titels im juengsten Bewertungslauf (Track G, G3).",
+        "properties": {
+          "ranks": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Ranks",
+            "type": "object"
+          },
+          "scoring_run_id": {
+            "title": "Scoring Run Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scoring_run_id",
+          "ranks"
+        ],
+        "title": "FactorRanks",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -137,6 +167,16 @@
       "Instrument": {
         "additionalProperties": false,
         "properties": {
+          "factor_ranks": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactorRanks"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "index": {
             "anyOf": [
               {
@@ -812,6 +852,26 @@
             "title": "Origin",
             "type": "string"
           },
+          "params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileParamsV1-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "quality_weight": {
             "anyOf": [
               {
@@ -1343,6 +1403,38 @@
         "title": "RunDetail",
         "type": "object"
       },
+      "RunProfile": {
+        "additionalProperties": false,
+        "description": "Profil eines Bewertungslaufs (Track G, G3).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "name"
+        ],
+        "title": "RunProfile",
+        "type": "object"
+      },
       "RunStart": {
         "additionalProperties": false,
         "description": "Ein Run aus dem UI (P4.7); die Optionen wie ``RunOptionsV1`` im Event.",
@@ -1593,6 +1685,17 @@
               }
             ],
             "title": "Rank"
+          },
+          "ranked_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranked Count"
           },
           "scoring_run_id": {
             "title": "Scoring Run Id",

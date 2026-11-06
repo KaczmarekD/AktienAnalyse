@@ -16,8 +16,18 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
+from va_contracts.profile import ProfileParamsV1
+
 from . import read
-from .models import Instrument, Ranking, RankingRow, RunDetail, ScorePoint, Snapshot
+from .models import (
+    FactorRanks,
+    Instrument,
+    Ranking,
+    RankingRow,
+    RunDetail,
+    ScorePoint,
+    Snapshot,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
@@ -88,6 +98,18 @@ _HEAD = text("""
     FROM web.ranking_run WHERE scoring_run_id = :scoring_run_id
 """)
 
+# Track G (G3): Profil und Parameter des Bewertungslaufs
+_PROFILE = text("""
+    SELECT profile_id, profile_version, profile_name, params
+    FROM web.ranking_profile WHERE scoring_run_id = :scoring_run_id
+""")
+
+# G3: Perzentile je Faktor eines Titels in einem Bewertungslauf
+_FACTORS = text("""
+    SELECT ranks FROM web.ranking_factor
+    WHERE scoring_run_id = :scoring_run_id AND symbol = :symbol
+""")
+
 # Wie _RANKING_ROWS in read.py: erst die bewerteten Titel, dann die gefilterten des Abrufs
 _ROWS = text("""
     SELECT r.rank_overall AS rank, COALESCE(r.symbol, s.symbol) AS symbol, s.name,
@@ -120,7 +142,10 @@ _HISTORY = text("""
     SELECT rr.scoring_run_id, rr.created_at, rr.origin, r.rank_overall AS rank,
            r.symbol IS NOT NULL AS passed_filter, r.composite_score, r.value_score,
            r.quality_score,
-           CASE WHEN r.symbol IS NULL THEN NULL ELSE r.value_trap END AS value_trap_flag
+           CASE WHEN r.symbol IS NULL THEN NULL ELSE r.value_trap END AS value_trap_flag,
+           (SELECT count(*) FROM web.ranking_row c
+            WHERE c.scoring_run_id = rr.scoring_run_id AND c.rank_overall IS NOT NULL)
+               AS ranked_count
     FROM web.ranking_run rr
     LEFT JOIN web.ranking_row r ON r.scoring_run_id = rr.scoring_run_id AND r.symbol = :symbol
     WHERE r.symbol IS NOT NULL
@@ -157,9 +182,14 @@ class ProjectionReadModel:
             head = conn.execute(_HEAD, {"scoring_run_id": scoring_run_id}).mappings().first()
             if head is None:
                 return None
-            rows = conn.execute(
-                _ROWS, {"scoring_run_id": scoring_run_id, "fetch_run_id": head["fetch_run_id"]}
-            ).mappings()
+            rows = (
+                conn.execute(
+                    _ROWS, {"scoring_run_id": scoring_run_id, "fetch_run_id": head["fetch_run_id"]}
+                )
+                .mappings()
+                .all()
+            )
+            profile = conn.execute(_PROFILE, {"scoring_run_id": scoring_run_id}).mappings().first()
             return Ranking(
                 scoring_run_id=head["scoring_run_id"],
                 fetch_run_id=head["fetch_run_id"],
@@ -169,6 +199,14 @@ class ProjectionReadModel:
                 universe_source=head["universe_source"],
                 value_weight=head["value_weight"],
                 quality_weight=head["quality_weight"],
+                profile=None
+                if profile is None
+                else read.run_profile(
+                    profile["profile_id"], profile["profile_version"], profile["profile_name"]
+                ),
+                params=None
+                if profile is None or profile["params"] is None
+                else ProfileParamsV1.model_validate(profile["params"]),
                 rows=[RankingRow.model_validate(dict(row)) for row in rows],
             )
 
@@ -179,6 +217,13 @@ class ProjectionReadModel:
                 return None
             isin = conn.execute(_ISIN, {"symbol": symbol}).scalar()
             history = conn.execute(_HISTORY, {"symbol": symbol}).mappings().all()
+            # G3: aus dem juengsten Bewertungslauf; ohne Bewertung dort keine Perzentile
+            latest = conn.execute(_LATEST).scalar()
+            ranks = (
+                None
+                if latest is None
+                else conn.execute(_FACTORS, {"scoring_run_id": latest, "symbol": symbol}).scalar()
+            )
         values: dict[str, Any] = dict(snapshot)
         identity = {
             "name": values.pop("name"),
@@ -193,6 +238,9 @@ class ProjectionReadModel:
             **identity,
             latest=Snapshot.model_validate(values),
             score_history=[ScorePoint.model_validate(dict(row)) for row in history],
+            factor_ranks=None
+            if latest is None or ranks is None
+            else FactorRanks(scoring_run_id=int(latest), ranks=ranks),
         )
 
     def get_report(self, report_id: int) -> Report | None:

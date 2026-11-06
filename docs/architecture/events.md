@@ -64,7 +64,7 @@ verpasster Events für WebSocket-Clients.
 | `va.screening.run.requested` | web-api | market-data | run_id, trigger (`scheduled`/`manual`), options (`force_refresh`, `dry_run`, `notify`) |
 | `live.va.marketdata.fetch.progressed` | market-data | web-api | run_id, done, total, symbol, ok |
 | `va.marketdata.snapshot.completed` | market-data | scoring, web-api | run_id, trigger, options, fetch_run_id, as_of, success_share, universe (Quelle, Stichtag, Größe, Zu-/Abgänge), fundamentals[] |
-| `va.scoring.run.completed` | scoring | notification, web-api | run_id (leer genau bei Rescore), trigger, options, scoring_run_id, fetch_run_id, as_of, universe, value_weight, quality_weight, Profil (id, version, Name), ranking[] (mindestens eine Zeile) |
+| `va.scoring.run.completed` | scoring | notification, web-api | run_id (leer genau bei Rescore), trigger, options, scoring_run_id, fetch_run_id, as_of, universe, value_weight, quality_weight, Profil (id, version, Name), seit G3 die Parameter des Laufs (`params`, optional), ranking[] (mindestens eine Zeile, mit Perzentilen je Faktor) |
 | `va.scoring.profile.saved` | scoring | web-api | profile_id, version |
 | `va.scoring.profile.activated` | scoring | web-api | profile_id, version |
 | `va.notification.report.sent` | notification | web-api | run_id, report_id, subject, dry_run |

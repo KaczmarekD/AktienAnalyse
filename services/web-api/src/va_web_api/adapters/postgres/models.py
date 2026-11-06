@@ -12,6 +12,7 @@ Geschrieben wird mit der Rolle ``va_web``, gelesen auch mit ``va_read``.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import CheckConstraint, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -151,6 +152,38 @@ class RankingRun(Base):
     universe_source: Mapped[str | None]
     value_weight: Mapped[float | None]
     quality_weight: Mapped[float | None]
+    created_at: Mapped[datetime]
+
+
+class RankingProfile(Base):
+    """Profil und Parameter eines Bewertungslaufs (Track G, G3), aus ``scoring.run.completed``.
+
+    Nur zum Anfuegen. Eine Zeile gibt es nur, wenn das Event Profil oder Parameter traegt.
+    """
+
+    __tablename__ = "ranking_profile"
+    __table_args__ = {"schema": "web"}  # noqa: RUF012
+
+    scoring_run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    profile_id: Mapped[int | None]
+    profile_version: Mapped[int | None]
+    profile_name: Mapped[str | None]
+    params: Mapped[dict[str, Any] | None]  # ProfileParamsV1 als JSON
+    created_at: Mapped[datetime]
+
+
+class RankingFactor(Base):
+    """Perzentile je Faktor eines Titels in einem Bewertungslauf (Track G, G3). Nur zum Anfuegen.
+
+    ``ranks`` haelt genau die Faktoren des Profils dieses Laufs, fehlende Daten als ``null``.
+    """
+
+    __tablename__ = "ranking_factor"
+    __table_args__ = {"schema": "web"}  # noqa: RUF012
+
+    scoring_run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    symbol: Mapped[str] = mapped_column(primary_key=True, index=True)
+    ranks: Mapped[dict[str, Any]]
     created_at: Mapped[datetime]
 
 
