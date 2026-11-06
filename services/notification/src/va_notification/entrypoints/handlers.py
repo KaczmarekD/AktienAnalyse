@@ -156,6 +156,8 @@ class NotificationHandler:
             universe_added=[_label(m) for m in event.universe.added],
             universe_removed=[_label(m) for m in event.universe.removed],
             now=cfg.clock(),
+            cost_of_capital=event.params.cost_of_capital if event.params else None,
+            terminal_growth=event.params.terminal_growth if event.params else None,
         )
 
     def _send_report(self, run_id: int | None, report_id: int, report: ReportArtifacts) -> None:

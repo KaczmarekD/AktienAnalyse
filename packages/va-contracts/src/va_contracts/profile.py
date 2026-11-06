@@ -25,6 +25,10 @@ QualityFactorKey = Literal[
 # Der Composite braucht je Gruppe mindestens zwei vorhandene Faktoren
 MIN_ACTIVE_FACTORS = 2
 
+# Branchenregel (ADR-0011, Punkt 3, mit den Ergaenzungen bei der Annahme am 06.11.2026): Anfaenge
+# der Yahoo-``industry`` von Banken, Versicherern, "Capital Markets" und Immobilien
+DEFAULT_INDUSTRY_PREFIXES = ("Banks", "Insurance", "Capital Markets", "Real Estate", "REIT")
+
 
 class ProfileParamsV1(Contract):
     """Die Parameter eines Profils mit ihren Regeln.
@@ -68,6 +72,35 @@ class ProfileParamsV1(Contract):
         default_factory=lambda: frozenset(get_args(QualityFactorKey)),
         description="Aktive Quality-Faktoren, mindestens 2",
     )
+    # F2.4 (ADR-0011, Punkt 3): zunaechst abgeschaltet, erst das Profil v2 (F2.5) schaltet sie an
+    industry_rules: bool = Field(
+        default=False,
+        description="Branchenregel: EV-, FCF- und Margen-Kennzahlen zaehlen bei Finanzwerten nicht",
+    )
+    industry_prefixes: tuple[str, ...] = Field(
+        default=DEFAULT_INDUSTRY_PREFIXES,
+        description="Anfaenge der Branche (Yahoo), fuer die die Branchenregel gilt",
+    )
+    cost_of_capital: float = Field(
+        default=0.08, gt=0, le=0.5, description="Kapitalkosten r fuer das gerechtfertigte KBV"
+    )
+    terminal_growth: float = Field(
+        default=0.02,
+        ge=-0.05,
+        le=0.1,
+        description="Langfristiges Wachstum g fuer das gerechtfertigte KBV",
+    )
+
+    @model_validator(mode="after")
+    def _justified_pb_defined(self) -> Self:
+        # Gerechtfertigtes KBV (ROE - g) / (r - g): nur mit r > g definiert
+        if self.cost_of_capital <= self.terminal_growth:
+            msg = "cost_of_capital muss groesser als terminal_growth sein"
+            raise ValueError(msg)
+        if any(not prefix.strip() for prefix in self.industry_prefixes):
+            msg = "industry_prefixes: leere Eintraege sind nicht erlaubt"
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def _enough_factors(self) -> Self:
@@ -114,6 +147,8 @@ def params_from_config(config: Mapping[str, Any] | None) -> ProfileParamsV1 | No
     for name in ("value_factors", "quality_factors"):
         if name in config:
             data[name] = list(config[name])  # Schluessel des Katalogs
+    if "industry_prefixes" in config:
+        data["industry_prefixes"] = tuple(config["industry_prefixes"])
     try:
         return ProfileParamsV1.model_validate(data)
     except ValidationError:

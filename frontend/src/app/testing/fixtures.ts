@@ -59,6 +59,11 @@ export const PARAMS: ProfileParamsV1Output = {
     'operating_margin',
     'roic',
   ],
+  // F2.4 (ADR-0011): Branchenregel, abgeschaltet bis zum Profil v2
+  industry_rules: false,
+  industry_prefixes: ['Banks', 'Insurance', 'Capital Markets', 'Real Estate', 'REIT'],
+  cost_of_capital: 0.08,
+  terminal_growth: 0.02,
 };
 
 export const RANKING: Ranking = {

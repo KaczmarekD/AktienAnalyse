@@ -101,6 +101,10 @@ class ScoringProfileParams(ProfileParamsV1):
                 # Ein Faktor ausserhalb des Katalogs faellt hier auf
                 "value_factors": list(cfg.value_factors),
                 "quality_factors": list(cfg.quality_factors),
+                "industry_rules": cfg.industry_rules,
+                "industry_prefixes": tuple(cfg.industry_prefixes),
+                "cost_of_capital": cfg.cost_of_capital,
+                "terminal_growth": cfg.terminal_growth,
             }
         )
 
@@ -126,6 +130,10 @@ class ScoringProfileParams(ProfileParamsV1):
                 for key, factor in DEFAULT_QUALITY_FACTORS.items()
                 if key in self.quality_factors
             },
+            industry_rules=self.industry_rules,
+            industry_prefixes=tuple(self.industry_prefixes),
+            cost_of_capital=self.cost_of_capital,
+            terminal_growth=self.terminal_growth,
         )
 
 

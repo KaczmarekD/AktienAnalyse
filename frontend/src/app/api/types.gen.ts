@@ -427,11 +427,29 @@ export type ProfileDetail = {
  */
 export type ProfileParamsV1Input = {
   /**
+   * Cost Of Capital
+   *
+   * Kapitalkosten r fuer das gerechtfertigte KBV
+   */
+  cost_of_capital?: number;
+  /**
    * Drop Negative Value Metrics
    *
    * Negative Multiples aus dem Value-Ranking ausschliessen
    */
   drop_negative_value_metrics?: boolean;
+  /**
+   * Industry Prefixes
+   *
+   * Anfaenge der Branche (Yahoo), fuer die die Branchenregel gilt
+   */
+  industry_prefixes?: Array<string>;
+  /**
+   * Industry Rules
+   *
+   * Branchenregel: EV-, FCF- und Margen-Kennzahlen zaehlen bei Finanzwerten nicht
+   */
+  industry_rules?: boolean;
   /**
    * Min Factor Count
    *
@@ -464,6 +482,12 @@ export type ProfileParamsV1Input = {
   quality_factors?: Array<
     'roic' | 'fcf_margin' | 'operating_margin' | 'net_debt_ebitda' | 'earnings_stability'
   >;
+  /**
+   * Terminal Growth
+   *
+   * Langfristiges Wachstum g fuer das gerechtfertigte KBV
+   */
+  terminal_growth?: number;
   /**
    * Value Factors
    *
@@ -500,11 +524,29 @@ export type ProfileParamsV1Input = {
  */
 export type ProfileParamsV1Output = {
   /**
+   * Cost Of Capital
+   *
+   * Kapitalkosten r fuer das gerechtfertigte KBV
+   */
+  cost_of_capital?: number;
+  /**
    * Drop Negative Value Metrics
    *
    * Negative Multiples aus dem Value-Ranking ausschliessen
    */
   drop_negative_value_metrics?: boolean;
+  /**
+   * Industry Prefixes
+   *
+   * Anfaenge der Branche (Yahoo), fuer die die Branchenregel gilt
+   */
+  industry_prefixes?: Array<string>;
+  /**
+   * Industry Rules
+   *
+   * Branchenregel: EV-, FCF- und Margen-Kennzahlen zaehlen bei Finanzwerten nicht
+   */
+  industry_rules?: boolean;
   /**
    * Min Factor Count
    *
@@ -535,6 +577,12 @@ export type ProfileParamsV1Output = {
    * Aktive Quality-Faktoren, mindestens 2
    */
   quality_factors?: Array<string>;
+  /**
+   * Terminal Growth
+   *
+   * Langfristiges Wachstum g fuer das gerechtfertigte KBV
+   */
+  terminal_growth?: number;
   /**
    * Value Factors
    *

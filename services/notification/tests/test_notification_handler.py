@@ -377,10 +377,13 @@ class TestFinancialsInTheMail:
         return RankingRowV1(
             fundamentals=FundamentalsV1(
                 identity=IdentityV1(
-                    symbol="INS.DE", name="Versicherung AG", industry="Insurance - Diversified"
+                    symbol="INS.DE",
+                    name="Versicherung AG",
+                    index="DAX",
+                    industry="Insurance - Diversified",
                 ),
                 market=MarketDataV1(market_cap=5e9, price=10.0),
-                value=ValueMetricsV1(pb_ratio=2.0, pe_ratio=10.0),
+                value=ValueMetricsV1(pb_ratio=3.0, pe_ratio=10.0),
             ),
             rank_overall=4,
             value_score=0.6,
@@ -397,7 +400,9 @@ class TestFinancialsInTheMail:
         html = setup.store.reports[0][2].html
         section = html.split("Finanzwerte", 1)[1]
         assert "Versicherung AG" in section
-        assert "2.00" in section  # (0,20 - 0) / (0,10 - 0)
+        assert "30.0 %" in section  # ROE = 3,0 / 10
+        assert "3.00" in section  # gerechtfertigt (0,30 - 0) / (0,10 - 0), wie das KBV
+        assert "3.00" in section.split("30.0 %", 1)[1]
 
     def test_without_flagged_titles_no_section(self, setup):
         _publish(setup, _completed())

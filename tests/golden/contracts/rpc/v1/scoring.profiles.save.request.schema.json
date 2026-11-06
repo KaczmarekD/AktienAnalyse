@@ -4,10 +4,39 @@
       "additionalProperties": false,
       "description": "Die Parameter eines Profils mit ihren Regeln.\n\nUnbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten\nparams oder im Formular darf nicht still wegfallen.",
       "properties": {
+        "cost_of_capital": {
+          "default": 0.08,
+          "description": "Kapitalkosten r fuer das gerechtfertigte KBV",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5,
+          "title": "Cost Of Capital",
+          "type": "number"
+        },
         "drop_negative_value_metrics": {
           "default": true,
           "description": "Negative Multiples aus dem Value-Ranking ausschliessen",
           "title": "Drop Negative Value Metrics",
+          "type": "boolean"
+        },
+        "industry_prefixes": {
+          "default": [
+            "Banks",
+            "Insurance",
+            "Capital Markets",
+            "Real Estate",
+            "REIT"
+          ],
+          "description": "Anfaenge der Branche (Yahoo), fuer die die Branchenregel gilt",
+          "items": {
+            "type": "string"
+          },
+          "title": "Industry Prefixes",
+          "type": "array"
+        },
+        "industry_rules": {
+          "default": false,
+          "description": "Branchenregel: EV-, FCF- und Margen-Kennzahlen zaehlen bei Finanzwerten nicht",
+          "title": "Industry Rules",
           "type": "boolean"
         },
         "min_factor_count": {
@@ -55,6 +84,14 @@
           "title": "Quality Factors",
           "type": "array",
           "uniqueItems": true
+        },
+        "terminal_growth": {
+          "default": 0.02,
+          "description": "Langfristiges Wachstum g fuer das gerechtfertigte KBV",
+          "maximum": 0.1,
+          "minimum": -0.05,
+          "title": "Terminal Growth",
+          "type": "number"
         },
         "value_factors": {
           "description": "Aktive Value-Faktoren, mindestens 2",

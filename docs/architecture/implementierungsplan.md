@@ -2810,21 +2810,36 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
 - **Voraussetzung:** P2b.2. Seit der Annahme von ADR-0011 (06.11.2026) kommt F2.4 vor F2.1;
   F2.1 nimmt seine neuen Faktoren dann in die Ausschlussliste auf.
 - **Präfixe** (Yahoo-`industry`, Ergänzungen bei der Annahme): „Banks“, „Insurance“,
-  „Capital Markets“, „Real Estate“ sowie „REIT“ irgendwo im Namen.
+  „Capital Markets“, „Real Estate“ und „REIT“ (Yahoo nennt REITs „REIT - …“).
 - **Test:**
-  - Bei Banken und Versicherern werden die ausgeschlossenen Faktoren nicht gerankt. Die Titel
-    fallen unter den Mindestanteil und erscheinen in der Liste „Finanzwerte“ mit P/B, P/E, ROE und
-    dem gerechtfertigten P/B.
-  - Für alle anderen Titel ändern sich die Ränge nur, weil die Finanzwerte aus dem Querschnitt
-    fallen.
-  - Mit abgeschalteter Regel (v1) bleiben die Golden-Files unverändert.
-  - Renderer-Test: Der Abschnitt erscheint nur, wenn Titel betroffen sind.
-- **Implementierung:** Die Klassifikation läuft über die Yahoo-`industry` mit einer Präfix-Liste im
-  Profil. Dazu kommen der Parameter `industry_rules` (an/aus), die Liste im Ergebnis und ein
-  Template-Abschnitt.
-- **Immobilien:** Die Präfix-Liste folgt aus der Vorprüfung zu ADR-0011: Enthält das EBIT von
-  Vonovia, LEG, TAG und Aroundtown Bewertungsergebnisse nach IAS 40? Ein Test mit deren
-  gespeicherten `statement_value`-Zeilen sichert die Einstufung ab.
+  - Profil (`services/scoring/tests/test_profile.py`): `industry_rules` (aus), `industry_prefixes`,
+    `cost_of_capital` (0,08) und `terminal_growth` (0,02) mit Grenzen, r > g, keine leeren
+    Präfixe; gespeicherte Profile ohne die Felder bekommen die Standardwerte; Abbildung auf
+    `ScoringConfig` und zurück.
+  - Scoring (`test_scoring.py`): Präfixe je Branche, darunter Deutsche Börse und DWS nicht. Bei
+    einem Versicherer werden die ausgeschlossenen Faktoren nicht gerankt, KBV, Shareholder Yield
+    und Gewinnstabilität schon; ohne Quality-Score kein Composite. Für alle anderen Titel ändern
+    sich die Ränge der ausgeschlossenen Faktoren nur, weil der Versicherer aus dem Querschnitt
+    fällt; die übrigen Ränge bleiben gleich. Abgeschaltet ändert sich nichts.
+  - Replay-Woche vom 30.10.2026 (`tests/test_industry_rules.py`): Die Regel trifft genau die elf
+    Titel aus der Vorprüfung (sechs Banken und Versicherer, flatexDEGIRO, vier Immobilienwerte),
+    abgeschaltet reproduziert sie die gespeicherten Scores. Die Belege zum Immobilien-EBIT stehen
+    im [Bericht der Vorprüfung](../research/adr-0011-vorpruefung/bericht.md); gespeicherte
+    `statement_value`-Zeilen von der NAS gibt es noch nicht.
+  - Contract: `RankingRowV1.industry_rule`, fehlt bei älteren Events und gilt dann als nicht
+    gesetzt.
+  - Mail (`tests/test_reporting.py`, Handler-Test): Abschnitt „Finanzwerte“ mit KBV, KGV, ROE
+    und gerechtfertigtem KBV, gerechnet mit r und g aus den Parametern des Laufs; ohne Gewinn kein
+    ROE; ohne betroffene Titel kein Abschnitt. Die Golden-Files der Mail bleiben byte-gleich.
+- **Implementierung:**
+  - `ProfileParamsV1` (`va_contracts.profile`): die vier Parameter, `DEFAULT_INDUSTRY_PREFIXES`.
+  - `va_scoring.domain.scoring`: `INDUSTRY_RULE_EXCLUDED`, `industry_rule_applies`, die Felder in
+    `ScoringConfig`. `score()` entfernt die ausgeschlossenen Kennzahlen vor dem Ranking und gibt
+    die Spalte `industry_rule` aus.
+  - `RankingRowV1.industry_rule` (additiv), Golden-Schemas, OpenAPI-Snapshot und TS-Client.
+  - notification: `build_report(cost_of_capital=, terminal_growth=)`, ROE = KBV / KGV (nur mit
+    positiven Werten), Abschnitt im Template vor „Methodik“.
+  - Keine Migration: Die Einstufung folgt aus Branche und Profil-Version, beide sind gespeichert.
 - **Review:** Es wird kein Rang innerhalb einer Branche berechnet.
 
 #### F2.5 Standardprofil v2 aktivieren

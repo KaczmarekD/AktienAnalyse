@@ -534,6 +534,7 @@ def test_ranking_row_carries_the_industry_rule():
     flat = {
         "symbol": "ALV.DE",
         "name": "Allianz",
+        "index": "DAX",
         "industry": "Insurance - Diversified",
         "rank_overall": 88,
         "industry_rule": True,

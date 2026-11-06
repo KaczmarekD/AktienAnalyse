@@ -16,7 +16,8 @@ Grundlage ist der [Bericht zur Vorprüfung](../research/adr-0011-vorpruefung/ber
 
 1. **Immobilien fest in der Branchenregel:** Das EBIT von Vonovia, LEG, TAG und Aroundtown
    enthält Bewertungsergebnisse nach IAS 40, die Bedingung aus Punkt 4 ist erfüllt. Für
-   Titel, deren Yahoo-`industry` mit „Real Estate“ beginnt oder „REIT“ enthält, gilt Punkt 3.
+   Titel, deren Yahoo-`industry` mit „Real Estate“ oder „REIT“ beginnt (Yahoo nennt REITs
+   „REIT - …“), gilt Punkt 3.
 2. **„Capital Markets“ in der Branchenregel:** flatexDEGIRO ist eine Bank, Yahoo führt es als
    „Capital Markets“. Ohne die Regel ginge sein negativer Unternehmenswert (Kundengelder) und
    ein Free Cashflow mit Kundeneinlagen in das Ranking ein.

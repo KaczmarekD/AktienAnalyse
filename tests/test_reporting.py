@@ -196,6 +196,8 @@ class TestFinancialsSection:
         assert "Mid Co" in section
         assert "20.0 %" in section  # ROE = 2,0 / 10
         assert "3.00" in section  # (0,20 - 0,02) / (0,08 - 0,02)
+        assert "r = 8.0 %" in section
+        assert "g = 2.0 %" in section
         # Nicht in Top und Flop: Der Titel hat keinen Composite
         assert "Mid Co" not in html.split("Finanzwerte", 1)[0]
 

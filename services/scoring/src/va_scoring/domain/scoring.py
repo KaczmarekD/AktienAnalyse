@@ -12,6 +12,11 @@ Universum gerankt):
    ``value_trap_value_threshold``-Perzentil und Quality im unteren
    ``value_trap_quality_threshold``-Perzentil.
 
+Branchenregel (F2.4, ADR-0011 Punkt 3, nur mit ``industry_rules``): Bei Banken, Versicherern,
+"Capital Markets" und Immobilien sagen EV-, FCF- und Margen-Kennzahlen nichts aus. Sie fallen
+vor dem Ranking aus dem Querschnitt; die Titel landen meist unter dem Mindestanteil und ohne
+Composite. Alle Raenge bleiben global, innerhalb einer Branche wird nicht gerankt.
+
 Robust gegen fehlende Werte: Faktoren, die fuer einen Titel nicht
 vorliegen, werden aus dem Mittel ausgenommen (nicht mit 0 bestraft).
 Negative Bewertungsmultiplikatoren (Verluste) werden vom Value-Ranking
@@ -26,6 +31,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
+
+from va_contracts.profile import DEFAULT_INDUSTRY_PREFIXES
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +55,18 @@ DEFAULT_QUALITY_FACTORS: dict[str, QualityFactor] = {
     "net_debt_ebitda": ("net_debt_ebitda", "low"),
     "earnings_stability": ("earnings_stability", "high"),
 }
+
+
+# Faktoren, die die Branchenregel ausschliesst (ADR-0011, Punkt 3). F2.1 ergaenzt F-Score,
+# Accruals und CFO/Bilanzsumme.
+INDUSTRY_RULE_EXCLUDED: frozenset[str] = frozenset(
+    {"ev_ebit", "p_fcf", "fcf_margin", "net_debt_ebitda", "operating_margin", "roic"}
+)
+
+
+def industry_rule_applies(industry: object, prefixes: tuple[str, ...]) -> bool:
+    """Faellt eine Branche (Yahoo-``industry``) unter die Branchenregel?"""
+    return isinstance(industry, str) and industry.startswith(prefixes) and bool(prefixes)
 
 
 @dataclass
@@ -76,6 +95,12 @@ class ScoringConfig:
     quality_factors: dict[str, QualityFactor] = field(
         default_factory=lambda: dict(DEFAULT_QUALITY_FACTORS),
     )
+
+    # Branchenregel (F2.4) und die Parameter des gerechtfertigten KBV im Abschnitt "Finanzwerte"
+    industry_rules: bool = False
+    industry_prefixes: tuple[str, ...] = DEFAULT_INDUSTRY_PREFIXES
+    cost_of_capital: float = 0.08
+    terminal_growth: float = 0.02
 
 
 def _percentile_rank(series: pd.Series, direction: str, drop_non_positive: bool) -> pd.Series:
@@ -120,20 +145,24 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
     if out.empty:
         return out
 
+    # Gerankt wird auf einer Kopie ohne die Kennzahlen, die die Branchenregel ausschliesst; die
+    # Ausgabe behaelt die Rohwerte (CSV, Speicherung)
+    ruled, inputs = _industry_rule_inputs(out, cfg)
+
     value_ranks = pd.DataFrame(index=out.index)
     for name, (col, direction) in cfg.value_factors.items():
-        if col in out.columns:
+        if col in inputs.columns:
             value_ranks[f"rank_{name}"] = _percentile_rank(
-                out[col],
+                inputs[col],
                 direction,
                 cfg.drop_negative_value_metrics,
             )
 
     quality_ranks = pd.DataFrame(index=out.index)
     for name, (col, direction) in cfg.quality_factors.items():
-        if col in out.columns:
+        if col in inputs.columns:
             quality_ranks[f"rank_{name}"] = _percentile_rank(
-                out[col],
+                inputs[col],
                 direction,
                 drop_non_positive=False,
             )
@@ -155,6 +184,7 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
         out["quality_score"].fillna(1) <= cfg.value_trap_quality_threshold
     )
 
+    out["industry_rule"] = ruled
     out = pd.concat([out, value_ranks, quality_ranks], axis=1)
     # Feste Reihenfolge: bei gleichem oder fehlendem Composite nach Symbol. Sonst hinge der
     # Rang von der Reihenfolge der Eingabe ab (Abruf: Universum, Wiederverwendung: DB).
@@ -163,9 +193,29 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
     ).reset_index(drop=True)
     out["rank_overall"] = np.arange(1, len(out) + 1)
 
+    if cfg.industry_rules:
+        log.info("Branchenregel: %d Titel ohne EV-, FCF- und Margen-Kennzahlen", int(ruled.sum()))
     log.info(
         "Scoring fertig: %d bewertet, %d mit Value-Trap-Flag",
         int(out["composite_score"].notna().sum()),
         int(out["value_trap_flag"].sum()),
     )
     return out
+
+
+def _industry_rule_inputs(out: pd.DataFrame, cfg: ScoringConfig) -> tuple[pd.Series, pd.DataFrame]:
+    """Maske der Titel unter der Branchenregel und die Eingabe fuers Ranking.
+
+    Die Eingabe ist eine Kopie, in der bei diesen Titeln die ausgeschlossenen Kennzahlen fehlen.
+    Ohne ``industry_rules`` ist die Maske leer und die Eingabe ``out`` selbst.
+    """
+    if not cfg.industry_rules or "industry" not in out.columns:
+        return pd.Series(False, index=out.index, dtype=bool), out
+    mask = out["industry"].map(lambda value: industry_rule_applies(value, cfg.industry_prefixes))
+    mask = mask.astype(bool)
+    inputs = out.copy()
+    catalog = cfg.value_factors | cfg.quality_factors
+    for key, (col, _direction) in catalog.items():
+        if key in INDUSTRY_RULE_EXCLUDED and col in inputs.columns:
+            inputs[col] = inputs[col].astype(float).mask(mask)
+    return mask, inputs

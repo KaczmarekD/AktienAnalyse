@@ -109,7 +109,31 @@
   </tbody>
 </table>
 
-<h2>Methodik (kurz)</h2>
+{% if financial_rows %}<h2>Finanzwerte</h2>
+<p>Banken, Versicherer, Capital Markets und Immobilien: EV-, FCF- und Margen-Kennzahlen sagen hier nichts aus. Diese Titel haben deshalb keinen Composite. ROE = P/B / P/E, gerechtfertigtes P/B = (ROE - g) / (r - g) mit r = {{ fmt_pct(financial_params.r) }} und g = {{ fmt_pct(financial_params.g) }}.</p>
+<table>
+  <thead>
+    <tr>
+      <th class="text">Unternehmen</th><th>Index</th><th class="text">Branche</th>
+      <th>P/B</th><th>P/E</th><th>ROE</th><th>Gerechtf. P/B</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in financial_rows %}
+    <tr>
+      <td class="text"><b>{{ r.name }}</b><br><span style="color:#888;font-size:11px">{{ r.symbol }}</span></td>
+      <td>{{ r.index }}</td>
+      <td class="text">{{ r.industry or "-" }}</td>
+      <td>{{ fmt_num(r.pb_ratio) }}</td>
+      <td>{{ fmt_num(r.pe_ratio) }}</td>
+      <td>{{ fmt_pct(r.roe) }}</td>
+      <td>{{ fmt_num(r.justified_pb) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% endif %}<h2>Methodik (kurz)</h2>
 <p style="font-size:13px">
 Composite Value Score: Perzentilrang ueber EV/EBIT, P/B, P/FCF und Shareholder Yield (Cross-Sektional auf das gefilterte Universum). Niedrige Bewertungs-Multiples und hohe Yields ergeben hohe Ranks.
 <br>Quality Score: Perzentilrang ueber ROIC, FCF-Marge, operative Marge, Net Debt / EBITDA (invertiert) und Earnings-Stabilitaet.

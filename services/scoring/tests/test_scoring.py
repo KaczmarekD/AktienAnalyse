@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+import math
+from typing import Any, ClassVar
 
 import numpy as np
 import pandas as pd
@@ -87,7 +88,7 @@ class TestCompositeMean:
         assert result.empty
 
 
-def _frame(rows: dict[str, dict[str, float]]) -> pd.DataFrame:
+def _frame(rows: dict[str, dict[str, Any]]) -> pd.DataFrame:
     """Kleines Universum: Symbol -> Kennzahlen, alle ueber der Mindest-Marktkapitalisierung."""
     return pd.DataFrame(
         [{"symbol": s, "market_cap": 1e9, **metrics} for s, metrics in rows.items()]
@@ -272,7 +273,7 @@ class TestIndustryRules:
     den Mindestanteil und bekommen keinen Composite. Alle Ränge bleiben global."""
 
     PREFIXES = ScoringConfig().industry_prefixes
-    INSURER: ClassVar[dict[str, object]] = {
+    INSURER: ClassVar[dict[str, Any]] = {
         "industry": "Insurance - Diversified",
         "ev_ebit": 4.0,
         "pb_ratio": 2.6,
@@ -318,35 +319,40 @@ class TestIndustryRules:
     def test_off_by_default(self):
         out = score(self._universe(), ScoringConfig()).set_index("symbol")
         assert not out["industry_rule"].any()
-        assert pd.notna(out.loc["INS.DE", "rank_ev_ebit"])
+        assert out["rank_ev_ebit"].notna()["INS.DE"]
 
     def test_excluded_factors_are_not_ranked(self):
         out = score(self._universe(), ScoringConfig(industry_rules=True)).set_index("symbol")
-        insurer = out.loc["INS.DE"]
+        insurer = out.loc["INS.DE"].to_dict()
         assert bool(insurer["industry_rule"]) is True
-        for key in INDUSTRY_RULE_EXCLUDED:
-            assert pd.isna(insurer[f"rank_{key}"]), key
+        missing = {key for key, value in insurer.items() if _missing(value)}
+        assert {f"rank_{key}" for key in INDUSTRY_RULE_EXCLUDED} <= missing
         # KBV und Shareholder Yield bleiben, Gewinnstabilität auch
-        assert pd.notna(insurer["rank_pb"])
-        assert pd.notna(insurer["rank_shareholder_yield"])
-        assert pd.notna(insurer["rank_earnings_stability"])
+        assert not {"rank_pb", "rank_shareholder_yield", "rank_earnings_stability"} & missing
         # Nur ein Quality-Faktor: kein Quality-Score, also kein Composite (M1)
-        assert pd.isna(insurer["quality_score"])
-        assert pd.isna(insurer["composite_score"])
+        assert {"quality_score", "composite_score"} <= missing
         assert out.index[-1] == "INS.DE"  # hinter allen bewerteten Titeln, nach Symbol
         assert not out.drop(index="INS.DE")["industry_rule"].any()
+        # Die Kennzahlen selbst bleiben stehen (CSV, Speicherung), sie zählen nur nicht
+        assert insurer["ev_ebit"] == 4.0
+        assert insurer["roic"] == _FULL_QUALITY["roic"]
 
     def test_others_only_lose_them_from_the_cross_section(self):
         frame = self._universe()
         ruled = score(frame, ScoringConfig(industry_rules=True)).set_index("symbol")
         without = score(frame[frame["symbol"] != "INS.DE"], ScoringConfig()).set_index("symbol")
         unruled = score(frame, ScoringConfig()).set_index("symbol")
-        others = [s for s in ruled.index if s != "INS.DE" and pd.notna(ruled.loc[s, "rank_roic"])]
+        others = [s for s in ruled.index[ruled["rank_roic"].notna()] if s != "INS.DE"]
         assert others
-        for symbol in others:
-            # Ausgeschlossene Faktoren: gerankt, als gäbe es den Versicherer nicht
-            assert ruled.loc[symbol, "rank_ev_ebit"] == pytest.approx(
-                without.loc[symbol, "rank_ev_ebit"]
-            )
-            # Übrige Faktoren: unverändert, der Versicherer zählt dort weiter mit
-            assert ruled.loc[symbol, "rank_pb"] == pytest.approx(unruled.loc[symbol, "rank_pb"])
+        # Ausgeschlossene Faktoren: gerankt, als gäbe es den Versicherer nicht
+        assert ruled.loc[others, "rank_ev_ebit"].tolist() == pytest.approx(
+            without.loc[others, "rank_ev_ebit"].tolist()
+        )
+        # Übrige Faktoren: unverändert, der Versicherer zählt dort weiter mit
+        assert ruled.loc[others, "rank_pb"].tolist() == pytest.approx(
+            unruled.loc[others, "rank_pb"].tolist()
+        )
+
+
+def _missing(value: object) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value))

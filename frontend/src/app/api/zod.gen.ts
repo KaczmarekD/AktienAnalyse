@@ -169,7 +169,13 @@ export const zPreview = z.object({
  * params oder im Formular darf nicht still wegfallen.
  */
 export const zProfileParamsV1Input = z.object({
+  cost_of_capital: z.number().gt(0).lte(0.5).optional().default(0.08),
   drop_negative_value_metrics: z.boolean().optional().default(true),
+  industry_prefixes: z
+    .array(z.string())
+    .optional()
+    .default(['Banks', 'Insurance', 'Capital Markets', 'Real Estate', 'REIT']),
+  industry_rules: z.boolean().optional().default(false),
   min_factor_count: z.int().gte(1).optional().default(2),
   min_market_cap: z.number().gte(0).optional().default(300000000),
   min_quality_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
@@ -179,6 +185,7 @@ export const zProfileParamsV1Input = z.object({
       z.enum(['roic', 'fcf_margin', 'operating_margin', 'net_debt_ebitda', 'earnings_stability']),
     )
     .optional(),
+  terminal_growth: z.number().gte(-0.05).lte(0.1).optional().default(0.02),
   value_factors: z.array(z.enum(['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield'])).optional(),
   value_trap_quality_threshold: z.number().gte(0).lte(1).optional().default(0.3),
   value_trap_value_threshold: z.number().gte(0).lte(1).optional().default(0.7),
@@ -194,12 +201,19 @@ export const zProfileParamsV1Input = z.object({
  * params oder im Formular darf nicht still wegfallen.
  */
 export const zProfileParamsV1Output = z.object({
+  cost_of_capital: z.number().gt(0).lte(0.5).optional().default(0.08),
   drop_negative_value_metrics: z.boolean().optional().default(true),
+  industry_prefixes: z
+    .array(z.string())
+    .optional()
+    .default(['Banks', 'Insurance', 'Capital Markets', 'Real Estate', 'REIT']),
+  industry_rules: z.boolean().optional().default(false),
   min_factor_count: z.int().gte(1).optional().default(2),
   min_market_cap: z.number().gte(0).optional().default(300000000),
   min_quality_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
   min_value_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
   quality_factors: z.array(z.string()).optional(),
+  terminal_growth: z.number().gte(-0.05).lte(0.1).optional().default(0.02),
   value_factors: z.array(z.string()).optional(),
   value_trap_quality_threshold: z.number().gte(0).lte(1).optional().default(0.3),
   value_trap_value_threshold: z.number().gte(0).lte(1).optional().default(0.7),

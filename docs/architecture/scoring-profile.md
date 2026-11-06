@@ -38,6 +38,10 @@ Die Standardwerte entsprechen dem heutigen `ScoringConfig`:
 | `drop_negative_value_metrics` | an | negative Multiples aus dem Value-Ranking ausschließen |
 | `value_factors` | EV/EBIT, P/B, P/FCF, Shareholder Yield | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv |
 | `quality_factors` | ROIC, FCF-Marge, Operating Margin, Net Debt/EBITDA, Earnings Stability | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv |
+| `industry_rules` | aus | Branchenregel (seit F2.4, ADR-0011): Bei passender Branche zählen EV/EBIT, P/FCF, FCF-Marge, Net Debt/EBITDA, operative Marge und ROIC nicht; die Titel stehen im Abschnitt „Finanzwerte“ der Mail. Erst das Profil v2 (F2.5) schaltet sie an. |
+| `industry_prefixes` | Banks, Insurance, Capital Markets, Real Estate, REIT | Anfänge der Yahoo-`industry`, für die die Branchenregel gilt; keine leeren Einträge |
+| `cost_of_capital` | 0.08 | 0–0,5 (ohne 0): Kapitalkosten r für das gerechtfertigte KBV (ROE − g) / (r − g) |
+| `terminal_growth` | 0.02 | −0,05–0,1: Wachstum g dafür; `cost_of_capital` muss größer sein |
 
 **Bewusst nicht änderbar** sind der Faktor-Katalog selbst und die Richtung jedes Faktors (ob ein
 hoher oder niedriger Wert besser ist). Neue Faktoren bleiben Code-Änderungen nach dem Ablauf in

@@ -16,8 +16,11 @@ from datetime import date, datetime
 from importlib import resources
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from jinja2 import Template
+
+from va_contracts.profile import ProfileParamsV1
 
 # Name der Fallback-Quelle wie in market-data (Import verboten, ein Test vergleicht beide)
 FALLBACK_SOURCE = "Fallback-CSV"
@@ -58,6 +61,33 @@ def _template_rows(frame: pd.DataFrame) -> list[dict[Hashable, Any]]:
             if value is not None and not isinstance(value, str) and pd.isna(value):
                 row[col] = None
     return rows
+
+
+def _numbers(frame: pd.DataFrame, column: str) -> pd.Series:
+    """Spalte als Zahlen; fehlt sie, NaN."""
+    if column not in frame.columns:
+        return pd.Series(np.nan, index=frame.index, dtype=float)
+    return pd.to_numeric(frame[column], errors="coerce").astype(float)
+
+
+def _financial_rows(
+    scored: pd.DataFrame, cost_of_capital: float, terminal_growth: float
+) -> list[dict[Hashable, Any]]:
+    """Titel unter der Branchenregel (F2.4) fuer den Abschnitt "Finanzwerte", nach Symbol.
+
+    ROE = KBV / KGV (Gewinn je Buchwert), nur mit positivem KBV und KGV. Gerechtfertigtes KBV
+    nach ADR-0011, Punkt 3: (ROE - g) / (r - g).
+    """
+    if "industry_rule" not in scored.columns:
+        return []
+    rows = scored[scored["industry_rule"].fillna(value=False).astype(bool)].copy()
+    if rows.empty:
+        return []
+    pb, pe = _numbers(rows, "pb_ratio"), _numbers(rows, "pe_ratio")
+    roe = (pb / pe).where((pb > 0) & (pe > 0), np.nan)
+    rows["roe"] = roe
+    rows["justified_pb"] = (roe - terminal_growth) / (cost_of_capital - terminal_growth)
+    return _template_rows(rows.sort_values("symbol", kind="stable"))
 
 
 def _fmt_num(v: Any) -> str:
@@ -114,6 +144,10 @@ def build_report(
     universe_added: Sequence[str] = (),
     universe_removed: Sequence[str] = (),
     now: datetime | None = None,
+    # Gerechtfertigtes KBV im Abschnitt "Finanzwerte" (F2.4): aus den Parametern des Laufs,
+    # ohne sie die Standardwerte des Contracts
+    cost_of_capital: float | None = None,
+    terminal_growth: float | None = None,
 ) -> ReportArtifacts:
     # Injizierbar, damit Tests (Golden-Master) deterministisch sind. Lokale Zeit:
     # Dockerfile und Compose setzen TZ=Europe/Berlin.
@@ -123,6 +157,11 @@ def build_report(
     valid = scored[scored["composite_score"].notna()].copy()
     top_rows = _template_rows(valid.head(top_n))
     bottom_rows = _template_rows(valid.tail(bottom_n).iloc[::-1])
+
+    defaults = ProfileParamsV1()
+    rate = cost_of_capital if cost_of_capital is not None else defaults.cost_of_capital
+    growth = terminal_growth if terminal_growth is not None else defaults.terminal_growth
+    financial_rows = _financial_rows(scored, rate, growth)
 
     scored_count = int(valid.shape[0])
     universe = universe_size if universe_size is not None else len(scored)
@@ -134,6 +173,8 @@ def build_report(
         bottom_n=bottom_n,
         top_rows=top_rows,
         bottom_rows=bottom_rows,
+        financial_rows=financial_rows,
+        financial_params={"r": rate, "g": growth},
         weights={"value": value_weight, "quality": quality_weight},
         version=version,
         profile=profile,

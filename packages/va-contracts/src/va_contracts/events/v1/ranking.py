@@ -31,6 +31,9 @@ class RankingRowV1(Contract):
     composite_score: float | None = Field(default=None, ge=0)
     value_trap_flag: bool = False
     factor_ranks: dict[str, float | None] = Field(default_factory=dict)
+    # F2.4 (additiv): Der Titel faellt unter die Branchenregel und steht im Abschnitt
+    # "Finanzwerte" der Mail. Fehlt bei aelteren Events und gilt dann als nicht gesetzt.
+    industry_rule: bool = False
 
     def to_flat(self) -> dict[str, Any]:
         """Eine Zeile wie die Ausgabe von ``score()``: Faktor-Raenge als ``rank_<name>``."""
@@ -41,6 +44,7 @@ class RankingRowV1(Contract):
             composite_score=self.composite_score,
             value_trap_flag=self.value_trap_flag,
             rank_overall=self.rank_overall,
+            industry_rule=self.industry_rule,
         )
         flat.update({f"rank_{name}": rank for name, rank in self.factor_ranks.items()})
         return flat
@@ -58,6 +62,7 @@ class RankingRowV1(Contract):
             fundamentals=fundamentals or FundamentalsV1.from_flat(flat),
             rank_overall=int(flat["rank_overall"]),
             value_trap_flag=bool(flat.get("value_trap_flag", False)),
+            industry_rule=bool(flat.get("industry_rule", False)),
             factor_ranks={
                 key.removeprefix("rank_"): missing_to_none(value)
                 for key, value in flat.items()
