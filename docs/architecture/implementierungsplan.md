@@ -3285,7 +3285,7 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
     `WEB_API_AUTH_REQUIRED=true`, `docker-compose.yml` bleibt bis D1.5 bei `false`. Der E2E-Stack
     legt einen Admin an (`E2E_USERNAME`, `E2E_PASSWORD` in `docker/e2e.env`). `docker/e2e_run.py`,
     `tests/e2e` und Playwright melden sich damit an.
-- **Umgesetzt (06.11.2026, Branch `feat/d1-4-frontend`):** wie im Entwurf, dazu:
+- **Umgesetzt (06.11.2026, auf `main` als `00d8b62`, CI grün):** wie im Entwurf, dazu:
   - **`GET /auth/session`** (offen, immer 200, `{"user": …}` oder `null`): Ein 401 von `/me`
     beim Start stünde auf jeder Anmeldeseite als Fehler in der Konsole des Browsers, die
     Browser-Tests verlangen aber eine leere Konsole.
@@ -3307,8 +3307,16 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   - **Sicherheitstest aus P3.4:** geprüft wird jetzt, dass nur die vier Anfragen ein Passwort
     nehmen und keine Antwort ein Feld mit Passwort, Geheimnis oder Token als Text hat.
   - **`make local-admin NAME=<name>`** legt im lokalen Stack das erste Konto an.
+  - **Review (`/code-review high`):** behoben, dass Vertipper beim Passwortändern die gemeinsame
+    Adresse hinter nginx sperrten (zählt jetzt nur für das Konto), dass ein gescheitertes Abmelden
+    den Nutzer nur scheinbar abmeldete, dass „Sitzung abgelaufen“ ohne Sitzungspflicht veraltet
+    stehen blieb, dass 422 als „Server nicht erreichbar“ erschien und dass ein abgelehntes
+    Kopieren die Konsole füllte. Beim Ansehen im Browser: `display: flex` auf Tabellenzellen
+    verschob die Spalten der Nutzerliste. Bewusst gelassen: die vier ähnlichen Guards und der
+    JSON-Interceptor (siehe oben).
   - **Offen gelassen:** `Retry-After` nennt weiter 900 s statt der Restzeit; das UI zeigt ohnehin
-    „in 15 Minuten“.
+    „in 15 Minuten“. Lokal fehlte Chromium für Playwright (Download nicht ohne Rückfrage); die
+    Browser-Tests liefen in der CI.
 
 **D1.5 Betrieb: HTTPS, Proxys, NATS-Nutzer 🔒** (NUT-07, Regeln 9 bis 11)
 - **Test:**
