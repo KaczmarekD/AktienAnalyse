@@ -3,7 +3,18 @@ import { LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import '../locale';
-import { DayPipe, DayTimePipe, MISSING, OrDashPipe, PctPipe } from './format';
+import {
+  DayPipe,
+  DayTimePipe,
+  DurationPipe,
+  IndexSourcePipe,
+  MISSING,
+  OrDashPipe,
+  PctPipe,
+  RunKindPipe,
+  SECTORS,
+  SectorPipe,
+} from './format';
 
 function pipe<T>(type: new () => T): T {
   TestBed.configureTestingModule({ providers: [{ provide: LOCALE_ID, useValue: 'de-DE' }] });
@@ -50,5 +61,46 @@ describe('PctPipe', () => {
     expect(plain(pct.transform(0.123))).toBe('12,3 %');
     expect(plain(pct.transform(0.6, '1.0-0'))).toBe('60 %');
     expect(pct.transform(null)).toBe(MISSING);
+  });
+});
+
+describe('SectorPipe', () => {
+  it('names the eleven Yahoo sectors in German and keeps unknown ones', () => {
+    const sector = pipe(SectorPipe);
+    expect(Object.keys(SECTORS)).toHaveLength(11);
+    expect(sector.transform('Financial Services')).toBe('Finanzen');
+    expect(sector.transform('Consumer Defensive')).toBe('Basiskonsum');
+    expect(sector.transform('Something New')).toBe('Something New');
+    expect(sector.transform(null)).toBe(MISSING);
+  });
+});
+
+describe('RunKindPipe', () => {
+  it('names the kind of a run in German', () => {
+    const kind = pipe(RunKindPipe);
+    expect(kind.transform('batch')).toBe('Abruf und Bewertung');
+    expect(kind.transform('rescore')).toBe('Neu bewertet');
+    expect(kind.transform('import')).toBe('Import');
+    expect(kind.transform('other')).toBe('other');
+  });
+});
+
+describe('DurationPipe', () => {
+  it('gives minutes, from one hour on hours and minutes', () => {
+    const duration = pipe(DurationPipe);
+    expect(plain(duration.transform('2026-10-30T06:02:00Z', '2026-10-30T06:14:20Z'))).toBe('12 min');
+    expect(plain(duration.transform('2026-10-30T06:00:00Z', '2026-10-30T07:05:00Z'))).toBe('1 h 5 min');
+    expect(plain(duration.transform('2026-10-30T06:00:00Z', '2026-10-30T06:00:20Z'))).toBe('< 1 min');
+    expect(duration.transform('2026-10-30T06:00:00Z', null)).toBe(MISSING);
+  });
+});
+
+describe('IndexSourcePipe', () => {
+  it('keeps the live sources and calls the fallback list Ersatzliste', () => {
+    const source = pipe(IndexSourcePipe);
+    expect(source.transform('Deka')).toBe('Deka');
+    expect(source.transform('iShares')).toBe('iShares');
+    expect(source.transform('Fallback-CSV')).toBe('Ersatzliste');
+    expect(source.transform(null)).toBe(MISSING);
   });
 });

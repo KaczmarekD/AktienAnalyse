@@ -208,6 +208,32 @@ def test_every_factor_has_label_and_hint():
     assert all(label and hint for label, hint in FACTOR_INFO.values())
 
 
+def test_factor_texts_match_the_ui_glossary():
+    # Track G (G2): Labels wie in frontend/src/app/shared/glossary/glossary.ts, Texte aus dem
+    # Katalog der Spec mit echten Umlauten; das UI zeigt sie als Tooltip (höchstens 200 Zeichen)
+    from va_scoring.domain.profile import FACTOR_INFO
+
+    labels = {key: label for key, (label, _hint) in FACTOR_INFO.items()}
+    assert labels == {
+        "ev_ebit": "EV/EBIT",
+        "pb": "KBV",
+        "p_fcf": "Kurs/FCF",
+        "shareholder_yield": "Shareholder Yield",
+        "roic": "ROIC",
+        "fcf_margin": "FCF-Marge",
+        "operating_margin": "Operative Marge",
+        "net_debt_ebitda": "Net Debt/EBITDA",
+        "earnings_stability": "Gewinnstabilität",
+    }
+    # Ersatzschreibungen der alten Texte; "Steuern" o. Ä. sind echte Wörter und bleiben erlaubt
+    ascii_umlauts = ("verhaeltnis", "beschoen", "rueck", "boerse", "stabilitaet", "ueber", "fuenf")
+    ascii_umlauts += ("geschaeft", "unabhaengig", "zaehl")
+    for label, hint in FACTOR_INFO.values():
+        assert len(hint) <= 200, label
+        text = f"{label} {hint}".lower()
+        assert not [word for word in ascii_umlauts if word in text], label
+
+
 def test_params_are_the_shared_contract():
     # Das web-api kennt nur den Contract; scoring ergaenzt die Abbildung auf score()
     from va_contracts.profile import ProfileParamsV1

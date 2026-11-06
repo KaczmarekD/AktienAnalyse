@@ -82,7 +82,7 @@ describe('ProfileEditorPage', () => {
     const content = text(fixture);
     expect(content).toContain('EV/EBIT');
     expect(content).toContain('niedriger ist besser');
-    expect(content).toContain('Unternehmenswert zu EBIT.');
+    expect(content).toContain('Unternehmenswert (Börsenwert plus Nettoschulden)');
     const pb = query<HTMLInputElement>(fixture, '[data-factor="pb"] input[type="checkbox"]')[0];
     expect(pb.checked).toBe(true);
   });

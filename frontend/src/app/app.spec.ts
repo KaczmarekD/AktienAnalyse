@@ -15,6 +15,7 @@ import { appConfig } from './app.config';
 import { routes } from './app.routes';
 import { RealtimeService } from './shared/realtime/realtime.service';
 import { FakeWebSocket, realtimeTestingProviders } from './testing/realtime';
+import { abbreviationsWithoutExplanation, controlsWithoutTooltip } from './testing/tooltips';
 
 const HEALTH = '/api/v1/health';
 
@@ -81,6 +82,25 @@ describe('App', () => {
     expect(tooltipOf(fixture, links[1])).toBe(
       'Verlauf aller Läufe, neuen Lauf starten, Mails ansehen.',
     );
+  });
+
+  it('links to the glossary with an icon button, aria-label and tooltip', async () => {
+    const fixture = await render();
+    const help = element(fixture).querySelector<HTMLAnchorElement>('header a[href="/glossary"]');
+    expect(help?.getAttribute('aria-label')).toBe('Begriffe');
+    expect(help?.querySelector('app-icon svg')).not.toBeNull();
+    expect(tooltipOf(fixture, help as Element)).toBe('Alle Begriffe und Abkürzungen erklärt.');
+    expect(routes.find((route) => route.path === 'glossary')?.title).toBe('Begriffe · Value-Analyzer');
+
+    await TestBed.inject(Router).navigateByUrl('/glossary');
+    fixture.detectChanges();
+    expect(help?.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('explains every control of the app bar (tests 1 and 2)', async () => {
+    const fixture = await render();
+    expect(controlsWithoutTooltip(fixture)).toEqual([]);
+    expect(abbreviationsWithoutExplanation(fixture)).toEqual([]);
   });
 
   it('marks the active section, the title detail belongs to the ranking', async () => {

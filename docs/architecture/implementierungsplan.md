@@ -2914,3 +2914,29 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   Seiten bekommen mit G1 nur das neue Theme.
 - **Review:** hell und dunkel bei 1366 px und 375 px angesehen, Start-Bundle unter 500 kB.
 - **NAS (du):** nichts Eigenes, es kommt mit dem Image `va-frontend`.
+
+#### G2 Begriffe und Tooltips
+
+- **Voraussetzung:** G1.
+- **Test:**
+  - Glossar (Test 3 der Spec): Jeder Faktor-Schlüssel des erzeugten Clients hat einen Eintrag und
+    ist einem Feld der Ranking-Zeilen zugeordnet. Jeder Run-Status, jede Lauf-Art und jeder Sektor
+    aus den Fixtures hat einen Text. Kein Tooltip ist leer oder länger als 200 Zeichen. Texte mit
+    Werten aus dem Profil setzen die Werte ein und kommen ohne sie allgemein aus.
+  - `GlossaryStore`: Faktortexte aus `GET /api/v1/scoring/factors` mit Richtung und Rolle im
+    Score; antwortet die API nicht, zeigen Faktoren nur ihr Label.
+  - Pipes `sector`, `runKind`, `duration` und `indexSource`.
+  - Bausteine: `app-term` (Tooltip aus dem Glossar, fokussierbar, ohne Text kein Tooltip) und
+    `app-info-tip` (Icon-Button mit `aria-label` und Tooltip).
+  - Gerüst der Tests 1 und 2 (`testing/tooltips.ts`): Bedienelemente ohne Tooltip und Kürzel
+    ohne Erklärung finden. Angewandt auf App-Hülle und Begriffe-Seite, die Ansichten folgen mit
+    G4 bis G7.
+  - Seite „Begriffe“: Gruppen, Anker je Begriff, Suche, „So entsteht das Ranking“, erreichbar über
+    das Icon in der App-Leiste.
+  - scoring: `FACTOR_INFO` mit Umlauten und den Texten des Katalogs, Label wie im UI.
+- **Implementierung:** `shared/glossary/` (`GLOSSARY`, `CONTROLS`, `FIELD_FACTOR`,
+  `GlossaryStore`), `shared/ui/term.ts`, `shared/ui/info-tip.ts`, Ansicht `glossary/` mit Route
+  `/glossary` und Ankersprung im Router, Icon „Begriffe“ in der App-Leiste, Pipes in `format.ts`,
+  `.term` in `_patterns.scss`, Styleguide.
+- **Review:** Tooltips mit Maus und Tastatur, Start-Bundle unter 500 kB.
+- **NAS (du):** nichts Eigenes.

@@ -1,17 +1,25 @@
 // Gemeinsame UI-Bausteine (docs/architecture/styleguide.md).
+import { HttpTestingController } from '@angular/common/http/testing';
 import { ChangeDetectionStrategy, Component, signal, Type } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
+
+import { apiTestingProviders } from '../../testing/api';
+import { FACTORS } from '../../testing/fixtures';
 
 import type { Progress } from '../realtime/live.store';
 import { BackLink } from './back-link';
 import { AppIcon, ICONS } from './icon';
+import { InfoTip } from './info-tip';
 import { Notice, NoticeBox } from './notice';
 import { PageHeader } from './page-header';
 import { RunStatus } from './run-status';
 import { AppSection } from './section';
 import { AppState } from './state';
+import { Term } from './term';
 import { ValueTrapBadge } from './value-trap-badge';
 
 @Component({
@@ -88,6 +96,53 @@ class BadgeHost {
 })
 class NoticeHost {
   readonly notice = signal<Notice | undefined>(undefined);
+}
+
+@Component({
+  imports: [Term],
+  template: `
+    <app-term key="ev_ebit" data-case="factor" />
+    <app-term key="revenue_growth_5y" variant="short" data-case="short" />
+    <app-term key="scoring_run" data-case="content">Bewertungslauf #42</app-term>
+    <app-term key="value_trap" [params]="params" data-case="params" />
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class TermHost {
+  readonly params = { value_trap_value_threshold: 0.7, value_trap_quality_threshold: 0.3 };
+}
+
+@Component({
+  imports: [InfoTip],
+  template: `
+    <app-info-tip text="Holt die Daten neu von Yahoo." label="Was heißt Daten neu abrufen?" />
+    <app-info-tip key="min_market_cap" />
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class InfoTipHost {}
+
+/** Mit Antwort auf die Faktortexte, die der GlossaryStore beim ersten Gebrauch lädt. */
+async function renderWithGlossary<T>(host: Type<T>, factors = true) {
+  TestBed.configureTestingModule({ providers: apiTestingProviders() });
+  const fixture = TestBed.createComponent(host);
+  fixture.detectChanges();
+  TestBed.tick();
+  const request = TestBed.inject(HttpTestingController).expectOne('/api/v1/scoring/factors');
+  if (factors) {
+    request.flush(FACTORS);
+  }
+  await new Promise((resolve) => setTimeout(resolve));
+  TestBed.tick();
+  fixture.detectChanges();
+  return { fixture, element: fixture.nativeElement as HTMLElement };
+}
+
+function tooltip(fixture: ComponentFixture<unknown>, element: Element | null): string | undefined {
+  return fixture.debugElement
+    .queryAll(By.directive(MatTooltip))
+    .find((debug) => debug.nativeElement === element)
+    ?.injector.get(MatTooltip).message;
 }
 
 function render<T>(host: Type<T>) {
@@ -270,5 +325,39 @@ describe('AppState', () => {
     expect(state?.querySelector('button')?.textContent).toBe('Lauf starten');
     expect(state?.querySelector('app-icon')).not.toBeNull();
     expect(element.querySelector('[role="alert"]')).toBeNull();
+  });
+});
+
+describe('Term', () => {
+  it('shows the label with the tooltip from the glossary and can be focused', async () => {
+    const { fixture, element } = await renderWithGlossary(TermHost);
+    const term = (name: string) => element.querySelector(`[data-case="${name}"] span`);
+    expect(term('factor')?.textContent?.trim()).toBe('EV/EBIT');
+    expect(term('factor')?.getAttribute('tabindex')).toBe('0');
+    expect(tooltip(fixture, term('factor'))).toMatch(/Niedriger ist besser\. Value-Faktor\.$/);
+    expect(term('short')?.textContent?.trim()).toBe('Umsatz 5 J.');
+    expect(term('content')?.textContent?.trim()).toBe('Bewertungslauf #42');
+    expect(tooltip(fixture, term('content'))).toContain('Berechnung des Rankings');
+    expect(tooltip(fixture, term('params'))).toContain('Value ≥ 0,70');
+  });
+
+  it('is plain text without tooltip while there is no text', async () => {
+    const { element } = await renderWithGlossary(TermHost, false);
+    const factor = element.querySelector('[data-case="factor"] span');
+    expect(factor?.textContent?.trim()).toBe('EV/EBIT');
+    expect(factor?.hasAttribute('tabindex')).toBe(false);
+  });
+});
+
+describe('InfoTip', () => {
+  it('is an icon button with aria-label and the same explanation as tooltip', async () => {
+    const { fixture, element } = await renderWithGlossary(InfoTipHost);
+    const [own, glossary] = Array.from(element.querySelectorAll('app-info-tip button'));
+    expect(own.getAttribute('type')).toBe('button');
+    expect(own.getAttribute('aria-label')).toBe('Was heißt Daten neu abrufen?');
+    expect(tooltip(fixture, own)).toBe('Holt die Daten neu von Yahoo.');
+    expect(own.querySelector('app-icon')).not.toBeNull();
+    expect(glossary.getAttribute('aria-label')).toBe('Was heißt Größenschwelle?');
+    expect(tooltip(fixture, glossary)).toContain('Börsenwert');
   });
 });

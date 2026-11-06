@@ -237,51 +237,70 @@ export const PROFILE: ProfileDetail = {
   ],
 };
 
+// Wie FACTOR_INFO in va_scoring.domain.profile (Track G, G2)
 export const FACTORS: Factor[] = [
   {
     key: 'ev_ebit',
     group: 'value',
     label: 'EV/EBIT',
     better: 'low',
-    hint: 'Unternehmenswert zu EBIT.',
+    hint: 'Unternehmenswert (Börsenwert plus Nettoschulden) geteilt durch den operativen Gewinn. Negative Werte zählen nicht.',
   },
-  { key: 'pb', group: 'value', label: 'Kurs-Buchwert', better: 'low', hint: 'Kurs zu Buchwert.' },
-  { key: 'p_fcf', group: 'value', label: 'Kurs/Free Cashflow', better: 'low', hint: 'FCF.' },
+  {
+    key: 'pb',
+    group: 'value',
+    label: 'KBV',
+    better: 'low',
+    hint: 'Kurs-Buchwert-Verhältnis: Börsenwert geteilt durch das Eigenkapital laut Bilanz. Negative Werte zählen nicht.',
+  },
+  {
+    key: 'p_fcf',
+    group: 'value',
+    label: 'Kurs/FCF',
+    better: 'low',
+    hint: 'Börsenwert geteilt durch den Free Cashflow, also das Geld, das nach Investitionen übrig bleibt. Schwerer zu schönen als der Gewinn.',
+  },
   {
     key: 'shareholder_yield',
     group: 'value',
     label: 'Shareholder Yield',
     better: 'high',
-    hint: 'Dividende plus Rueckkaeufe.',
+    hint: 'Dividenden plus Aktienrückkäufe im Verhältnis zum Börsenwert: Wie viel fließt an die Aktionäre zurück?',
   },
-  { key: 'roic', group: 'quality', label: 'ROIC', better: 'high', hint: 'Kapitalrendite.' },
+  {
+    key: 'roic',
+    group: 'quality',
+    label: 'ROIC',
+    better: 'high',
+    hint: 'Return on Invested Capital: Rendite nach Steuern auf das eingesetzte Eigen- und Fremdkapital.',
+  },
   {
     key: 'fcf_margin',
     group: 'quality',
     label: 'FCF-Marge',
     better: 'high',
-    hint: 'FCF zu Umsatz.',
+    hint: 'Free Cashflow je Euro Umsatz.',
   },
   {
     key: 'operating_margin',
     group: 'quality',
     label: 'Operative Marge',
     better: 'high',
-    hint: 'EBIT zu Umsatz.',
+    hint: 'Operativer Gewinn (EBIT) je Euro Umsatz.',
   },
   {
     key: 'net_debt_ebitda',
     group: 'quality',
     label: 'Net Debt/EBITDA',
     better: 'low',
-    hint: 'Verschuldung.',
+    hint: 'Nettoschulden geteilt durch den Gewinn vor Zinsen, Steuern und Abschreibungen: in wie vielen Jahren die Schulden getilgt wären.',
   },
   {
     key: 'earnings_stability',
     group: 'quality',
-    label: 'Gewinnstabilitaet',
+    label: 'Gewinnstabilität',
     better: 'high',
-    hint: 'Schwankung.',
+    hint: 'Wie wenig der Nettogewinn über die letzten fünf Geschäftsjahre schwankt. 1 heißt sehr stabil.',
   },
 ];
 
