@@ -42,6 +42,25 @@ export function row(values: Partial<RankingRow> & Pick<RankingRow, 'symbol'>): R
   };
 }
 
+export const PARAMS: ProfileParamsV1Output = {
+  value_weight: 0.6,
+  min_market_cap: 300_000_000,
+  min_value_factor_share: 0.5,
+  min_quality_factor_share: 0.5,
+  min_factor_count: 2,
+  value_trap_value_threshold: 0.7,
+  value_trap_quality_threshold: 0.3,
+  drop_negative_value_metrics: true,
+  value_factors: ['ev_ebit', 'p_fcf', 'pb', 'shareholder_yield'],
+  quality_factors: [
+    'earnings_stability',
+    'fcf_margin',
+    'net_debt_ebitda',
+    'operating_margin',
+    'roic',
+  ],
+};
+
 export const RANKING: Ranking = {
   scoring_run_id: 1,
   fetch_run_id: 1,
@@ -51,6 +70,9 @@ export const RANKING: Ranking = {
   universe_source: 'Deka',
   value_weight: 0.6,
   quality_weight: 0.4,
+  // Track G (G3): Profil und Parameter des Bewertungslaufs
+  profile: { id: 1, version: 3, name: 'Standard' },
+  params: PARAMS,
   rows: [
     row({
       rank: 1,
@@ -178,25 +200,6 @@ export const INSTRUMENT: Instrument = {
 };
 
 // --- Scoring-Profile (P3.3, Editor in P3.7) --------------------------------------------------
-
-export const PARAMS: ProfileParamsV1Output = {
-  value_weight: 0.6,
-  min_market_cap: 300_000_000,
-  min_value_factor_share: 0.5,
-  min_quality_factor_share: 0.5,
-  min_factor_count: 2,
-  value_trap_value_threshold: 0.7,
-  value_trap_quality_threshold: 0.3,
-  drop_negative_value_metrics: true,
-  value_factors: ['ev_ebit', 'p_fcf', 'pb', 'shareholder_yield'],
-  quality_factors: [
-    'earnings_stability',
-    'fcf_margin',
-    'net_debt_ebitda',
-    'operating_margin',
-    'roic',
-  ],
-};
 
 export const PROFILES: ProfileSummary[] = [
   {

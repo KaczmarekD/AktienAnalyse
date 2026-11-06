@@ -48,8 +48,13 @@ export function controlsWithoutTooltip(
   exceptions: readonly TooltipException[] = [],
 ): string[] {
   const hosts = tooltipHosts(fixture);
-  const covered = (element: Element) =>
+  const covers = (element: Element) =>
     hosts.has(element) || Array.from(hosts.keys()).some((host) => element.contains(host));
+  // Die inneren Buttons von Umschaltern gehören zu ihrem Material-Element, das den Tooltip trägt
+  const covered = (element: Element) => {
+    const owner = element.closest('mat-button-toggle, mat-slide-toggle');
+    return covers(element) || (owner !== null && covers(owner));
+  };
   return fixture.debugElement
     .queryAll(By.css(NEEDS_TOOLTIP))
     .map((debug: DebugElement) => debug.nativeElement as Element)

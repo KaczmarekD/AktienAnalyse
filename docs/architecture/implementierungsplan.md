@@ -2973,3 +2973,23 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
   wenn das UI ihn braucht.
 - **Review:** `make api-breaking` grün (nur additive Felder).
 - **NAS (du):** nichts Eigenes; die Migration läuft beim Start, der Backfill danach.
+
+#### G4 Ranking
+
+- **Voraussetzung:** G1, G2, G3.
+- **Test** (`ranking-page.spec.ts`, Bausteine in `ui.spec.ts`):
+  - Metazeile mit Abruf, Profil samt Gewichten, Indexliste und Bewertungslauf als Begriffe.
+  - Vier Kennzahlkarten: Bewertet (mit Composite von allen), Spitzenreiter (Link), Value-Traps und
+    Ohne Composite als Schalter, die filtern; Filter entfernen.
+  - Symbol und Index unter dem Namen, Sektor deutsch, Composite mit Balken, Scores mit Einordnung
+    im Tooltip, Hinweise als Badges mit Tooltip (Value-Trap mit den Schwellen des Profils,
+    „ohne Composite“, „unter Größenschwelle“ mit der Größenschwelle). Keine eingefärbte Zeile (E6).
+  - Spaltenwahl: Standardspalten, weitere Faktoren nach Gruppen, gemerkt im `localStorage`.
+  - Älterer Bewertungslauf: Hinweis mit Link zum aktuellen; leer nach Filter: „Filter
+    zurücksetzen“.
+  - Tests 1 und 2 der Spec.
+  - Bausteine `app-score`, `app-stat-card`, `app-column-picker`; `app-term` ohne Tab-Stopp.
+- **Implementierung:** Ansicht `ranking/`, Bausteine unter `shared/ui/`, `app-value-trap-badge`
+  mit Icon und Schwellen, Tabellen-Blatt mit klebendem Kopf unter der App-Leiste.
+- **Review:** hell und dunkel, 375 px, Start-Bundle unter 500 kB.
+- **NAS (du):** nichts Eigenes.

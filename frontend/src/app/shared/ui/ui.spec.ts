@@ -1,23 +1,27 @@
 // Gemeinsame UI-Bausteine (docs/architecture/styleguide.md).
 import { HttpTestingController } from '@angular/common/http/testing';
-import { ChangeDetectionStrategy, Component, signal, Type } from '@angular/core';
+import { ChangeDetectionStrategy, Component, LOCALE_ID, signal, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
+import '../../locale';
 import { apiTestingProviders } from '../../testing/api';
 import { FACTORS } from '../../testing/fixtures';
 
 import type { Progress } from '../realtime/live.store';
 import { BackLink } from './back-link';
+import { ColumnGroup, ColumnPicker } from './column-picker';
 import { AppIcon, ICONS } from './icon';
 import { InfoTip } from './info-tip';
 import { Notice, NoticeBox } from './notice';
 import { PageHeader } from './page-header';
 import { RunStatus } from './run-status';
 import { AppSection } from './section';
+import { Score } from './score';
+import { StatCard } from './stat-card';
 import { AppState } from './state';
 import { Term } from './term';
 import { ValueTrapBadge } from './value-trap-badge';
@@ -122,6 +126,69 @@ class TermHost {
 })
 class InfoTipHost {}
 
+@Component({
+  imports: [Term],
+  template: `<app-term key="DAX" [focusable]="false" />`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class QuietTermHost {}
+
+@Component({
+  imports: [Score],
+  template: `
+    <app-score [value]="0.777" bar data-case="bar" />
+    <app-score [value]="0.4" data-case="plain" />
+    <app-score [value]="null" data-case="missing" />
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class ScoreHost {}
+
+@Component({
+  imports: [StatCard],
+  template: `
+    <app-stat-card label="Bewertet" tip="Titel mit Composite." data-case="plain">
+      3 <span statSub>mit Composite</span>
+    </app-stat-card>
+    <app-stat-card
+      label="Spitzenreiter"
+      tip="Öffnet den Titel."
+      link="/instruments/ALV.DE"
+      data-case="link"
+    >
+      Allianz
+    </app-stat-card>
+    <app-stat-card
+      label="Value-Traps"
+      tip="Zeigt nur die Value-Traps."
+      [pressed]="pressed()"
+      (toggled)="pressed.set(!pressed())"
+      data-case="toggle"
+      >1</app-stat-card
+    >
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class StatCardHost {
+  readonly pressed = signal(false);
+}
+
+@Component({
+  imports: [ColumnPicker],
+  template: `<app-column-picker [groups]="groups" [(selected)]="selected" />`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class ColumnPickerHost {
+  readonly groups: ColumnGroup[] = [
+    { label: 'Allgemein', columns: [{ key: 'sector', label: 'Sektor', tip: 'Branche.' }] },
+    {
+      label: 'Value-Faktoren',
+      columns: [{ key: 'pb_ratio', label: 'KBV', tip: 'Kurs-Buchwert.' }],
+    },
+  ];
+  readonly selected = signal<string[]>(['sector']);
+}
+
 /** Mit Antwort auf die Faktortexte, die der GlossaryStore beim ersten Gebrauch lädt. */
 async function renderWithGlossary<T>(host: Type<T>, factors = true) {
   TestBed.configureTestingModule({ providers: apiTestingProviders() });
@@ -142,11 +209,14 @@ function tooltip(fixture: ComponentFixture<unknown>, element: Element | null): s
   return fixture.debugElement
     .queryAll(By.directive(MatTooltip))
     .find((debug) => debug.nativeElement === element)
-    ?.injector.get(MatTooltip).message;
+    ?.injector.get(MatTooltip)
+    .message.replace(/\s/g, ' '); // geschützte Leerzeichen wie normale
 }
 
 function render<T>(host: Type<T>) {
-  TestBed.configureTestingModule({ providers: [provideRouter([])] });
+  TestBed.configureTestingModule({
+    providers: [provideRouter([]), { provide: LOCALE_ID, useValue: 'de-DE' }],
+  });
   const fixture = TestBed.createComponent(host);
   fixture.detectChanges();
   const element = fixture.nativeElement as HTMLElement;
@@ -359,5 +429,70 @@ describe('InfoTip', () => {
     expect(own.querySelector('app-icon')).not.toBeNull();
     expect(glossary.getAttribute('aria-label')).toBe('Was heißt Größenschwelle?');
     expect(tooltip(fixture, glossary)).toContain('Börsenwert');
+  });
+});
+
+describe('Term without focus', () => {
+  it('keeps the tooltip but is no tab stop, e.g. in every table row', async () => {
+    const { fixture, element } = await renderWithGlossary(QuietTermHost);
+    const term = element.querySelector('app-term span');
+    expect(term?.hasAttribute('tabindex')).toBe(false);
+    expect(tooltip(fixture, term)).toContain('40 größten');
+  });
+});
+
+describe('Score', () => {
+  it('shows the score with optional bar and explains it as percentile', () => {
+    const { fixture, element } = render(ScoreHost);
+    const score = (name: string) => element.querySelector(`[data-case="${name}"] span`);
+    expect(score('bar')?.textContent?.trim()).toBe('0,78');
+    expect(element.querySelector('[data-case="bar"] [data-bar]')).not.toBeNull();
+    expect(element.querySelector('[data-case="plain"] [data-bar]')).toBeNull();
+    expect(tooltip(fixture, score('bar'))).toContain('besser als etwa 78 %');
+    expect(score('missing')?.textContent?.trim()).toBe('–');
+    expect(tooltip(fixture, score('missing'))).toContain('Kein Composite');
+  });
+});
+
+describe('StatCard', () => {
+  it('is a focusable card, a link or a toggle button, each with tooltip', () => {
+    const { fixture, element } = render(StatCardHost);
+    const card = (name: string) => element.querySelector(`[data-case="${name}"] [data-stat]`);
+    expect(card('plain')?.tagName).toBe('DIV');
+    expect(card('plain')?.getAttribute('tabindex')).toBe('0');
+    expect(card('plain')?.textContent).toContain('Bewertet');
+    expect(card('plain')?.textContent).toContain('mit Composite');
+    expect(card('link')?.tagName).toBe('A');
+    expect(card('link')?.getAttribute('href')).toBe('/instruments/ALV.DE');
+    expect(card('toggle')?.tagName).toBe('BUTTON');
+    expect(card('toggle')?.getAttribute('aria-pressed')).toBe('false');
+    for (const name of ['plain', 'link', 'toggle']) {
+      expect(tooltip(fixture, card(name))).toBeTruthy();
+    }
+
+    (card('toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(card('toggle')?.getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+describe('ColumnPicker', () => {
+  it('opens a menu with the columns by group and switches them on and off', async () => {
+    const { fixture, element } = render(ColumnPickerHost);
+    const button = element.querySelector<HTMLButtonElement>('button[data-action="columns"]');
+    expect(button?.getAttribute('aria-label')).toBe('Spalten wählen');
+    expect(tooltip(fixture, button)).toBe('Weitere Faktoren ein- oder ausblenden.');
+    button?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.body.textContent).toContain('Value-Faktoren');
+    const kbv = document.querySelector<HTMLInputElement>('[data-column="pb_ratio"] input');
+    kbv?.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selected()).toEqual(['sector', 'pb_ratio']);
+    const sector = document.querySelector<HTMLInputElement>('[data-column="sector"] input');
+    sector?.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selected()).toEqual(['pb_ratio']);
   });
 });
