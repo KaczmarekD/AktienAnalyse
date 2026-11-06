@@ -115,6 +115,8 @@ services:
     environment:
       # Lokal keine Wochenlaeufe von selbst (Runs startet das UI oder make local-run)
       WEB_API_SCHEDULE: ""
+      # D1.1: lokal ohne HTTPS, das Sitzungs-Cookie darf nicht Secure sein
+      WEB_API_COOKIE_SECURE: "false"
 
   frontend:
     # nginx mit dem Build aus dem Arbeitsstand (make local-ui). Nur auf Wunsch: Der Node-Build

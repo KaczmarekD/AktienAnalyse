@@ -32,6 +32,7 @@ ROLE_PASSWORDS = {
     "va_market_data": "va_market_data_test",
     "va_scoring": "va_scoring_test",
     "va_notification": "va_notification_test",
+    "va_identity": "va_identity_test",  # D1.1: Konten und Sitzungen des web-api
 }
 
 
@@ -124,6 +125,13 @@ def profiles_engine(db_url: str) -> Iterator[Engine]:
 @pytest.fixture
 def web_engine(db_url: str) -> Iterator[Engine]:
     eng = _role_engine(db_url, "va_web")
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def identity_engine(db_url: str) -> Iterator[Engine]:
+    eng = _role_engine(db_url, "va_identity")
     yield eng
     eng.dispose()
 

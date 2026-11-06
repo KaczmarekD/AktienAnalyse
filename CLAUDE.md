@@ -29,7 +29,7 @@ Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-
 | `market-data` | Universum, yfinance, Kennzahlen | `va-market-data` |
 | `scoring` | Cross-sektionales Ranking, Scoring-Profile, Vorschau | `va-scoring` |
 | `notification` | HTML + CSV, SMTP, Healthcheck | `va-notification` |
-| `web-api` | REST, WebSocket, Projektionen, Runs mit Scheduler und Watchdog | `va-web-api` |
+| `web-api` | REST, WebSocket, Projektionen, Runs mit Scheduler und Watchdog, Anmeldung (D1.1) | `va-web-api` |
 | `frontend` | Angular hinter nginx, einziger Port (8080 über `UI_LAN_BIND`) | `va-frontend` |
 | `value-analyzer` | Batch und Werkzeuge, nur auf Wunsch (Profil `run`) | App-Image |
 
@@ -70,8 +70,23 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
 - Profile, Vorschau und Reports holt es per Request/Reply bei ihren Besitzern (`va_web_api.rpc`).
   Die Vorschau rechnet scoring aus seiner Kopie der Eingangsdaten (`scoring.input_snapshot`).
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
-- Rollen `va_read` (schreibgeschützte Verbindung) und `va_web`. Die Zugangsdaten der Services
-  bekommt es nie.
+- Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
+  Zugangsdaten der Services bekommt es nie.
+- Anmeldung (D1.1, ADR-0012, `va_web_api.identity`): `POST /api/v1/auth/login` setzt ein
+  Sitzungs-Cookie (`__Host-va_session`, lokal mit `WEB_API_COOKIE_SECURE=false` `va_session`),
+  `POST /auth/logout`, `GET /me`. Passwort-Hash mit `hashlib.scrypt`, Sperre nach 5 Fehlversuchen
+  je Konto oder IP, alles im Schema `identity`. Ohne `WEB_API_IDENTITY_DATABASE_URL` antworten
+  diese Endpunkte mit 503. Den ersten Admin legt `python -m va_web_api.admin create-user <name>
+  --admin` an.
+- Seit D1.2 verlangen alle übrigen Endpunkte eine Sitzung (`current_user` beim Einbinden der
+  Router in `main.create_app`), Run-Start, Profil speichern und aktivieren die Rolle Admin
+  (`require_admin`). Übergang: Bis Login-Seite (D1.4) und HTTPS (D1.5) da sind, setzen die
+  Compose-Dateien `WEB_API_AUTH_REQUIRED=false`, dann gilt das Verhalten von ADR-0007
+  (`LAN_USER`). Jede schreibende Anfrage mit fremdem `Origin` ergibt 403
+  (`OriginCheckMiddleware`). `va_platform.redaction` schwärzt Mail-Adressen und Geheimnisse in
+  den Logs von Services, Batch und web-api. Ein neuer Endpunkt braucht einen Eintrag in den
+  Tabellen von `services/web-api/tests/test_authz.py`, falls er offen sein oder nur Admins
+  zustehen soll.
 - Ohne NATS (`make api` aus der `.venv`) startet es über `src.web:create_app`. Diese Composition
   Root rechnet Vorschau und Profil-Befehle mit dem Code von scoring im selben Prozess
   (`LocalCaller`, Rolle `va_profiles`), denn `va_web_api` darf `va_scoring` nicht importieren.
@@ -240,12 +255,15 @@ einzige Quelle der Wahrheit (keine Parquet-Caches, kein Housekeeping mehr).
 Warum: Snapshots sind nicht rekonstruierbar – yfinance liefert nur den
 aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`, dazu seit P4.4
-  `web` (Projektionen des web-api, seit P4.9 auch die Lesemodelle für REST).
+  `web` (Projektionen des web-api, seit P4.9 auch die Lesemodelle für REST) und seit D1.1
+  `identity` (Konten und Sitzungen, persönliche Daten). Alle stehen in `APP_SCHEMAS`
+  (Löschschutz, Migrationen). Die Grants für `va_app` und `va_read` gelten nur für `SCHEMAS` in
+  `va_platform.db.ddl`; `identity` steht dort bewusst nicht.
   Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID
   (`tests/db/test_schema_boundaries.py` prüft Modelle und migrierte DB).
 - Jedes Schema gehört einem Modul, Modelle und Repository liegen dort unter
   `adapters/postgres/`: `market_data` → `va_market_data`, `scoring` → `va_scoring`,
-  `reporting` → `va_notification`, `web` → `va_web_api`, `batch` → `src/db` (Ablaufsteuerung). Basis,
+  `reporting` → `va_notification`, `web` und `identity` → `va_web_api`, `batch` → `src/db` (Ablaufsteuerung). Basis,
   Engine/Session und DDL-Helfer stehen in `va_platform.db`. Die Alembic-Historie
   ist eine; `src/db/models/__init__.py` sammelt alle Modelle für sie.
 - Die DB erzwingt „niemals löschen“ selbst (`va_platform.db.ddl`): Trigger gegen
@@ -259,7 +277,9 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`), seit P4.7 dazu
   Runs in `batch.run` anlegen und einmal abschließen. Seit P5.3 je Service eine Rolle nur fürs
   eigene Schema (`va_market_data`, `va_scoring`, `va_notification`, `SERVICE_ROLES`,
-  `VA_<SERVICE>_PASSWORD`); `va_app` bleibt für den Batch im Prozess. Eine Rolle, die nach
+  `VA_<SERVICE>_PASSWORD`); `va_app` bleibt für den Batch im Prozess. Seit D1.1 `va_identity`:
+  liest und fügt nur im Schema `identity` an (`identity_grant_statements`, `VA_IDENTITY_PASSWORD`),
+  keine andere Rolle sieht es. Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
@@ -300,10 +320,12 @@ Das fängt beide Typen ab und ist kein Python-2-Binding.
 
 Der Umbau zu ereignisgetriebenen Services ist umgesetzt (Phasen 0 bis 5 der
 [Roadmap](docs/architecture/roadmap.md)). Offen ist Track F: ADR-0010 sammelt Daten,
-ADR-0011 ist nur vorgeschlagen. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0011), Recherche:
-`docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei Widersprüchen gelten die
-ADRs. Pläne und Recherche-Ergebnisse werden in `docs/` fortgeschrieben, nicht nur im Chat
-besprochen.
+ADR-0011 ist nur vorgeschlagen. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
+als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
+bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007), umgesetzt ist davon
+noch nichts. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
+Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
+fortgeschrieben, nicht nur im Chat besprochen.
 
 **Arbeitsweise:** Umgesetzt wird in Arbeitspaketen nach dem Zyklus
 Test → Implementierung → Grün → Review

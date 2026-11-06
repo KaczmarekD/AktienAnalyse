@@ -257,3 +257,20 @@ class Preview(_Model):
     left: list[str]  # nicht mehr in den Top ``top``, nach altem Rang
     trap_changed: list[str]  # Value-Trap-Markierung geaendert
     rows: list[PreviewRow]  # nach neuem Rang
+
+
+# D1.1: Anmeldung (docs/architecture/depot/nutzer.md)
+class LoginRequest(_Model):
+    username: str = Field(min_length=1, max_length=64)
+    # Obergrenze gegen sehr lange Eingaben vor dem teuren Hash
+    password: str = Field(min_length=1, max_length=1024)
+
+
+class Me(_Model):
+    """Das eigene Konto, ohne Anmeldedaten."""
+
+    id: int
+    username: str
+    role: Literal["admin", "user"]
+    display_name: str | None
+    email: str | None

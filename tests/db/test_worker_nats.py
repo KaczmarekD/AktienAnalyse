@@ -55,6 +55,7 @@ def _web_client(db_settings, nats_url: str | None = None) -> Iterator[TestClient
     read = _url_for(database, "va_read", ROLE_PASSWORDS["va_read"])
     web = _url_for(database, "va_web", ROLE_PASSWORDS["va_web"])
     settings = WebApiSettings(
+        auth_required=False,  # D1.2: Endpunkte, nicht Anmeldung
         database_url=SecretStr(read),
         nats_url=nats_url,
         projections_database_url=None if nats_url is None else SecretStr(web),

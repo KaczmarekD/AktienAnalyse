@@ -153,6 +153,48 @@ export type Instrument = {
 };
 
 /**
+ * LoginRequest
+ */
+export type LoginRequest = {
+  /**
+   * Password
+   */
+  password: string;
+  /**
+   * Username
+   */
+  username: string;
+};
+
+/**
+ * Me
+ *
+ * Das eigene Konto, ohne Anmeldedaten.
+ */
+export type Me = {
+  /**
+   * Display Name
+   */
+  display_name: string | null;
+  /**
+   * Email
+   */
+  email: string | null;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Role
+   */
+  role: 'admin' | 'user';
+  /**
+   * Username
+   */
+  username: string;
+};
+
+/**
  * Preview
  */
 export type Preview = {
@@ -1011,6 +1053,66 @@ export type ValidationError = {
   type: string;
 };
 
+export type LoginData = {
+  body: LoginRequest;
+  path?: never;
+  query?: never;
+  url: '/api/v1/auth/login';
+};
+
+export type LoginErrors = {
+  /**
+   * Benutzername oder Passwort falsch
+   */
+  401: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Zu viele Fehlversuche, voruebergehend gesperrt
+   */
+  429: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type LoginError = LoginErrors[keyof LoginErrors];
+
+export type LoginResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type LoginResponse = LoginResponses[keyof LoginResponses];
+
+export type LogoutData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/auth/logout';
+};
+
+export type LogoutErrors = {
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type LogoutResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
 export type HealthData = {
   body?: never;
   path?: never;
@@ -1041,6 +1143,10 @@ export type GetInstrumentData = {
 
 export type GetInstrumentErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1061,6 +1167,33 @@ export type GetInstrumentResponses = {
 
 export type GetInstrumentResponse = GetInstrumentResponses[keyof GetInstrumentResponses];
 
+export type MeData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me';
+};
+
+export type MeErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type MeResponses = {
+  /**
+   * Successful Response
+   */
+  200: Me;
+};
+
+export type MeResponse = MeResponses[keyof MeResponses];
+
 export type LatestRankingData = {
   body?: never;
   path?: never;
@@ -1069,6 +1202,10 @@ export type LatestRankingData = {
 };
 
 export type LatestRankingErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1097,6 +1234,10 @@ export type GetRankingData = {
 };
 
 export type GetRankingErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1132,6 +1273,10 @@ export type GetReportData = {
 
 export type GetReportErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1165,6 +1310,10 @@ export type GetReportCsvData = {
 };
 
 export type GetReportCsvErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1202,6 +1351,10 @@ export type ListRunsData = {
 
 export type ListRunsErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Validation Error
    */
   422: HttpValidationError;
@@ -1228,6 +1381,14 @@ export type StartRunData = {
 };
 
 export type StartRunErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
   /**
    * Es laeuft schon ein Run
    */
@@ -1267,6 +1428,10 @@ export type GetRunData = {
 
 export type GetRunErrors = {
   /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
    * Nicht gefunden
    */
   404: unknown;
@@ -1295,6 +1460,10 @@ export type ListFactorsData = {
 };
 
 export type ListFactorsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Scoring nicht verfuegbar
    */
@@ -1325,6 +1494,10 @@ export type PreviewProfileData = {
 };
 
 export type PreviewProfileErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1357,6 +1530,13 @@ export type ListProfilesData = {
   url: '/api/v1/scoring/profiles';
 };
 
+export type ListProfilesErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+};
+
 export type ListProfilesResponses = {
   /**
    * Response List Profiles
@@ -1381,6 +1561,10 @@ export type GetProfileData = {
 };
 
 export type GetProfileErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
   /**
    * Nicht gefunden
    */
@@ -1421,6 +1605,14 @@ export type SaveProfileVersionData = {
 };
 
 export type SaveProfileVersionErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
   /**
    * Nicht gefunden
    */
@@ -1468,6 +1660,14 @@ export type ActivateProfileVersionData = {
 };
 
 export type ActivateProfileVersionErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nur fuer Admins
+   */
+  403: unknown;
   /**
    * Nicht gefunden
    */

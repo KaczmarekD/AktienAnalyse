@@ -133,8 +133,9 @@ Versionen verifiziert am 29. und 30.09.2026, Quellen in den
 | [betrieb-synology.md](betrieb-synology.md) | Regeln für den J4125, Compose, Build und Deployment, Backup, Monitoring |
 | [umgebungen.md](umgebungen.md) | Lokaler Stack (Mailpit, pgweb, Läufe auf Knopfdruck) und NAS: was wo läuft |
 | [regressionstest.md](regressionstest.md) | Alt gegen Neu auf der NAS, Replay-Regression über gespeicherte Wochen |
-| [roadmap.md](roadmap.md) | Phasen 0–5, Track F (Fundamentaldaten), Track U (Umgebungen) und Track G (Gestaltung des UI) mit Arbeitspaketen zum Abhaken und Abschlusskriterien |
+| [depot/](depot/README.md) | Spezifikation (ADRs angenommen am 06.11.2026, Umsetzung offen): mehrere Nutzer, Depots mit Aktien, ETFs und Anleihen, Analyse, Hinweise, News, Berichte, nur lesende Bankanbindung (DKB) |
+| [roadmap.md](roadmap.md) | Phasen 0–5, Track F (Fundamentaldaten), Track U (Umgebungen), Track G (Gestaltung des UI) und Track D (Depots) mit Arbeitspaketen zum Abhaken und Abschlusskriterien |
 | [ui-neugestaltung.md](ui-neugestaltung.md) | Spec für die Neugestaltung des UI: Leitlinien, visuelle Sprache, Tooltips und Begriffe, alle Ansichten, Bausteine, Tests, Pakete G0–G8 |
 | [implementierungsplan.md](implementierungsplan.md) | Arbeitsweise Test → Implementierung → Grün → Review und alle Arbeitspakete im Detail |
-| [ADRs](../adr/README.md) | Architekturentscheidungen ADR-0001 bis ADR-0011 |
+| [ADRs](../adr/README.md) | Architekturentscheidungen ADR-0001 bis ADR-0014 (ADR-0011 vorgeschlagen, ADR-0007 ersetzt durch ADR-0012) |
 | [Recherche](../research/) | Notizen zur Zielarchitektur, zu DAX/MDAX-Datenquellen und zur langfristigen Fundamentalanalyse |

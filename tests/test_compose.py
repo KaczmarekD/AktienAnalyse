@@ -41,6 +41,7 @@ _COMPOSE_INPUTS = (
     "VA_APP_PASSWORD",
     "VA_READ_PASSWORD",
     "VA_PROFILES_PASSWORD",
+    "VA_IDENTITY_PASSWORD",
     "DB_LAN_BIND",
     "REG",
     "VERSION",
@@ -217,19 +218,32 @@ class TestLocalWebApi:
     def test_gets_only_its_own_roles(self, local):
         env = local["services"]["web-api"]["environment"]
         # keine Zugangsdaten des Batches: lesen (va_read) und Projektionen (va_web, P4.4), dazu
-        # NATS. Seit P5.4 speichert scoring die Profile selbst, va_profiles braucht es nicht mehr
+        # NATS. Seit P5.4 speichert scoring die Profile selbst, va_profiles braucht es nicht mehr.
+        # D1.1: Konten und Sitzungen mit va_identity; lokal ohne HTTPS, also Cookie ohne Secure
         assert set(env) == {
             "TZ",
             "WEB_API_DATABASE_URL",
             "WEB_API_NATS_URL",
             "WEB_API_PROJECTIONS_DATABASE_URL",
+            "WEB_API_IDENTITY_DATABASE_URL",
             "WEB_API_SCHEDULE",
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
+            "WEB_API_COOKIE_SECURE",
+            "WEB_API_AUTH_REQUIRED",  # D1.2: bis zur Login-Seite (D1.4) aus
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_IDENTITY_DATABASE_URL"].startswith("postgresql+psycopg://va_identity:")
         assert env["WEB_API_NATS_URL"] == "nats://nats:4222"
         assert env["WEB_API_SCHEDULE"] == ""  # lokal keine Wochenlaeufe von selbst
+        assert env["WEB_API_COOKIE_SECURE"] == "false"
+        assert env["WEB_API_AUTH_REQUIRED"] == "false"
+
+    def test_e2e_cookie_without_https(self, e2e):
+        """D1.1: Der E2E-Stack spricht HTTP mit nginx, das Cookie darf dort nicht Secure sein."""
+        env = e2e["services"]["web-api"]["environment"]
+        assert env["WEB_API_COOKIE_SECURE"] == "false"
+        assert env["WEB_API_IDENTITY_DATABASE_URL"].startswith("postgresql+psycopg://va_identity:")
 
     def test_e2e_web_api_runs_the_full_stack(self, e2e):
         """P5.2: Der E2E-Stack prueft die Zielarchitektur: NATS, Projektionen, Services."""
@@ -318,6 +332,7 @@ class TestNasDefinition:
             "VA_MARKET_DATA_PASSWORD",
             "VA_SCORING_PASSWORD",
             "VA_NOTIFICATION_PASSWORD",
+            "VA_IDENTITY_PASSWORD",  # D1.1
         ):
             assert variable in env
         for name in ("market-data", "scoring", "notification", "web-api"):
@@ -342,7 +357,7 @@ class TestNasDefinition:
         [port] = nas["services"]["db"]["ports"]
         assert port["host_ip"] == "192.168.1.10"
 
-    def test_web_api_has_no_port_and_only_its_two_roles(self, nas):
+    def test_web_api_has_no_port_and_only_its_roles(self, nas):
         api = nas["services"]["web-api"]
         assert "ports" not in api  # nur hinter nginx erreichbar
         # P5.4: das eigene Image (P5.1), der Einstieg steht darin
@@ -354,12 +369,19 @@ class TestNasDefinition:
             "WEB_API_DATABASE_URL",
             "WEB_API_NATS_URL",
             "WEB_API_PROJECTIONS_DATABASE_URL",
+            "WEB_API_IDENTITY_DATABASE_URL",  # D1.1: Konten und Sitzungen
             "WEB_API_SCHEDULE",
             "WEB_API_OTEL_TRACES_EXPORTER",  # P5.5, Standard none
+            "WEB_API_AUTH_REQUIRED",  # D1.2: bis HTTPS (D1.5) aus, dann entfaellt der Eintrag
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
+        assert env["WEB_API_IDENTITY_DATABASE_URL"].startswith("postgresql+psycopg://va_identity:")
         assert env["WEB_API_OTEL_TRACES_EXPORTER"] == "none"
+        # Auf der NAS mit HTTPS (D1.5): Das Cookie ist Secure, das ist der Standard
+        assert "WEB_API_COOKIE_SECURE" not in env
+        # Ohne HTTPS geht kein Login: bis D1.5 ohne Sitzungspflicht wie unter ADR-0007
+        assert env["WEB_API_AUTH_REQUIRED"] == "false"
 
     def test_tracing_is_one_switch_for_all_services(self, nas):
         """P5.5: OTEL_TRACES_EXPORTER aus der .env gilt fuer jeden Dienst, der einen Run sieht."""
@@ -369,6 +391,10 @@ class TestNasDefinition:
     def test_db_creates_the_profiles_role_on_first_start(self, nas):
         env = nas["services"]["db"]["environment"]
         assert "VA_PROFILES_PASSWORD" in env
+
+    def test_db_creates_the_identity_role_on_first_start(self, nas):
+        """D1.1: In einer bestehenden Datenbank legt migrate die Rolle an, sonst db/init."""
+        assert "VA_IDENTITY_PASSWORD" in nas["services"]["db"]["environment"]
 
     def test_frontend_from_ghcr_on_8080_in_the_lan(self, nas):
         frontend = nas["services"]["frontend"]

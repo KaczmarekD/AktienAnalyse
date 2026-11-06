@@ -102,13 +102,25 @@ docker compose ps  # migrate "exited (0)", alle anderen "running" bzw. "healthy"
 
 Pflicht in der `.env` sind `POSTGRES_PASSWORD`, `VA_APP_PASSWORD`, `VA_READ_PASSWORD`,
 `VA_PROFILES_PASSWORD`, `VA_WEB_PASSWORD`, `VA_MARKET_DATA_PASSWORD`, `VA_SCORING_PASSWORD`,
-`VA_NOTIFICATION_PASSWORD`, dazu `SMTP_USER`, `SMTP_PASSWORD` und `MAIL_TO`. Fehlt ein
+`VA_NOTIFICATION_PASSWORD`, seit D1.1 `VA_IDENTITY_PASSWORD`, dazu `SMTP_USER`, `SMTP_PASSWORD`
+und `MAIL_TO`. Fehlt ein
 Passwort, bricht Compose mit einem Hinweis wie „VA_WEB_PASSWORD in .env setzen“ ab. Fehlen die
 Angaben für die Mail, startet `notification` nicht und nennt das Feld in
 `docker compose logs notification`.
 
 Sind die Pakete in GHCR privat, braucht die NAS einmalig `docker login ghcr.io` mit einem Token,
 das nur `read:packages` darf.
+
+**Konten (seit D1.1):** Den ersten Admin legt ein Kommando im Container des web-api an. Es fragt
+das Passwort zweimal ab (mindestens 12 Zeichen):
+
+```bash
+docker compose exec web-api python -m va_web_api.admin create-user <name> --admin --email <mail>
+```
+
+Weitere Konten ohne `--admin`. Anmelden im Browser geht erst mit HTTPS (D1.5), denn das
+Sitzungs-Cookie ist `Secure`. Bis dahin bleiben alle bisherigen Ansichten ohne Anmeldung nutzbar:
+`docker-compose.yml` setzt dafür `WEB_API_AUTH_REQUIRED=false` (seit D1.2, entfällt mit D1.5).
 
 ## Umstellung vom Batch mit Cron (einmalig)
 
@@ -127,8 +139,9 @@ Housekeeping beim nächsten Lauf Altdateien, die der Import braucht.
    Altdateien, die `.env` und, falls es ihn schon gibt, `pgdata/`.
 2. `git pull`, dann die `.env` mit `.env.example` vergleichen. Neu sind je nach Stand
    `POSTGRES_PASSWORD`, `VA_APP_PASSWORD` und `VA_READ_PASSWORD` (Phase 2),
-   `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4) und die drei `VA_<SERVICE>_PASSWORD`
-   (P5.3). Für das UI im LAN `UI_LAN_BIND` und `UI_SERVER_NAMES` setzen.
+   `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4), die drei `VA_<SERVICE>_PASSWORD`
+   (P5.3) und `VA_IDENTITY_PASSWORD` (D1.1). Für das UI im LAN `UI_LAN_BIND` und
+   `UI_SERVER_NAMES` setzen.
 3. `make pull` und der Import-Test aus Regel 2.
 4. Alles stoppen, auch den alten Batch-Container:
    ```bash

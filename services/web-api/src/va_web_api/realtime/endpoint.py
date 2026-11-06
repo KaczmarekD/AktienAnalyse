@@ -15,10 +15,10 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ..security import origin_allowed
 from .protocol import (
     MAX_MESSAGE_BYTES,
     PROTOCOL,
@@ -46,14 +46,11 @@ CLOSE_POLICY = 1008
 CLOSE_TOO_BIG = 1009
 
 
-def origin_allowed(origin: str | None, host: str | None, allowed: frozenset[str]) -> bool:
-    if not origin:
-        return False
-    origin = origin.strip().rstrip("/").lower()
-    if allowed:
-        return origin in allowed
-    parts = urlsplit(origin)
-    return parts.scheme in ("http", "https") and bool(host) and parts.netloc == host.lower()
+def _has_session(ws: WebSocket, settings: WebApiSettings) -> bool:
+    identity = getattr(ws.app.state, "identity", None)
+    return identity is not None and (
+        identity.authenticate(ws.cookies.get(settings.cookie_name)) is not None
+    )
 
 
 @router.websocket("/ws")
@@ -65,6 +62,11 @@ async def realtime(ws: WebSocket) -> None:
     ):
         log.info("WebSocket abgelehnt (Origin %s)", ws.headers.get("origin"))
         await ws.close(code=CLOSE_POLICY)  # vor accept: Uvicorn antwortet mit 403
+        return
+    if settings.auth_required and not _has_session(ws, settings):
+        # D1.2: wie REST nur mit Sitzung; Topics je Nutzer und Trennen beim Abmelden folgen in D1.3
+        log.info("WebSocket abgelehnt (ohne Sitzung)")
+        await ws.close(code=CLOSE_POLICY)
         return
     await ws.accept(subprotocol=PROTOCOL)
 

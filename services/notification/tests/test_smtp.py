@@ -66,6 +66,13 @@ def fake_smtp():
 
 
 class TestSmtpSender:
+    def test_the_log_names_no_recipient(self, fake_smtp, caplog):
+        """D1.2: Mail-Adressen sind personenbezogen und gehoeren nicht ins Log."""
+        caplog.set_level("INFO")
+        SmtpSender(CONFIG).send("[ok 90/90] Test", "<p>hi</p>")
+        assert "versendet" in caplog.text
+        assert "empfaenger@example.com" not in caplog.text
+
     def test_tls_login_and_send(self, fake_smtp):
         SmtpSender(CONFIG).send("[ok 90/90] Test", "<p>hi</p>")
         (server,) = fake_smtp

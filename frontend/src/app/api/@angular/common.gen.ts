@@ -28,6 +28,12 @@ import type {
   ListProfilesResponse,
   ListRunsData,
   ListRunsResponse,
+  LoginData,
+  LoginResponse,
+  LogoutData,
+  LogoutResponse,
+  MeData,
+  MeResponse,
   PreviewProfileData,
   PreviewProfileResponse,
   SaveProfileVersionData,
@@ -35,6 +41,36 @@ import type {
   StartRunData,
   StartRunResponse,
 } from '../types.gen';
+
+/**
+ * Login
+ *
+ * Meldet an und setzt das Sitzungs-Cookie.
+ */
+export const loginRequest = <ThrowOnError extends boolean = false>(
+  options: Options<LoginData, ThrowOnError>,
+): HttpRequest<LoginResponse> =>
+  (options?.client ?? client).requestOptions<LoginResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    ...options,
+  });
+
+/**
+ * Logout
+ *
+ * Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.
+ */
+export const logoutRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<LogoutData, ThrowOnError>,
+): HttpRequest<LogoutResponse> =>
+  (options?.client ?? client).requestOptions<LogoutResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/auth/logout',
+    ...options,
+  });
 
 /**
  * Health
@@ -59,6 +95,21 @@ export const getInstrumentRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'GET',
     url: '/api/v1/instruments/{symbol}',
+    ...options,
+  });
+
+/**
+ * Me
+ *
+ * Das eigene Konto.
+ */
+export const meRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<MeData, ThrowOnError>,
+): HttpRequest<MeResponse> =>
+  (options?.client ?? client).requestOptions<MeResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/me',
     ...options,
   });
 
@@ -250,6 +301,32 @@ export const activateProfileVersionRequest = <ThrowOnError extends boolean = fal
   });
 
 /**
+ * Login
+ *
+ * Meldet an und setzt das Sitzungs-Cookie.
+ */
+export const loginResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<LoginData, ThrowOnError> | undefined,
+) =>
+  httpResource<LoginResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? loginRequest(opts) : undefined;
+  });
+
+/**
+ * Logout
+ *
+ * Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.
+ */
+export const logoutResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<LogoutData, ThrowOnError> | undefined,
+) =>
+  httpResource<LogoutResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? logoutRequest(opts) : undefined;
+  });
+
+/**
  * Health
  */
 export const healthResource = <ThrowOnError extends boolean = false>(
@@ -269,6 +346,19 @@ export const getInstrumentResource = <ThrowOnError extends boolean = false>(
   httpResource<GetInstrumentResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? getInstrumentRequest(opts) : undefined;
+  });
+
+/**
+ * Me
+ *
+ * Das eigene Konto.
+ */
+export const meResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<MeData, ThrowOnError> | undefined,
+) =>
+  httpResource<MeResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? meRequest(opts) : undefined;
   });
 
 /**

@@ -1,7 +1,7 @@
 """Profil, Parameter und Perzentile je Bewertungslauf: web.ranking_profile, web.ranking_factor
 
-Revision ID: 0015
-Revises: 0014
+Revision ID: 0016
+Revises: 0015
 Erstellt: 2026-11-06
 
 Track G (G3, docs/architecture/ui-neugestaltung.md): Das UI nennt Gewichte, Schwellen und Faktoren
@@ -19,8 +19,8 @@ from sqlalchemy.dialects import postgresql
 
 from va_platform.db.ddl import protect_table, web_grant_statements
 
-revision: str = "0015"
-down_revision: str | None = "0014"
+revision: str = "0016"
+down_revision: str | None = "0015"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

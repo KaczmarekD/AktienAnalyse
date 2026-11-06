@@ -17,7 +17,11 @@ from va_web_api.main import create_app
 from va_web_api.ports import RunActive
 from va_web_api.settings import WebApiSettings
 
-SETTINGS = WebApiSettings(database_url=SecretStr("postgresql+psycopg://x:x@127.0.0.1:1/none"))
+# D1.2: Die Tests pruefen die Endpunkte, nicht die Anmeldung (Uebergang bis D1.4)
+SETTINGS = WebApiSettings(
+    database_url=SecretStr("postgresql+psycopg://x:x@127.0.0.1:1/none"),
+    auth_required=False,
+)
 
 
 @dataclass

@@ -58,6 +58,27 @@ export const zHealth = z.object({
 });
 
 /**
+ * LoginRequest
+ */
+export const zLoginRequest = z.object({
+  password: z.string().min(1).max(1024),
+  username: z.string().min(1).max(64),
+});
+
+/**
+ * Me
+ *
+ * Das eigene Konto, ohne Anmeldedaten.
+ */
+export const zMe = z.object({
+  display_name: z.string().nullable(),
+  email: z.string().nullable(),
+  id: z.int(),
+  role: z.enum(['admin', 'user']),
+  username: z.string(),
+});
+
+/**
  * PreviewRow
  *
  * Ein Titel mit den neuen params und, zum Vergleich, mit dem aktiven Profil.
@@ -391,6 +412,18 @@ export const zHttpValidationError = z.object({
   detail: z.array(zValidationError).optional(),
 });
 
+export const zLoginBody = zLoginRequest;
+
+/**
+ * Successful Response
+ */
+export const zLoginResponse = z.void();
+
+/**
+ * Successful Response
+ */
+export const zLogoutResponse = z.void();
+
 /**
  * Successful Response
  */
@@ -404,6 +437,11 @@ export const zGetInstrumentPath = z.object({
  * Successful Response
  */
 export const zGetInstrumentResponse = zInstrument;
+
+/**
+ * Successful Response
+ */
+export const zMeResponse = zMe;
 
 /**
  * Successful Response

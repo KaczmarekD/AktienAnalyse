@@ -8,6 +8,7 @@
 #   va_profiles - web-api: Profile lesen, Versionen und Aktivierungen anfuegen (P3.3)
 #   va_web      - web-api: Projektionen im Schema web schreiben (P4.4)
 #   va_market_data, va_scoring, va_notification - je Service nur das eigene Schema (P5.3)
+#   va_identity - web-api: Konten und Sitzungen im Schema identity (D1.1)
 set -euo pipefail
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
@@ -34,7 +35,8 @@ SQL
 fi
 
 # P5.3: eine Rolle je Service; ohne Passwort keine Rolle (die Services laufen erst mit NATS)
-for pair in "va_market_data:${VA_MARKET_DATA_PASSWORD:-}"             "va_scoring:${VA_SCORING_PASSWORD:-}"             "va_notification:${VA_NOTIFICATION_PASSWORD:-}"; do
+# D1.1: va_identity ebenso; ohne Passwort keine Anmeldung im UI
+for pair in "va_market_data:${VA_MARKET_DATA_PASSWORD:-}"             "va_scoring:${VA_SCORING_PASSWORD:-}"             "va_notification:${VA_NOTIFICATION_PASSWORD:-}"             "va_identity:${VA_IDENTITY_PASSWORD:-}"; do
     role="${pair%%:*}"
     password="${pair#*:}"
     if [ -n "$password" ]; then

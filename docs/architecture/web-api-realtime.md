@@ -53,6 +53,8 @@ FastAPI gestartet und gestoppt, ebenso der Takt von Scheduler und Watchdog.
 | `POST /api/v1/scoring/profiles/{id}/activate` | Version aktivieren | `rpc.va.scoring.profiles.activate` |
 | `POST /api/v1/scoring/preview` | Live-Vorschau | `rpc.va.scoring.preview` |
 | `GET /api/v1/health` | Healthcheck | – |
+| `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` | Anmelden (Sitzungs-Cookie), abmelden (seit D1.1) | Schema `identity`, Rolle `va_identity` |
+| `GET /api/v1/me` | eigenes Konto (seit D1.1) | Schema `identity` |
 
 Schreibende Endpunkte akzeptieren ausschließlich JSON (siehe Sicherheitsregeln).
 
@@ -241,6 +243,17 @@ Adressen im Heimnetz schicken. Diese Regeln verhindern Missbrauch
 4. Die DSM-Firewall gibt Port 8080 nur für das eigene Subnetz frei.
 
 Secrets (SMTP-Passwort, DB-Passwörter) sind nie über die API lesbar oder änderbar.
+
+**Seit D1.2** ([ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md),
+[nutzer.md](depot/nutzer.md#sicherheitsregeln)) kommen dazu:
+
+- Jeder Endpunkt außer Health, Anmelden, Abmelden und der API-Beschreibung verlangt eine
+  Sitzung. Run-Start, Profil speichern und aktivieren dürfen nur Admins. Übergang bis D1.4/D1.5:
+  `WEB_API_AUTH_REQUIRED=false`.
+- Jede schreibende Anfrage mit fremdem `Origin` ergibt 403, mit derselben Regel wie am WebSocket.
+  Mit dem Sitzungs-Cookie reicht der Preflight allein nicht mehr gegen CSRF.
+- Logs enthalten keine Passwörter, Tokens, Sitzungs-IDs oder Mail-Adressen
+  (`va_platform.redaction`).
 
 ## Warum WebSocket und nicht SSE
 

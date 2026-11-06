@@ -35,10 +35,20 @@ import type {
   ListFactorsErrors,
   ListFactorsResponses,
   ListProfilesData,
+  ListProfilesErrors,
   ListProfilesResponses,
   ListRunsData,
   ListRunsErrors,
   ListRunsResponses,
+  LoginData,
+  LoginErrors,
+  LoginResponses,
+  LogoutData,
+  LogoutErrors,
+  LogoutResponses,
+  MeData,
+  MeErrors,
+  MeResponses,
   PreviewProfileData,
   PreviewProfileErrors,
   PreviewProfileResponses,
@@ -70,6 +80,10 @@ import {
   zListProfilesResponse,
   zListRunsQuery,
   zListRunsResponse,
+  zLoginBody,
+  zLoginResponse,
+  zLogoutResponse,
+  zMeResponse,
   zPreviewProfileBody,
   zPreviewProfileQuery,
   zPreviewProfileResponse,
@@ -98,6 +112,54 @@ export type Options<
    */
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Login
+ *
+ * Meldet an und setzt das Sitzungs-Cookie.
+ */
+export const login = <ThrowOnError extends boolean = false>(
+  options: Options<LoginData, ThrowOnError>,
+): RequestResult<LoginResponses, LoginErrors, ThrowOnError> =>
+  (options.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zLoginBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zLoginResponse.parseAsync(data),
+    url: '/api/v1/auth/login',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Logout
+ *
+ * Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.
+ */
+export const logout = <ThrowOnError extends boolean = false>(
+  options?: Options<LogoutData, ThrowOnError>,
+): RequestResult<LogoutResponses, LogoutErrors, ThrowOnError> =>
+  (options?.client ?? client).post<LogoutResponses, LogoutErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zLogoutResponse.parseAsync(data),
+    url: '/api/v1/auth/logout',
+    ...options,
+  });
 
 /**
  * Health
@@ -136,6 +198,28 @@ export const getInstrument = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zGetInstrumentResponse.parseAsync(data),
     url: '/api/v1/instruments/{symbol}',
+    ...options,
+  });
+
+/**
+ * Me
+ *
+ * Das eigene Konto.
+ */
+export const me = <ThrowOnError extends boolean = false>(
+  options?: Options<MeData, ThrowOnError>,
+): RequestResult<MeResponses, MeErrors, ThrowOnError> =>
+  (options?.client ?? client).get<MeResponses, MeErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zMeResponse.parseAsync(data),
+    url: '/api/v1/me',
     ...options,
   });
 
@@ -343,8 +427,8 @@ export const previewProfile = <ThrowOnError extends boolean = false>(
  */
 export const listProfiles = <ThrowOnError extends boolean = false>(
   options?: Options<ListProfilesData, ThrowOnError>,
-): RequestResult<ListProfilesResponses, unknown, ThrowOnError> =>
-  (options?.client ?? client).get<ListProfilesResponses, unknown, ThrowOnError>({
+): RequestResult<ListProfilesResponses, ListProfilesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListProfilesResponses, ListProfilesErrors, ThrowOnError>({
     requestValidator: async (data) =>
       await z
         .object({

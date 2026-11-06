@@ -10,6 +10,7 @@ from va_contracts.events.v1 import RunOptionsV1
 
 from ..models import RunDetail, RunStart, RunStarted, RunSummary
 from ..ports import RunActive, RunStarter
+from .auth import FORBIDDEN, require_admin
 from .deps import NOT_FOUND, Reader, not_found
 
 router = APIRouter(tags=["runs"])
@@ -43,7 +44,12 @@ def list_runs(
     return reader.list_runs(limit=limit, offset=offset)
 
 
-@router.post("/runs", status_code=202, responses=START_RESPONSES)
+@router.post(
+    "/runs",
+    status_code=202,
+    responses={**START_RESPONSES, **FORBIDDEN},
+    dependencies=[Depends(require_admin)],  # D1.2: nur Admins starten Runs
+)
 def start_run(body: RunStart, runs: RunsPort) -> RunStarted:
     """Startet einen Run. Ausgefuehrt wird er vom Worker ueber NATS; Fortschritt und Ergebnis
     meldet der WebSocket."""

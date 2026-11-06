@@ -19,6 +19,9 @@ Mit NATS und Projektions-Datenbank verwaltet das web-api auch Runs (P4.7): ``POS
 einen an, eine Hintergrund-Aufgabe startet geplante Runs (``WEB_API_SCHEDULE``), ruft den
 Watchdog und leert die Outbox, einmal je ``RUNS_TICK_SECONDS``.
 
+Mit ``WEB_API_IDENTITY_DATABASE_URL`` (Rolle ``va_identity``) gibt es Anmeldung und Sitzungen
+(D1.1, ``/auth``, ``/me``); ohne antworten diese Endpunkte mit 503.
+
 Swagger und OpenAPI liegen unter ``/api``, damit nginx (P3.6) sie mit ``/api/*`` weiterreicht.
 """
 
@@ -33,16 +36,21 @@ from functools import partial
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
 from va_platform import tracing
 from va_platform.db import create_db_engine
 from va_platform.nats import NatsBus
+from va_platform.redaction import install_redaction
 
-from .api import health, instruments, ranking, reports, runs, scoring
+from .adapters.postgres.identity_store import PostgresIdentityStore
+from .api import auth, health, instruments, ranking, reports, runs, scoring
 from .events import open_event_consumer
+from .identity.service import IdentityService
 from .ports import RemoteUnavailable
 from .read_models import ProjectionReadModel, TableReadModel
 from .realtime import endpoint
@@ -50,7 +58,7 @@ from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
 from .rpc import RemoteReads, RemoteScoring
 from .runs import RunManager
-from .security import JsonOnlyMiddleware
+from .security import JsonOnlyMiddleware, OriginCheckMiddleware
 from .settings import WebApiSettings
 
 if TYPE_CHECKING:
@@ -141,6 +149,8 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         tracing.configure("va-web-api", settings.otel_traces_exporter)  # Runs beginnen hier
+        # D1.2: keine Geheimnisse und Mail-Adressen in den Logs von uvicorn und der App
+        install_redaction("uvicorn", "uvicorn.error", "uvicorn.access")
         app.state.engine = create_db_engine(
             settings.database_url.get_secret_value(), read_only=True
         )
@@ -159,6 +169,18 @@ def create_app(
                 if commands is None or app.state.profiles_engine is None
                 else commands(app.state.profiles_engine)
             )
+        # D1.1: Konten und Sitzungen mit der Rolle va_identity; ohne URL antwortet /auth mit 503
+        identity_url = settings.identity_database_url
+        app.state.identity_engine = (
+            None if identity_url is None else create_db_engine(identity_url.get_secret_value())
+        )
+        app.state.identity = (
+            None
+            if app.state.identity_engine is None
+            else IdentityService(
+                PostgresIdentityStore(app.state.identity_engine), sessions=settings.session_policy
+            )
+        )
         # P4.5: WebSocket-Hub; der Eventmanager meldet ueber den Broadcaster aus seinen Threads
         app.state.settings = settings
         app.state.hub = WebSocketHub()
@@ -215,6 +237,8 @@ def create_app(
                 app.state.profiles_engine.dispose()
             if app.state.projections_engine is not None:
                 app.state.projections_engine.dispose()
+            if app.state.identity_engine is not None:
+                app.state.identity_engine.dispose()
 
     app = FastAPI(
         title="Value-Analyzer web-api",
@@ -229,10 +253,32 @@ def create_app(
     )
     # Kein CORSMiddleware: CORS bleibt bewusst aus (ADR-0007)
     app.add_middleware(JsonOnlyMiddleware)
-    for module in (health, runs, ranking, instruments, reports, scoring):
+    # D1.2: Mit dem Sitzungs-Cookie pruefen schreibende Anfragen auch die Herkunft
+    app.add_middleware(OriginCheckMiddleware, allowed=settings.origins)
+    # Ohne Sitzung: Health, Anmelden, Abmelden (NUT-09)
+    for module in (health, auth):
         app.include_router(module.router, prefix=API_PREFIX)
+    # D1.2: alle anderen nur mit Sitzung, bis D1.4/D1.5 abschaltbar (WEB_API_AUTH_REQUIRED)
+    for module in (runs, ranking, instruments, reports, scoring):
+        app.include_router(
+            module.router,
+            prefix=API_PREFIX,
+            dependencies=[Depends(auth.current_user)],
+            responses=auth.UNAUTHORIZED,
+        )
     # P4.5: WebSocket unter /ws, nginx reicht ihn neben /api/ weiter
     app.include_router(endpoint.router)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        if request.url.path.startswith(f"{API_PREFIX}/auth/"):
+            # D1.1: Die Standard-Antwort wiederholt die Eingaben, bei der Anmeldung das Passwort
+            errors = [
+                {"loc": e.get("loc"), "msg": e.get("msg"), "type": e.get("type")}
+                for e in exc.errors()
+            ]
+            return JSONResponse(status_code=422, content={"detail": errors})
+        return await request_validation_exception_handler(request, exc)
 
     @app.exception_handler(RemoteUnavailable)
     async def remote_down(request: Request, exc: RemoteUnavailable) -> JSONResponse:  # noqa: ARG001 - Signatur von FastAPI

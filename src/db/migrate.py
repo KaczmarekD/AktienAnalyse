@@ -6,7 +6,8 @@ Nutzt ``DATABASE_OWNER_URL`` (Fallback ``DATABASE_URL``). Migrationen sind
 ausschliesslich additiv: keine Tabelle und keine Spalte mit Daten wird entfernt.
 
 Danach die Login-Rollen des web-api, wenn ihr Passwort gesetzt ist: ``va_profiles`` (P3.3,
-``VA_PROFILES_PASSWORD``) und ``va_web`` (P4.4, ``VA_WEB_PASSWORD``). Das Init-Skript
+``VA_PROFILES_PASSWORD``), ``va_web`` (P4.4, ``VA_WEB_PASSWORD``) und ``va_identity`` (D1.1,
+``VA_IDENTITY_PASSWORD``), dazu die der Services (P5.3). Das Init-Skript
 ``db/init/01_roles.sh`` laeuft nur in einer leeren Datenbank, eine bestehende bekommt die Rollen
 hier. Ihr Passwort folgt der ``.env``.
 """
@@ -26,9 +27,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from va_platform.db import normalize_url
 from va_platform.db.ddl import (
+    IDENTITY_ROLE,
     PROFILES_ROLE,
     SERVICE_ROLES,
     WEB_ROLE,
+    identity_grant_statements,
     profiles_grant_statements,
     service_grant_statements,
     web_grant_statements,
@@ -113,6 +116,17 @@ def ensure_web_role(url: str, password: str) -> None:
         engine.dispose()
 
 
+def ensure_identity_role(url: str, password: str) -> None:
+    """Die Rolle der Konten und Sitzungen (D1.1) samt Rechten im Schema ``identity``."""
+    ensure_login_role(url, IDENTITY_ROLE, password)
+    engine = create_engine(normalize_url(url))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(identity_grant_statements()))
+    finally:
+        engine.dispose()
+
+
 def ensure_service_role(url: str, password: str, *, role: str) -> None:
     """Eine Service-Rolle (P5.3) samt Rechten im eigenen Schema."""
     ensure_login_role(url, role, password)
@@ -140,6 +154,8 @@ def main() -> int:
     roles = (
         (PROFILES_ROLE, settings.va_profiles_password, ensure_profiles_role),
         (WEB_ROLE, settings.va_web_password, ensure_web_role),
+        # D1.1: Konten und Sitzungen des web-api
+        (IDENTITY_ROLE, settings.va_identity_password, ensure_identity_role),
         # P5.3: eine Rolle je Service
         *(
             (role, getattr(settings, f"{role}_password"), partial(ensure_service_role, role=role))

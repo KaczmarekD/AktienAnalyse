@@ -2963,7 +2963,8 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
 - **Implementierung:**
   - Vertrag `ScoringRunCompletedV1.params: ProfileParamsV1 | None`, gesetzt im Handler von scoring
     aus der `ScoringConfig` des Laufs.
-  - Migration `0015`: `web.ranking_profile` und `web.ranking_factor`, nur zum Anfügen
+  - Migration `0016` (beim Aufsetzen auf D1.1 von `0015` umbenannt): `web.ranking_profile` und
+    `web.ranking_factor`, nur zum Anfügen
     (`protect_table`), Rechte für `va_web` und `va_read`. Neue Tabellen statt neuer Spalten, denn
     die vorhandenen Zeilen lassen sich nicht ändern und der Backfill kann neue Tabellen ganz füllen.
   - Projektionen `ranking_profile` und `ranking_factor`, Backfill aus `scoring.scoring_run`,
@@ -3062,3 +3063,188 @@ ihnen brauchen (Muster-Klassen, Tabellen, Formularfelder), legt deshalb schon G1
 - **Review des Ganzen:** `make ui-check`, `make check`, `make test-db`; E2E in der CI;
   Screenshots hell und dunkel bei 1366 × 768 und 375 px für die Abnahme; Start-Bundle 489 kB.
 - **NAS (du):** nichts Eigenes; mit dem nächsten Deployment kommen alle G-Pakete zusammen.
+
+### Track D – Depots, mehrere Nutzer und Bankanbindung
+
+Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
+[ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis
+[ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md) (angenommen am 06.11.2026).
+
+- **Stand (06.11.2026):** Die ADRs sind angenommen, D1 ist in Pakete geschnitten (unten). Die
+  übrigen offenen Fragen der Spezifikation klärt der User vor der Stufe, die sie braucht.
+- **Pakete:** Jede Stufe D1 bis D9 wird zu Beginn in Pakete geschnitten. Der Entwurf je Paket
+  kommt dann hierher, nach dem Muster der Phasen oben (Test, Implementierung, Review). Die
+  Anforderungs-IDs der Spezifikation (z. B. `NUT-01`, `HIN-K01`) stehen in Tests und Entwürfen.
+- **Grenzen, die jede Stufe einhält:**
+  - Die Golden-Master der Samstags-Mail und die Replay-Fixtures bleiben unverändert.
+  - Contracts und REST-API ändern sich nur additiv. Den Bruch durch die Anmeldung klärt D1.
+  - Neue Abhängigkeiten (argon2-cffi, cryptography, fints, yfinance ≥ 1.8) laufen durch
+    `make check-j4125`.
+  - Jede neue Tabelle bekommt den Löschschutz. Persönliche Schemas bekommen keine Rechte für
+    `va_read`.
+
+#### D1 Mehrere Nutzer – Paketschnitt
+
+- **Stand (06.11.2026):** Entwurf. ADR-0012 ist angenommen, dazu die Fragen 1, 2, 3 und 6 der
+  Spezifikation. Anforderungen: [depot/nutzer.md](depot/nutzer.md). Reihenfolge D1.1 → D1.2 →
+  D1.3; D1.4 kann nach D1.2 parallel laufen; D1.5 und D1.6 zum Schluss.
+- **Ausgangslage im Code:** `va_web_api.security.JsonOnlyMiddleware` (P3.4), `Origin`-Prüfung am
+  WebSocket, Settings in `va_web_api.settings.WebApiSettings` (Präfix `WEB_API_`), letzte
+  Migration `0014_service_roles`, Grants in `va_platform.db.ddl` (`SCHEMAS`, `SERVICE_ROLES`).
+
+**D1.1 Konten, Anmeldung, Sitzungen 🔒** (NUT-01, 02, 04, 05, 06, 09)
+- **Test:**
+  - DB: Tabellen aus [nutzer.md](depot/nutzer.md#datenmodell) mit Löschschutz; `va_read` und
+    `va_app` lesen nichts in `identity` (auch nicht nach erneutem Lauf der Grants).
+  - Domain: Passwortregeln (Länge, Liste häufiger Passwörter), Hash und Prüfung, Sperre nach
+    5 Fehlversuchen je Konto und je IP, Ablauf nach Inaktivität und absolut, Widerruf.
+  - API: Login (204 mit Cookie, 401 bei falschem Passwort, 429 bei Sperre), Logout, `GET /me`;
+    das Cookie enthält nur die ID, in der DB steht ihr SHA-256.
+  - Kommando `python -m va_web_api.admin create-user --admin` legt genau einen Admin an.
+- **Implementierung:** Migration `0015_identity` (Schema, Tabellen, Rolle `va_identity`, eigene
+  Grant-Funktion außerhalb von `SCHEMAS`), Modul `va_web_api.identity` (domain, Repository,
+  Router `auth` und `me`), Setting `WEB_API_IDENTITY_DATABASE_URL`, Passwort `VA_IDENTITY_PASSWORD`
+  in `src.db.migrate`. Hash mit `argon2-cffi`, sofern `make check-j4125` grün ist, sonst
+  `hashlib.scrypt`.
+- **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (06.11.2026):**
+  - **Hash:** `hashlib.scrypt` aus der Standardbibliothek (N = 2¹⁷, r = 8, p = 1, 128 MiB), nicht
+    argon2-cffi. Keine neue native Abhängigkeit, also kein Risiko auf dem J4125. Die Parameter
+    stehen im Hash (`scrypt$n$r$p$salt$hash`), ein späterer Wechsel geht beim nächsten Login.
+  - **Schema:** `identity` kommt in `APP_SCHEMAS` (Löschschutz, Outbox-Prüfung, Alembic), aber
+    nicht in `SCHEMAS`: `va_read` und `va_app` bekommen dort nichts. Eigene Grants
+    (`identity_grant_statements`) nur für `va_identity`.
+  - **Tabellen in D1.1:** alle aus [nutzer.md](depot/nutzer.md#datenmodell) außer
+    `email_confirmation` und `erasure_log` (D1.6). Outbox und Inbox gleich mit, wie in jedem
+    Schema.
+  - **Sperre:** gezählt aus `login_event`, übersteht also einen Neustart. Je Konto die
+    Fehlversuche seit seinem letzten Erfolg, je IP die seit dem letzten Erfolg von dort, beides
+    höchstens 15 Minuten zurück. Es zählen nur falsches Passwort und unbekannter Name, nicht die
+    abgewiesenen Versuche während der Sperre.
+  - **Unbekannter Name:** Der Dienst prüft trotzdem einen Hash, damit die Antwortzeit nichts
+    verrät. Deaktiviertes Konto und falsches Passwort ergeben dieselbe Antwort 401.
+  - **Cookie:** `__Host-va_session` mit `Secure`; lokal und im E2E-Stack
+    `WEB_API_COOKIE_SECURE=false`, dann `va_session` ohne `Secure`.
+  - **Settings:** `WEB_API_IDENTITY_DATABASE_URL` (ohne: 503 auf den neuen Endpunkten),
+    `WEB_API_COOKIE_SECURE`, `WEB_API_SESSION_IDLE_HOURS` (12), `WEB_API_SESSION_MAX_DAYS` (30).
+    Compose: `VA_IDENTITY_PASSWORD` ist für `migrate` und das web-api Pflicht.
+  - **Kommando:** `python -m va_web_api.admin create-user <name> [--admin] [--email …]
+    [--display-name …] [--password-stdin]`. Ohne `--password-stdin` fragt es zweimal per
+    `getpass`.
+  - **Bestehende Endpunkte** bleiben bis D1.2 offen. D1.1 fügt nur `auth` und `me` hinzu.
+- **Umgesetzt (06.11.2026, auf `main` als `0d2d8bd`, CI grün):**
+  - **Code:** `va_web_api.identity` (`domain`, `ports`, `service`, `memory`), Postgres-Speicher
+    und Modelle unter `va_web_api.adapters.postgres.identity_*`, Router `api/auth.py`,
+    Kommando `va_web_api.admin`, Migration `0015_identity`, Rolle `va_identity` in
+    `src.db.migrate` und `db/init/01_roles.sh`.
+  - **Tests:** Fachregeln und API ohne Datenbank; gemeinsame Speicher-Tests für den Speicher im
+    Prozess und Postgres; Rechte im Schema `identity`, auch nach erneutem Lauf aller Grants.
+    Migration und Modelle per `alembic compare_metadata` ohne Unterschied.
+  - **Abweichung beim Schreiben der Tests:** „Seit dem letzten Erfolg“ zählt nach
+    Einfügereihenfolge, nicht nach Zeitstempel. Sonst zählte die Sperre bei gleichen Zeitstempeln
+    falsch.
+  - **Geändert:** Der Sicherheitstest aus P3.4 verbot „password“ in der ganzen API-Beschreibung.
+    Jetzt ist die Login-Anfrage die einzige Ausnahme, ein zweiter Test prüft genau das.
+  - **Review (`/code-review high`, `/security-review`):** behoben, dass ein 422 der Anmeldung
+    die Eingaben samt Passwort zurückschickt (eigene Antwort für `/api/v1/auth/*`), dass
+    `create_user` einen ungetrimmten Anzeigenamen zurückgab und dass das Kommando ohne
+    `WEB_API_DATABASE_URL` mit Traceback abbrach. Höchstens zwei scrypt-Berechnungen laufen
+    zugleich (je 128 MiB). Offen gelassen: `Retry-After` nennt immer 900 s statt der Restzeit
+    (mit D1.4), die vier `ensure_*_role` in `src.db.migrate` sind fast gleich (eigenes Aufräumen).
+    Die Sicherheitsprüfung fand nichts mit hoher Sicherheit.
+  - **Bekannte Grenze bis D1.5:** Hinter nginx sieht das web-api nur die Adresse von nginx, weil
+    uvicorn `X-Forwarded-For` noch nicht vertraut. Die Sperre je IP zählt dann für alle
+    gemeinsam: Fünf Fehlversuche von irgendwem sperren 15 Minuten jede Anmeldung. Auf der NAS
+    wirkt das erst mit HTTPS (D1.5), das dieselbe Stufe mit der Vertrauenskette behebt.
+  - **NAS:** `VA_IDENTITY_PASSWORD` in die `.env` (Pflicht für `migrate` und das web-api), danach
+    den ersten Admin anlegen ([Runbook](betrieb-synology.md)).
+
+**D1.2 Rollen und Schutz der bestehenden Endpunkte 🔒** (NUT-02, 03, 09, Regeln 6 und 7)
+- **Test:**
+  - Eine Tabelle aller Routen: ohne Sitzung 401 außer Health, Login und `confirm-email`.
+  - Nutzer bekommt 403 bei Run starten, Profil speichern und aktivieren; Admin darf.
+  - Schreibende Anfrage mit fremdem `Origin` ergibt 403, auch mit gültigem Cookie.
+  - Log-Filter: Passwort, Token, Sitzungs-ID und Mail-Adresse erscheinen in keinem Log
+    (auch `va_notification.adapters.smtp`).
+- **Implementierung:** `CurrentUser` und `require_admin` als `Depends`, `Origin`-Prüfung in der
+  Middleware neben `JsonOnlyMiddleware`, Filter im Logging. OpenAPI-Snapshot und TS-Client neu
+  (`make ui-api`). Klären, ob `oasdiff breaking` die neuen Sicherheitsangaben als Bruch meldet;
+  wenn ja, als bewusst begründete Ausnahme im Review, nicht als `/api/v2`.
+- **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (06.11.2026):**
+  - **Übergang `WEB_API_AUTH_REQUIRED`** (Standard `true`): Ohne Login-Seite (D1.4) und ohne
+    HTTPS (D1.5) wäre das UI sonst unbenutzbar. Die Compose-Dateien setzen den Schalter bis dahin
+    auf `false`. Dann gilt das Verhalten von ADR-0007 weiter: Alle Endpunkte antworten ohne
+    Sitzung, als wäre ein Admin angemeldet (`LAN_USER`). `GET /me` verlangt immer eine echte
+    Sitzung. D1.4 schaltet lokal und im E2E-Stack um, D1.5 auf der NAS.
+  - **Ohne Sitzung erreichbar:** Health, Login, Logout (löscht nur das Cookie), OpenAPI und
+    Swagger (keine Daten). NUT-09 wird entsprechend ergänzt.
+  - **Schutz je Router:** `current_user` als Abhängigkeit beim Einbinden von `runs`, `ranking`,
+    `instruments`, `reports` und `scoring`, `require_admin` an Run-Start, Profil speichern und
+    aktivieren. Die Vorschau bleibt für Nutzer offen. Kein Sicherheitsschema in OpenAPI (Cookie
+    wird von Hand gelesen), nur zusätzliche Antworten 401 und 403: So meldet `oasdiff` keinen
+    Bruch.
+  - **`Origin`-Prüfung** für jede schreibende Anfrage als Middleware, dieselbe Regel wie am
+    WebSocket (`origin_allowed` zieht dafür nach `va_web_api.security`). Ohne `Origin` (kein
+    Browser) erlaubt.
+  - **Log-Filter** in `va_platform.redaction`: schwärzt Mail-Adressen und Werte hinter
+    `password`, `passwort`, `pin`, `tan`, `token`, `secret`, `session` in jeder Log-Zeile. Er
+    hängt an den Handlern von Services, Batch und web-api. `va_notification.adapters.smtp` loggt
+    den Empfänger nicht mehr.
+- **Umgesetzt (06.11.2026, auf `main` als `2f21b48`, CI grün):**
+  - **Code:** `current_user`, `session_user`, `require_admin` und `LAN_USER` in `api/auth.py`,
+    `OriginCheckMiddleware` und `origin_allowed` in `va_web_api.security`,
+    `va_platform.redaction`, Schalter `WEB_API_AUTH_REQUIRED` (Compose: `false`).
+  - **Vorgezogen aus D1.3:** Mit Sitzungspflicht lehnt auch der WebSocket einen Handshake ohne
+    Sitzung ab. Sonst hätte er Runs und Rankings an Unangemeldete gemeldet. Topics je Nutzer und
+    Trennen beim Abmelden bleiben in D1.3.
+  - **Tests:** Die Routentabelle kommt aus der OpenAPI-Beschreibung, weil FastAPI eingebundene
+    Router verzögert auflöst (`app.routes` enthält sie nicht direkt). Bestehende Endpunkt-Tests
+    laufen mit `auth_required=False`.
+  - **Review:** Tracebacks und Passwörter in URLs werden ebenfalls geschwärzt. Bewusst
+    unverändert: Ist `WEB_API_ALLOWED_ORIGINS` gesetzt, gilt nur die Liste, jetzt auch für
+    REST (Hinweis an der Einstellung). Die Sicherheitsprüfung fand nichts mit hoher Sicherheit.
+  - **NAS:** nichts zu tun; `docker-compose.yml` hält die Sitzungspflicht bis D1.5 aus.
+
+**D1.3 WebSocket mit Sitzung 🔒** (NUT-08)
+- **Test:** Handshake ohne Sitzung abgelehnt; Topic `user:<id>` nur für diesen Nutzer; Abmelden
+  trennt die Verbindungen der Sitzung; die globalen Topics (`runs`, `ranking`, `profiles`) wie
+  bisher für alle Angemeldeten.
+- **Implementierung:** Sitzungsprüfung im Endpunkt `/ws`, Berechtigung je Topic im Hub,
+  Golden-Schema `tests/golden/realtime/v1.json` nur additiv.
+- **Review:** `/code-review high`, `/security-review`.
+
+**D1.4 Frontend: Anmeldung und Nutzerverwaltung** (NUT-10, 11, Rollen)
+- **Test:** Komponententests für Login-Seite, Guard und Behandlung von 401 (zurück zum Login);
+  Admin-Ansicht der Nutzer; Playwright: anmelden, Ranking sehen, abmelden, mit leerer Konsole.
+- **Implementierung:** Login-Seite, Route-Guard, Nutzermenü (Passwort ändern, Sitzungen),
+  Verwaltung der Nutzer für Admins, Run-Start und Profil-Editor nur für Admins sichtbar.
+  Der E2E-Stack (`docker/e2e.sh`) legt einen Testnutzer an.
+- **Review:** `/code-review high`.
+
+**D1.5 Betrieb: HTTPS, Proxys, NATS-Nutzer 🔒** (NUT-07, Regeln 9 bis 11)
+- **Test:**
+  - `tests/test_nginx_conf.py`: `set_real_ip_from` nur für das Netz des DSM-Proxys.
+  - Gefälschtes `X-Forwarded-For` von außen ändert die erkannte Adresse nicht.
+  - NATS-Integrationstest (`TEST_NATS_URL`): Ein Dienst ohne Recht kann fremde Subjects weder
+    senden noch lesen.
+  - Cookie ohne `Secure` nur mit dem lokalen Setting.
+- **Implementierung:** NATS-Konfiguration mit einem Nutzer je Dienst (Passwörter in der `.env`),
+  `forwarded_allow_ips` für uvicorn, Runbook-Abschnitt „HTTPS über den Reverse-Proxy von DSM“ in
+  [betrieb-synology.md](betrieb-synology.md) mit `UI_LAN_BIND=127.0.0.1`. Vorher entscheidet der
+  User das Zertifikat (eigene Domain oder eigene CA).
+- **Review:** `/code-review high`, `/security-review`.
+
+**D1.6 Mail-Bestätigung, Datenexport, Löschkommando** (NUT-10, 12, Löschkommando aus ADR-0012)
+- **Test:** Token einmalig und 24 h gültig; `confirm-email` ohne Sitzung; Export enthält alle
+  eigenen Zeilen aus `identity`; `erase_user` entfernt alle Zeilen eines Nutzers in `identity`,
+  schreibt `erasure_log` ohne Inhalte und lässt fremde Zeilen unberührt.
+- **Implementierung:** Event `priv.va.identity.email_confirmation.requested` braucht `VA_PRIVATE`
+  (Plattform-Änderungen aus der Spezifikation, hier zuerst gebaut), Versand in notification mit
+  Empfänger als Parameter von `ReportSender`. `erase_user` zuerst für `identity`, die anderen
+  Besitzer folgen mit ihren Stufen.
+- **Review:** `/code-review high`, `/security-review`.
+
+**Fertig, wenn:** jeder Zugriff eine Anmeldung braucht, Admin und Nutzer getrennte Rechte haben,
+der E2E-Test mit Testnutzer grün ist und das Runbook HTTPS über DSM beschreibt. Die Samstags-Mail
+und ihr Golden-Master bleiben unverändert.

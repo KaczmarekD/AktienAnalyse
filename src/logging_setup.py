@@ -7,6 +7,8 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from va_platform.redaction import RedactingFilter
+
 LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)-22s | %(message)s"
 
 
@@ -32,6 +34,9 @@ def setup_logging(logs_dir: Path, level: int = logging.INFO) -> None:
 
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
+    # D1.2: keine Geheimnisse und Mail-Adressen im Log (Datei und Konsole)
+    for handler in (file_handler, stream_handler):
+        handler.addFilter(RedactingFilter())
 
     root = logging.getLogger()
     # Bestehende Handler entfernen (relevant fuer Tests / Re-Runs im selben Prozess)

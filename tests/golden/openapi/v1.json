@@ -267,6 +267,82 @@
         "title": "Instrument",
         "type": "object"
       },
+      "LoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "Me": {
+        "additionalProperties": false,
+        "description": "Das eigene Konto, ohne Anmeldedaten.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "role",
+          "display_name",
+          "email"
+        ],
+        "title": "Me",
+        "type": "object"
+      },
       "Preview": {
         "additionalProperties": false,
         "properties": {
@@ -2011,6 +2087,68 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Meldet an und setzt das Sitzungs-Cookie.",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Benutzername oder Passwort falsch"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Zu viele Fehlversuche, voruebergehend gesperrt"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Beendet die Sitzung auf dem Server und loescht das Cookie im Browser.",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health",
@@ -2057,6 +2195,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2077,6 +2218,34 @@
         ]
       }
     },
+    "/api/v1/me": {
+      "get": {
+        "description": "Das eigene Konto.",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/ranking/latest": {
       "get": {
         "description": "Juengster Bewertungslauf ausser Rescores.",
@@ -2091,6 +2260,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2126,6 +2298,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2172,6 +2347,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2212,6 +2390,9 @@
               "text/csv": {}
             },
             "description": "Die CSV der Mail"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2277,6 +2458,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2316,6 +2500,12 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
           },
           "409": {
             "description": "Es laeuft schon ein Run"
@@ -2365,6 +2555,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2403,6 +2596,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "503": {
             "description": "Scoring nicht verfuegbar"
@@ -2453,6 +2649,9 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2493,6 +2692,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           }
         },
         "summary": "List Profiles",
@@ -2526,6 +2728,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
           },
           "404": {
             "description": "Nicht gefunden"
@@ -2597,6 +2802,12 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
+          },
           "404": {
             "description": "Nicht gefunden"
           },
@@ -2661,6 +2872,12 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "403": {
+            "description": "Nur fuer Admins"
           },
           "404": {
             "description": "Nicht gefunden"
