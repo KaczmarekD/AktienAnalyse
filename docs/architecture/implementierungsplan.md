@@ -2998,7 +2998,7 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
     `password`, `passwort`, `pin`, `tan`, `token`, `secret`, `session` in jeder Log-Zeile. Er
     hängt an den Handlern von Services, Batch und web-api. `va_notification.adapters.smtp` loggt
     den Empfänger nicht mehr.
-- **Umgesetzt (06.11.2026, Branch `feat/d1-2-rollen`):**
+- **Umgesetzt (06.11.2026, auf `main` als `2f21b48`, CI grün):**
   - **Code:** `current_user`, `session_user`, `require_admin` und `LAN_USER` in `api/auth.py`,
     `OriginCheckMiddleware` und `origin_allowed` in `va_web_api.security`,
     `va_platform.redaction`, Schalter `WEB_API_AUTH_REQUIRED` (Compose: `false`).
