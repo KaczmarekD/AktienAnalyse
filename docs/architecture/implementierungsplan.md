@@ -3512,7 +3512,7 @@ Golden-Master und die Replay-Fixtures.
   `RemoteSecurities` im web-api. Die Suche schreibt nichts; `resolve` speichert Wertpapier,
   Stammdaten und Listing.
 - **Review:** `/code-review high`.
-- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (07.11.2026, auf `main` als `1b295f3`, CI grün):** wie im Entwurf, dazu:
   - **ISIN aus der WKN:** OpenFIGI liefert zur WKN keine ISIN; deutsche ISINs enthalten sie
     (`DE000` + WKN + Prüfziffer). `valid_isin` steht in `va_contracts.securities`, weil web-api
     (422) und market-data dieselbe Prüfziffer prüfen.
