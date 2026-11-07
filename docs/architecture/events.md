@@ -241,6 +241,31 @@ mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.fail
 - **Batch:** Über NATS wartet `src/main.py`, bis der `RunTracker` ein Ergebnis hat (höchstens
   `RUN_TIMEOUT_MINUTES`). Dann wartet es, bis nichts mehr offen ist, und schließt den Bus geordnet.
 
+## NATS-Nutzer und Rechte (seit D1.5)
+
+NATS verlangt eine Anmeldung ([nutzer.md](depot/nutzer.md#sicherheitsregeln) Regel 11). Die
+Nutzer stehen in `docker/nats/nats.conf`, die Passwörter (`NATS_*_PASSWORD`) in der `.env`, der
+Nutzername in der `NATS_URL` des Dienstes.
+
+| Nutzer | Sendet | Liest | RPC |
+|---|---|---|---|
+| `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | – |
+| `scoring` | `va.scoring.>`, `va.screening.run.failed` | Consumer `scoring` | antwortet auf `rpc.va.scoring.>` |
+| `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification` | antwortet auf `rpc.va.notification.>` |
+| `web-api` | `va.screening.run.requested`, `va.screening.run.failed` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus dem Stream (Nachspielen) | fragt `rpc.va.scoring.>`, `rpc.va.notification.>` |
+| `batch` | alles | alles | alles |
+
+- **Inbox:** Antworten (JetStream-API, RPC) gehen an `_INBOX.<nutzer>`; jeder darf nur seine
+  lesen (`va_platform.nats.inbox_prefix`).
+- **Provisionierung:** Jeder Dienst legt den Stream und nur seinen eigenen Consumer an. Umstellen
+  darf den Stream nur `batch`; weicht er ab, meldet ein Dienst das im Log und läuft weiter. Alle
+  Consumer legt `provision()` ohne `consumers` an: der Batch, `src.worker`, `make nats-provision`
+  (Nutzer `batch`).
+- **Neues Event oder RPC:** Eintrag in `nats.conf` beim Sender (und beim Besitzer des RPC). Fehlt
+  er, meldet NATS „Permissions Violation“, und der Dienst bekommt keinen PubAck.
+  `tests/test_nats_permissions.py` prüft die Rechte gegen einen NATS mit dieser Datei, der
+  E2E-Stack die ganze Kette.
+
 ## Run-Optionen und Sonderfälle
 
 - `force_refresh`: market-data ignoriert einen wiederverwendbaren Snapshot vom selben Tag.

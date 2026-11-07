@@ -173,7 +173,10 @@ def open_event_consumer(nats_url: str, engine: Engine, broadcaster: Broadcaster)
         # Fluechtig (P4.5): an den Projektionen vorbei direkt an die Clients, ohne seq
         broadcaster.publish(EventMessage("runs", env.type, None, plain(env.data)))
 
-    bus = NatsBus(nats_url, max_deliver=MAX_DELIVER, on_dead_letter=dead_letter)
+    # D1.5: Mit dem NATS-Nutzer web-api nur der eigene Consumer
+    bus = NatsBus(
+        nats_url, max_deliver=MAX_DELIVER, on_dead_letter=dead_letter, consumers=(CONSUMER,)
+    )
     bus.start()
     try:
         for spec in EVENTS.values():

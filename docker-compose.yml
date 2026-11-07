@@ -46,9 +46,17 @@ services:
     image: nats:2.15.1-alpine
     container_name: value-analyzer-nats
     restart: unless-stopped
-    command: ["-js", "-sd", "/data", "-m", "8222"]
+    # D1.5: JetStream, Port der Ueberwachung und ein Nutzer je Dienst stehen in der Datei
+    command: ["-c", "/etc/nats/nats.conf"]
+    environment:
+      NATS_MARKET_DATA_PASSWORD: ${NATS_MARKET_DATA_PASSWORD:?NATS_MARKET_DATA_PASSWORD in .env setzen}
+      NATS_SCORING_PASSWORD: ${NATS_SCORING_PASSWORD:?NATS_SCORING_PASSWORD in .env setzen}
+      NATS_NOTIFICATION_PASSWORD: ${NATS_NOTIFICATION_PASSWORD:?NATS_NOTIFICATION_PASSWORD in .env setzen}
+      NATS_WEB_API_PASSWORD: ${NATS_WEB_API_PASSWORD:?NATS_WEB_API_PASSWORD in .env setzen}
+      NATS_BATCH_PASSWORD: ${NATS_BATCH_PASSWORD:?NATS_BATCH_PASSWORD in .env setzen}
     volumes:
       - ./natsdata:/data
+      - ./docker/nats/nats.conf:/etc/nats/nats.conf:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
       interval: 10s
@@ -123,7 +131,8 @@ services:
     environment:
       TZ: Europe/Berlin
       DATABASE_URL: postgresql+psycopg://va_market_data:${VA_MARKET_DATA_PASSWORD:?VA_MARKET_DATA_PASSWORD in .env setzen}@db:5432/value_analyzer
-      NATS_URL: nats://nats:4222
+      # D1.5: eigener NATS-Nutzer, nur die eigenen Subjects (docker/nats/nats.conf)
+      NATS_URL: nats://market-data:${NATS_MARKET_DATA_PASSWORD:?NATS_MARKET_DATA_PASSWORD in .env setzen}@nats:4222
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
       UNIVERSE: ${UNIVERSE:-}
@@ -140,7 +149,7 @@ services:
     environment:
       TZ: Europe/Berlin
       DATABASE_URL: postgresql+psycopg://va_scoring:${VA_SCORING_PASSWORD:?VA_SCORING_PASSWORD in .env setzen}@db:5432/value_analyzer
-      NATS_URL: nats://nats:4222
+      NATS_URL: nats://scoring:${NATS_SCORING_PASSWORD:?NATS_SCORING_PASSWORD in .env setzen}@nats:4222
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
       # Nur Startwerte fuer das Profil "Standard" (ADR-0009)
@@ -156,7 +165,7 @@ services:
     environment:
       TZ: Europe/Berlin
       DATABASE_URL: postgresql+psycopg://va_notification:${VA_NOTIFICATION_PASSWORD:?VA_NOTIFICATION_PASSWORD in .env setzen}@db:5432/value_analyzer
-      NATS_URL: nats://nats:4222
+      NATS_URL: nats://notification:${NATS_NOTIFICATION_PASSWORD:?NATS_NOTIFICATION_PASSWORD in .env setzen}@nats:4222
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
       OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -194,12 +203,16 @@ services:
     environment:
       TZ: Europe/Berlin
       WEB_API_DATABASE_URL: postgresql+psycopg://va_read:${VA_READ_PASSWORD}@db:5432/value_analyzer
-      WEB_API_NATS_URL: nats://nats:4222
+      WEB_API_NATS_URL: nats://web-api:${NATS_WEB_API_PASSWORD:?NATS_WEB_API_PASSWORD in .env setzen}@nats:4222
       WEB_API_PROJECTIONS_DATABASE_URL: postgresql+psycopg://va_web:${VA_WEB_PASSWORD:?VA_WEB_PASSWORD in .env setzen}@db:5432/value_analyzer
-      # D1.1: Konten und Sitzungen. Das Cookie ist Secure: anmelden erst mit HTTPS (D1.5)
+      # D1.1: Konten und Sitzungen. Seit D1.5 mit Sitzungspflicht (Standard) hinter HTTPS: Das
+      # Cookie ist Secure, der Reverse-Proxy von DSM terminiert TLS (betrieb-synology.md)
       WEB_API_IDENTITY_DATABASE_URL: postgresql+psycopg://va_identity:${VA_IDENTITY_PASSWORD:?VA_IDENTITY_PASSWORD in .env setzen}@db:5432/value_analyzer
-      # D1.2: Uebergang. Ohne HTTPS geht kein Login, bis D1.5 ohne Sitzungspflicht wie bisher
-      WEB_API_AUTH_REQUIRED: "false"
+      # D1.5: Herkunft des UI hinter dem DSM-Proxy (https://<name>); leer: dieselbe wie Host
+      WEB_API_ALLOWED_ORIGINS: ${UI_ORIGINS:-}
+      # D1.5: uvicorn glaubt X-Forwarded-For nur aus dem Docker-Netz (nginx); ohne Port im LAN.
+      # Vergibt Docker andere Netze: UI_FORWARDED_ALLOW_IPS in der .env (wie UI_TRUSTED_PROXY)
+      FORWARDED_ALLOW_IPS: ${UI_FORWARDED_ALLOW_IPS:-172.16.0.0/12,192.168.0.0/16,10.0.0.0/8}
       WEB_API_SCHEDULE: ${CRON_SCHEDULE:-30 7 * * 6}
       WEB_API_OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
 
@@ -215,7 +228,10 @@ services:
       # Hostnamen, unter denen das UI im Browser aufgerufen wird; alle anderen bekommen keine
       # Antwort (Schutz vor DNS-Rebinding)
       VA_SERVER_NAMES: ${UI_SERVER_NAMES:-localhost 127.0.0.1}
+      # D1.5: Die Client-Adresse aus X-Forwarded-For nur von hier (der DSM-Proxy kommt ueber
+      # 127.0.0.1:8080 aus dem Docker-Netz). Wichtig fuer die Sperre nach Fehlversuchen je Geraet.
+      VA_TRUSTED_PROXY: ${UI_TRUSTED_PROXY:-172.16.0.0/12}
     ports:
-      # Nur im LAN: UI_LAN_BIND auf die NAS-IP setzen (Default: nur auf der NAS selbst).
-      # Die DSM-Firewall sollte Port 8080 auf das Heimnetz beschraenken.
+      # Seit D1.5 nur auf der NAS selbst: Der Reverse-Proxy von DSM nimmt HTTPS an und reicht an
+      # 127.0.0.1:8080 weiter. UI_LAN_BIND auf die NAS-IP nur ohne Anmeldung (Cookie Secure).
       - "${UI_LAN_BIND:-127.0.0.1}:8080:8080"

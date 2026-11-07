@@ -3348,6 +3348,51 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   [betrieb-synology.md](betrieb-synology.md) mit `UI_LAN_BIND=127.0.0.1`. Vorher entscheidet der
   User das Zertifikat (eigene Domain oder eigene CA).
 - **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (06.11.2026):** Das Zertifikat richtet der User in DSM ein; der Code hängt nicht davon
+  ab. Das Runbook beschreibt beide Wege, die Wahl bleibt offen.
+  - **Vertrauenskette:** nginx übernimmt die Client-Adresse aus `X-Forwarded-For` nur von
+    `VA_TRUSTED_PROXY` (Standard `172.16.0.0/12`, das Docker-Netz, aus dem der DSM-Proxy über
+    `127.0.0.1:8080` ankommt; nicht rekursiv, also die letzte Adresse) und reicht dem web-api genau
+    diese Adresse weiter (`X-Forwarded-For $remote_addr`, nicht angehängt). uvicorn glaubt dem Kopf
+    nur aus den privaten Netzen (`FORWARDED_ALLOW_IPS`); das web-api hat auf der NAS keinen Port.
+    Damit zählt die Sperre je IP wieder je Gerät.
+  - **NATS mit Anmeldung** (`docker/nats/nats.conf`, Passwörter aus der `.env`): je Dienst ein
+    Nutzer (`market-data`, `scoring`, `notification`, `web-api`) mit Rechten nur auf die eigenen
+    Event-Subjects, `va.screening.run.failed`, die eigenen RPC-Subjects (`rpc.va.scoring.>` usw.)
+    und den eigenen Consumer in `VA_EVENTS`. Antworten über `allow_responses`. Jeder Dienst hat
+    eine eigene Inbox (`_INBOX.<nutzer>`, aus dem Nutzernamen der URL), sonst läse jeder mit
+    `_INBOX.>` die Antworten der anderen. Dazu `batch` mit allen Rechten für Batch über NATS,
+    `src.worker` und `make nats-provision` (hat ohnehin alle Rechte in der Datenbank).
+  - **Provisionierung je Dienst:** Ein Dienst legt nur den Stream und seinen eigenen Consumer an
+    (`NatsBus(..., consumers=…)`), nicht mehr alle. Ohne Angabe wie bisher alle (Batch, Tests).
+  - **NAS:** `WEB_API_AUTH_REQUIRED` entfällt (Standard: Sitzungspflicht), `UI_LAN_BIND` bleibt
+    `127.0.0.1`, neu `UI_ORIGINS` (→ `WEB_API_ALLOWED_ORIGINS`) und `UI_TRUSTED_PROXY`. Runbook:
+    Reverse-Proxy in DSM (HTTPS, HSTS, WebSocket), `UI_SERVER_NAMES`, Zertifikat über eigene
+    Domain (Let's Encrypt) oder eigene CA.
+  - **Tests:** nginx-Regeln statisch, Compose-Werte, NATS-Rechte gegen einen zweiten NATS mit
+    der echten Konfiguration (`TEST_NATS_AUTH_URL`, in der CI ein eigener Container), im E2E die
+    ganze Kette mit Anmeldung bei NATS und die Sperre je weitergereichter IP.
+- **Umgesetzt (07.11.2026, auf `main` als `36e5e86`, CI grün):** wie im Entwurf, dazu:
+  - **`src.worker`** startet alle drei Services in einem Prozess und legt deshalb weiter alle
+    Consumer an (`run_service(..., all_consumers=True)`, Nutzer `batch`).
+  - **Inbox aus der URL:** Kein neues Setting; der Nutzername in `NATS_URL` bestimmt die Inbox.
+  - **Beim Testen gefunden:** `max_reconnect_attempts=0` heißt in nats-py „endlos“, nicht „nie“.
+    Die Tests verbinden deshalb mit `allow_reconnect=False`.
+  - **Frontend-Image:** `ENV VA_TRUSTED_PROXY` als Standard, sonst stünde der Platzhalter in der
+    nginx-Konfiguration.
+  - **Zertifikat:** weiter offen beim User; das Runbook beschreibt Let's Encrypt mit eigener
+    Domain und eine eigene CA in DSM.
+  - **Review (`/code-review high`, `/security-review`):** behoben, dass jeder Dienst den Stream
+    umstellen durfte (jetzt nur `batch`; ein Dienst meldet eine Abweichung und läuft weiter), dass
+    `make nats-provision` das Passwort nicht fand, dass `FORWARDED_ALLOW_IPS` nicht einstellbar
+    war; das Runbook verlangt jetzt, `UI_LAN_BIND` zu entfernen, und prüft die Geräteadresse im
+    Log von nginx. Die Sicherheitsprüfung fand nichts mit hoher Sicherheit.
+  - **Offen für D8 (Bank-RPC):** NATS prüft die Antwortadresse einer Anfrage nicht. Ein
+    kompromittierter Dienst könnte JetStream über `CONSUMER.MSG.NEXT` mit fremder Antwortadresse
+    eine Nachricht an `rpc.va.<anderer>.…` zustellen lassen, und ein Dienst kann den Filter seines
+    eigenen Consumers ändern. Heute ohne Gewicht (keine persönlichen Daten in `VA_EVENTS`, die
+    Dienste beeinflussen das Ranking ohnehin). Vor `rpc.va.bank.>` und `VA_PRIVATE`: RPC in einem
+    eigenen NATS-Account oder Anfragen signieren.
 
 **D1.6 Mail-Bestätigung, Datenexport, Löschkommando** (NUT-10, 12, Löschkommando aus ADR-0012)
 - **Test:** Token einmalig und 24 h gültig; `confirm-email` ohne Sitzung; Export enthält alle

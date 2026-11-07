@@ -52,8 +52,13 @@ Zeitplan:
   nach dem Umstieg auf NATS.
 - **Anmeldung (seit D1.4):** Lokal gilt die Sitzungspflicht (`WEB_API_AUTH_REQUIRED=true`, Cookie
   ohne `Secure`). Das erste Konto legt `make local-admin NAME=<name>` an, das Kommando fragt das
-  Passwort zweimal ab. Weitere Konten entstehen im UI unter „Nutzer“. Auf der NAS bleibt die
-  Sitzungspflicht bis HTTPS (D1.5) aus.
+  Passwort zweimal ab. Weitere Konten entstehen im UI unter „Nutzer“. Auf der NAS gilt die
+  Sitzungspflicht seit D1.5 hinter HTTPS über den Reverse-Proxy von DSM.
+- **NATS mit Nutzern (seit D1.5):** lokal dieselbe `docker/nats/nats.conf` wie auf der NAS, die
+  Passwörter `NATS_*_PASSWORD` aus der `.env` ([.env.local.example](../../.env.local.example)).
+  Aus der `.venv` (`make run` mit `EVENT_BUS=nats`, `make nats-provision`) als Nutzer `batch`:
+  `NATS_URL=nats://batch:<passwort>@127.0.0.1:4222`. Für die Tests startet `make test-nats-up`
+  zusätzlich einen NATS mit dieser Datei (`TEST_NATS_AUTH_URL`).
 - **pgweb liest mit der Rolle `va_read`** und zusätzlich im Modus `--readonly`.
 - **Eigene Namen:** Der lokale Stack heißt `value-analyzer-local`, seine Container auch. Er
   kollidiert so nicht mit einem Stack aus `docker-compose.yml` auf demselben Rechner. Ist Port

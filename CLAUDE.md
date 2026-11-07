@@ -24,7 +24,7 @@ Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-
 | Dienst | Aufgabe | Image |
 |---|---|---|
 | `db` | PostgreSQL 18, Daten unter `./pgdata` | `postgres:18` |
-| `nats` | NATS mit JetStream, Daten unter `./natsdata`, nur im Docker-Netz | `nats:2.15` |
+| `nats` | NATS mit JetStream, Daten unter `./natsdata`, nur im Docker-Netz, ein Nutzer je Dienst (D1.5) | `nats:2.15` |
 | `migrate` | migriert vor allen anderen (`python -m src.db.migrate`), legt neue Rollen an | App-Image |
 | `market-data` | Universum, yfinance, Kennzahlen | `va-market-data` |
 | `scoring` | Cross-sektionales Ranking, Scoring-Profile, Vorschau | `va-scoring` |
@@ -41,7 +41,15 @@ Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-
   notification → `notification.report.sent`. Scheitert eine Stufe, kommt
   `screening.run.failed`. Events, Subjects und Consumer:
   [events.md](docs/architecture/events.md). Stream `VA_EVENTS` und Consumer legt der `NatsBus`
-  beim Start an (`va_platform.nats.provision`).
+  beim Start an (`va_platform.nats.provision`), seit D1.5 jeder Dienst nur seinen eigenen
+  Consumer (`NatsBus(..., consumers=…)`).
+- NATS mit Anmeldung (D1.5, `docker/nats/nats.conf`): je Dienst ein Nutzer (Name in der
+  `NATS_URL`, Passwort `NATS_*_PASSWORD`). Er sendet nur seine eigenen Events und
+  `va.screening.run.failed`, liest nur über seinen Consumer, antwortet nur auf seine RPC
+  (`rpc.va.<dienst>.>`), nur das web-api fragt und liest Nachrichten aus dem Stream. Jeder hat eine
+  eigene Inbox `_INBOX.<nutzer>` (`va_platform.nats.inbox_prefix`). `batch` hat alle Rechte (Batch
+  über NATS, `src.worker`, `make nats-provision`). Ein neues Event oder RPC braucht einen Eintrag
+  in `nats.conf`; `tests/test_nats_permissions.py` und der E2E-Stack prüfen die Rechte.
 - Aus den Events füllt das web-api die Projektionen im Schema `web` (Consumer `web-api`,
   `va_web_api.events.EventManager`) und schließt `batch.run` ab. Der WebSocket `/ws`
   (Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) meldet die
@@ -80,9 +88,11 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   --admin` an.
 - Seit D1.2 verlangen alle übrigen Endpunkte eine Sitzung (`current_user` beim Einbinden der
   Router in `main.create_app`), Run-Start, Profil speichern und aktivieren die Rolle Admin
-  (`require_admin`). Übergang: Bis HTTPS (D1.5) da ist, setzt `docker-compose.yml` (NAS)
-  `WEB_API_AUTH_REQUIRED=false`, dann gilt das Verhalten von ADR-0007 (`LAN_USER`). Lokal und im
-  E2E-Stack gilt seit D1.4 die Sitzungspflicht. Jede schreibende Anfrage mit fremdem `Origin` ergibt 403
+  (`require_admin`). Seit D1.5 gilt die Sitzungspflicht überall, auf der NAS hinter HTTPS über den
+  Reverse-Proxy von DSM. `WEB_API_AUTH_REQUIRED=false` schaltet sie noch ab (Verhalten von
+  ADR-0007, `LAN_USER`), keine Compose-Datei setzt das mehr. Die Client-Adresse für die Sperre je IP
+  übernimmt nginx nur vom Proxy davor (`VA_TRUSTED_PROXY`), uvicorn nur aus dem Docker-Netz
+  (`FORWARDED_ALLOW_IPS`). Jede schreibende Anfrage mit fremdem `Origin` ergibt 403
   (`OriginCheckMiddleware`). `va_platform.redaction` schwärzt Mail-Adressen und Geheimnisse in
   den Logs von Services, Batch und web-api. Ein neuer Endpunkt braucht einen Eintrag in den
   Tabellen von `services/web-api/tests/test_authz.py`, falls er offen sein oder nur Admins
@@ -347,8 +357,9 @@ Tooltips aus dem Glossar, [Spec](docs/architecture/ui-neugestaltung.md), abgenom
 ADR-0011 ist angenommen und wird in F2/F3 umgesetzt. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
 als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
 bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt sind D1.1 bis
-D1.4 (Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI). Auf der
-NAS bleibt die Sitzungspflicht bis HTTPS (D1.5) abgeschaltet. Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
+D1.5 (Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI, HTTPS
+über DSM, NATS-Nutzer je Dienst). Das Zertifikat für die NAS wählt der User (Runbook: beide Wege).
+Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
 fortgeschrieben, nicht nur im Chat besprochen.
 

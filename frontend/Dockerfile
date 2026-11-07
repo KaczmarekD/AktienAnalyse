@@ -14,6 +14,9 @@ LABEL org.opencontainers.image.description="Value-Analyzer: Web-UI (Angular) hin
 # Hostnamen, unter denen das UI aufgerufen wird; alle anderen bekommen keine Antwort.
 # Auf der NAS setzt docker-compose.yml den Wert aus UI_SERVER_NAMES.
 ENV VA_SERVER_NAMES="localhost 127.0.0.1"
+# D1.5: Netz des Proxys davor, dem nginx X-Forwarded-For glaubt (docker-compose.yml:
+# UI_TRUSTED_PROXY). Ohne Wert stuende der Platzhalter in der Konfiguration.
+ENV VA_TRUSTED_PROXY="172.16.0.0/12"
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 8080
 

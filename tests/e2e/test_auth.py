@@ -38,6 +38,31 @@ def test_without_session_no_websocket(base_url):
     assert rejected.value.response.status_code == 403
 
 
+def test_the_lock_counts_per_device_behind_the_proxy(base_url, account):
+    """D1.5: nginx uebernimmt die Adresse vom Proxy davor (hier der Test, auf der NAS der
+    DSM-Proxy), uvicorn die von nginx. Fuenf Fehlversuche von einem Geraet sperren nur dieses."""
+    with httpx.Client(base_url=base_url, timeout=30) as client:
+        for n in range(5):
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"username": f"niemand-{n}", "password": "Falsch-Falsch-Falsch-1"},
+                headers={"X-Forwarded-For": "10.77.0.1"},
+            )
+            assert response.status_code == 401
+        locked = client.post(
+            "/api/v1/auth/login",
+            json={"username": account[0], "password": account[1]},
+            headers={"X-Forwarded-For": "10.77.0.1"},
+        )
+        assert locked.status_code == 429
+        other = client.post(
+            "/api/v1/auth/login",
+            json={"username": account[0], "password": account[1]},
+            headers={"X-Forwarded-For": "10.77.0.2"},
+        )
+        assert other.status_code == 204
+
+
 def test_login_me_and_logout(base_url, account):
     with httpx.Client(base_url=base_url, timeout=30) as client:
         login(client)

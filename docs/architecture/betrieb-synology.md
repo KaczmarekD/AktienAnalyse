@@ -51,14 +51,68 @@
 
 - Nur der `frontend`-Container veröffentlicht einen Port (8080). web-api, Postgres und NATS hängen
   ausschließlich im internen Docker-Netz.
-- Zugriff über `http://<nas>:8080`. Die DSM-Firewall gibt den Port nur für das eigene Subnetz frei.
-- Seit P3.6 in `docker-compose.yml`: Port 8080 bindet an `UI_LAN_BIND` (Default `127.0.0.1`, also
-  nur auf der NAS selbst). Für das LAN die NAS-IP eintragen und in `UI_SERVER_NAMES` die Namen,
-  unter denen das UI aufgerufen wird. Alle anderen Hostnamen bekommen keine Antwort.
-- HTTPS ist optional über den DSM-Reverse-Proxy möglich. Dann dort die WebSocket-Header
-  aktivieren: Reverse Proxy → Benutzerdefinierter Header → Erstellen → WebSocket.
+- Seit D1.5 gibt es das UI nur über HTTPS mit Anmeldung: Der Reverse-Proxy von DSM nimmt
+  `https://<name>` an und reicht an `127.0.0.1:8080` weiter. Port 8080 bindet an `UI_LAN_BIND`
+  (Default `127.0.0.1`, nur auf der NAS selbst), so kommt niemand am Proxy vorbei. Einrichten:
+  [HTTPS über den Reverse-Proxy von DSM](#https-über-den-reverse-proxy-von-dsm).
+- `UI_SERVER_NAMES` nennt die Namen, unter denen das UI aufgerufen wird; alle anderen Hostnamen
+  bekommen keine Antwort.
+- NATS verlangt seit D1.5 eine Anmeldung: je Dienst ein Nutzer mit Rechten nur auf seine Subjects
+  (`docker/nats/nats.conf`, Passwörter `NATS_*_PASSWORD` in der `.env`).
 - Weitere Sicherheitsregeln (Origin-Prüfung, nur JSON, Hostnamen-Filter):
   [web-api-realtime.md](web-api-realtime.md#sicherheitsregeln-lan-ohne-login).
+
+## HTTPS über den Reverse-Proxy von DSM
+
+Seit D1.5 (entschieden am 06.11.2026, [nutzer.md](depot/nutzer.md#sicherheitsregeln) Regel 9 und
+10). DSM terminiert TLS, nginx im Container übernimmt die Client-Adresse nur vom Proxy, das web-api
+nur von nginx. So zählt die Sperre nach fünf Fehlversuchen je Gerät.
+
+**1. Zertifikat** (Systemsteuerung → Sicherheit → Zertifikat), einer von zwei Wegen:
+
+- **Eigene Domain mit Let's Encrypt:** ein Name, der öffentlich auflöst, etwa eine Subdomain der
+  eigenen Domain oder ein Synology-DDNS-Name (`<name>.synology.me`). DSM holt und erneuert das
+  Zertifikat selbst. Im Heimnetz zeigt der Name per DNS des Routers auf die NAS-IP. Vorteil: Jeder
+  Browser vertraut dem Zertifikat ohne weiteres Zutun.
+- **Eigene CA im LAN:** DSM erstellt ein selbstsigniertes Zertifikat mit eigener
+  Zertifizierungsstelle („Hinzufügen → Selbstsigniertes Zertifikat erstellen“). Die CA
+  (`syno-ca-cert.pem` aus dem Export) wird auf jedem Gerät als vertrauenswürdig importiert. Vorteil:
+  nichts im Internet; Nachteil: jedes Gerät einzeln.
+
+**2. Reverse-Proxy** (Systemsteuerung → Anmeldeportal → Erweitert → Reverse Proxy → Erstellen):
+
+| Feld | Wert |
+|---|---|
+| Quelle | Protokoll HTTPS, Hostname `<name>`, Port 443, HSTS aktivieren |
+| Ziel | Protokoll HTTP, Hostname `localhost`, Port 8080 |
+| Benutzerdefinierte Kopfzeile | Erstellen → WebSocket; dazu `X-Forwarded-For` mit `$proxy_add_x_forwarded_for` |
+
+Danach unter „Zertifikat → Einstellungen“ dem Eintrag `<name>` das Zertifikat aus Schritt 1
+zuordnen.
+
+**3. `.env`** und Neustart von `frontend` und `web-api` (`make up`):
+
+```bash
+UI_SERVER_NAMES=<name>
+UI_ORIGINS=https://<name>
+# UI_LAN_BIND nicht setzen: Port 8080 bleibt auf der NAS selbst
+```
+
+`UI_TRUSTED_PROXY` (Standard `172.16.0.0/12`) ist das Docker-Netz, aus dem der Proxy bei nginx
+ankommt. Nur ändern, wenn Docker andere Netze vergibt (`docker network inspect
+value-analyzer_default`, Feld „Gateway“).
+
+**Wichtig:** `UI_LAN_BIND` aus der `.env` entfernen. Liegt Port 8080 im LAN, kommen Geräte am
+Proxy vorbei, je nach Docker über dasselbe Netz wie der Proxy, und könnten über
+`X-Forwarded-For` jede Adresse vorgeben (die Sperre je Gerät liefe dann ins Leere).
+
+**4. Prüfen:**
+- `https://<name>` zeigt die Anmeldeseite; nach der Anmeldung verbindet sich das UI live (kein
+  Chip „offline“).
+- `http://<nas-ip>:8080` aus dem LAN antwortet nicht mehr.
+- `docker compose logs --tail 5 frontend` zeigt am Zeilenanfang die Adresse des eigenen Geräts,
+  nicht `172.x.0.1`. Steht dort die Docker-Adresse, fehlt im Proxy der Kopf `X-Forwarded-For`,
+  und die Sperre nach Fehlversuchen gälte für alle gemeinsam.
 
 ## Dienste
 
@@ -102,8 +156,9 @@ docker compose ps  # migrate "exited (0)", alle anderen "running" bzw. "healthy"
 
 Pflicht in der `.env` sind `POSTGRES_PASSWORD`, `VA_APP_PASSWORD`, `VA_READ_PASSWORD`,
 `VA_PROFILES_PASSWORD`, `VA_WEB_PASSWORD`, `VA_MARKET_DATA_PASSWORD`, `VA_SCORING_PASSWORD`,
-`VA_NOTIFICATION_PASSWORD`, seit D1.1 `VA_IDENTITY_PASSWORD`, dazu `SMTP_USER`, `SMTP_PASSWORD`
-und `MAIL_TO`. Fehlt ein
+`VA_NOTIFICATION_PASSWORD`, seit D1.1 `VA_IDENTITY_PASSWORD`, seit D1.5 die fünf
+`NATS_*_PASSWORD` (nur Buchstaben, Ziffern und Bindestrich, sie stehen in URLs), dazu
+`SMTP_USER`, `SMTP_PASSWORD` und `MAIL_TO`. Fehlt ein
 Passwort, bricht Compose mit einem Hinweis wie „VA_WEB_PASSWORD in .env setzen“ ab. Fehlen die
 Angaben für die Mail, startet `notification` nicht und nennt das Feld in
 `docker compose logs notification`.
@@ -118,11 +173,9 @@ das Passwort zweimal ab (mindestens 12 Zeichen):
 docker compose exec web-api python -m va_web_api.admin create-user <name> --admin --email <mail>
 ```
 
-Weitere Konten ohne `--admin`. Anmelden im Browser geht erst mit HTTPS (D1.5), denn das
-Sitzungs-Cookie ist `Secure`. Bis dahin bleiben alle bisherigen Ansichten ohne Anmeldung nutzbar:
-`docker-compose.yml` setzt dafür `WEB_API_AUTH_REQUIRED=false` (seit D1.2, entfällt mit D1.5).
-Die Anmeldeseite und die Nutzerverwaltung im UI (seit D1.4) brauchen eine echte Sitzung, auf der
-NAS also ebenfalls HTTPS.
+Weitere Konten legt ein Admin danach im UI unter „Nutzer“ an. Seit D1.5 verlangt jede Ansicht
+eine Anmeldung, und die geht nur über HTTPS, denn das Sitzungs-Cookie ist `Secure`: Vor dem ersten
+Aufruf den [Reverse-Proxy von DSM](#https-über-den-reverse-proxy-von-dsm) einrichten.
 
 ## Umstellung vom Batch mit Cron (einmalig)
 
@@ -195,6 +248,11 @@ make up            # migrate läuft zuerst, dann starten die geänderten Dienste
 
 Das Volume `./data` verdeckt die Fallback-CSV im Image, neue Fassungen kommen deshalb mit
 `git pull`. Neue Variablen nennt `.env.example`.
+
+**Update auf D1.5 (einmalig):** Vor `make up` die fünf `NATS_*_PASSWORD` in die `.env` (sonst
+bricht Compose mit einem Hinweis ab), `UI_LAN_BIND` aus der `.env` entfernen und den [Reverse-Proxy von
+DSM](#https-über-den-reverse-proxy-von-dsm) einrichten. Danach verlangt das UI eine Anmeldung;
+ohne Admin-Konto zuerst `create-user --admin` (oben). Stream und Consumer in `./natsdata` bleiben.
 
 ## Läufe
 

@@ -20,7 +20,7 @@
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
 | F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), angenommen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; ADR-0011 angenommen (06.11.2026), F2 beginnt mit F2.4 |
 | G | Gestaltung des UI: klar, ruhig, jeder Begriff erklärt ([Spec](ui-neugestaltung.md)) | ✅ G0 bis G8 umgesetzt und abgenommen (06.11.2026); NAS: mit dem nächsten Deployment |
-| D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 🚧 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1.1 (Konten, Anmeldung, Sitzungen), D1.2 (Sitzungspflicht, Rollen), D1.3 (WebSocket je Nutzer) und D1.4 (Anmeldung und Nutzerverwaltung im UI) im Code erledigt |
+| D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 🚧 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1.1 (Konten, Anmeldung, Sitzungen), D1.2 (Sitzungspflicht, Rollen), D1.3 (WebSocket je Nutzer), D1.4 (Anmeldung und Nutzerverwaltung im UI) und D1.5 (HTTPS, Proxys, NATS-Nutzer) im Code erledigt |
 
 **NAS:** Alle offenen NAS-Punkte (unter „Sofort“ und in Phase 0, 2, 3, 5 und F1) erledigt ein
 Durchgang nach dem [Runbook](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig). Er enthält auch den Altdaten-Import und die Sicherung.
@@ -275,7 +275,8 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D1.3 WebSocket mit Sitzung, Topics je Nutzer 🔒 (`253fcda`)
   - [x] D1.4 Frontend: Anmeldung, Nutzerverwaltung, E2E mit Testnutzer (`00d8b62`; lokal und im
         E2E-Stack mit Sitzungspflicht, auf der NAS erst mit D1.5)
-  - [ ] D1.5 Betrieb: HTTPS über DSM, Vertrauenskette der Proxys, NATS-Nutzer je Dienst 🔒
+  - [x] D1.5 Betrieb: HTTPS über DSM, Vertrauenskette der Proxys, NATS-Nutzer je Dienst 🔒
+        (`36e5e86`; NAS: Zertifikat wählen und Reverse-Proxy einrichten, Runbook)
   - [ ] D1.6 Mail-Bestätigung, Datenexport, Löschkommando für `identity`
 - [ ] D2 Wertpapiere über ISIN, Suche, Abdeckung, Tageskurse
 - [ ] D3 Dienst portfolio, Depots und Depotstände

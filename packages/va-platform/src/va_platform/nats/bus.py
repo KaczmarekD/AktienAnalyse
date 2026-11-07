@@ -46,10 +46,10 @@ from va_contracts.rpc.v1 import RpcErrorV1
 from .. import tracing
 from ..bus import DeadLetter, _readable
 from ..messaging import OutboxMessage
-from . import ACK_WAIT, MAX_DELIVER, STREAM_NAME, JetStreamPublisher, provision
+from . import ACK_WAIT, MAX_DELIVER, STREAM_NAME, JetStreamPublisher, inbox_prefix, provision
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Coroutine
+    from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
 
     from nats.aio.client import Client
     from nats.aio.msg import Msg
@@ -112,12 +112,16 @@ class NatsBus:
         retry_delay: float = 1.0,
         ack_wait: float = ACK_WAIT,
         timeout: float = 10.0,
+        consumers: Iterable[str] | None = None,
     ) -> None:
+        """``consumers``: die Consumer, die der Bus beim Start anlegt (D1.5, mit einem NATS-Nutzer
+        je Dienst nur der eigene); ohne Angabe alle (Batch, Werkzeuge)."""
         if not 1 <= max_deliver <= MAX_DELIVER:
             # Darueber verwuerfe NATS das Event still, ohne Dead Letter
             msg = f"max_deliver muss zwischen 1 und {MAX_DELIVER} liegen, nicht {max_deliver}"
             raise ValueError(msg)
         self._url = url
+        self._consumers = None if consumers is None else tuple(consumers)
         self._max_deliver = max_deliver
         self._on_dead_letter = on_dead_letter
         self._retry_delay = retry_delay
@@ -325,13 +329,15 @@ class NatsBus:
             connect_timeout=self._timeout,
             name="va-bus",
             max_reconnect_attempts=CONNECT_ATTEMPTS,
+            # D1.5: eigene Inbox je NATS-Nutzer, die Rechte erlauben nur sie
+            inbox_prefix=inbox_prefix(self._url),
         )
         # Dieselbe Grenze gilt bei nats-py fuer den Start und spaetere Abbrueche; erst nach dem
         # Start auf die lange Grenze stellen
         self._nc.options["max_reconnect_attempts"] = RECONNECT_ATTEMPTS
         self._js = self._nc.jetstream()
         self._publisher = JetStreamPublisher(self._js, timeout=self._timeout)
-        await provision(self._nc.jsm())
+        await provision(self._nc.jsm(), consumers=self._consumers)
 
     async def _shutdown(self, timeout: float) -> None:
         pullers = list(self._pullers.values())

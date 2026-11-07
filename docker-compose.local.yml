@@ -26,10 +26,11 @@ services:
 
   nats:
     container_name: value-analyzer-local-nats
-    # Eigene Daten, getrennt von ./natsdata der NAS-Definition
+    # Eigene Daten, getrennt von ./natsdata der NAS-Definition; dieselben Nutzer (D1.5)
     volumes: !override
       - ./.local/natsdata:/data
-    # Fuer make run/api und make nats-provision aus der .venv
+      - ./docker/nats/nats.conf:/etc/nats/nats.conf:ro
+    # Fuer make run/api und make nats-provision aus der .venv (als Nutzer batch, D1.5)
     ports:
       - "127.0.0.1:4222:4222"
 
@@ -49,8 +50,9 @@ services:
       SMTP_PORT: "1025"
       SMTP_PLAIN: "true"
       HEALTHCHECK_URL: ""
-      # Fuer EVENT_BUS=nats aus der .env (P4.3); ohne den Schalter ungenutzt
-      NATS_URL: nats://nats:4222
+      # Fuer EVENT_BUS=nats aus der .env (P4.3); ohne den Schalter ungenutzt. Seit D1.5 als
+      # NATS-Nutzer batch (alle Rechte, wie va_app in der Datenbank)
+      NATS_URL: nats://batch:${NATS_BATCH_PASSWORD:?NATS_BATCH_PASSWORD in .env setzen}@nats:4222
       # Pfade im Container, auch wenn die .env sie fuer make run/dry aus der .venv setzt
       DATA_DIR: /app/data
       LOGS_DIR: /app/logs

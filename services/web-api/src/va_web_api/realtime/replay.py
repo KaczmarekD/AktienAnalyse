@@ -20,7 +20,7 @@ import nats
 from nats.js.errors import NotFoundError
 
 from va_contracts import parse_envelope
-from va_platform.nats import STREAM_NAME
+from va_platform.nats import STREAM_NAME, inbox_prefix
 
 from ..events import EventMessage, plain, topics_for
 
@@ -108,5 +108,7 @@ class NatsReplayer(Replayer):
                     connect_timeout=self._timeout,
                     max_reconnect_attempts=1,
                     name="va-web-api-replay",
+                    # D1.5: eigene Inbox des NATS-Nutzers web-api
+                    inbox_prefix=inbox_prefix(self._url),
                 )
             return self._nc.jsm()

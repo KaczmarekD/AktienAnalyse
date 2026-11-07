@@ -111,7 +111,8 @@ async def _keep_started(app: FastAPI, attr: str, start: Callable[[], NatsBus], w
 
 
 def _rpc_bus(url: str) -> NatsBus:
-    bus = NatsBus(url)
+    # Nur Request/Reply: legt keinen Consumer an (D1.5, der des web-api kommt vom Event-Consumer)
+    bus = NatsBus(url, consumers=())
     bus.start()
     return bus
 
