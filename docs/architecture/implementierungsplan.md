@@ -3532,7 +3532,7 @@ Golden-Master und die Replay-Fixtures.
   Abdeckung meldet (D3); `IdentityV1.index = "-"` für Abdeckungstitel; Watchdog-Grenze für den
   Abruf wächst mit der Abdeckung (je Titel ein Zuschlag, einstellbar).
 - **Review:** `/code-review high`.
-- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (07.11.2026, auf `main` als `647a9b5`, CI grün):** wie im Entwurf, dazu:
   - **Symbole:** Fundamentaldaten vom Heimat-Listing (dort hat Yahoo die Abschlüsse), Kurse von
     Xetra; deutsche Aktien beides von Xetra. ETFs und Anleihen haben keine Fundamentaldaten.
   - **Wiederverwendung:** Nutzt der Lauf den Abruf des Tages, holt er von der Abdeckung nur, was
