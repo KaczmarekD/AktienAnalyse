@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from va_market_data.domain.consensus import ConsensusEntry
+from va_market_data.domain.coverage import CoverageItem as Coverage
 from va_market_data.domain.fundamentals import join_errors
 from va_market_data.domain.history import PriceBar
 from va_market_data.domain.periods import period_end
@@ -22,6 +23,7 @@ from va_platform.serialization import json_safe, to_python
 from .models import (
     FREQUENCIES,
     ConsensusSnapshot,
+    CoverageVersion,
     FetchRun,
     FundamentalSnapshot,
     FxRate,
@@ -30,6 +32,7 @@ from .models import (
     ShareCount,
     StatementValue,
 )
+from .models import CoverageItem as CoverageItemRow
 from .models import PriceBar as PriceBarRow
 from .models import UniverseMember as UniverseMemberRow
 
@@ -39,11 +42,11 @@ if TYPE_CHECKING:
     from va_market_data.domain.consensus import ConsensusStatus
     from va_market_data.domain.fundamentals import Fundamentals
 
-# Spalten, die write_snapshot annimmt (alles ausser den Schluesseln)
+# Spalten, die write_snapshot annimmt (alles ausser den Schluesseln und der Rolle, D2.2)
 SNAPSHOT_COLUMNS: tuple[str, ...] = tuple(
     c.name
     for c in FundamentalSnapshot.__table__.columns
-    if c.name not in {"fetch_run_id", "instrument_id"}
+    if c.name not in {"fetch_run_id", "instrument_id", "role"}
 )
 # Numerische Kennzahlen, fuer die es Zeitreihen gibt
 SNAPSHOT_METRICS: frozenset[str] = frozenset(
@@ -193,6 +196,58 @@ class MarketDataRepository:
             if wanted <= set(members):
                 return fetch_run
         return None
+
+    # --- Abdeckung (D2.2) ----------------------------------------------------
+
+    def get_coverage(self) -> list[Coverage]:
+        """Die Wertpapiere der juengsten Fassung, nach ISIN."""
+        latest = self.session.scalar(select(func.max(CoverageVersion.id)))
+        if latest is None:
+            return []
+        rows = self.session.scalars(
+            select(CoverageItemRow)
+            .where(CoverageItemRow.version_id == latest)
+            .order_by(CoverageItemRow.isin)
+        )
+        return [
+            Coverage(
+                isin=row.isin,
+                asset_class=row.asset_class,  # type: ignore[arg-type]
+                fundamentals_symbol=row.fundamentals_symbol,
+                price_symbol=row.price_symbol,
+                name=row.name,
+            )
+            for row in rows
+        ]
+
+    def write_coverage(self, items: Sequence[Coverage], *, source: str, at: datetime) -> bool:
+        """Neue Fassung, wenn sich die Menge aendert; ``False``, wenn sie gleich bleibt."""
+        wanted = sorted(items, key=lambda item: item.isin)
+        if wanted == self.get_coverage() and self.session.scalar(
+            select(func.count()).select_from(CoverageVersion)
+        ):
+            return False
+        version_id = self.session.execute(
+            insert(CoverageVersion)
+            .values(source=source, created_at=at)
+            .returning(CoverageVersion.id)
+        ).scalar_one()
+        if wanted:
+            self.session.execute(
+                insert(CoverageItemRow),
+                [
+                    {
+                        "version_id": version_id,
+                        "isin": item.isin,
+                        "asset_class": item.asset_class,
+                        "fundamentals_symbol": item.fundamentals_symbol,
+                        "price_symbol": item.price_symbol,
+                        "name": item.name,
+                    }
+                    for item in wanted
+                ],
+            )
+        return True
 
     # --- Universum -----------------------------------------------------------
 
@@ -682,7 +737,12 @@ class MarketDataRepository:
     # --- Kennzahlen-Snapshots ---------------------------------------------------
 
     def write_snapshot(
-        self, fetch_run_id: int, instrument_id: int, values: Mapping[str, Any]
+        self,
+        fetch_run_id: int,
+        instrument_id: int,
+        values: Mapping[str, Any],
+        *,
+        role: str = "universe",
     ) -> None:
         """``values`` = Spalten aus ``SNAPSHOT_COLUMNS``. Unbekannte Spalten -> ValueError,
         damit eine neue Kennzahl nicht still verloren geht (Migration fehlt)."""
@@ -694,22 +754,25 @@ class MarketDataRepository:
         row["errors"] = [to_python(e) for e in values.get("errors") or []]
         self.session.execute(
             insert(FundamentalSnapshot).values(
-                fetch_run_id=fetch_run_id, instrument_id=instrument_id, **row
+                fetch_run_id=fetch_run_id, instrument_id=instrument_id, role=role, **row
             )
         )
 
     def get_snapshots_df(
-        self, fetch_run_id: int, symbols: Collection[str] | None = None
+        self, fetch_run_id: int, symbols: Collection[str] | None = None, *, role: str = "universe"
     ) -> pd.DataFrame:
         """Gleiche Spalten wie ``Fundamentals.to_flat_dict()`` - direkt fuer ``score()``.
 
         ``symbols`` beschraenkt auf ein Teiluniversum (z.B. DAX_ONLY auf einem Vollabruf).
+        ``role``: nur das Referenzuniversum (Standard), sonst stuenden Titel der Abdeckung im
+        Ranking (D2.2); ``coverage`` fuer die Abdeckung.
         """
         columns = [getattr(FundamentalSnapshot, c) for c in SNAPSHOT_COLUMNS]
         stmt = (
             select(Instrument.symbol, *columns)
             .join(Instrument, Instrument.id == FundamentalSnapshot.instrument_id)
             .where(FundamentalSnapshot.fetch_run_id == fetch_run_id)
+            .where(FundamentalSnapshot.role == role)
             .order_by(Instrument.symbol)
         )
         if symbols is not None:

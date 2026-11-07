@@ -574,3 +574,26 @@ def test_ranking_row_carries_the_industry_rule():
     assert row.to_flat()["industry_rule"] is True
     flat.pop("industry_rule")
     assert RankingRowV1.from_flat(flat).industry_rule is False
+
+
+class TestCoverage:
+    """D2.2: Aktien der Abdeckung reisen in ``covered[]``, getrennt vom Referenzuniversum."""
+
+    def test_covered_is_optional_and_empty_by_default(self):
+        snapshot = _examples()[SNAPSHOT_COMPLETED.type]
+        assert isinstance(snapshot, SnapshotCompletedV1)
+        assert snapshot.covered == []
+
+    def test_covered_shares_round_trip(self):
+        snapshot = _examples()[SNAPSHOT_COMPLETED.type]
+        assert isinstance(snapshot, SnapshotCompletedV1)
+        apple = Fundamentals(
+            identity=Identity("AAPL", "Apple Inc.", "-"), market=MarketData(market_cap=3e12)
+        )
+        covered = FundamentalsV1.from_flat(apple.to_flat_dict())
+        with_coverage = snapshot.model_copy(update={"covered": [covered]})
+        restored = SnapshotCompletedV1.model_validate_json(with_coverage.model_dump_json())
+        assert [f.identity.symbol for f in restored.covered] == ["AAPL"]
+        assert [f.identity.symbol for f in restored.fundamentals] == [
+            f.identity.symbol for f in snapshot.fundamentals
+        ]

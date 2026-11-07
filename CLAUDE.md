@@ -332,6 +332,13 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   liest und fügt nur im Schema `identity` an (`identity_grant_statements`, `VA_IDENTITY_PASSWORD`),
   keine andere Rolle sieht es. Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
+- Abdeckung (D2.2): Aktien außerhalb des Referenzuniversums, die in Depots stehen
+  (`market_data.coverage_version`/`coverage_item`, bis D3 gepflegt mit
+  `python -m va_market_data.coverage`). Der Wochenlauf der Services holt sie im selben Abruf
+  mit `fundamental_snapshot.role = 'coverage'` und schickt sie in `covered[]`. Alle
+  bestehenden Lesewege (`get_snapshots_df`, Backfill, Replay, Vorschau, Rescore) sehen nur
+  `role = 'universe'`; Ranking, CSV und Mail bleiben gleich. Der Batch im Prozess kennt keine
+  Abdeckung.
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,

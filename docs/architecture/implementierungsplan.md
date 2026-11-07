@@ -3532,6 +3532,24 @@ Golden-Master und die Replay-Fixtures.
   Abdeckung meldet (D3); `IdentityV1.index = "-"` für Abdeckungstitel; Watchdog-Grenze für den
   Abruf wächst mit der Abdeckung (je Titel ein Zuschlag, einstellbar).
 - **Review:** `/code-review high`.
+- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+  - **Symbole:** Fundamentaldaten vom Heimat-Listing (dort hat Yahoo die Abschlüsse), Kurse von
+    Xetra; deutsche Aktien beides von Xetra. ETFs und Anleihen haben keine Fundamentaldaten.
+  - **Wiederverwendung:** Nutzt der Lauf den Abruf des Tages, holt er von der Abdeckung nur, was
+    dort noch fehlt.
+  - **Robustheit:** Ist die Abdeckung nicht lesbar oder scheitert ihr Abruf, läuft der
+    Wochenlauf ohne sie weiter (WP-07).
+  - **Watchdog:** Die Grenze für den Abruf war schon eine Einstellung des web-api, jetzt auch in
+    Compose (`WATCHDOG_FETCH_MINUTES` in der `.env`, Standard 45). Das web-api kennt die Abdeckung
+    nicht, ein Zuschlag je Titel entfällt. Das Runbook nennt die Einstellung.
+  - **Name im Eintrag:** `coverage_item.name` (zusätzlich zur Spezifikation) gibt dem Titel im
+    Abruf einen Namen, bevor Yahoo antwortet.
+  - **Batch im Prozess** kennt keine Abdeckung; der Wochenlauf läuft über die Services.
+  - **Review (`/code-review high`):** behoben, dass der Abruf der Abdeckung keinen Fortschritt
+    meldete (jetzt zählt er mit dem Universum zusammen), dass ein Abbruch die schon
+    gespeicherten Titel aus dem Event nahm, dass `set` ohne ISIN die Abdeckung leerte (jetzt nur
+    `clear`) und dass bei `DAX_ONLY` MDAX-Titel als Abdeckung kamen. Offen gelassen: Die
+    Titelseite ohne NATS zeigt für Abdeckungstitel den Index „-“.
 
 **D2.3 Tageskurse** (WP-06, 11)
 - **Test:** `price_run`, `daily_close` (eindeutig je ISIN, Quelle, Tag), `fx_daily`; Sammelabruf

@@ -111,3 +111,18 @@ def test_copies_the_inputs_of_scoring(db_settings, engine):
         engine, "SELECT count(*) FROM market_data.fundamental_snapshot"
     )
     assert backfill_projections(engine)["input_snapshot"] == 0
+
+
+def test_covered_titles_are_not_projected(db_settings, engine):
+    """D2.2: Snapshots der Abdeckung (``role = 'coverage'``) gehoeren nicht in die Projektionen
+    des Rankings; sie kommen erst mit der Einordnung (D4)."""
+    from va_market_data.adapters.postgres.store import PostgresSnapshotStore
+    from va_market_data.domain.fundamentals import Fundamentals, Identity, MarketData
+
+    _patched_run(db_settings)
+    fetch_run_id = _count(engine, "SELECT max(id) FROM market_data.fetch_run")
+    store = PostgresSnapshotStore(engine, provider="yfinance", provider_version="test")
+    covered = Fundamentals(identity=Identity("AAPL", "Apple Inc.", "-"), market=MarketData())
+    store.record_covered(fetch_run_id, covered, "US0378331005")
+    backfill_projections(engine)
+    assert _count(engine, "SELECT count(*) FROM web.snapshot_row WHERE symbol = 'AAPL'") == 0

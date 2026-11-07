@@ -69,7 +69,8 @@ _SNAPSHOTS = text(f"""
     FROM market_data.fundamental_snapshot fs
     JOIN market_data.instrument i ON i.id = fs.instrument_id
     JOIN market_data.fetch_run fr ON fr.id = fs.fetch_run_id
-    WHERE NOT EXISTS (SELECT 1 FROM web.snapshot_row s
+    WHERE fs.role = 'universe'  -- D2.2: die Abdeckung gehoert nicht ins Ranking
+      AND NOT EXISTS (SELECT 1 FROM web.snapshot_row s
                       WHERE s.fetch_run_id = fs.fetch_run_id AND s.symbol = i.symbol)
 """)
 

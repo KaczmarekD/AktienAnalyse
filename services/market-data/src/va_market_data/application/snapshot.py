@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 class Snapshot:
     fetch_run_id: int
     frame: pd.DataFrame  # eine Zeile je Titel, wie ``Fundamentals.to_flat_dict``
+    reused: bool = False  # Abruf vom selben Tag wiederverwendet (D2.2: Abdeckung ergaenzen)
 
 
 def take_snapshot(
@@ -50,7 +51,7 @@ def take_snapshot(
     fetch_run_id = None if force_refresh else store.find_reusable_fetch(today, symbols)
     if fetch_run_id is not None:
         log.info("Nutze Abruf #%d von heute aus der Datenbank", fetch_run_id)
-        return Snapshot(fetch_run_id, store.load_snapshots(fetch_run_id, symbols))
+        return Snapshot(fetch_run_id, store.load_snapshots(fetch_run_id, symbols), reused=True)
 
     fetch_run_id = store.start_fetch(tickers, source, as_of)
     unsaved: set[str] = set()

@@ -20,12 +20,13 @@ from ...domain.history import HistoryState, daily_price_bars, daily_share_counts
 from .repository import MarketDataRepository, UniverseMember, snapshot_values
 
 if TYPE_CHECKING:
-    from datetime import date
+    from datetime import date, datetime
 
     import pandas as pd
     from sqlalchemy import Engine
     from sqlalchemy.orm import Session
 
+    from ...domain.coverage import CoverageItem as Coverage
     from ...domain.fundamentals import Fundamentals
     from ...domain.universe import Ticker
 
@@ -124,10 +125,39 @@ class PostgresSnapshotStore:
     )
     def record_fundamentals(self, fetch_run_id: int, fund: Fundamentals) -> None:
         """Ein Titel = eine Transaktion; ein Retry wiederholt sie vollstaendig."""
+        self._record(fetch_run_id, fund, role="universe", isin=None)
+
+    @retry(
+        retry=retry_if_exception_type(TRANSIENT_DB_ERRORS),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        reraise=True,
+    )
+    def record_covered(self, fetch_run_id: int, fund: Fundamentals, isin: str | None) -> None:
+        """Ein Titel der Abdeckung (D2.2): ``role = 'coverage'``, dazu seine ISIN."""
+        self._record(fetch_run_id, fund, role="coverage", isin=isin)
+
+    def coverage(self) -> list[Coverage]:
+        with session_scope(self._engine) as s:
+            return MarketDataRepository(s).get_coverage()
+
+    def write_coverage(self, items: Sequence[Coverage], *, source: str, at: datetime) -> bool:
+        with session_scope(self._engine) as s:
+            return MarketDataRepository(s).write_coverage(items, source=source, at=at)
+
+    def covered_snapshots(self, fetch_run_id: int) -> pd.DataFrame:
+        with session_scope(self._engine) as s:
+            return MarketDataRepository(s).get_snapshots_df(fetch_run_id, role="coverage")
+
+    def _record(
+        self, fetch_run_id: int, fund: Fundamentals, *, role: str, isin: str | None
+    ) -> None:
         with session_scope(self._engine) as s:
             repo = MarketDataRepository(s)
             instrument_id = repo.get_or_create_instruments([fund.symbol])[fund.symbol]
-            repo.write_snapshot(fetch_run_id, instrument_id, snapshot_values(fund))
+            if isin:
+                repo.write_isins({fund.symbol: isin})
+            repo.write_snapshot(fetch_run_id, instrument_id, snapshot_values(fund), role=role)
             fetched_at = fund.provenance.fetched_at
             if fund.raw is None or fetched_at is None:
                 return

@@ -27,6 +27,7 @@ from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
 FETCH_ORIGINS = ("live", "import")
 STATEMENTS = ("income", "balance", "cashflow")
 FREQUENCIES = ("annual", "quarterly")  # geprueft im Repository, die Spalte ist freier Text
+SNAPSHOT_ROLES = ("universe", "coverage")  # D2.2
 
 
 class Instrument(Base):
@@ -236,7 +237,10 @@ class FundamentalSnapshot(Base):
     """
 
     __tablename__ = "fundamental_snapshot"
-    __table_args__ = {"schema": "market_data"}  # noqa: RUF012
+    __table_args__ = (
+        CheckConstraint(in_values("role", SNAPSHOT_ROLES), name="role"),
+        {"schema": "market_data"},
+    )
 
     fetch_run_id: Mapped[int] = mapped_column(
         ForeignKey("market_data.fetch_run.id"), primary_key=True
@@ -283,6 +287,38 @@ class FundamentalSnapshot(Base):
     # Status
     fetch_ok: Mapped[bool]
     errors: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
+    # D2.2: universe (Referenzuniversum, im Ranking) oder coverage (Abdeckung, nicht im Ranking)
+    role: Mapped[str] = mapped_column(Text, server_default=text("'universe'"))
+
+
+class CoverageVersion(Base):
+    """D2.2 (WP-05): eine Fassung der Abdeckung; gueltig ist die juengste."""
+
+    __tablename__ = "coverage_version"
+    __table_args__ = {"schema": "market_data"}  # noqa: RUF012
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    source: Mapped[str]  # command (Kommando, bis D3), spaeter portfolio
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class CoverageItem(Base):
+    """D2.2 (WP-09): ein Wertpapier der Abdeckung, ohne Nutzer und Mengen."""
+
+    __tablename__ = "coverage_item"
+    __table_args__ = (
+        CheckConstraint(in_values("asset_class", ASSET_CLASSES), name="asset_class"),
+        UniqueConstraint("version_id", "isin", name="uq_coverage_item_version_id_isin"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    version_id: Mapped[int] = mapped_column(ForeignKey("market_data.coverage_version.id"))
+    isin: Mapped[str]
+    asset_class: Mapped[str]
+    fundamentals_symbol: Mapped[str | None]
+    price_symbol: Mapped[str | None]
+    name: Mapped[str | None]
 
 
 class Security(Base):

@@ -4,7 +4,9 @@
 > [Depot-Spezifikation](README.md), Stufe D2. Grundsatzentscheidung:
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (angenommen am 06.11.2026).
 > Datenquellen: [Recherche 11/2026](../../research/2026-11-depot-datenquellen-und-bankzugang.md).
-> Umgesetzt: Suche und Auflösung (D2.1, `security`, `security_master`, `listing`).
+> Umgesetzt: Suche und Auflösung (D2.1, `security`, `security_master`, `listing`), Abdeckung im
+> Wochenlauf (D2.2, `coverage_version`, `coverage_item`, `fundamental_snapshot.role`,
+> `covered[]`; bis D3 per Kommando gepflegt).
 
 ## Ausgangslage
 

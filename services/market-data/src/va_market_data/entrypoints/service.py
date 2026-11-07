@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from va_platform.bus import EventBus
     from va_platform.nats import NatsBus
 
+    from ..application.coverage import CoverageStore
     from ..application.ports import Fetch, FundamentalsProvider, SnapshotStore
     from ..domain.fundamentals import Fundamentals
     from ..domain.history import HistoryState
@@ -62,6 +63,8 @@ class MarketDataAdapters:
     store: SnapshotStore
     load_universe: Callable[[], Universe]
     fetch: Fetch
+    # D2.2: Abdeckung im Wochenlauf; ohne (Replay, Tests) nur das Referenzuniversum
+    coverage: CoverageStore | None = None
 
 
 def live_universe(
@@ -131,10 +134,13 @@ def build_adapters(
             history=history,
         )
 
+    store = PostgresSnapshotStore(engine, provider=provider_name, provider_version=version)
     return MarketDataAdapters(
-        store=PostgresSnapshotStore(engine, provider=provider_name, provider_version=version),
+        store=store,
         load_universe=universe,
         fetch=fetch,
+        # Eine Replay-Datei kennt nur das Universum: Abdeckung nur im echten Abruf
+        coverage=store if settings.replay_source is None else None,
     )
 
 
@@ -144,6 +150,7 @@ def wire(bus: EventBus, adapters: MarketDataAdapters, settings: MarketDataSettin
         load_universe=adapters.load_universe,
         store=adapters.store,
         fetch=adapters.fetch,
+        coverage=adapters.coverage,
         dax_only=settings.universe == "DAX_ONLY",
     ).subscribe()
 

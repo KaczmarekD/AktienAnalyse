@@ -2,6 +2,9 @@
 
 Jeder Fehler wird zu ``screening.run.failed`` (Stufe ``market-data``); der Handler selbst
 wirft nicht, damit der Bus nicht den ganzen Abruf wiederholt.
+
+Seit D2.2 ruft er nach dem Referenzuniversum die Aktien der Abdeckung ab und schickt sie in
+``covered[]``. Ein Fehler dort kostet nur die Abdeckung, nicht den Lauf.
 """
 
 from __future__ import annotations
@@ -12,6 +15,8 @@ import traceback
 from collections.abc import Callable
 from datetime import date
 from typing import TYPE_CHECKING
+
+import pandas as pd
 
 from va_contracts.events.v1 import (
     FETCH_PROGRESSED,
@@ -27,6 +32,7 @@ from va_contracts.events.v1 import (
 )
 from va_platform.bus import follow_up
 
+from ..application.coverage import Covered, plan_coverage, take_coverage
 from ..application.fetch import success_share
 from ..application.snapshot import take_snapshot
 
@@ -35,6 +41,7 @@ if TYPE_CHECKING:
     from va_contracts.events.v1 import ScreeningRunRequestedV1
     from va_platform.bus import EventBus
 
+    from ..application.coverage import CoverageStore
     from ..application.ports import Fetch, SnapshotStore
     from ..domain.fundamentals import Fundamentals
     from ..domain.universe import Ticker, Universe
@@ -53,6 +60,7 @@ class RunRequestedHandler:
         load_universe: Callable[[], Universe],
         store: SnapshotStore,
         fetch: Fetch,
+        coverage: CoverageStore | None = None,
         dax_only: bool = False,
         today: Callable[[], date] = date.today,
     ) -> None:
@@ -60,6 +68,7 @@ class RunRequestedHandler:
         self._load_universe = load_universe
         self._store = store
         self._fetch = fetch
+        self._coverage = coverage
         self._dax_only = dax_only
         self._today = today
 
@@ -74,6 +83,12 @@ class RunRequestedHandler:
             if self._dax_only:
                 tickers = [t for t in tickers if t.index == "DAX"]
             today = self._today()
+            # D2.2: vorab, damit der Fortschritt Universum und Abdeckung zusammen zaehlt; gegen das
+            # volle Universum, auch bei DAX_ONLY
+            planned = (
+                [] if self._coverage is None else plan_coverage(self._coverage, universe.tickers)
+            )
+            progress = self._progress(env, len(tickers) + len(planned))
             snapshot = take_snapshot(
                 tickers,
                 source=universe.source,
@@ -82,8 +97,25 @@ class RunRequestedHandler:
                 fetch=self._fetch,
                 today=today,
                 force_refresh=request.options.force_refresh,
-                on_result=self._progress(env, len(tickers)),
+                on_result=progress,
             )
+            covered = (
+                Covered(pd.DataFrame())
+                if self._coverage is None
+                else take_coverage(
+                    fetch_run_id=snapshot.fetch_run_id,
+                    universe=tickers,
+                    store=self._coverage,
+                    fetch=self._fetch,
+                    reused=snapshot.reused,
+                    tickers=planned,
+                    on_result=progress,
+                )
+            )
+            covered_rows = covered.frame.to_dict("records")
+            symbols = [
+                str(s) for frame in (snapshot.frame, covered.frame) for s in frame.get("symbol", [])
+            ]
             completed = SnapshotCompletedV1(
                 run_id=request.run_id,
                 trigger=request.trigger,
@@ -102,11 +134,10 @@ class RunRequestedHandler:
                     FundamentalsV1.from_flat(row) for row in snapshot.frame.to_dict("records")
                 ],
                 # P4.9: fuer die Titelseite im web-api, das keine Tabellen von market-data liest
-                isins={t.symbol: t.isin for t in tickers if t.isin},
+                isins={t.symbol: t.isin for t in tickers if t.isin} | covered.isins,
                 # P5.3: scoring liest market_data.instrument nicht mehr
-                instrument_ids=dict(
-                    self._store.instrument_ids([str(s) for s in snapshot.frame.get("symbol", [])])
-                ),
+                instrument_ids=dict(self._store.instrument_ids(symbols)),
+                covered=[FundamentalsV1.from_flat(row) for row in covered_rows],
             )
         except Exception as e:
             log.exception("Abruf fehlgeschlagen")

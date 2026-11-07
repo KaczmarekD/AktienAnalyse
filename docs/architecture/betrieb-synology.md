@@ -183,6 +183,18 @@ erst, wenn er den Link aus der Bestätigungsmail öffnet (24 Stunden, einmal). D
 aufgerufen wurde; hinter dem DSM-Proxy also `https://<name>`. Kommt keine Mail an: `docker compose
 logs notification` zeigt „Bestaetigungsmail fuer Nutzer … verschickt“ oder den Fehler.
 
+**Abdeckung pflegen (seit D2.2):** Bis Depots im UI angelegt werden (D3), legt ein Kommando
+fest, welche Wertpapiere außerhalb von DAX und MDAX market-data zusätzlich abruft. `set`
+ersetzt die ganze Menge, `ISIN=SYMBOL` wählt das Listing für die Kurse:
+
+```bash
+docker compose exec market-data python -m va_market_data.coverage set US0378331005 IE00B4L5Y983
+```
+
+`show` statt `set` zeigt die aktuelle Menge, `clear` leert sie. Der nächste Wochenlauf holt die Aktien darin
+zusätzlich ab; Ranking und Mail ändern sich dadurch nicht. Jeder Titel verlängert den Abruf um
+einige Sekunden; bei vielen Titeln `WATCHDOG_FETCH_MINUTES` in der `.env` (Standard 45) erhöhen.
+
 **Daten einer Person löschen (seit D1.6, ADR-0012):** Konten werden sonst nur deaktiviert. Nur auf
 ausdrücklichen Wunsch der Person löscht ein Kommando alle ihre Daten im Schema `identity`, ohne
 Rückweg. Es braucht die Rolle des Besitzers und läuft deshalb im Container `value-analyzer`:

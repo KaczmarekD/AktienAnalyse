@@ -104,6 +104,10 @@ class SnapshotCompletedV1(Contract):
     # Symbol -> market_data.instrument.id (additiv seit P5.3): scoring speichert seine Ergebnisse
     # je Titel unter dieser ID, ohne market_data zu lesen
     instrument_ids: dict[str, int] = Field(default_factory=dict)
+    # D2.2: Aktien der Abdeckung ausserhalb des Referenzuniversums (``index = "-"``). Nicht im
+    # Ranking: scoring rankt nur ``fundamentals`` und ordnet diese spaeter ein (D4).
+    # ``isins`` und ``instrument_ids`` decken sie mit ab.
+    covered: list[FundamentalsV1] = Field(default_factory=list)
 
 
 class ProfileRefV1(Contract):

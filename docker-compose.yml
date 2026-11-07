@@ -215,6 +215,8 @@ services:
       FORWARDED_ALLOW_IPS: ${UI_FORWARDED_ALLOW_IPS:-172.16.0.0/12,192.168.0.0/16,10.0.0.0/8}
       WEB_API_SCHEDULE: ${CRON_SCHEDULE:-30 7 * * 6}
       WEB_API_OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
+      # D2.2: Grenze des Watchdogs fuer den Abruf; mit vielen Titeln in der Abdeckung erhoehen
+      WEB_API_WATCHDOG_FETCH_MINUTES: ${WATCHDOG_FETCH_MINUTES:-45}
 
   frontend:
     # Einziger Einstieg im LAN (P3.6, ADR-0005/0007): Angular-Build und /api/ an das web-api.

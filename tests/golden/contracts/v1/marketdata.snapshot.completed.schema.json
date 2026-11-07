@@ -568,6 +568,13 @@
       "title": "As Of",
       "type": "string"
     },
+    "covered": {
+      "items": {
+        "$ref": "#/$defs/FundamentalsV1"
+      },
+      "title": "Covered",
+      "type": "array"
+    },
     "fetch_run_id": {
       "minimum": 1,
       "title": "Fetch Run Id",
