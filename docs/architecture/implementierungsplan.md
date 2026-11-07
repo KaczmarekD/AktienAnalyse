@@ -3435,7 +3435,7 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   - **UI:** Mail-Adresse auf `/account` mit „Bestätigung ausstehend“, Seite `/confirm-email`
     (ohne Anmeldung), Button „Meine Daten herunterladen“.
   - **E2E:** Adresse ändern, Mail in Mailpit, Link aufrufen, Adresse gilt.
-- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (07.11.2026, auf `main` als `b753158`, CI grün):** wie im Entwurf, dazu:
   - **Ohne Herkunft kein Link:** Hat die Anfrage kein `Origin` und ist `WEB_API_ALLOWED_ORIGINS`
     leer, antwortet `PUT /me/profile` mit 400. Die Herkunft hat `OriginCheckMiddleware` schon
     geprüft, und nginx nimmt nur die Hostnamen aus `UI_SERVER_NAMES` an; ein Link auf einen
