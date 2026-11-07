@@ -280,6 +280,18 @@ class TestEmailChange:
         assert response.json()["pending_email"] is None
         assert store.outbox() == []
 
+    def test_at_most_five_mails_an_hour(self, client, store, clock):
+        """Gegen Mails in Serie an fremde Adressen ueber das SMTP-Konto der NAS."""
+        _login(client, username="dennis")
+        for n in range(5):
+            assert self._change(client, f"neu{n}@example.com").status_code == 200
+        refused = self._change(client, "neu5@example.com")
+        assert refused.status_code == 429
+        assert refused.headers["retry-after"] == "3600"
+        assert len(store.outbox()) == 5
+        clock.now += timedelta(hours=1, minutes=1)
+        assert self._change(client, "neu5@example.com").status_code == 200
+
     def test_an_invalid_address_is_rejected(self, client):
         _login(client)
         assert self._change(client, "keine-adresse").status_code == 400

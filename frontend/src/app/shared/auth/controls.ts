@@ -1,4 +1,4 @@
-// Tooltips der Seiten Anmelden, Konto und Nutzerverwaltung (D1.4). Eigene Datei neben
+// Tooltips der Seiten Anmelden, Konto, Mail bestätigen (D1.6) und Nutzerverwaltung (D1.4). Eigene Datei neben
 // shared/glossary/controls.ts: Diese Seiten laden nach, ihre Texte gehören nicht ins Start-Bundle
 // (Grenze 500 kB). Texte mit {name} sind Funktionen des Benutzernamens.
 
@@ -7,7 +7,12 @@ export type AccountText = string | ((name: string) => string);
 export const ACCOUNT_CONTROLS = {
   'login.submit': 'Meldet dich mit Benutzername und Passwort an.',
   'login.blocked': 'Erst Benutzername und Passwort eingeben.',
-  'account.saveName': 'Speichert den Namen, der oben in der App-Leiste steht.',
+  'account.saveName':
+    'Speichert den Namen, der oben in der App-Leiste steht. Eine neue Mail-Adresse gilt erst nach dem Link aus der Bestätigungsmail.',
+  'account.pending':
+    'An diese Adresse ging ein Link. Bis du ihn öffnest (24 Stunden lang), gilt die bisherige.',
+  'account.export':
+    'Lädt alle deine Daten als JSON-Datei herunter: Konto, Profil, Sitzungen und Anmeldungen, ohne Passwörter.',
   'account.changePassword':
     'Ersetzt dein Passwort. Deine anderen Sitzungen enden, diese hier bleibt.',
   'account.changeBlocked':
@@ -43,6 +48,8 @@ export const ACCOUNT_CONTROLS = {
   'users.own': 'Das eigene Konto änderst du unter „Konto“.',
   'users.copy': 'Kopiert das Einmal-Passwort in die Zwischenablage.',
   'confirm.cancel': 'Schließt die Frage, ohne etwas zu ändern.',
+  'confirm.account': 'Zu deinem Konto mit der neuen Mail-Adresse.',
+  'confirm.login': 'Zur Anmeldung.',
   'confirm.disable': (name: string) => `Deaktiviert ${name} jetzt.`,
   'confirm.reset': (name: string) => `Setzt das neue Einmal-Passwort für ${name} jetzt.`,
 } satisfies Record<string, AccountText>;

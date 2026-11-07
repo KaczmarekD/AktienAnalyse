@@ -356,6 +356,13 @@ class TestEmailConfirmation:
     def test_unknown_token(self, store):
         assert store.find_email_confirmation("x" * 64) is None
 
+    def test_counts_the_recent_requests(self, store):
+        user_id = _user(store)
+        self._request(store, user_id, token="a" * 64)
+        self._request(store, user_id, token="b" * 64, minute=30)
+        assert store.count_email_confirmations(user_id, since=T0) == 2
+        assert store.count_email_confirmations(user_id, since=T0 + timedelta(minutes=10)) == 1
+
 
 class TestExport:
     """D1.6 (NUT-12): alle eigenen Zeilen aus identity, ohne Hashes, ohne fremde Zeilen."""
@@ -402,7 +409,7 @@ class TestExport:
             "account",
             "profiles",
             "statuses",
-            "passwords",
+            "credentials",
             "sessions",
             "logins",
             "email_confirmations",

@@ -87,6 +87,72 @@ export type ActiveProfileRef = {
 };
 
 /**
+ * DataExport
+ *
+ * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
+ */
+export type DataExport = {
+  /**
+   * Account
+   */
+  account: Array<{
+    [key: string]: unknown;
+  }>;
+  /**
+   * Credentials
+   */
+  credentials: Array<{
+    [key: string]: unknown;
+  }>;
+  /**
+   * Email Confirmations
+   */
+  email_confirmations: Array<{
+    [key: string]: unknown;
+  }>;
+  /**
+   * Exported At
+   */
+  exported_at: string;
+  /**
+   * Logins
+   */
+  logins: Array<{
+    [key: string]: unknown;
+  }>;
+  /**
+   * Profiles
+   */
+  profiles: Array<{
+    [key: string]: unknown;
+  }>;
+  /**
+   * Sessions
+   */
+  sessions: Array<{
+    [key: string]: unknown;
+  }>;
+  /**
+   * Statuses
+   */
+  statuses: Array<{
+    [key: string]: unknown;
+  }>;
+};
+
+/**
+ * EmailConfirmation
+ *
+ * Das Token aus dem Link der Bestaetigungsmail (D1.6).
+ */
+export type EmailConfirmation = {
+  /**
+   * Token
+   */
+  token: string;
+};
+
+/**
  * Factor
  *
  * Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.
@@ -232,6 +298,10 @@ export type Me = {
    * Must Change Password
    */
   must_change_password: boolean;
+  /**
+   * Pending Email
+   */
+  pending_email?: string | null;
   /**
    * Role
    */
@@ -590,13 +660,18 @@ export type ProfileSummary = {
 /**
  * ProfileUpdate
  *
- * Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6).
+ * Anzeigename; leer entfernt ihn. Eine neue Mail-Adresse gilt erst nach dem Link aus der Mail
+ * (D1.6); ohne ``email`` bleibt die Adresse, wie sie ist.
  */
 export type ProfileUpdate = {
   /**
    * Display Name
    */
   display_name?: string | null;
+  /**
+   * Email
+   */
+  email?: string | null;
 };
 
 /**
@@ -1436,6 +1511,39 @@ export type ResetPasswordResponses = {
 
 export type ResetPasswordResponse = ResetPasswordResponses[keyof ResetPasswordResponses];
 
+export type ConfirmEmailData = {
+  body: EmailConfirmation;
+  path?: never;
+  query?: never;
+  url: '/api/v1/auth/confirm-email';
+};
+
+export type ConfirmEmailErrors = {
+  /**
+   * Der Link ist ungueltig oder abgelaufen.
+   */
+  400: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type ConfirmEmailError = ConfirmEmailErrors[keyof ConfirmEmailErrors];
+
+export type ConfirmEmailResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type ConfirmEmailResponse = ConfirmEmailResponses[keyof ConfirmEmailResponses];
+
 export type LoginData = {
   body: LoginRequest;
   path?: never;
@@ -1593,6 +1701,33 @@ export type MeResponses = {
 
 export type MeResponse = MeResponses[keyof MeResponses];
 
+export type ExportDataData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/me/export';
+};
+
+export type ExportDataErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
+   */
+  503: unknown;
+};
+
+export type ExportDataResponses = {
+  /**
+   * JSON-Datei zum Herunterladen
+   */
+  200: DataExport;
+};
+
+export type ExportDataResponse = ExportDataResponses[keyof ExportDataResponses];
+
 export type ChangePasswordData = {
   body: PasswordChange;
   path?: never;
@@ -1643,6 +1778,10 @@ export type UpdateProfileData = {
 
 export type UpdateProfileErrors = {
   /**
+   * Keine gueltige Mail-Adresse oder Adresse des UI unbekannt
+   */
+  400: unknown;
+  /**
    * Nicht angemeldet
    */
   401: unknown;
@@ -1650,6 +1789,10 @@ export type UpdateProfileErrors = {
    * Validation Error
    */
   422: HttpValidationError;
+  /**
+   * Zu viele Bestaetigungsmails, spaeter erneut versuchen
+   */
+  429: unknown;
   /**
    * Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)
    */

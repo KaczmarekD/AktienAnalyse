@@ -135,6 +135,102 @@
         "title": "ActiveProfileRef",
         "type": "object"
       },
+      "DataExport": {
+        "additionalProperties": false,
+        "description": "Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.",
+        "properties": {
+          "account": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Account",
+            "type": "array"
+          },
+          "credentials": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Credentials",
+            "type": "array"
+          },
+          "email_confirmations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Email Confirmations",
+            "type": "array"
+          },
+          "exported_at": {
+            "format": "date-time",
+            "title": "Exported At",
+            "type": "string"
+          },
+          "logins": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Logins",
+            "type": "array"
+          },
+          "profiles": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "sessions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sessions",
+            "type": "array"
+          },
+          "statuses": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Statuses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exported_at",
+          "account",
+          "profiles",
+          "statuses",
+          "credentials",
+          "sessions",
+          "logins",
+          "email_confirmations"
+        ],
+        "title": "DataExport",
+        "type": "object"
+      },
+      "EmailConfirmation": {
+        "additionalProperties": false,
+        "description": "Das Token aus dem Link der Bestaetigungsmail (D1.6).",
+        "properties": {
+          "token": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "EmailConfirmation",
+        "type": "object"
+      },
       "Factor": {
         "additionalProperties": false,
         "description": "Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.",
@@ -404,6 +500,17 @@
           "must_change_password": {
             "title": "Must Change Password",
             "type": "boolean"
+          },
+          "pending_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Email"
           },
           "role": {
             "enum": [
@@ -1025,7 +1132,7 @@
       },
       "ProfileUpdate": {
         "additionalProperties": false,
-        "description": "Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6).",
+        "description": "Anzeigename; leer entfernt ihn. Eine neue Mail-Adresse gilt erst nach dem Link aus der Mail\n(D1.6); ohne ``email`` bleibt die Adresse, wie sie ist.",
         "properties": {
           "display_name": {
             "anyOf": [
@@ -1038,6 +1145,18 @@
               }
             ],
             "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
           }
         },
         "title": "ProfileUpdate",
@@ -2612,6 +2731,47 @@
         ]
       }
     },
+    "/api/v1/auth/confirm-email": {
+      "post": {
+        "description": "Bestaetigt eine neue Mail-Adresse mit dem Token aus dem Link (einmalig, 24 h, nur\ndie juengste Anfrage). Ohne Sitzung: Das Token ist der Nachweis.",
+        "operationId": "confirm_email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Der Link ist ungueltig oder abgelaufen."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Confirm Email",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Meldet an und setzt das Sitzungs-Cookie.",
@@ -2793,6 +2953,34 @@
         ]
       }
     },
+    "/api/v1/me/export": {
+      "get": {
+        "description": "Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.",
+        "operationId": "export_data",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataExport"
+                }
+              }
+            },
+            "description": "JSON-Datei zum Herunterladen"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "503": {
+            "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"
+          }
+        },
+        "summary": "Export Data",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/api/v1/me/password": {
       "put": {
         "description": "Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.",
@@ -2842,7 +3030,7 @@
     },
     "/api/v1/me/profile": {
       "put": {
-        "description": "Aendert den Anzeigenamen; leer entfernt ihn.",
+        "description": "Aendert den Anzeigenamen (leer entfernt ihn) und fordert fuer eine neue Mail-Adresse\ndie Bestaetigung an. Bis zum Link aus der Mail gilt die bisherige (``pending_email``).",
         "operationId": "update_profile",
         "requestBody": {
           "content": {
@@ -2865,6 +3053,9 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "description": "Keine gueltige Mail-Adresse oder Adresse des UI unbekannt"
+          },
           "401": {
             "description": "Nicht angemeldet"
           },
@@ -2877,6 +3068,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "description": "Zu viele Bestaetigungsmails, spaeter erneut versuchen"
           },
           "503": {
             "description": "Anmeldung nicht eingerichtet (ohne Identitaets-Datenbank)"

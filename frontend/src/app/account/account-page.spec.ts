@@ -147,6 +147,17 @@ describe('AccountPage', () => {
       );
     });
 
+    it('does not pretend to remove the address', async () => {
+      const fixture = await render(me({ email: 'anna@example.com' }));
+      type(fixture, 'email', '');
+      button(fixture, 'save-name').click();
+      await settle(fixture);
+      TestBed.inject(HttpTestingController).expectNone('/api/v1/me/profile');
+      expect(query(fixture, '[role="alert"]')[0]?.textContent).toContain(
+        'Bitte eine Mail-Adresse angeben.',
+      );
+    });
+
     it('shows the reason when the server refuses the address', async () => {
       const fixture = await render(me({ email: 'anna@example.com' }));
       type(fixture, 'email', 'falsch@x');
@@ -169,13 +180,19 @@ describe('AccountPage', () => {
       const created = vi.fn(() => 'blob:export');
       const revoked = vi.fn();
       Object.assign(URL, { createObjectURL: created, revokeObjectURL: revoked });
+      // jsdom kann keine Datei speichern; der Klick auf den Download-Link reicht als Nachweis
+      const saved = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
       button(fixture, 'export').click();
       await settle(fixture);
       const request = expectRequest('/api/v1/me/export', 'GET');
       request.flush({ account: [{ username: 'anna' }] });
       await settle(fixture);
       expect(created).toHaveBeenCalledTimes(1);
+      expect(saved).toHaveBeenCalledTimes(1);
       expect(revoked).toHaveBeenCalledWith('blob:export');
+      saved.mockRestore();
     });
   });
 

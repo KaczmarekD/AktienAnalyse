@@ -1,4 +1,5 @@
-"""SMTP-Versand fuer Reports und Fehlermails (Port ``ReportSender``)."""
+"""SMTP-Versand fuer Reports, Fehlermails und seit D1.6 Bestaetigungsmails (Port
+``ReportSender``)."""
 
 from __future__ import annotations
 
@@ -35,18 +36,27 @@ class SmtpSender:
         self._config = config
 
     def send(
-        self, subject: str, html_body: str, attachment: tuple[str, bytes] | None = None
+        self,
+        subject: str,
+        html_body: str,
+        attachment: tuple[str, bytes] | None = None,
+        *,
+        recipient: str | None = None,
+        text: str | None = None,
     ) -> None:
         cfg = self._config
         msg = EmailMessage()
         full_subject = f"{cfg.subject_prefix} {subject}".strip()
         msg["Subject"] = full_subject
         msg["From"] = cfg.mail_from
-        msg["To"] = cfg.mail_to
+        msg["To"] = recipient or cfg.mail_to
 
         msg.set_content(
-            "Dieser Report enthaelt HTML. Bitte in einem Mail-Client mit HTML-Anzeige oeffnen. "
-            "Das vollstaendige Ranking liegt als CSV-Anhang bei.",
+            text
+            or (
+                "Dieser Report enthaelt HTML. Bitte in einem Mail-Client mit HTML-Anzeige oeffnen. "
+                "Das vollstaendige Ranking liegt als CSV-Anhang bei."
+            ),
         )
         msg.add_alternative(html_body, subtype="html")
 

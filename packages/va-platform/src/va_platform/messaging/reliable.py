@@ -101,7 +101,10 @@ class ReliableBus:
         self._bus.publish(parse_envelope(message.payload))
 
     def _deliver[T: Contract](self, consumer: str, handler: Handler[T], env: Envelope[T]) -> None:
-        if self._max_age is not None and self._clock() - env.time > self._max_age:
+        # D1.6: Ein Event mit eigenem Hoechstalter (etwa ein Link, der 24 h gilt) wartet so lange,
+        # die Run-Kette nur RUN_TIMEOUT_MINUTES
+        max_age = BY_DATASCHEMA[env.dataschema].max_age or self._max_age
+        if max_age is not None and self._clock() - env.time > max_age:
             log.warning(
                 "%s: %s (%s) vom %s ist veraltet, uebersprungen",
                 consumer,

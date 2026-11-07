@@ -33,19 +33,40 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 STREAM_NAME = "VA_EVENTS"
+# D1.6: private Events (priv.va.>): Mail-Adressen, Links, spaeter Bestaende und Berichte. Nur im
+# Speicher (nicht in natsdata, also nicht im Backup) und nach 24 h weg
+PRIVATE_STREAM = "VA_PRIVATE"
 DAY = 24 * 60 * 60.0
 RETENTION = 30 * DAY  # Aufbewahrung im Stream; Postgres behaelt alles
+PRIVATE_RETENTION = DAY
 DUPLICATE_WINDOW = 10 * 60.0  # gleiche Nats-Msg-Id (= Event-ID) wird so lange verworfen
 MAX_DELIVER = 5  # danach endet der Run ueber va.screening.run.failed (P4.3)
 ACK_WAIT = 60.0  # lange Handler senden In-Progress-Acks (market-data, ab P4.3)
 
 
+def stream_for(subject: str) -> str:
+    """Der Stream, in dem ein Subject landet."""
+    return PRIVATE_STREAM if subject.startswith("priv.va.") else STREAM_NAME
+
+
 @dataclass(frozen=True)
 class ConsumerSpec:
-    """Ein durable Pull-Consumer und die Subjects, die er bekommt."""
+    """Ein durable Pull-Consumer, die Subjects, die er bekommt, und sein Stream.
+
+    Die Namen sind ueber beide Streams eindeutig (``notification-private``): Der Bus fuehrt seine
+    Consumer nur nach Namen.
+    """
 
     durable: str
     subjects: tuple[str, ...]
+
+    @property
+    def stream(self) -> str:
+        streams = {stream_for(subject) for subject in self.subjects}
+        if len(streams) != 1:
+            msg = f"Consumer {self.durable} mischt Streams: {', '.join(self.subjects)}"
+            raise ValueError(msg)
+        return streams.pop()
 
     def config(self) -> ConsumerConfig:
         config = ConsumerConfig(
@@ -77,7 +98,10 @@ CONSUMERS = (
             "va.screening.run.failed",
         ),
     ),
+    # D1.6: Bestaetigungsmail (VA_PRIVATE)
+    ConsumerSpec("notification-private", ("priv.va.identity.email_confirmation.requested",)),
 )
+CONSUMERS_BY_NAME = {spec.durable: spec for spec in CONSUMERS}
 
 
 def stream_config() -> StreamConfig:
@@ -90,17 +114,46 @@ def stream_config() -> StreamConfig:
     )
 
 
-async def provision(jsm: JetStreamManager, *, consumers: Iterable[str] | None = None) -> None:
-    """Stream und Consumer wie vorgegeben, idempotent.
+def private_stream_config() -> StreamConfig:
+    return StreamConfig(
+        name=PRIVATE_STREAM,
+        subjects=["priv.va.>"],
+        storage=StorageType.MEMORY,
+        max_age=PRIVATE_RETENTION,
+        duplicate_window=DUPLICATE_WINDOW,
+    )
+
+
+STREAMS = {STREAM_NAME: stream_config, PRIVATE_STREAM: private_stream_config}
+
+
+async def provision(
+    jsm: JetStreamManager,
+    *,
+    consumers: Iterable[str] | None = None,
+    streams: Iterable[str] | None = None,
+) -> None:
+    """Streams und Consumer wie vorgegeben, idempotent.
 
     ``consumers``: nur diese Consumer (D1.5). Mit einem NATS-Nutzer je Dienst darf ein Dienst nur
     seinen eigenen anlegen. Ohne Angabe alle (Batch, Werkzeuge, Tests).
+
+    ``streams``: diese Streams; ohne Angabe ``VA_EVENTS`` und die Streams der Consumer (D1.6).
+    ``VA_PRIVATE`` sieht so nur, wer ihn braucht; das web-api verlangt ihn, weil es dorthin sendet.
     """
     wanted = None if consumers is None else set(consumers)
-    await _ensure_stream(jsm, stream_config())
-    for spec in CONSUMERS:
-        if wanted is None or spec.durable in wanted:
-            await _ensure_consumer(jsm, spec)
+    specs = [spec for spec in CONSUMERS if wanted is None or spec.durable in wanted]
+    if streams is not None:
+        names = set(streams)
+    elif wanted is None:
+        names = set(STREAMS)
+    else:
+        names = {STREAM_NAME, *(spec.stream for spec in specs)}
+    for name, config in STREAMS.items():
+        if name in names:
+            await _ensure_stream(jsm, config())
+    for spec in specs:
+        await _ensure_consumer(jsm, spec)
 
 
 def inbox_prefix(url: str) -> str:
@@ -114,11 +167,13 @@ def inbox_prefix(url: str) -> str:
 
 
 async def _ensure_stream(jsm: JetStreamManager, wanted: StreamConfig) -> None:
+    name = wanted.name
+    assert name is not None
     try:
-        current = (await jsm.stream_info(STREAM_NAME)).config
+        current = (await jsm.stream_info(name)).config
     except NotFoundError:
         await jsm.add_stream(wanted)
-        log.info("Stream %s angelegt", STREAM_NAME)
+        log.info("Stream %s angelegt", name)
         return
     drift = {
         field: getattr(wanted, field)
@@ -136,20 +191,20 @@ async def _ensure_stream(jsm: JetStreamManager, wanted: StreamConfig) -> None:
             # laeuft mit dem bisherigen Stream weiter, statt nicht zu starten
             log.warning(
                 "Stream %s weicht ab (%s), angleichen mit make nats-provision",
-                STREAM_NAME,
+                name,
                 ", ".join(sorted(drift)),
                 exc_info=True,
             )
             return
-        log.info("Stream %s angeglichen: %s", STREAM_NAME, ", ".join(sorted(drift)))
+        log.info("Stream %s angeglichen: %s", name, ", ".join(sorted(drift)))
 
 
 async def _ensure_consumer(jsm: JetStreamManager, spec: ConsumerSpec) -> None:
     wanted = spec.config()
     try:
-        current = (await jsm.consumer_info(STREAM_NAME, spec.durable)).config
+        current = (await jsm.consumer_info(spec.stream, spec.durable)).config
     except NotFoundError:
-        await jsm.add_consumer(STREAM_NAME, wanted)
+        await jsm.add_consumer(spec.stream, wanted)
         log.info("Consumer %s angelegt", spec.durable)
         return
     filters = sorted(current.filter_subjects or [current.filter_subject or ""])
@@ -160,7 +215,7 @@ async def _ensure_consumer(jsm: JetStreamManager, spec: ConsumerSpec) -> None:
         or current.ack_wait != wanted.ack_wait
     ):
         # Dieselbe Anfrage aendert einen bestehenden durable Consumer (NATS ab 2.10)
-        await jsm.add_consumer(STREAM_NAME, wanted)
+        await jsm.add_consumer(spec.stream, wanted)
         log.info("Consumer %s angeglichen", spec.durable)
 
 
@@ -168,8 +223,9 @@ class JetStreamPublisher:
     """``Publisher`` der Outbox fuer JetStream (P4.2).
 
     ``Nats-Msg-Id`` ist die Event-ID: Sendet das Relay ein Event noch einmal, verwirft JetStream
-    es im Deduplizierungsfenster. ``stream`` verlangt die Bestaetigung von ``VA_EVENTS``. Fehlt
-    der Stream oder antwortet NATS nicht, wirft ``publish``, und der Eintrag bleibt offen.
+    es im Deduplizierungsfenster. ``stream`` verlangt die Bestaetigung des Streams, in den das
+    Subject gehoert (``VA_EVENTS`` oder seit D1.6 ``VA_PRIVATE``). Fehlt der Stream oder antwortet
+    NATS nicht, wirft ``publish``, und der Eintrag bleibt offen.
     """
 
     def __init__(self, js: JetStreamContext, *, timeout: float = 5.0) -> None:
@@ -181,7 +237,7 @@ class JetStreamPublisher:
             message.subject,
             message.payload,
             timeout=self._timeout,
-            stream=STREAM_NAME,
+            stream=stream_for(message.subject),
             headers={"Nats-Msg-Id": str(message.id)},
         )
 
@@ -198,7 +254,9 @@ from .bus import (  # noqa: E402
 __all__ = [
     "ACK_WAIT",
     "CONSUMERS",
+    "CONSUMERS_BY_NAME",
     "MAX_DELIVER",
+    "PRIVATE_STREAM",
     "RPC_TIMEOUT",
     "STREAM_NAME",
     "ConsumerSpec",

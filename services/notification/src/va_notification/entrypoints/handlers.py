@@ -6,6 +6,9 @@
 - ``screening.run.failed``: Healthcheck ``/fail`` bei ``scheduled``, Fehlermail ausser bei
   ``dry_run``, ``notify=False`` oder ``no_data`` (keine bewertbaren Daten: nur der Ping).
 - Ein Rescore loest weder Mail noch Ping aus.
+- ``identity.email_confirmation.requested`` (privat, Consumer ``notification-private``, D1.6):
+  Bestaetigungsmail an die neue Adresse, solange der Link gilt. Ohne Versandprotokoll, sonst stuende
+  die Adresse im Schema ``reporting``.
 
 Protokoll-Schreibzugriffe (Versand, Ping) duerfen den Lauf nicht kippen und werden nur
 geloggt, wenn sie scheitern.
@@ -17,12 +20,13 @@ import logging
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from va_contracts.events.v1 import (
+    EMAIL_CONFIRMATION_REQUESTED,
     REASON_NO_DATA,
     REPORT_SENT,
     RUN_FAILED,
@@ -34,6 +38,7 @@ from va_contracts.events.v1 import (
 )
 from va_platform.bus import follow_up
 
+from ..domain.confirmation import confirmation_mail
 from ..domain.errors import ERROR_SUBJECT, error_mail_html
 from ..domain.report import build_report
 
@@ -41,7 +46,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from va_contracts import Envelope
-    from va_contracts.events.v1 import ScoringRunCompletedV1
+    from va_contracts.events.v1 import EmailConfirmationRequestedV1, ScoringRunCompletedV1
     from va_platform.bus import EventBus
 
     from ..application.ports import Heartbeat, ReportSender, ReportStore
@@ -50,6 +55,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 CONSUMER = "notification"
+PRIVATE_CONSUMER = "notification-private"  # D1.6: Stream VA_PRIVATE
 SOURCE = "va/notification"
 # Text des Pings, wenn es nichts zu bewerten gab
 NO_DATA_MESSAGE = "no scoreable data"
@@ -85,6 +91,22 @@ class NotificationHandler:
     def subscribe(self) -> None:
         self._bus.subscribe(SCORING_RUN_COMPLETED, CONSUMER, self.on_scoring_completed)
         self._bus.subscribe(RUN_FAILED, CONSUMER, self.on_run_failed)
+        self._bus.subscribe(
+            EMAIL_CONFIRMATION_REQUESTED, PRIVATE_CONSUMER, self.on_email_confirmation
+        )
+
+    # --- Bestaetigungsmail (D1.6) ---------------------------------------------
+
+    def on_email_confirmation(self, env: Envelope[EmailConfirmationRequestedV1]) -> None:
+        """Schickt den Link an die neue Adresse. Scheitert der Versand, wirft der Handler, und der
+        Bus stellt erneut zu; einen Run gibt es hier nicht."""
+        event = env.data
+        if event.expires_at <= datetime.now(UTC):
+            log.info("Bestaetigungslink fuer Nutzer %s ist abgelaufen, keine Mail", event.user_id)
+            return
+        mail = confirmation_mail(event.link, event.expires_at)
+        self._sender.send(mail.subject, mail.html, recipient=event.email, text=mail.text)
+        log.info("Bestaetigungsmail fuer Nutzer %s verschickt", event.user_id)
 
     # --- Report ---------------------------------------------------------------
 

@@ -36,6 +36,18 @@
           (input)="displayName.set(value($event))"
         />
       </mat-form-field>
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-label>Mail-Adresse</mat-label>
+        <input
+          matInput
+          name="email"
+          type="email"
+          autocomplete="email"
+          maxlength="254"
+          [value]="email()"
+          (input)="email.set(value($event))"
+        />
+      </mat-form-field>
       <button
         matButton="outlined"
         type="submit"
@@ -46,7 +58,32 @@
         Speichern
       </button>
     </form>
+    @if (user.pending_email) {
+      <p class="meta pending">
+        <span tabindex="0" [matTooltip]="controls['account.pending']">Bestätigung ausstehend:</span>
+        {{ user.pending_email }}
+      </p>
+    }
     <app-notice [notice]="nameNotice()" />
+  </app-section>
+
+  <app-section heading="Deine Daten">
+    <button
+      sectionActions
+      matButton="outlined"
+      type="button"
+      data-action="export"
+      [disabled]="exporting()"
+      [matTooltip]="controls['account.export']"
+      (click)="download()"
+    >
+      <app-icon name="download" />
+      Meine Daten herunterladen
+    </button>
+    <p class="meta">
+      Alles, was der Value-Analyzer über dein Konto gespeichert hat, als JSON-Datei.
+    </p>
+    <app-notice [notice]="exportNotice()" />
   </app-section>
 
   <app-section heading="Passwort ändern">

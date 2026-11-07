@@ -187,6 +187,23 @@ class TestOrigin:
         )
         assert response.status_code == 403
 
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "https://testserver/ bitte bestaetigen: https://boese.example",
+            "https://testserver/pfad",
+            "https://testserver?x=1",
+            "https://user@testserver",
+        ],
+    )
+    def test_an_origin_is_only_scheme_host_and_port(self, client, runs, origin):
+        """D1.6: Ein Browser schickt nie mehr als ``scheme://host[:port]``. Mit Pfad oder Text
+        dahinter landete sonst fremder Inhalt im Link der Bestaetigungsmail."""
+        _login(client, "dennis")
+        response = client.post("/api/v1/runs", json={}, headers={"Origin": origin})
+        assert response.status_code == 403
+        assert runs.calls == []
+
     def test_without_origin_writing_is_allowed(self, client, runs):
         """Kein Browser (curl, Skripte): Ohne Origin gibt es keinen CSRF-Angriffsweg."""
         _login(client, "dennis")

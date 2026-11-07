@@ -36,7 +36,13 @@ from va_contracts.events.v1 import (
 )
 from va_platform.db import session_scope
 from va_platform.messaging import Inbox
-from va_platform.nats import MAX_DELIVER, NatsBus, current_sequence
+from va_platform.nats import (
+    MAX_DELIVER,
+    PRIVATE_STREAM,
+    STREAM_NAME,
+    NatsBus,
+    current_sequence,
+)
 
 from ..adapters.postgres.models import WebInbox
 from ..projections import register
@@ -173,14 +179,19 @@ def open_event_consumer(nats_url: str, engine: Engine, broadcaster: Broadcaster)
         # Fluechtig (P4.5): an den Projektionen vorbei direkt an die Clients, ohne seq
         broadcaster.publish(EventMessage("runs", env.type, None, plain(env.data)))
 
-    # D1.5: Mit dem NATS-Nutzer web-api nur der eigene Consumer
+    # D1.5: Mit dem NATS-Nutzer web-api nur der eigene Consumer. D1.6: Der Bus sendet auch die
+    # Bestaetigungsmails (VA_PRIVATE), liest dort aber nichts
     bus = NatsBus(
-        nats_url, max_deliver=MAX_DELIVER, on_dead_letter=dead_letter, consumers=(CONSUMER,)
+        nats_url,
+        max_deliver=MAX_DELIVER,
+        on_dead_letter=dead_letter,
+        consumers=(CONSUMER,),
+        streams=(STREAM_NAME, PRIVATE_STREAM),
     )
     bus.start()
     try:
         for spec in EVENTS.values():
-            if not spec.volatile:
+            if not spec.volatile and not spec.private:
                 bus.subscribe(spec, CONSUMER, handle)
         bus.subscribe(FETCH_PROGRESSED, CONSUMER, progress)
     except BaseException:

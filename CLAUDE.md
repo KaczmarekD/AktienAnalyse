@@ -50,6 +50,11 @@ Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-
   eigene Inbox `_INBOX.<nutzer>` (`va_platform.nats.inbox_prefix`). `batch` hat alle Rechte (Batch
   über NATS, `src.worker`, `make nats-provision`). Ein neues Event oder RPC braucht einen Eintrag
   in `nats.conf`; `tests/test_nats_permissions.py` und der E2E-Stack prüfen die Rechte.
+- Private Events seit D1.6: `EventSpec(private=True)` ergibt das Subject `priv.va.<typ>` im Stream
+  `VA_PRIVATE` (nur im Speicher, 24 h, nicht im Backup). Ihn sehen nur Sender und Empfänger, heute
+  web-api (sendet die Bestätigungsmail) und notification (Consumer `notification-private`). Das
+  web-api abonniert keine privaten Events. `EventSpec.max_age` gibt einem Event ein eigenes
+  Höchstalter im `ReliableBus` (Bestätigung 24 h statt `RUN_TIMEOUT_MINUTES`).
 - Aus den Events füllt das web-api die Projektionen im Schema `web` (Consumer `web-api`,
   `va_web_api.events.EventManager`) und schließt `batch.run` ab. Der WebSocket `/ws`
   (Subprotokoll `va.v1`, nur dieselbe Herkunft oder `WEB_API_ALLOWED_ORIGINS`) meldet die
@@ -109,6 +114,13 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   Passwörter zurücksetzen. Mit Einmal-Passwort (`must_change`) antworten alle anderen Endpunkte
   mit 403, der WebSocket nimmt keine Verbindung an. Der Server schickt nie ein Passwort zurück,
   das Einmal-Passwort entsteht im Browser. `GET /auth/session` sagt ohne 401, wer angemeldet ist.
+- Seit D1.6: `PUT /me/profile` nimmt eine neue Mail-Adresse an, sie gilt erst nach dem Link aus der
+  Mail (`pending_email`, 24 h, einmalig, nur die jüngste Anfrage, gespeichert nur der SHA-256 des
+  Tokens, höchstens 5 Anfragen je Stunde). Den Link baut das web-api aus der geprüften Herkunft
+  der Anfrage (sonst aus `WEB_API_ALLOWED_ORIGINS`, wenn dort genau eine steht). Das Event geht über die Outbox im Schema `identity`, ein Takt im
+  web-api und der Endpunkt selbst schicken sie los. `POST /auth/confirm-email` (ohne Sitzung,
+  Seite `/confirm-email` im UI) bestätigt. `GET /me/export` liefert alle eigenen Zeilen aus
+  `identity` als JSON-Datei, ohne Hashes.
 - Ohne NATS (`make api` aus der `.venv`) startet es über `src.web:create_app`. Diese Composition
   Root rechnet Vorschau und Profil-Befehle mit dem Code von scoring im selben Prozess
   (`LocalCaller`, Rolle `va_profiles`), denn `va_web_api` darf `va_scoring` nicht importieren.
@@ -302,7 +314,12 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   (das UPDATE muss `finished_at` setzen, Migration `0005`), das Nachtragen einer
   ISIN und das einmalige Setzen von `published_at` in der Outbox (Trigger `va_guard_outbox`,
   `va_app` hat nur dieses Spaltenrecht). Projektionen sind veränderlich, aber nie löschbar
-  (`MUTABLE_TABLES`, heute `web.run_status`). Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
+  (`MUTABLE_TABLES`, heute `web.run_status`). Einzige Ausnahme vom Löschverbot (ADR-0012, D1.6):
+  `python -m va_web_api.admin erase-user <name> --by <admin> --yes` löscht auf Wunsch einer
+  Person ihre Zeilen in `identity` (`identity_erasure.erase_user`, Rolle des Besitzers aus
+  `DATABASE_OWNER_URL`, Container `value-analyzer`). Es schaltet `va_no_delete` nur in seiner
+  Transaktion ab und protokolliert ohne Inhalte in `identity.erasure_log`. Ein neuer Besitzer
+  persönlicher Daten bekommt sein eigenes `erase_user`. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
   nur Profile lesen und Versionen/Aktivierungen anfügen (web-api ohne NATS, `make api`), `va_web` nur im Schema
   `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`), seit P4.7 dazu
   Runs in `batch.run` anlegen und einmal abschließen. Seit P5.3 je Service eine Rolle nur fürs
@@ -354,9 +371,10 @@ Tooltips aus dem Glossar, [Spec](docs/architecture/ui-neugestaltung.md), abgenom
 06.11.2026). Offen ist Track F: ADR-0010 sammelt Daten,
 ADR-0011 ist nur vorgeschlagen. Track D (Depots, mehrere Nutzer, nur lesende Bankanbindung) liegt
 als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
-bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt sind D1.1 bis
-D1.5 (Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI, HTTPS
-über DSM, NATS-Nutzer je Dienst). Das Zertifikat für die NAS wählt der User (Runbook: beide Wege).
+bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt ist D1
+(D1.1 bis D1.6: Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI,
+HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando). Das
+Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
 fortgeschrieben, nicht nur im Chat besprochen.
@@ -463,7 +481,8 @@ auf Liste umstellen (`pydantic.EmailStr` → `list[EmailStr]`, `;`-getrennt
 parsen), `SmtpConfig` in `va_notification.adapters.smtp` und `smtp_config` in
 `va_notification.entrypoints.service` anpassen. Dazu `NotificationConfig.recipient`
 (`va_notification.entrypoints.handlers`, gesetzt in `va_notification.entrypoints.service.wire`):
-Es landet im Versandprotokoll.
+Es landet im Versandprotokoll. Eine Mail an eine andere Adresse geht schon heute über
+`ReportSender.send(..., recipient=, text=)` (D1.6, Bestätigungsmail).
 
 ## Externe Quellen, von denen wir abhängen
 

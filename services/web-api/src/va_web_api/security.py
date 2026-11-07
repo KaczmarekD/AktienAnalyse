@@ -32,10 +32,32 @@ def origin_allowed(origin: str | None, host: str | None, allowed: frozenset[str]
     if not origin:
         return False
     origin = origin.strip().rstrip("/").lower()
+    if not _bare(origin):
+        return False
     if allowed:
         return origin in allowed
     parts = urlsplit(origin)
     return parts.scheme in ("http", "https") and bool(host) and parts.netloc == host.lower()
+
+
+def _bare(origin: str) -> bool:
+    """Nur ``scheme://host[:port]``, wie ein Browser es schickt (D1.6). Mit Pfad, Abfrage oder
+    Text dahinter kaeme fremder Inhalt in den Link der Bestaetigungsmail."""
+    if any(c.isspace() or ord(c) < 0x20 for c in origin):
+        return False
+    try:
+        parts = urlsplit(origin)
+        parts.port  # noqa: B018 - wirft bei ungueltigem Port
+    except ValueError:
+        return False
+    return (
+        bool(parts.hostname)
+        and not parts.path
+        and not parts.query
+        and not parts.fragment
+        and parts.username is None
+        and parts.password is None
+    )
 
 
 class OriginCheckMiddleware:

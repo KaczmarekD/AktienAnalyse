@@ -8,10 +8,13 @@ Uhr rechnen. Es gibt bewusst kein Loeschen: Konten werden deaktiviert, Sitzungen
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from datetime import datetime
+
+    from va_contracts import Envelope
 
     from .domain import Failures
 
@@ -42,6 +45,18 @@ class SessionRecord:
     last_seen: datetime  # juengster Eintrag in session_seen, sonst created_at
     revoked: bool
     user_agent: str | None = None
+
+
+@dataclass(frozen=True)
+class EmailConfirmationRecord:
+    """Eine Anfrage, eine neue Mail-Adresse zu bestaetigen (D1.6)."""
+
+    user_id: int
+    email: str
+    expires_at: datetime
+    created_at: datetime
+    used: bool  # schon bestaetigt: einmalig
+    latest: bool  # die juengste Anfrage dieses Nutzers; aeltere Links gelten nicht mehr
 
 
 class IdentityStore(Protocol):
@@ -127,4 +142,44 @@ class IdentityStore(Protocol):
     ) -> list[str]:
         """Widerruft alle offenen Sitzungen eines Nutzers ausser ``keep``; gibt ihre Hashes
         zurueck (D1.4), damit der Hub ihre WebSockets trennen kann."""
+        ...
+
+    # --- D1.6: Mail-Adresse bestaetigen, Export ---
+
+    def add_email_confirmation(
+        self,
+        user_id: int,
+        *,
+        email: str,
+        token_hash: str,
+        expires_at: datetime,
+        at: datetime,
+        envelope: Envelope[Any] | None,
+    ) -> None:
+        """Legt die Anfrage an und, in derselben Transaktion, das Event fuer die Mail in die
+        Outbox (``envelope``)."""
+        ...
+
+    def find_email_confirmation(self, token_hash: str) -> EmailConfirmationRecord | None: ...
+
+    def count_email_confirmations(self, user_id: int, *, since: datetime) -> int:
+        """Wie viele Anfragen der Nutzer seit ``since`` gestellt hat (Begrenzung)."""
+        ...
+
+    def confirm_email(self, token_hash: str, *, at: datetime) -> bool:
+        """Bestaetigt einmalig: neue Profil-Version mit der Adresse und ``email_confirmed_at``.
+        ``False``, wenn der Link schon benutzt wurde."""
+        ...
+
+    def pending_email(self, user_id: int, *, now: datetime) -> str | None:
+        """Die Adresse der juengsten offenen, noch gueltigen Anfrage."""
+        ...
+
+    def export(self, user_id: int) -> dict[str, list[dict[str, Any]]]:
+        """Alle Zeilen des Nutzers in ``identity``, ohne Hashes (NUT-12)."""
+        ...
+
+    def publish_pending(self, publish: Callable[[Envelope[Any]], None]) -> int:
+        """Gibt die offenen Events der Outbox an ``publish``, in Reihenfolge; jedes gilt
+        danach als gesendet. Wirft ``publish``, bleibt es mit allen spaeteren offen."""
         ...

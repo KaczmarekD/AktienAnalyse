@@ -48,6 +48,7 @@ dann braucht notification die Inbox, sonst ginge die Mail doppelt raus.
 | Präfix | Zweck | Speicherung |
 |---|---|---|
 | `va.<kontext>.<ereignis>` | dauerhafte Events | Stream `VA_EVENTS` (Subjects `va.>`) |
+| `priv.va.<kontext>.<ereignis>` | private Events mit persönlichen Daten (seit D1.6) | Stream `VA_PRIVATE` (Subjects `priv.va.>`) |
 | `live.va.…` | flüchtige Meldungen (Fortschritt) | keine, bewusst außerhalb des Streams |
 | `rpc.va.…` | Request/Reply (Vorschau, Profil-Befehle, Detailabfragen) | keine |
 
@@ -56,6 +57,16 @@ Flüchtige Meldungen dürfen nicht unter `va.` liegen, sonst speichert JetStream
 Stream `VA_EVENTS`: Speicherung in Dateien, Aufbewahrung 30 Tage, Deduplizierungsfenster
 10 Minuten. Die Wahrheit liegt in Postgres, der Stream dient der Zustellung und dem Nachspielen
 verpasster Events für WebSocket-Clients.
+
+Stream `VA_PRIVATE` (seit D1.6, [nutzer.md](depot/nutzer.md#personenbezogene-daten-und-das-löschverbot)):
+nur im Speicher, also nicht in `natsdata` und nicht im Backup, Aufbewahrung 24 Stunden. Hier
+laufen Events mit Mail-Adressen und Links, später Bestände und Berichte. Im Katalog trägt so ein
+Event `private=True` (`EventSpec`), der Publisher wählt den Stream nach dem Subject
+(`va_platform.nats.stream_for`). Ein Dienst legt `VA_PRIVATE` nur an, wenn einer seiner Consumer
+dort liegt oder er dorthin sendet (`NatsBus(..., streams=…)`, das web-api). Das web-api abonniert
+keine privaten Events, sie stehen nie in den Projektionen. Ein Event darf ein eigenes Höchstalter
+haben (`EventSpec.max_age`): Der `ReliableBus` überspringt es erst danach, nicht schon nach
+`RUN_TIMEOUT_MINUTES`.
 
 ## Event-Katalog (v1)
 
@@ -69,6 +80,7 @@ verpasster Events für WebSocket-Clients.
 | `va.scoring.profile.activated` | scoring | web-api | profile_id, version |
 | `va.notification.report.sent` | notification | web-api | run_id, report_id, subject, dry_run |
 | `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id (leer genau bei Rescore), trigger, options, stage, reason (z. B. `timeout`, `no_data`), scoring_run_id, detail (Traceback für die Fehlermail) |
+| `priv.va.identity.email_confirmation.requested` (D1.6, privat, 24 h) | web-api (Outbox im Schema `identity`) | notification (`notification-private`) | user_id, email (die neue Adresse), link (mit Token, aus der geprüften Herkunft der Anfrage), expires_at |
 
 Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring
 setzt den Trigger fort, notification verschickt bei `dry_run` oder `notify=false` keine Mail und
@@ -220,9 +232,14 @@ NATS. Er umhüllt den Bus je Service, mit Inbox und Outbox aus dessen Schema.
 | `notification` | `va.scoring.run.completed`, `va.screening.run.failed` | ignoriert `trigger=rescore`, bei `dry_run` nur rendern und speichern |
 | `web-api` | `va.>` | Projektionen und WebSocket, siehe [web-api-realtime.md](web-api-realtime.md) |
 | `batch` | `va.marketdata.snapshot.completed`, `va.scoring.run.completed`, `va.notification.report.sent`, `va.screening.run.failed` | seit P4.3: der `RunTracker` des Batches, Vorläufer der Run-Projektion im web-api |
+| `notification-private` | `priv.va.identity.email_confirmation.requested` | seit D1.6, im Stream `VA_PRIVATE`: Bestätigungsmail an die neue Adresse, ohne Versandprotokoll (die Adresse gehört nicht ins Schema `reporting`); ein abgelaufener Link geht nicht mehr raus |
+
+Consumer-Namen sind über beide Streams eindeutig: Der Bus führt seine Consumer nur nach Namen,
+den Stream kennt er aus `ConsumerSpec.stream`.
 
 Alle Consumer begrenzen die Wiederholungen (`max_deliver`, z. B. 5). Danach wird die Nachricht
-mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.failed`.
+mit Fehler in der Inbox vermerkt, und der Run endet über `va.screening.run.failed`. Ein Event ohne
+Run (die Bestätigungsmail) löst dabei kein `va.screening.run.failed` aus.
 
 **`NatsBus` (P4.3):**
 
@@ -251,12 +268,14 @@ Nutzername in der `NATS_URL` des Dienstes.
 |---|---|---|---|
 | `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | – |
 | `scoring` | `va.scoring.>`, `va.screening.run.failed` | Consumer `scoring` | antwortet auf `rpc.va.scoring.>` |
-| `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification` | antwortet auf `rpc.va.notification.>` |
-| `web-api` | `va.screening.run.requested`, `va.screening.run.failed` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus dem Stream (Nachspielen) | fragt `rpc.va.scoring.>`, `rpc.va.notification.>` |
+| `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification`, seit D1.6 `notification-private` (`VA_PRIVATE`) | antwortet auf `rpc.va.notification.>` |
+| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>` |
 | `batch` | alles | alles | alles |
 
 - **Inbox:** Antworten (JetStream-API, RPC) gehen an `_INBOX.<nutzer>`; jeder darf nur seine
   lesen (`va_platform.nats.inbox_prefix`).
+- **`VA_PRIVATE` (D1.6):** `market-data` und `scoring` sehen den Stream nicht, das web-api sendet
+  nur und legt ihn an, notification liest nur über `notification-private`.
 - **Provisionierung:** Jeder Dienst legt den Stream und nur seinen eigenen Consumer an. Umstellen
   darf den Stream nur `batch`; weicht er ab, meldet ein Dienst das im Log und läuft weiter. Alle
   Consumer legt `provision()` ohne `consumers` an: der Batch, `src.worker`, `make nats-provision`

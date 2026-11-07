@@ -117,12 +117,13 @@ auch die Berichts-Abos ([berichte.md](berichte.md#datenmodell)), weil sie persö
 | `user_profile_version` | user_id, display_name, email, email_confirmed_at, created_at | anfügen, gültig ist die jüngste Zeile |
 | `user_status` | user_id, status (`active`/`disabled`), reason, at | anfügen, gültig ist die jüngste Zeile |
 | `password_credential` | user_id, hash, algorithm, must_change, created_at | anfügen, gültig ist die jüngste Zeile |
-| `email_confirmation` | user_id, email, token_hash, expires_at, created_at; Bestätigung als eigene Zeile | anfügen |
+| `email_confirmation` | user_id, email, token_hash, expires_at, created_at | anfügen |
+| `email_confirmation_used` | token_hash, at: die Bestätigung, einmalig (D1.6) | anfügen |
 | `session` | id_hash, user_id, created_at, expires_at, user_agent | anfügen |
 | `session_seen` | id_hash, seen_at | anfügen, höchstens alle 10 Minuten je Sitzung |
 | `session_revocation` | id_hash, at, reason (`logout`, `admin`, `password_changed`) | anfügen |
 | `login_event` | username, user_id, ip, ok, reason, at | anfügen |
-| `erasure_log` | user_key (Hash der user_id), at, by_admin, Schemas und Zeilenzahlen, keine Inhalte | anfügen |
+| `erasure_log` | user_key (SHA-256 der user_id), at, by_admin, Zeilenzahlen je Tabelle, keine Inhalte | anfügen |
 | `outbox`, `inbox` | wie in den anderen Schemas | wie dort |
 
 Rechte: `va_identity` darf in `identity` lesen und anfügen, sonst nichts. Alles bleibt eine
@@ -173,8 +174,8 @@ Das Löschkommando hat der User mit ADR-0012 am 06.11.2026 angenommen.
 | `GET /api/v1/admin/users`, `POST /api/v1/admin/users` | Nutzer auflisten, mit Einmal-Passwort anlegen | Admin |
 | `POST /api/v1/admin/users/{id}/disable`, `…/enable`, `…/reset-password` | verwalten (nicht am eigenen Konto) | Admin |
 
-Seit D1.4 umgesetzt bis auf `confirm-email`, die Mail-Adresse in `/me/profile` und `/me/export`
-(D1.6). `/me` und `/admin` brauchen auch im Übergang eine echte Sitzung. Das Einmal-Passwort
+Alles umgesetzt (D1.4, `confirm-email`, Mail-Adresse und Export seit D1.6). `/me` und `/admin`
+brauchen auch im Übergang eine echte Sitzung. Das Einmal-Passwort
 vergibt der Admin, das UI schlägt ein zufälliges vor; der Server schickt nie ein Passwort zurück.
 Mit Einmal-Passwort antworten alle anderen Endpunkte mit 403, bis es ersetzt ist.
 

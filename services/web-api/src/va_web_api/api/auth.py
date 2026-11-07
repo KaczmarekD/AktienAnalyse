@@ -6,6 +6,9 @@ Das Cookie enthaelt nur eine zufaellige Sitzungs-ID (``HttpOnly``, ``SameSite=St
 
 Seit D1.2 verlangen die uebrigen Router eine Sitzung (``current_user``, eingebunden in
 ``main.create_app``), Run-Start und Profil-Befehle zusaetzlich die Rolle Admin (``Admin``).
+
+Seit D1.6 bestaetigt ``POST /auth/confirm-email`` eine neue Mail-Adresse, ohne Sitzung: Der
+Link aus der Mail kann in einem anderen Browser geoeffnet werden, das Token ist der Nachweis.
 """
 
 from __future__ import annotations
@@ -15,8 +18,15 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from ..identity.domain import token_hash
-from ..identity.service import LAN_USER, IdentityService, LoginFailed, LoginLocked, User
-from ..models import LoginRequest, Me, SessionState
+from ..identity.service import (
+    LAN_USER,
+    IdentityService,
+    InvalidConfirmation,
+    LoginFailed,
+    LoginLocked,
+    User,
+)
+from ..models import EmailConfirmation, LoginRequest, Me, SessionState
 from ..settings import WebApiSettings
 
 router = APIRouter(tags=["auth"])
@@ -168,7 +178,9 @@ def logout(request: Request, response: Response, identity: Identity, settings: S
     )
 
 
-def me_of(user: User) -> Me:
+def me_of(user: User, identity: IdentityService | None = None) -> Me:
+    """Das Konto fuer die Antwort; mit ``identity`` auch die Adresse, die auf ihre
+    Bestaetigung wartet (D1.6)."""
     return Me(
         id=user.id,
         username=user.username,
@@ -176,13 +188,14 @@ def me_of(user: User) -> Me:
         display_name=user.display_name,
         email=user.email,
         must_change_password=user.must_change_password,
+        pending_email=None if identity is None else identity.pending_email(user),
     )
 
 
 @router.get("/me", responses=ME_RESPONSES)
-def me(user: SessionUser) -> Me:
+def me(user: SessionUser, identity: Identity) -> Me:
     """Das eigene Konto."""
-    return me_of(user)
+    return me_of(user, identity)
 
 
 @router.get("/auth/session")
@@ -195,4 +208,21 @@ def current_session(request: Request, settings: Settings) -> SessionState:
         if identity is None
         else identity.authenticate(request.cookies.get(settings.cookie_name))
     )
-    return SessionState(user=None if user is None else me_of(user))
+    return SessionState(user=None if user is None else me_of(user, identity))
+
+
+INVALID_LINK = "Der Link ist ungueltig oder abgelaufen."
+
+
+@router.post(
+    "/auth/confirm-email",
+    status_code=204,
+    responses={400: {"description": INVALID_LINK}, **UNAVAILABLE},
+)
+def confirm_email(body: EmailConfirmation, identity: Identity) -> None:
+    """Bestaetigt eine neue Mail-Adresse mit dem Token aus dem Link (einmalig, 24 h, nur
+    die juengste Anfrage). Ohne Sitzung: Das Token ist der Nachweis."""
+    try:
+        identity.confirm_email(body.token)
+    except InvalidConfirmation as e:
+        raise HTTPException(status_code=400, detail=INVALID_LINK) from e
