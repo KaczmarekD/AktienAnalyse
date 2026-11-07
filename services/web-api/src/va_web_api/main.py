@@ -49,7 +49,18 @@ from va_platform.nats import NatsBus
 from va_platform.redaction import install_redaction
 
 from .adapters.postgres.identity_store import PostgresIdentityStore
-from .api import account, admin, auth, health, instruments, ranking, reports, runs, scoring
+from .api import (
+    account,
+    admin,
+    auth,
+    health,
+    instruments,
+    ranking,
+    reports,
+    runs,
+    scoring,
+    securities,
+)
 from .events import open_event_consumer
 from .identity.service import IdentityService
 from .ports import RemoteUnavailable
@@ -57,7 +68,7 @@ from .read_models import ProjectionReadModel, TableReadModel
 from .realtime import endpoint
 from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
-from .rpc import RemoteReads, RemoteScoring
+from .rpc import RemoteReads, RemoteScoring, RemoteSecurities
 from .runs import RunManager
 from .security import JsonOnlyMiddleware, OriginCheckMiddleware
 from .settings import WebApiSettings
@@ -177,6 +188,10 @@ def create_app(
             None if profiles_url is None else create_db_engine(profiles_url.get_secret_value())
         )
         app.state.rpc = None
+        # D2.1: Wertpapiere bei market-data, nur ueber NATS (ohne antworten /securities mit 503)
+        app.state.securities = (
+            RemoteSecurities(lambda: app.state.rpc) if settings.nats_url else None
+        )
         if settings.nats_url:
             # P4.8: Vorschau und Profil-Befehle beantwortet der Worker ueber NATS
             app.state.preview = app.state.commands = RemoteScoring(lambda: app.state.rpc)
@@ -280,7 +295,7 @@ def create_app(
     for module in (health, auth, account, admin):
         app.include_router(module.router, prefix=API_PREFIX)
     # D1.2: alle anderen nur mit Sitzung, bis D1.4/D1.5 abschaltbar (WEB_API_AUTH_REQUIRED)
-    for module in (runs, ranking, instruments, reports, scoring):
+    for module in (runs, ranking, instruments, reports, scoring, securities):
         app.include_router(
             module.router,
             prefix=API_PREFIX,

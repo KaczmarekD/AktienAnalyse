@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_market_data.domain.consensus import CONSENSUS_KINDS, CONSENSUS_STATUSES
+from va_market_data.domain.securities import ASSET_CLASSES
 from va_platform.db import Base, in_values
 from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
 
@@ -282,6 +283,56 @@ class FundamentalSnapshot(Base):
     # Status
     fetch_ok: Mapped[bool]
     errors: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
+
+
+class Security(Base):
+    """D2.1 (WP-01): ein Wertpapier, ueber die ISIN eindeutig."""
+
+    __tablename__ = "security"
+    __table_args__ = (
+        CheckConstraint(in_values("asset_class", ASSET_CLASSES), name="asset_class"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str] = mapped_column(Text, unique=True)
+    asset_class: Mapped[str]
+    first_seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class SecurityMasterVersion(Base):
+    """D2.1 (WP-04): Stammdaten je Quelle als JSONB, neue Zeile nur bei geaendertem Inhalt."""
+
+    __tablename__ = "security_master"
+    __table_args__ = (
+        Index("ix_security_master_isin_source", "isin", "source"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str] = mapped_column(ForeignKey("market_data.security.isin"))
+    source: Mapped[str]
+    payload: Mapped[dict[str, Any]]
+    fetched_at: Mapped[datetime]
+
+
+class Listing(Base):
+    """D2.1 (WP-03): Handel eines Wertpapiers an einem Boersenplatz; ``instrument`` bleibt das
+    Listing fuer die Fundamentaldaten. ``symbol`` ist das Yahoo-Symbol, falls es eines gibt."""
+
+    __tablename__ = "listing"
+    __table_args__ = (
+        UniqueConstraint("isin", "ticker", "exchange", name="uq_listing_isin_ticker_exchange"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str] = mapped_column(ForeignKey("market_data.security.isin"), index=True)
+    symbol: Mapped[str | None] = mapped_column(Text, unique=True)
+    ticker: Mapped[str | None]
+    exchange: Mapped[str | None]
+    currency: Mapped[str | None]
+    first_seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 class MarketDataOutbox(OutboxMixin, Base):

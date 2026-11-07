@@ -1,0 +1,28 @@
+{
+  "description": "``symbol``: ein vom Nutzer gewaehltes Listing statt Xetra oder Heimatboerse (WP-03).",
+  "properties": {
+    "isin": {
+      "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+      "title": "Isin",
+      "type": "string"
+    },
+    "symbol": {
+      "anyOf": [
+        {
+          "maxLength": 40,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Symbol"
+    }
+  },
+  "required": [
+    "isin"
+  ],
+  "title": "SecurityResolveRequestV1",
+  "type": "object"
+}

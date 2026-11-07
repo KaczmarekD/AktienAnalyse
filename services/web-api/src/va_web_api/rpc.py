@@ -37,6 +37,8 @@ from va_contracts.rpc.v1 import (
     REPORT_GET,
     SCORING_FACTORS,
     SCORING_PREVIEW,
+    SECURITIES_RESOLVE,
+    SECURITIES_SEARCH,
     ActivateReplyV1,
     ActivateRequestV1,
     FactorsReplyV1,
@@ -52,11 +54,14 @@ from va_contracts.rpc.v1 import (
     RpcReplyV1,
     SaveVersionReplyV1,
     SaveVersionRequestV1,
+    SecurityResolveRequestV1,
+    SecuritySearchRequestV1,
 )
 from va_platform.nats import RpcUnavailable
 
 from .models import Factor, ProfileDetail, ProfileSummary, Report
 from .ports import (
+    MarketDataUnavailable,
     NoPreviewData,
     NotificationUnavailable,
     PreviewBasis,
@@ -74,6 +79,7 @@ if TYPE_CHECKING:
     from va_contracts import Contract, Envelope
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.rpc.v1 import RpcSpec
+    from va_contracts.securities import SecurityHitV1, SecurityV1
 
     from .ports import ProfileCommands, ScoringPreview
 
@@ -189,6 +195,25 @@ class RemoteReads:
         if reply.filename is None or reply.content is None:
             return None
         return reply.filename, reply.content
+
+
+class RemoteSecurities:
+    """Wertpapiere suchen und aufloesen bei market-data (D2.1, ``SecurityDirectory``)."""
+
+    def __init__(self, bus: Callable[[], RpcCaller | None]) -> None:
+        self._bus = bus
+
+    def search(self, query: str) -> list[SecurityHitV1]:
+        request = SecuritySearchRequestV1(query=query)
+        reply = _request(self._bus, SECURITIES_SEARCH, request, MarketDataUnavailable)
+        _raise(reply)
+        return list(reply.hits)
+
+    def resolve(self, isin: str, symbol: str | None = None) -> SecurityV1 | None:
+        request = SecurityResolveRequestV1(isin=isin, symbol=symbol)
+        reply = _request(self._bus, SECURITIES_RESOLVE, request, MarketDataUnavailable)
+        _raise(reply)
+        return reply.security
 
 
 def _raise(reply: RpcReplyV1) -> None:

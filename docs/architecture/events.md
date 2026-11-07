@@ -109,6 +109,8 @@ ein optionales `error` (`no_data`, `unknown_profile`, `unknown_version`, `confli
 | `rpc.va.scoring.profiles.activate` (P4.8) | profile_id + version → ok |
 | `rpc.va.notification.report` / `.report.csv` (P4.9) | report_id → Mail bzw. CSV als Base64 (leer: unbekannt) |
 | `rpc.va.marketdata.instrument` | Symbol → Stammdaten und Kennzahlen-Verlauf (nicht nötig: die Titelseite kommt seit P4.9 aus den Projektionen) |
+| `rpc.va.marketdata.securities.search` (D2.1) | ISIN, WKN, Name oder Symbol → Treffer (eigene Wertpapiere, OpenFIGI, Yahoo; 24 h im Speicher) |
+| `rpc.va.marketdata.securities.resolve` (D2.1) | ISIN, optional ein Listing → Wertpapier mit Stammdaten (ESMA FIRDS) und Listings; speichert sie (leer: unbekannt, `invalid`: falsche Prüfziffer) |
 
 ## Envelope
 
@@ -266,10 +268,10 @@ Nutzername in der `NATS_URL` des Dienstes.
 
 | Nutzer | Sendet | Liest | RPC |
 |---|---|---|---|
-| `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | – |
+| `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | seit D2.1 antwortet auf `rpc.va.marketdata.>` |
 | `scoring` | `va.scoring.>`, `va.screening.run.failed` | Consumer `scoring` | antwortet auf `rpc.va.scoring.>` |
 | `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification`, seit D1.6 `notification-private` (`VA_PRIVATE`) | antwortet auf `rpc.va.notification.>` |
-| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>` |
+| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>`, seit D2.1 `rpc.va.marketdata.>` |
 | `batch` | alles | alles | alles |
 
 - **Inbox:** Antworten (JetStream-API, RPC) gehen an `_INBOX.<nutzer>`; jeder darf nur seine

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from va_contracts.events.v1 import RunOptionsV1
     from va_contracts.profile import ProfileParamsV1
+    from va_contracts.securities import SecurityHitV1, SecurityV1
 
     from .models import (
         Factor,
@@ -91,6 +92,22 @@ class NotificationUnavailable(RemoteUnavailable):
     """Reports (P4.9)."""
 
     service = "Notification"
+
+
+class MarketDataUnavailable(RemoteUnavailable):
+    """Wertpapiere suchen und aufloesen (D2.1)."""
+
+    service = "market-data"
+
+
+class SecurityDirectory(Protocol):
+    """Wertpapiere bei market-data (D2.1). Wirft ``MarketDataUnavailable``."""
+
+    def search(self, query: str) -> list[SecurityHitV1]: ...
+
+    def resolve(self, isin: str, symbol: str | None = None) -> SecurityV1 | None:
+        """Stammdaten und Listings; ``None`` fuer eine unbekannte ISIN."""
+        ...
 
 
 class ProfileConflict(Exception):

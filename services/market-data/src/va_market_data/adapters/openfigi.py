@@ -1,6 +1,7 @@
 """OpenFIGI: ISIN -> Yahoo-Symbol ueber das Xetra-Listing (fuer Neuaufnahmen ohne CSV-Eintrag).
 
-Ohne API-Key, hoechstens 10 ISINs je Anfrage.
+Ohne API-Key, hoechstens 10 ISINs je Anfrage. Seit D2.1 auch Name, Anlageklasse und Listings je
+ISIN fuer die Suche nach Wertpapieren (``OpenFigiLookup``).
 """
 
 from __future__ import annotations
@@ -12,6 +13,8 @@ from typing import Any
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..application.securities import LookupResult
+from ..domain.securities import Listing, asset_class_from_figi, yahoo_symbol
 from ..domain.universe import YAHOO_SUFFIX
 
 log = logging.getLogger(__name__)
@@ -56,3 +59,64 @@ def _figi_ticker(answer: Any) -> str | None:
         return None
     ticker = data[0].get("ticker")
     return ticker if isinstance(ticker, str) and ticker else None
+
+
+# --- D2.1: Listings je ISIN fuer Suche und Aufloesung (Port ``ListingLookup``) -----------
+
+MAX_LISTINGS = 10  # ohne exchCode liefert OpenFIGI bis zu 300 Listings je Aktie
+
+
+def lookup_from_figi(*answers: Any) -> LookupResult | None:
+    """Antworten von OpenFIGI (zuerst die mit ``exchCode`` Xetra, dann die ohne) -> Name,
+    Anlageklasse und Listings. Nur Listings mit Yahoo-Symbol, ausser es gibt keines (Anleihe)."""
+    entries = [
+        entry
+        for answer in answers
+        if isinstance(answer, dict) and isinstance(answer.get("data"), list)
+        for entry in answer["data"]
+        if isinstance(entry, dict)
+    ]
+    if not entries:
+        return None
+    first = entries[0]
+    listings: list[Listing] = []
+    seen: set[tuple[str | None, str | None]] = set()
+    for entry in entries:
+        ticker, exchange = entry.get("ticker"), entry.get("exchCode")
+        symbol = yahoo_symbol(ticker, exchange)
+        key = (symbol, None if symbol else exchange)
+        if key in seen:
+            continue
+        seen.add(key)
+        listings.append(Listing(symbol=symbol, ticker=ticker, exchange=exchange))
+    with_symbol = [listing for listing in listings if listing.symbol]
+    return LookupResult(
+        name=str(first.get("name") or first.get("ticker") or ""),
+        asset_class=asset_class_from_figi(first.get("securityType2")),
+        listings=tuple((with_symbol or listings)[:MAX_LISTINGS]),
+    )
+
+
+class OpenFigiLookup:
+    """``ListingLookup`` ueber OpenFIGI, ohne API-Key. Wirft bei Ausfall.
+
+    Ein Versuch mit kurzem Timeout, ohne die Wiederholungen von ``openfigi_post``: Die Anfrage kommt
+    per Request/Reply aus dem UI, das web-api wartet nicht laenger, und die Anfragen an market-data
+    laufen nacheinander.
+    """
+
+    def __init__(self, *, timeout: float = 8.0) -> None:
+        self._timeout = timeout
+
+    def lookup(self, isin: str) -> LookupResult | None:
+        jobs = [
+            {"idType": "ID_ISIN", "idValue": isin, "exchCode": OPENFIGI_EXCHANGE},
+            {"idType": "ID_ISIN", "idValue": isin},
+        ]
+        response = requests.post(OPENFIGI_URL, json=jobs, timeout=self._timeout)
+        response.raise_for_status()
+        answers = response.json()
+        if not isinstance(answers, list):
+            msg = f"OpenFIGI: unerwartete Antwort {answers!r}"
+            raise TypeError(msg)
+        return lookup_from_figi(*answers)

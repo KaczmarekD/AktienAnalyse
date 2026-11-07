@@ -43,6 +43,19 @@ export const zActiveProfileRef = z.object({
 });
 
 /**
+ * BondTerms
+ *
+ * Ausstattung einer Anleihe aus ESMA FIRDS.
+ */
+export const zBondTerms = z.object({
+  coupon: z.number().nullable(),
+  denomination: z.number().nullable(),
+  floating: z.boolean(),
+  maturity: z.iso.date().nullable(),
+  seniority: z.string().nullable(),
+});
+
+/**
  * DataExport
  *
  * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
@@ -97,6 +110,18 @@ export const zHealth = z.object({
   auth_required: z.boolean(),
   status: z.literal('ok'),
   version: z.string(),
+});
+
+/**
+ * Listing
+ *
+ * Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.
+ */
+export const zListing = z.object({
+  currency: z.string().nullable(),
+  exchange: z.string().nullable(),
+  symbol: z.string().nullable(),
+  ticker: z.string().nullable(),
 });
 
 /**
@@ -453,6 +478,36 @@ export const zScorePoint = z.object({
 });
 
 /**
+ * Security
+ *
+ * Ein Wertpapier mit Stammdaten, Listings und dem Listing fuer den Datenabruf.
+ */
+export const zSecurity = z.object({
+  asset_class: z.enum(['equity', 'etf', 'bond', 'other']),
+  bond: zBondTerms.nullable(),
+  cfi: z.string().nullable(),
+  currency: z.string().nullable(),
+  isin: z.string(),
+  lei: z.string().nullable(),
+  listing: zListing.nullable(),
+  listings: z.array(zListing),
+  name: z.string(),
+});
+
+/**
+ * SecurityHit
+ *
+ * Ein Treffer der Suche. Treffer der Yahoo-Suche haben keine ISIN.
+ */
+export const zSecurityHit = z.object({
+  asset_class: z.enum(['equity', 'etf', 'bond', 'other']),
+  isin: z.string().nullable(),
+  listings: z.array(zListing),
+  name: z.string(),
+  source: z.string(),
+});
+
+/**
  * SessionInfo
  *
  * Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage.
@@ -764,3 +819,27 @@ export const zActivateProfileVersionPath = z.object({
  * Successful Response
  */
 export const zActivateProfileVersionResponse = zActivatedProfile;
+
+export const zSearchSecuritiesQuery = z.object({
+  q: z.string().min(3).max(100),
+});
+
+/**
+ * Response Search Securities
+ *
+ * Successful Response
+ */
+export const zSearchSecuritiesResponse = z.array(zSecurityHit);
+
+export const zGetSecurityPath = z.object({
+  isin: z.string().length(12),
+});
+
+export const zGetSecurityQuery = z.object({
+  symbol: z.string().max(40).nullish(),
+});
+
+/**
+ * Successful Response
+ */
+export const zGetSecurityResponse = zSecurity;

@@ -45,6 +45,7 @@ from ..domain.metrics import (
     compute_metrics,
 )
 from ..domain.periods import period_end
+from ..domain.securities import AssetClass, Listing, SecurityHit
 from ..domain.universe import Ticker
 
 log = logging.getLogger(__name__)
@@ -159,6 +160,17 @@ PRICE_FIELDS: dict[str, str] = {
     "dividend": "Dividends",
     "split": "Stock Splits",
 }
+
+# Suche nach Wertpapieren (D2.1): eigener Name -> Schluessel in yf.Search(...).quotes.
+# Reihenfolge in "name" = Vorrang
+SEARCH_FIELDS: dict[str, tuple[str, ...]] = {
+    "symbol": ("symbol",),
+    "name": ("longname", "shortname"),
+    "type": ("quoteType",),
+    "exchange": ("exchange",),
+}
+# quoteType -> Anlageklasse; andere Typen (Index, Waehrung, Future) sind keine Wertpapiere
+SEARCH_TYPES: dict[str, AssetClass] = {"EQUITY": "equity", "ETF": "etf", "MUTUALFUND": "etf"}
 
 
 @dataclass
@@ -732,3 +744,54 @@ class YahooFundamentals:
 
     def fetch(self, ticker: Ticker, history: HistoryState | None = None) -> Fundamentals:
         return fetch_one(ticker, self.cfg, history=history)
+
+
+# --- D2.1: Suche nach Name oder Symbol (Port ``TextSearch``) ------------------------------
+
+
+def _quote_value(quote: dict[str, Any], key: str) -> str | None:
+    for field in SEARCH_FIELDS[key]:
+        value = quote.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def hits_from_yahoo_search(quotes: list[Any]) -> list[SecurityHit]:
+    """Treffer von ``yf.Search``: nur Aktien und Fonds, ohne ISIN (Yahoo nennt keine)."""
+    hits: list[SecurityHit] = []
+    for quote in quotes:
+        if not isinstance(quote, dict):
+            continue
+        asset_class = SEARCH_TYPES.get(_quote_value(quote, "type") or "")
+        symbol = _quote_value(quote, "symbol")
+        if asset_class is None or symbol is None:
+            continue
+        listing = Listing(symbol=symbol, ticker=symbol, exchange=_quote_value(quote, "exchange"))
+        hits.append(
+            SecurityHit(
+                isin=None,
+                name=_quote_value(quote, "name") or symbol,
+                asset_class=asset_class,
+                listings=(listing,),
+                source="yahoo",
+            )
+        )
+    return hits
+
+
+class YahooTextSearch:
+    """``TextSearch`` ueber ``yf.Search``.
+
+    Bewusst ohne ``_yahoo_errors_raised``: Die Suche laeuft in den Threads des Request/Reply, auch
+    waehrend des Wochenlaufs, und die Einstellung von yfinance gilt global. Verschluckt yfinance
+    einen Fehler, kommt eine leere Liste; der Anwendungsfall behaelt leere Ergebnisse deshalb
+    nicht im Speicher.
+    """
+
+    def __init__(self, *, timeout: int = 8) -> None:
+        self._timeout = timeout
+
+    def search(self, text: str, limit: int) -> list[SecurityHit]:
+        quotes = yf.Search(text, max_results=limit, news_count=0, timeout=self._timeout).quotes
+        return hits_from_yahoo_search(list(quotes or []))[:limit]

@@ -46,6 +46,9 @@ import type {
   GetRunData,
   GetRunErrors,
   GetRunResponses,
+  GetSecurityData,
+  GetSecurityErrors,
+  GetSecurityResponses,
   HealthData,
   HealthResponses,
   LatestRankingData,
@@ -87,6 +90,9 @@ import type {
   SaveProfileVersionData,
   SaveProfileVersionErrors,
   SaveProfileVersionResponses,
+  SearchSecuritiesData,
+  SearchSecuritiesErrors,
+  SearchSecuritiesResponses,
   StartRunData,
   StartRunErrors,
   StartRunResponses,
@@ -121,6 +127,9 @@ import {
   zGetReportResponse,
   zGetRunPath,
   zGetRunResponse,
+  zGetSecurityPath,
+  zGetSecurityQuery,
+  zGetSecurityResponse,
   zHealthResponse,
   zLatestRankingResponse,
   zListFactorsResponse,
@@ -144,6 +153,8 @@ import {
   zSaveProfileVersionHeaders,
   zSaveProfileVersionPath,
   zSaveProfileVersionResponse,
+  zSearchSecuritiesQuery,
+  zSearchSecuritiesResponse,
   zStartRunBody,
   zStartRunResponse,
   zUpdateProfileBody,
@@ -869,4 +880,48 @@ export const activateProfileVersion = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Search Securities
+ *
+ * Sucht in den eigenen Wertpapieren, bei OpenFIGI (ISIN, WKN) und bei Yahoo (Text).
+ */
+export const searchSecurities = <ThrowOnError extends boolean = false>(
+  options: Options<SearchSecuritiesData, ThrowOnError>,
+): RequestResult<SearchSecuritiesResponses, SearchSecuritiesErrors, ThrowOnError> =>
+  (options.client ?? client).get<SearchSecuritiesResponses, SearchSecuritiesErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: zSearchSecuritiesQuery,
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zSearchSecuritiesResponse.parseAsync(data),
+    url: '/api/v1/securities/search',
+    ...options,
+  });
+
+/**
+ * Get Security
+ *
+ * Stammdaten und Listings; ``symbol`` waehlt ein anderes Listing als Xetra.
+ */
+export const getSecurity = <ThrowOnError extends boolean = false>(
+  options: Options<GetSecurityData, ThrowOnError>,
+): RequestResult<GetSecurityResponses, GetSecurityErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetSecurityResponses, GetSecurityErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zGetSecurityPath,
+          query: zGetSecurityQuery.optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zGetSecurityResponse.parseAsync(data),
+    url: '/api/v1/securities/{isin}',
+    ...options,
   });

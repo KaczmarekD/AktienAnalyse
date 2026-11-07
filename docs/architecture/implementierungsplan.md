@@ -3480,3 +3480,71 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
 **Fertig, wenn:** jeder Zugriff eine Anmeldung braucht, Admin und Nutzer getrennte Rechte haben,
 der E2E-Test mit Testnutzer grün ist und das Runbook HTTPS über DSM beschreibt. Die Samstags-Mail
 und ihr Golden-Master bleiben unverändert.
+
+#### Stufe D2 – Wertpapiere, Suche, Abdeckung, Tageskurse
+
+Spezifikation: [depot/wertpapiere.md](depot/wertpapiere.md). Geschnitten am 07.11.2026 in vier
+Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail; das sichern die
+Golden-Master und die Replay-Fixtures.
+
+- **Ausgangslage im Code:** market-data kennt nur `market_data.instrument` (Symbol eindeutig, ISIN
+  nachtragbar) und den Adapter `openfigi.py` für Neuaufnahmen im Universum. market-data hat noch
+  kein Request/Reply. Migrationen: Track F nummeriert ab 0018; wer zuerst merged, nimmt die
+  nächste freie Nummer, der andere setzt seine `down_revision` beim Rebase um.
+
+**D2.1 Wertpapiere und Suche** (WP-01, 02, 03, 04, 07)
+- **Test:**
+  - Domain: Anlageklasse aus CFI-Code (`E…` Aktie, `C…` Fonds, `D…` Anleihe, sonst `other`) und
+    ersatzweise aus OpenFIGI `securityType2`; ISIN-Prüfziffer; WKN erkennen; Wahl des Listings
+    (Xetra `GY`, sonst Heimatbörse, sonst das erste).
+  - Suche: eigene Wertpapiere zuerst, dann OpenFIGI (ISIN, WKN), dann yfinance-Suche (Name,
+    Symbol); ein Ausfall einer Quelle liefert die Treffer der anderen; 24-h-Cache im Speicher;
+    unter drei Zeichen keine Suche. Quellen als Fakes hinter Ports.
+  - DB: `security`, `security_master` (neue Zeile nur bei geändertem Inhalt), `listing`; Löschschutz;
+    `va_market_data` darf anfügen, `va_read` lesen (keine persönlichen Daten).
+  - RPC `rpc.va.marketdata.securities.search` und `.resolve`, Golden-Schemas; web-api
+    `GET /api/v1/securities/search?q=` und `GET /api/v1/securities/{isin}` (angemeldet, 503 ohne
+    market-data, 404 unbekannt, 422 bei ungültiger ISIN); NATS-Rechte: market-data antwortet auf
+    `rpc.va.marketdata.>`, nur das web-api fragt.
+- **Implementierung:** Ports `SecuritySearch` und `SecurityMasterSource` in
+  `va_market_data.application`, Adapter OpenFIGI (Suche mit `exchCode`), yfinance-Suche,
+  ESMA FIRDS (Anlageklasse, LEI, Anleihe-Stammdaten); `entrypoints/rpc.py` in market-data;
+  `RemoteSecurities` im web-api. Die Suche schreibt nichts; `resolve` speichert Wertpapier,
+  Stammdaten und Listing.
+- **Review:** `/code-review high`.
+- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+  - **ISIN aus der WKN:** OpenFIGI liefert zur WKN keine ISIN; deutsche ISINs enthalten sie
+    (`DE000` + WKN + Prüfziffer). `valid_isin` steht in `va_contracts.securities`, weil web-api
+    (422) und market-data dieselbe Prüfziffer prüfen.
+  - **Yahoo-Suche ohne `_yahoo_errors_raised`:** Die Einstellung von yfinance gilt global, die
+    Suche läuft in Threads parallel zum Wochenlauf. Leere Treffer bleiben deshalb nicht im
+    Speicher, denn yfinance meldet manche Fehler als leere Liste.
+  - **Quelle der Stammdaten:** `security_master.source` ist `firds` oder `openfigi` (Ersatz
+    ohne FIRDS); je Quelle eine neue Zeile nur bei geändertem Inhalt.
+  - **Kein UI in D2.1:** Die Suche bekommt ihre Oberfläche mit der Erfassung von Depots (D3).
+
+**D2.2 Abdeckung im Wochenlauf** (WP-05, 09, 13 teilweise)
+- **Test:** `coverage_version`/`coverage_item`; `fundamental_snapshot.role` (`universe` Standard,
+  `coverage`); Wochenlauf ruft die Aktien der Abdeckung zusätzlich ab und schickt sie in
+  `covered[]`; alle Lesewege (Snapshots, Backfill, `scoring.input_snapshot`, Vorschau, Rescore,
+  Replay) sehen nur `universe`; Mail, CSV und Ranking byte-gleich zum Lauf ohne Abdeckung.
+- **Implementierung:** Kommando `python -m va_market_data.coverage set <isin>…` bis portfolio die
+  Abdeckung meldet (D3); `IdentityV1.index = "-"` für Abdeckungstitel; Watchdog-Grenze für den
+  Abruf wächst mit der Abdeckung (je Titel ein Zuschlag, einstellbar).
+- **Review:** `/code-review high`.
+
+**D2.3 Tageskurse** (WP-06, 11)
+- **Test:** `price_run`, `daily_close` (eindeutig je ISIN, Quelle, Tag), `fx_daily`; Sammelabruf
+  über `yf.download`, Feiertag ohne neue Kurse, Titel ohne Kurs, Fremdwährung und `GBp`;
+  Scheduler im web-api (Handelstage 22:30 `Europe/Berlin`) schickt `marketdata.prices.requested`,
+  market-data antwortet mit `marketdata.prices.completed`.
+- **Review:** `/code-review high`.
+
+**D2.4 ETF- und Anleihedaten** (WP-08, 10)
+- **Test:** `etf_composition` aus den Anbieterdateien (iShares JSON, Deka XLSX) und yfinance
+  `funds_data`; Anleihe-Stammdaten aus FIRDS; Kurse der Bundesanleihen aus der Liste der
+  Bundesbank; `marketdata.securities.updated`.
+- **Review:** `/code-review high`.
+
+**Fertig, wenn:** die Suche Aktie, ETF und Anleihe findet und der Wochenlauf mit `covered[]`
+dieselbe Mail liefert.

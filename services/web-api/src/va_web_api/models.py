@@ -358,3 +358,50 @@ class PasswordReset(_Model):
     """Neues Einmal-Passwort; alle Sitzungen des Kontos enden."""
 
     one_time_password: str = Field(min_length=1, max_length=PASSWORD_MAX)
+
+
+# D2.1: Wertpapiere ueber die ISIN (docs/architecture/depot/wertpapiere.md)
+AssetClass = Literal["equity", "etf", "bond", "other"]
+
+
+class Listing(_Model):
+    """Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt."""
+
+    symbol: str | None
+    ticker: str | None
+    exchange: str | None
+    currency: str | None
+
+
+class SecurityHit(_Model):
+    """Ein Treffer der Suche. Treffer der Yahoo-Suche haben keine ISIN."""
+
+    isin: str | None
+    name: str
+    asset_class: AssetClass
+    listings: list[Listing]
+    source: str  # catalog, openfigi, yahoo; weitere Quellen ohne neue API-Version
+
+
+class BondTerms(_Model):
+    """Ausstattung einer Anleihe aus ESMA FIRDS."""
+
+    coupon: float | None
+    maturity: date | None
+    denomination: float | None
+    seniority: str | None
+    floating: bool
+
+
+class Security(_Model):
+    """Ein Wertpapier mit Stammdaten, Listings und dem Listing fuer den Datenabruf."""
+
+    isin: str
+    name: str
+    asset_class: AssetClass
+    currency: str | None
+    lei: str | None
+    cfi: str | None
+    bond: BondTerms | None
+    listings: list[Listing]
+    listing: Listing | None

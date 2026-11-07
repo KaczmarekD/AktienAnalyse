@@ -1,0 +1,280 @@
+{
+  "$defs": {
+    "BondTermsV1": {
+      "description": "Ausstattung einer Anleihe aus ESMA FIRDS; Kupontermine und Zinsmethode fehlen dort.",
+      "properties": {
+        "coupon": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Coupon"
+        },
+        "denomination": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Denomination"
+        },
+        "floating": {
+          "default": false,
+          "title": "Floating",
+          "type": "boolean"
+        },
+        "maturity": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maturity"
+        },
+        "seniority": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seniority"
+        }
+      },
+      "title": "BondTermsV1",
+      "type": "object"
+    },
+    "ListingV1": {
+      "description": "Handel an einem Boersenplatz. ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.",
+      "properties": {
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "exchange": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exchange"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbol"
+        },
+        "ticker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ticker"
+        }
+      },
+      "title": "ListingV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    },
+    "SecurityV1": {
+      "description": "Ein aufgeloestes Wertpapier mit Stammdaten, Listings und dem gewaehlten Listing.",
+      "properties": {
+        "asset_class": {
+          "enum": [
+            "equity",
+            "etf",
+            "bond",
+            "other"
+          ],
+          "title": "Asset Class",
+          "type": "string"
+        },
+        "bond": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BondTermsV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cfi": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cfi"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "lei": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lei"
+        },
+        "listing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ListingV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "listings": {
+          "items": {
+            "$ref": "#/$defs/ListingV1"
+          },
+          "title": "Listings",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin",
+        "name",
+        "asset_class"
+      ],
+      "title": "SecurityV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "security": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecurityV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "SecurityResolveReplyV1",
+  "type": "object"
+}

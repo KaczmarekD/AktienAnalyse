@@ -15,6 +15,7 @@ from pydantic import ConfigDict, Field
 
 from ..base import Contract, PositiveId
 from ..profile import ProfileParamsV1
+from ..securities import IsinStr, SecurityHitV1, SecurityV1
 
 # no_data: noch kein Bewertungslauf fuer die Vorschau; invalid: Anfrage passt nicht zum Modell;
 # internal: Exception beim Antwortenden (Details nur im Log des Workers)
@@ -185,6 +186,30 @@ class ReportCsvReplyV1(RpcReplyV1):
     content: bytes | None = None  # die CSV-Datei mit BOM
 
 
+# -- marketdata.securities.search / .resolve (D2.1) -------------------------------------
+
+
+class SecuritySearchRequestV1(Contract):
+    """ISIN, WKN, Name oder Symbol; unter drei Zeichen sucht market-data nicht."""
+
+    query: str = Field(min_length=1, max_length=100)
+
+
+class SecuritySearchReplyV1(RpcReplyV1):
+    hits: list[SecurityHitV1] = Field(default_factory=list)
+
+
+class SecurityResolveRequestV1(Contract):
+    """``symbol``: ein vom Nutzer gewaehltes Listing statt Xetra oder Heimatboerse (WP-03)."""
+
+    isin: IsinStr
+    symbol: str | None = Field(default=None, max_length=40)
+
+
+class SecurityResolveReplyV1(RpcReplyV1):
+    security: SecurityV1 | None = None  # leer: unbekannte ISIN
+
+
 # -- Katalog ------------------------------------------------------------------------------
 
 
@@ -210,6 +235,12 @@ PROFILE_LIST = RpcSpec("scoring.profiles.list", ProfilesRequestV1, ProfilesReply
 PROFILE_GET = RpcSpec("scoring.profiles.get", ProfileGetRequestV1, ProfileReplyV1)
 REPORT_GET = RpcSpec("notification.report", ReportRequestV1, ReportReplyV1)
 REPORT_CSV = RpcSpec("notification.report.csv", ReportRequestV1, ReportCsvReplyV1)
+SECURITIES_SEARCH = RpcSpec(
+    "marketdata.securities.search", SecuritySearchRequestV1, SecuritySearchReplyV1
+)
+SECURITIES_RESOLVE = RpcSpec(
+    "marketdata.securities.resolve", SecurityResolveRequestV1, SecurityResolveReplyV1
+)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -222,6 +253,8 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         PROFILE_GET,
         REPORT_GET,
         REPORT_CSV,
+        SECURITIES_SEARCH,
+        SECURITIES_RESOLVE,
     )
 }
 
@@ -235,6 +268,8 @@ __all__ = [
     "RPCS",
     "SCORING_FACTORS",
     "SCORING_PREVIEW",
+    "SECURITIES_RESOLVE",
+    "SECURITIES_SEARCH",
     "ActivateReplyV1",
     "ActivateRequestV1",
     "FactorV1",
@@ -261,4 +296,8 @@ __all__ = [
     "RpcSpec",
     "SaveVersionReplyV1",
     "SaveVersionRequestV1",
+    "SecurityResolveReplyV1",
+    "SecurityResolveRequestV1",
+    "SecuritySearchReplyV1",
+    "SecuritySearchRequestV1",
 ]

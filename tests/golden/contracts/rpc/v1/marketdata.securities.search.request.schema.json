@@ -1,0 +1,16 @@
+{
+  "description": "ISIN, WKN, Name oder Symbol; unter drei Zeichen sucht market-data nicht.",
+  "properties": {
+    "query": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Query",
+      "type": "string"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "title": "SecuritySearchRequestV1",
+  "type": "object"
+}

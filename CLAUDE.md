@@ -80,7 +80,8 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
 **web-api** (`services/web-api`, FastAPI, Einstieg `va_web_api.main:create_app`):
 - Liest REST aus den Projektionen (Port `ReadModel`, `ProjectionReadModel`). Die Historie aus der
   Zeit vor den Projektionen füllt `src.db.backfill` bei jeder Migration nach.
-- Profile, Vorschau und Reports holt es per Request/Reply bei ihren Besitzern (`va_web_api.rpc`).
+- Profile, Vorschau und Reports holt es per Request/Reply bei ihren Besitzern (`va_web_api.rpc`),
+  seit D2.1 auch Suche und Auflösung von Wertpapieren bei market-data (`/securities`).
   Die Vorschau rechnet scoring aus seiner Kopie der Eingangsdaten (`scoring.input_snapshot`).
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
@@ -256,6 +257,7 @@ ein Baustein, kommt er zuerst in den Styleguide.
 - `INFO_FIELDS`: Schlüssel in `info` (`marketCap`, `currentPrice` …), Reihenfolge = Vorrang
 - `FX_FIELDS`: Aufbau des FX-Symbols (`…=X`) und das Feld `lastPrice` in `fast_info`
 - `CONSENSUS_FIELDS`, `QUARTERLY_FIELDS` und `PRICE_FIELDS`: Zusatzdaten (ADR-0010)
+- `SEARCH_FIELDS` und `SEARCH_TYPES`: Treffer von `yf.Search` (D2.1)
 
 yfinance benennt unangekündigt um ("Total Revenue" → "TotalRevenue") – wenn
 das passiert, ist dort die einzige zu ändernde Stelle.
@@ -504,7 +506,12 @@ Es landet im Versandprotokoll. Eine Mail an eine andere Adresse geht schon heute
   am Kopf von `va_market_data/adapters/ishares.py` anpassen.
 - **Deka-ETF-XLSX**: Blatt „Indexzusammensetzung“, nur ISIN/WKN.
 - **OpenFIGI**: ISIN → Xetra-Ticker für Neuaufnahmen, die noch nicht in der
-  CSV stehen; ohne API-Key (10 ISINs pro Request).
+  CSV stehen; ohne API-Key (10 ISINs pro Request). Seit D2.1 auch Name, Anlageklasse und
+  Listings je ISIN für die Suche (`OpenFigiLookup`). Zur WKN liefert OpenFIGI keine ISIN;
+  market-data rechnet die deutsche ISIN aus (`DE000` + WKN + Prüfziffer).
+- **ESMA FIRDS** (seit D2.1): Stammdaten je ISIN (CFI-Code, LEI, Anleihe-Ausstattung) über
+  die Suche des Registers, nicht als API dokumentiert, ohne Schlüssel. Die Feldnamen stehen
+  nur in `FIELDS` am Kopf von `va_market_data/adapters/firds.py`.
 - Keine dieser Quellen erlaubt automatisierten Abruf ausdrücklich; robots.txt
   sperrt die genutzten Pfade nicht. Private Nutzung, 1× pro Woche.
 - **Gmail SMTP**: kostenlos bis ~500 Mails/Tag; App-Passwort erforderlich.

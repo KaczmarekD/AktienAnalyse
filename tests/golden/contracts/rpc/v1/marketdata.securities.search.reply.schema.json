@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "ListingV1": {
+      "description": "Handel an einem Boersenplatz. ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.",
+      "properties": {
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "exchange": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exchange"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbol"
+        },
+        "ticker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ticker"
+        }
+      },
+      "title": "ListingV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    },
+    "SecurityHitV1": {
+      "description": "Ein Treffer der Suche. Treffer der Yahoo-Suche haben keine ISIN.",
+      "properties": {
+        "asset_class": {
+          "enum": [
+            "equity",
+            "etf",
+            "bond",
+            "other"
+          ],
+          "title": "Asset Class",
+          "type": "string"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Isin"
+        },
+        "listings": {
+          "items": {
+            "$ref": "#/$defs/ListingV1"
+          },
+          "title": "Listings",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin",
+        "name",
+        "asset_class",
+        "source"
+      ],
+      "title": "SecurityHitV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "hits": {
+      "items": {
+        "$ref": "#/$defs/SecurityHitV1"
+      },
+      "title": "Hits",
+      "type": "array"
+    }
+  },
+  "title": "SecuritySearchReplyV1",
+  "type": "object"
+}

@@ -135,6 +135,70 @@
         "title": "ActiveProfileRef",
         "type": "object"
       },
+      "BondTerms": {
+        "additionalProperties": false,
+        "description": "Ausstattung einer Anleihe aus ESMA FIRDS.",
+        "properties": {
+          "coupon": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coupon"
+          },
+          "denomination": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denomination"
+          },
+          "floating": {
+            "title": "Floating",
+            "type": "boolean"
+          },
+          "maturity": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maturity"
+          },
+          "seniority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seniority"
+          }
+        },
+        "required": [
+          "coupon",
+          "maturity",
+          "denomination",
+          "seniority",
+          "floating"
+        ],
+        "title": "BondTerms",
+        "type": "object"
+      },
       "DataExport": {
         "additionalProperties": false,
         "description": "Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.",
@@ -442,6 +506,64 @@
           "score_history"
         ],
         "title": "Instrument",
+        "type": "object"
+      },
+      "Listing": {
+        "additionalProperties": false,
+        "description": "Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.",
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "symbol",
+          "ticker",
+          "exchange",
+          "currency"
+        ],
+        "title": "Listing",
         "type": "object"
       },
       "LoginRequest": {
@@ -2210,6 +2332,154 @@
         "title": "ScorePoint",
         "type": "object"
       },
+      "Security": {
+        "additionalProperties": false,
+        "description": "Ein Wertpapier mit Stammdaten, Listings und dem Listing fuer den Datenabruf.",
+        "properties": {
+          "asset_class": {
+            "enum": [
+              "equity",
+              "etf",
+              "bond",
+              "other"
+            ],
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "bond": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BondTerms"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cfi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfi"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lei"
+          },
+          "listing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Listing"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/Listing"
+            },
+            "title": "Listings",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "isin",
+          "name",
+          "asset_class",
+          "currency",
+          "lei",
+          "cfi",
+          "bond",
+          "listings",
+          "listing"
+        ],
+        "title": "Security",
+        "type": "object"
+      },
+      "SecurityHit": {
+        "additionalProperties": false,
+        "description": "Ein Treffer der Suche. Treffer der Yahoo-Suche haben keine ISIN.",
+        "properties": {
+          "asset_class": {
+            "enum": [
+              "equity",
+              "etf",
+              "bond",
+              "other"
+            ],
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/Listing"
+            },
+            "title": "Listings",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "isin",
+          "name",
+          "asset_class",
+          "listings",
+          "source"
+        ],
+        "title": "SecurityHit",
+        "type": "object"
+      },
       "SessionInfo": {
         "additionalProperties": false,
         "description": "Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage.",
@@ -3862,6 +4132,134 @@
         "summary": "Activate Profile Version",
         "tags": [
           "scoring"
+        ]
+      }
+    },
+    "/api/v1/securities/search": {
+      "get": {
+        "description": "Sucht in den eigenen Wertpapieren, bei OpenFIGI (ISIN, WKN) und bei Yahoo (Text).",
+        "operationId": "search_securities",
+        "parameters": [
+          {
+            "description": "ISIN, WKN, Name, Symbol",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "ISIN, WKN, Name, Symbol",
+              "maxLength": 100,
+              "minLength": 3,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityHit"
+                  },
+                  "title": "Response Search Securities",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "market-data nicht erreichbar"
+          }
+        },
+        "summary": "Search Securities",
+        "tags": [
+          "securities"
+        ]
+      }
+    },
+    "/api/v1/securities/{isin}": {
+      "get": {
+        "description": "Stammdaten und Listings; ``symbol`` waehlt ein anderes Listing als Xetra.",
+        "operationId": "get_security",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "maxLength": 12,
+              "minLength": 12,
+              "title": "Isin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Security"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "market-data nicht erreichbar"
+          }
+        },
+        "summary": "Get Security",
+        "tags": [
+          "securities"
         ]
       }
     }

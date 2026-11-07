@@ -2,8 +2,9 @@
 
 > **Status:** Spezifikation, Entwurf vom 04.11.2026. Teil der
 > [Depot-Spezifikation](README.md), Stufe D2. Grundsatzentscheidung:
-> [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (vorgeschlagen). Datenquellen:
-> [Recherche 11/2026](../../research/2026-11-depot-datenquellen-und-bankzugang.md).
+> [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (angenommen am 06.11.2026).
+> Datenquellen: [Recherche 11/2026](../../research/2026-11-depot-datenquellen-und-bankzugang.md).
+> Umgesetzt: Suche und Auflösung (D2.1, `security`, `security_master`, `listing`).
 
 ## Ausgangslage
 
@@ -75,6 +76,11 @@ market-data: eigene Wertpapiere → OpenFIGI (ISIN/WKN → Listings) → yfinanc
 
 - OpenFIGI wird heute schon für Neuaufnahmen im Universum genutzt (ohne Schlüssel, 10 ISINs je
   Anfrage, Adapter `openfigi.py`).
+- **WKN:** OpenFIGI liefert zur WKN keine ISIN. Deutsche ISINs enthalten die WKN
+  (`DE000` + WKN + Prüfziffer), daraus rechnet market-data die ISIN aus. Für ausländische
+  Papiere mit WKN findet die Suche so nichts; dann hilft die ISIN oder der Name.
+- **Treffer der Yahoo-Suche** haben keine ISIN (Yahoo nennt keine). Sie zeigen Name,
+  Anlageklasse und Symbol; übernommen wird ein Wertpapier über seine ISIN.
 - Die Suche schreibt nichts. Gespeichert wird ein Wertpapier erst, wenn es in die Abdeckung kommt.
 - Ergebnisse werden 24 h im Speicher gehalten, damit Tippen im Suchfeld keine Rate-Limits trifft.
   Das UI sucht erst ab drei Zeichen und wartet 300 ms nach der letzten Taste.

@@ -32,6 +32,8 @@ import type {
   GetReportResponse,
   GetRunData,
   GetRunResponse,
+  GetSecurityData,
+  GetSecurityResponse,
   HealthData,
   HealthResponse,
   LatestRankingData,
@@ -60,6 +62,8 @@ import type {
   RevokeAllSessionsResponse,
   SaveProfileVersionData,
   SaveProfileVersionResponse,
+  SearchSecuritiesData,
+  SearchSecuritiesResponse,
   StartRunData,
   StartRunResponse,
   UpdateProfileData,
@@ -508,6 +512,36 @@ export const activateProfileVersionRequest = <ThrowOnError extends boolean = fal
   });
 
 /**
+ * Search Securities
+ *
+ * Sucht in den eigenen Wertpapieren, bei OpenFIGI (ISIN, WKN) und bei Yahoo (Text).
+ */
+export const searchSecuritiesRequest = <ThrowOnError extends boolean = false>(
+  options: Options<SearchSecuritiesData, ThrowOnError>,
+): HttpRequest<SearchSecuritiesResponse> =>
+  (options?.client ?? client).requestOptions<SearchSecuritiesResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/securities/search',
+    ...options,
+  });
+
+/**
+ * Get Security
+ *
+ * Stammdaten und Listings; ``symbol`` waehlt ein anderes Listing als Xetra.
+ */
+export const getSecurityRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetSecurityData, ThrowOnError>,
+): HttpRequest<GetSecurityResponse> =>
+  (options?.client ?? client).requestOptions<GetSecurityResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/securities/{isin}',
+    ...options,
+  });
+
+/**
  * List Users
  *
  * Alle Konten in der Reihenfolge, in der sie angelegt wurden.
@@ -886,4 +920,30 @@ export const activateProfileVersionResource = <ThrowOnError extends boolean = fa
   httpResource<ActivateProfileVersionResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? activateProfileVersionRequest(opts) : undefined;
+  });
+
+/**
+ * Search Securities
+ *
+ * Sucht in den eigenen Wertpapieren, bei OpenFIGI (ISIN, WKN) und bei Yahoo (Text).
+ */
+export const searchSecuritiesResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<SearchSecuritiesData, ThrowOnError> | undefined,
+) =>
+  httpResource<SearchSecuritiesResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? searchSecuritiesRequest(opts) : undefined;
+  });
+
+/**
+ * Get Security
+ *
+ * Stammdaten und Listings; ``symbol`` waehlt ein anderes Listing als Xetra.
+ */
+export const getSecurityResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<GetSecurityData, ThrowOnError> | undefined,
+) =>
+  httpResource<GetSecurityResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? getSecurityRequest(opts) : undefined;
   });

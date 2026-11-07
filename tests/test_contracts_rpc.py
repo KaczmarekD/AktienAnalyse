@@ -58,6 +58,9 @@ class TestCatalog:
             "scoring.profiles.get",
             "notification.report",
             "notification.report.csv",
+            # D2.1: Wertpapiere suchen und aufloesen (market-data)
+            "marketdata.securities.search",
+            "marketdata.securities.resolve",
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 
@@ -193,3 +196,59 @@ class TestReads:
         assert ProfileGetRequestV1(profile_id=1).profile_id == 1
         assert ProfilesRequestV1() == ProfilesRequestV1()
         assert ReportRequestV1(report_id=3).report_id == 3
+
+
+class TestSecurities:
+    """D2.1: Suche und Aufloesung bei market-data; die Modelle stehen in ``va_contracts.securities``,
+    damit spaeter auch Events (``marketdata.securities.updated``) sie nutzen."""
+
+    def test_a_search_round_trips(self):
+        from va_contracts.rpc.v1 import SecuritySearchReplyV1
+        from va_contracts.securities import ListingV1, SecurityHitV1
+
+        reply = SecuritySearchReplyV1(
+            hits=[
+                SecurityHitV1(
+                    isin=None,
+                    name="iShares Core MSCI World",
+                    asset_class="etf",
+                    listings=[ListingV1(symbol="EUNL.DE", ticker="EUNL", exchange="GER")],
+                    source="yahoo",
+                )
+            ]
+        )
+        assert SecuritySearchReplyV1.model_validate_json(reply.model_dump_json()) == reply
+
+    def test_a_resolved_bond_round_trips(self):
+        from va_contracts.rpc.v1 import SecurityResolveReplyV1
+        from va_contracts.securities import BondTermsV1, SecurityV1
+
+        reply = SecurityResolveReplyV1(
+            security=SecurityV1(
+                isin="DE000A383J95",
+                name="DB 4.000 7/12/28",
+                asset_class="bond",
+                currency="EUR",
+                lei="7LTWFZYICNSX8D621K86",
+                cfi="DTVUGB",
+                bond=BondTermsV1(
+                    coupon=4.0,
+                    maturity=date(2028, 7, 12),
+                    denomination=100000.0,
+                    seniority="SNDB",
+                    floating=True,
+                ),
+                listings=[],
+                listing=None,
+            )
+        )
+        assert SecurityResolveReplyV1.model_validate_json(reply.model_dump_json()) == reply
+
+    def test_the_request_checks_the_isin_format(self):
+        from pydantic import ValidationError
+
+        from va_contracts.rpc.v1 import SecurityResolveRequestV1
+
+        assert SecurityResolveRequestV1(isin="US0378331005").isin == "US0378331005"
+        with pytest.raises(ValidationError):
+            SecurityResolveRequestV1(isin="kein-isin")

@@ -2,7 +2,8 @@
 
 Baut die Adapter aus den eigenen Settings (Datenbank, iShares/Deka/CSV oder Replay, Yahoo) und
 haengt den Handler fuer ``screening.run.requested`` an den ``ReliableBus``. Der Batch und der
-Worker nutzen dieselben Funktionen (``src/composition.py``).
+Worker nutzen dieselben Funktionen (``src/composition.py``). Seit D2.1 beantwortet der Dienst
+Suche und Aufloesung von Wertpapieren per Request/Reply (``rpc``).
 """
 
 from __future__ import annotations
@@ -17,16 +18,26 @@ from va_platform.service import service_main
 
 from ..adapters.csv_universe import load_fallback
 from ..adapters.deka import DekaSource
+from ..adapters.firds import FirdsSource
 from ..adapters.ishares import IsharesSource
-from ..adapters.openfigi import resolve_isins_openfigi
+from ..adapters.openfigi import OpenFigiLookup, resolve_isins_openfigi
 from ..adapters.postgres.models import MarketDataInbox, MarketDataOutbox
+from ..adapters.postgres.securities import PostgresSecurityCatalog
 from ..adapters.postgres.store import PostgresSnapshotStore
 from ..adapters.replay import PROVIDER as REPLAY_PROVIDER
 from ..adapters.replay import ReplayFundamentals, load_replay_rows, replay_universe
-from ..adapters.yahoo import PROVIDER, FetcherConfig, YahooFundamentals, provider_version
+from ..adapters.yahoo import (
+    PROVIDER,
+    FetcherConfig,
+    YahooFundamentals,
+    YahooTextSearch,
+    provider_version,
+)
 from ..application.fetch import fetch_all
+from ..application.securities import SecurityService
 from ..application.universe import load_universe as load_universe_chain
 from ..domain.universe import UniverseConfig
+from . import rpc
 from .handlers import RunRequestedHandler
 from .settings import MarketDataSettings
 
@@ -143,14 +154,34 @@ def reliable(bus: EventBus, engine: Engine, settings: MarketDataSettings) -> Eve
     return ReliableBus(bus, engine, inbox=MarketDataInbox, outbox=MarketDataOutbox, max_age=max_age)
 
 
+QUEUE = "market-data"  # Queue-Gruppe fuer Request/Reply (D2.1)
+
+
+def securities(engine: Engine) -> SecurityService:
+    """Suche und Aufloesung (D2.1): eigene Wertpapiere, OpenFIGI, Yahoo, ESMA FIRDS."""
+    return SecurityService(
+        catalog=PostgresSecurityCatalog(engine),
+        lookup=OpenFigiLookup(),
+        text=YahooTextSearch(),
+        master=FirdsSource(),
+    )
+
+
+def serve(bus: NatsBus, service: rpc.Securities) -> None:
+    for spec, handler in rpc.handlers(service).items():
+        bus.serve(spec, handler, queue=QUEUE)
+
+
 def setup(
     bus: NatsBus,
     engine: Engine,
     *,
     settings: MarketDataSettings,
     adapters: MarketDataAdapters | None = None,
+    securities_service: rpc.Securities | None = None,
 ) -> None:
     wire(reliable(bus, engine, settings), adapters or build_adapters(settings, engine), settings)
+    serve(bus, securities_service or securities(engine))
 
 
 def main() -> int:

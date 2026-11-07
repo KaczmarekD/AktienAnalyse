@@ -87,6 +87,34 @@ export type ActiveProfileRef = {
 };
 
 /**
+ * BondTerms
+ *
+ * Ausstattung einer Anleihe aus ESMA FIRDS.
+ */
+export type BondTerms = {
+  /**
+   * Coupon
+   */
+  coupon: number | null;
+  /**
+   * Denomination
+   */
+  denomination: number | null;
+  /**
+   * Floating
+   */
+  floating: boolean;
+  /**
+   * Maturity
+   */
+  maturity: string | null;
+  /**
+   * Seniority
+   */
+  seniority: string | null;
+};
+
+/**
  * DataExport
  *
  * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
@@ -260,6 +288,30 @@ export type Instrument = {
    * Symbol
    */
   symbol: string;
+};
+
+/**
+ * Listing
+ *
+ * Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.
+ */
+export type Listing = {
+  /**
+   * Currency
+   */
+  currency: string | null;
+  /**
+   * Exchange
+   */
+  exchange: string | null;
+  /**
+   * Symbol
+   */
+  symbol: string | null;
+  /**
+   * Ticker
+   */
+  ticker: string | null;
 };
 
 /**
@@ -1174,6 +1226,72 @@ export type ScorePoint = {
    * Value Trap Flag
    */
   value_trap_flag: boolean | null;
+};
+
+/**
+ * Security
+ *
+ * Ein Wertpapier mit Stammdaten, Listings und dem Listing fuer den Datenabruf.
+ */
+export type Security = {
+  /**
+   * Asset Class
+   */
+  asset_class: 'equity' | 'etf' | 'bond' | 'other';
+  bond: BondTerms | null;
+  /**
+   * Cfi
+   */
+  cfi: string | null;
+  /**
+   * Currency
+   */
+  currency: string | null;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Lei
+   */
+  lei: string | null;
+  listing: Listing | null;
+  /**
+   * Listings
+   */
+  listings: Array<Listing>;
+  /**
+   * Name
+   */
+  name: string;
+};
+
+/**
+ * SecurityHit
+ *
+ * Ein Treffer der Suche. Treffer der Yahoo-Suche haben keine ISIN.
+ */
+export type SecurityHit = {
+  /**
+   * Asset Class
+   */
+  asset_class: 'equity' | 'etf' | 'bond' | 'other';
+  /**
+   * Isin
+   */
+  isin: string | null;
+  /**
+   * Listings
+   */
+  listings: Array<Listing>;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Source
+   */
+  source: string;
 };
 
 /**
@@ -2415,3 +2533,92 @@ export type ActivateProfileVersionResponses = {
 
 export type ActivateProfileVersionResponse =
   ActivateProfileVersionResponses[keyof ActivateProfileVersionResponses];
+
+export type SearchSecuritiesData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * Q
+     *
+     * ISIN, WKN, Name, Symbol
+     */
+    q: string;
+  };
+  url: '/api/v1/securities/search';
+};
+
+export type SearchSecuritiesErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * market-data nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type SearchSecuritiesError = SearchSecuritiesErrors[keyof SearchSecuritiesErrors];
+
+export type SearchSecuritiesResponses = {
+  /**
+   * Response Search Securities
+   *
+   * Successful Response
+   */
+  200: Array<SecurityHit>;
+};
+
+export type SearchSecuritiesResponse = SearchSecuritiesResponses[keyof SearchSecuritiesResponses];
+
+export type GetSecurityData = {
+  body?: never;
+  path: {
+    /**
+     * Isin
+     */
+    isin: string;
+  };
+  query?: {
+    /**
+     * Symbol
+     */
+    symbol?: string | null;
+  };
+  url: '/api/v1/securities/{isin}';
+};
+
+export type GetSecurityErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * market-data nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type GetSecurityError = GetSecurityErrors[keyof GetSecurityErrors];
+
+export type GetSecurityResponses = {
+  /**
+   * Successful Response
+   */
+  200: Security;
+};
+
+export type GetSecurityResponse = GetSecurityResponses[keyof GetSecurityResponses];

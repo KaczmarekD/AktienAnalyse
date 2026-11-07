@@ -351,12 +351,29 @@ class TestRpc:
 
         _run(scenario)
 
+    def test_market_data_answers_the_securities_search(self):
+        """D2.1: Suche und Aufloesung von Wertpapieren beantwortet market-data."""
+
+        async def scenario() -> None:
+            async with Connection("market-data") as market:
+                await self._serve(market, "rpc.va.marketdata.securities.search")
+                async with Connection("web-api") as web:
+                    answer = await web.nc.request(
+                        "rpc.va.marketdata.securities.search", b"ping", timeout=TIMEOUT * 3
+                    )
+                    assert answer.data == b"pong"
+                assert not await market.violations()
+
+        _run(scenario)
+
     @pytest.mark.parametrize(
         ("service", "subject"),
         [
             ("notification", "rpc.va.scoring.>"),
             ("scoring", "rpc.va.notification.>"),
+            ("scoring", "rpc.va.marketdata.>"),
             ("market-data", "rpc.va.>"),
+            ("market-data", "rpc.va.scoring.>"),
             ("web-api", "rpc.va.scoring.>"),
         ],
     )
