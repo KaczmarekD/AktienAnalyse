@@ -3557,7 +3557,7 @@ Golden-Master und die Replay-Fixtures.
   Scheduler im web-api (Handelstage 22:30 `Europe/Berlin`) schickt `marketdata.prices.requested`,
   market-data antwortet mit `marketdata.prices.completed`.
 - **Review:** `/code-review high`.
-- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (07.11.2026, auf `main` als `2966508`, CI grün):** wie im Entwurf, dazu:
   - **Kein spätes Abschließen:** `price_run` entsteht mit Ende und Ergebnis in einer Transaktion
     mit den Kursen, braucht also keinen Eintrag in `UPDATABLE_TABLES`.
   - **Währung:** aus früheren Kursen des Symbols, sonst einmal aus `fast_info`; ohne Währung
