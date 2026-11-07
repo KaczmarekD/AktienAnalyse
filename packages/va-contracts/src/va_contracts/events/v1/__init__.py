@@ -2,6 +2,7 @@
 
 from .catalog import (
     BY_DATASCHEMA,
+    EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
     FETCH_PROGRESSED,
     PROFILE_ACTIVATED,
@@ -25,6 +26,7 @@ from .fundamentals import (
 )
 from .payloads import (
     REASON_NO_DATA,
+    EmailConfirmationRequestedV1,
     FetchProgressedV1,
     ProfileActivatedV1,
     ProfileRefV1,
@@ -45,6 +47,7 @@ from .ranking import RankingRowV1
 
 __all__ = [
     "BY_DATASCHEMA",
+    "EMAIL_CONFIRMATION_REQUESTED",
     "ERRORS_SEPARATOR",
     "EVENTS",
     "FETCH_PROGRESSED",
@@ -56,6 +59,7 @@ __all__ = [
     "RUN_REQUESTED",
     "SCORING_RUN_COMPLETED",
     "SNAPSHOT_COMPLETED",
+    "EmailConfirmationRequestedV1",
     "EventSpec",
     "FetchProgressedV1",
     "FundamentalsV1",

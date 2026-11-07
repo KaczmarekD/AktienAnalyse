@@ -11,6 +11,9 @@ import type {
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
+  ConfirmEmailData,
+  ConfirmEmailErrors,
+  ConfirmEmailResponses,
   CreateUserData,
   CreateUserErrors,
   CreateUserResponses,
@@ -22,6 +25,9 @@ import type {
   EnableUserData,
   EnableUserErrors,
   EnableUserResponses,
+  ExportDataData,
+  ExportDataErrors,
+  ExportDataResponses,
   GetInstrumentData,
   GetInstrumentErrors,
   GetInstrumentResponses,
@@ -94,6 +100,8 @@ import {
   zActivateProfileVersionResponse,
   zChangePasswordBody,
   zChangePasswordResponse,
+  zConfirmEmailBody,
+  zConfirmEmailResponse,
   zCreateUserBody,
   zCreateUserResponse,
   zCurrentSessionResponse,
@@ -101,6 +109,7 @@ import {
   zDisableUserResponse,
   zEnableUserPath,
   zEnableUserResponse,
+  zExportDataResponse,
   zGetInstrumentPath,
   zGetInstrumentResponse,
   zGetProfilePath,
@@ -278,6 +287,33 @@ export const resetPassword = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Confirm Email
+ *
+ * Bestaetigt eine neue Mail-Adresse mit dem Token aus dem Link (einmalig, 24 h, nur
+ * die juengste Anfrage). Ohne Sitzung: Das Token ist der Nachweis.
+ */
+export const confirmEmail = <ThrowOnError extends boolean = false>(
+  options: Options<ConfirmEmailData, ThrowOnError>,
+): RequestResult<ConfirmEmailResponses, ConfirmEmailErrors, ThrowOnError> =>
+  (options.client ?? client).post<ConfirmEmailResponses, ConfirmEmailErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zConfirmEmailBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zConfirmEmailResponse.parseAsync(data),
+    url: '/api/v1/auth/confirm-email',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
  * Login
  *
  * Meldet an und setzt das Sitzungs-Cookie.
@@ -411,6 +447,28 @@ export const me = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Export Data
+ *
+ * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.
+ */
+export const exportData = <ThrowOnError extends boolean = false>(
+  options?: Options<ExportDataData, ThrowOnError>,
+): RequestResult<ExportDataResponses, ExportDataErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ExportDataResponses, ExportDataErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zExportDataResponse.parseAsync(data),
+    url: '/api/v1/me/export',
+    ...options,
+  });
+
+/**
  * Change Password
  *
  * Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.
@@ -439,7 +497,8 @@ export const changePassword = <ThrowOnError extends boolean = false>(
 /**
  * Update Profile
  *
- * Aendert den Anzeigenamen; leer entfernt ihn.
+ * Aendert den Anzeigenamen (leer entfernt ihn) und fordert fuer eine neue Mail-Adresse
+ * die Bestaetigung an. Bis zum Link aus der Mail gilt die bisherige (``pending_email``).
  */
 export const updateProfile = <ThrowOnError extends boolean = false>(
   options: Options<UpdateProfileData, ThrowOnError>,

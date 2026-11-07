@@ -20,7 +20,8 @@ einen an, eine Hintergrund-Aufgabe startet geplante Runs (``WEB_API_SCHEDULE``),
 Watchdog und leert die Outbox, einmal je ``RUNS_TICK_SECONDS``.
 
 Mit ``WEB_API_IDENTITY_DATABASE_URL`` (Rolle ``va_identity``) gibt es Anmeldung und Sitzungen
-(D1.1, ``/auth``, ``/me``); ohne antworten diese Endpunkte mit 503.
+(D1.1, ``/auth``, ``/me``); ohne antworten diese Endpunkte mit 503. Mit NATS leert ein Takt
+ausserdem die Outbox im Schema ``identity`` (D1.6, Bestaetigungsmails).
 
 Swagger und OpenAPI liegen unter ``/api``, damit nginx (P3.6) sie mit ``/api/*`` weiterreicht.
 """
@@ -83,6 +84,7 @@ def _operation_id(route: APIRoute) -> str:
 
 NATS_RETRY_SECONDS = 30.0  # so oft versucht das web-api, eine NATS-Verbindung aufzubauen
 RUNS_TICK_SECONDS = 60.0  # Takt von Scheduler, Watchdog und Outbox (P4.7)
+IDENTITY_OUTBOX_SECONDS = 30.0  # Takt der Outbox in identity (D1.6)
 
 
 async def _keep_started(app: FastAPI, attr: str, start: Callable[[], NatsBus], what: str) -> None:
@@ -126,6 +128,19 @@ async def _keep_runs(manager: RunManager, schedule: Schedule | None) -> None:
         except Exception:
             log.warning("Takt der Run-Verwaltung fehlgeschlagen", exc_info=True)
         await asyncio.sleep(RUNS_TICK_SECONDS)
+
+
+async def _keep_identity_outbox(app: FastAPI, identity: IdentityService) -> None:
+    """Takt der Outbox in ``identity`` (D1.6): Bestaetigungsmails, die nicht gleich mit der
+    Anfrage rausgingen (Event-Bus noch nicht da, NATS kurz weg)."""
+    while True:
+        publish = _publisher(app)
+        if publish is not None:
+            try:
+                await asyncio.to_thread(identity.publish_pending, publish)
+            except Exception:
+                log.warning("Outbox von identity nicht geleert", exc_info=True)
+        await asyncio.sleep(IDENTITY_OUTBOX_SECONDS)
 
 
 def _publisher(app: FastAPI) -> Callable[[Envelope[Any]], None] | None:
@@ -214,6 +229,8 @@ def create_app(
                 publisher=lambda: _publisher(app),
             )
             tasks.append(asyncio.create_task(_keep_runs(app.state.runs, settings.run_schedule)))
+            if app.state.identity is not None:
+                tasks.append(asyncio.create_task(_keep_identity_outbox(app, app.state.identity)))
         # P4.9: Mit NATS lesen die REST-Endpunkte aus den Projektionen, sonst aus den Tabellen
         app.state.reader = (
             TableReadModel(app.state.engine)

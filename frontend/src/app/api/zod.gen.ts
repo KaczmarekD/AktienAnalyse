@@ -43,6 +43,31 @@ export const zActiveProfileRef = z.object({
 });
 
 /**
+ * DataExport
+ *
+ * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
+ */
+export const zDataExport = z.object({
+  account: z.array(z.record(z.string(), z.unknown())),
+  credentials: z.array(z.record(z.string(), z.unknown())),
+  email_confirmations: z.array(z.record(z.string(), z.unknown())),
+  exported_at: z.iso.datetime(),
+  logins: z.array(z.record(z.string(), z.unknown())),
+  profiles: z.array(z.record(z.string(), z.unknown())),
+  sessions: z.array(z.record(z.string(), z.unknown())),
+  statuses: z.array(z.record(z.string(), z.unknown())),
+});
+
+/**
+ * EmailConfirmation
+ *
+ * Das Token aus dem Link der Bestaetigungsmail (D1.6).
+ */
+export const zEmailConfirmation = z.object({
+  token: z.string().min(1).max(200),
+});
+
+/**
  * Factor
  *
  * Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.
@@ -92,6 +117,7 @@ export const zMe = z.object({
   email: z.string().nullable(),
   id: z.int(),
   must_change_password: z.boolean(),
+  pending_email: z.string().nullish(),
   role: z.enum(['admin', 'user']),
   username: z.string(),
 });
@@ -234,10 +260,12 @@ export const zProfileSummary = z.object({
 /**
  * ProfileUpdate
  *
- * Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6).
+ * Anzeigename; leer entfernt ihn. Eine neue Mail-Adresse gilt erst nach dem Link aus der Mail
+ * (D1.6); ohne ``email`` bleibt die Adresse, wie sie ist.
  */
 export const zProfileUpdate = z.object({
   display_name: z.string().max(100).nullish(),
+  email: z.string().max(254).nullish(),
 });
 
 /**
@@ -548,6 +576,13 @@ export const zResetPasswordPath = z.object({
  */
 export const zResetPasswordResponse = z.void();
 
+export const zConfirmEmailBody = zEmailConfirmation;
+
+/**
+ * Successful Response
+ */
+export const zConfirmEmailResponse = z.void();
+
 export const zLoginBody = zLoginRequest;
 
 /**
@@ -583,6 +618,11 @@ export const zGetInstrumentResponse = zInstrument;
  * Successful Response
  */
 export const zMeResponse = zMe;
+
+/**
+ * JSON-Datei zum Herunterladen
+ */
+export const zExportDataResponse = zDataExport;
 
 export const zChangePasswordBody = zPasswordChange;
 

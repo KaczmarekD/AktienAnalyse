@@ -1,0 +1,32 @@
+{
+  "description": "web-api -> notification (privat, D1.6, NUT-10): Bestaetigungsmail an eine neue Adresse.\n\nLaeuft ueber ``priv.va.`` (Stream ``VA_PRIVATE``, nur im Speicher, 24 h), weil Adresse und Link\npersonenbezogen sind. ``link`` enthaelt das Token; gespeichert ist beim web-api nur sein Hash.",
+  "properties": {
+    "email": {
+      "title": "Email",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "link": {
+      "pattern": "^https?://[^\\s/?#@]+/confirm-email\\?token=\\S+$",
+      "title": "Link",
+      "type": "string"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "email",
+    "link",
+    "expires_at"
+  ],
+  "title": "EmailConfirmationRequestedV1",
+  "type": "object"
+}

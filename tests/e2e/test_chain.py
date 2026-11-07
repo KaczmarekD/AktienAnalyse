@@ -94,7 +94,11 @@ class TestReplayResult:
 
     @pytest.mark.usefixtures("expected")
     def test_only_this_mail_in_mailpit(self, mailpit):
-        assert get_json(mailpit, "/api/v1/messages")["total"] == 1
+        """Genau ein Report. Bestaetigungsmails (D1.6, tests/e2e/test_auth.py) zaehlen nicht mit,
+        sie gehen an die neue Adresse eines Kontos."""
+        messages = get_json(mailpit, "/api/v1/messages", limit=50)["messages"]
+        reports = [m for m in messages if not m["Subject"].endswith("Mail-Adresse bestätigen")]
+        assert len(reports) == 1
 
     @pytest.mark.usefixtures("expected")
     def test_latest_ranking_is_the_replayed_run(self, ui, run):

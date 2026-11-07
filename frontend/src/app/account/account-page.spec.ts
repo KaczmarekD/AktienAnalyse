@@ -120,6 +120,82 @@ describe('AccountPage', () => {
     expect(query(fixture, '[role="status"]')[0]?.textContent).toContain('Anzeigename gespeichert.');
   });
 
+  describe('mail address (D1.6)', () => {
+    it('shows the confirmed address and a pending one', async () => {
+      const fixture = await render(
+        me({ email: 'anna@example.com', pending_email: 'neu@example.com' }),
+      );
+      expect(query<HTMLInputElement>(fixture, 'input[name="email"]')[0].value).toBe(
+        'anna@example.com',
+      );
+      expect(text(fixture)).toContain('Bestätigung ausstehend');
+      expect(text(fixture)).toContain('neu@example.com');
+    });
+
+    it('asks for a confirmation of a new address', async () => {
+      const fixture = await render(me({ email: 'anna@example.com' }));
+      type(fixture, 'email', 'neu@example.com');
+      button(fixture, 'save-name').click();
+      await settle(fixture);
+      const request = expectRequest('/api/v1/me/profile', 'PUT');
+      expect(request.request.body).toEqual({ display_name: 'Anna', email: 'neu@example.com' });
+      fakeAuth().next = me({ email: 'anna@example.com', pending_email: 'neu@example.com' });
+      request.flush(me({ email: 'anna@example.com', pending_email: 'neu@example.com' }));
+      await settle(fixture);
+      expect(query(fixture, '[role="status"]')[0]?.textContent).toContain(
+        'Wir haben eine Mail an neu@example.com geschickt',
+      );
+    });
+
+    it('does not pretend to remove the address', async () => {
+      const fixture = await render(me({ email: 'anna@example.com' }));
+      type(fixture, 'email', '');
+      button(fixture, 'save-name').click();
+      await settle(fixture);
+      TestBed.inject(HttpTestingController).expectNone('/api/v1/me/profile');
+      expect(query(fixture, '[role="alert"]')[0]?.textContent).toContain(
+        'Bitte eine Mail-Adresse angeben.',
+      );
+    });
+
+    it('shows the reason when the server refuses the address', async () => {
+      const fixture = await render(me({ email: 'anna@example.com' }));
+      type(fixture, 'email', 'falsch@x');
+      button(fixture, 'save-name').click();
+      await settle(fixture);
+      expectRequest('/api/v1/me/profile', 'PUT').flush(
+        { detail: 'Keine gültige Mail-Adresse' },
+        { status: 400, statusText: 'x' },
+      );
+      await settle(fixture);
+      expect(query(fixture, '[role="alert"]')[0]?.textContent).toContain(
+        'Keine gültige Mail-Adresse',
+      );
+    });
+  });
+
+  describe('export (D1.6, NUT-12)', () => {
+    it('downloads the own data as a file', async () => {
+      const fixture = await render();
+      const created = vi.fn(() => 'blob:export');
+      const revoked = vi.fn();
+      Object.assign(URL, { createObjectURL: created, revokeObjectURL: revoked });
+      // jsdom kann keine Datei speichern; der Klick auf den Download-Link reicht als Nachweis
+      const saved = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      button(fixture, 'export').click();
+      await settle(fixture);
+      const request = expectRequest('/api/v1/me/export', 'GET');
+      request.flush({ account: [{ username: 'anna' }] });
+      await settle(fixture);
+      expect(created).toHaveBeenCalledTimes(1);
+      expect(saved).toHaveBeenCalledTimes(1);
+      expect(revoked).toHaveBeenCalledWith('blob:export');
+      saved.mockRestore();
+    });
+  });
+
   describe('password', () => {
     it('uses the autocomplete hints of a password manager', async () => {
       const fixture = await render();

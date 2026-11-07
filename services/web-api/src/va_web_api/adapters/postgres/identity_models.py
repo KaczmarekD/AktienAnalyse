@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, ForeignKey, Identity, Index, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_platform.db import Base, in_values
@@ -137,3 +138,43 @@ class IdentityOutbox(OutboxMixin, Base):
     """Ab D1.6 die Bestaetigungsmail (``priv.va.identity.email_confirmation.requested``)."""
 
     __table_args__ = outbox_table_args(SCHEMA)
+
+
+class EmailConfirmation(Base):
+    """D1.6 (NUT-10): Anfrage, eine neue Adresse zu bestaetigen. Nur der SHA-256 des Tokens."""
+
+    __tablename__ = "email_confirmation"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.user_account.id"), index=True)
+    email: Mapped[str]
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    expires_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class EmailConfirmationUsed(Base):
+    """D1.6: Der Link wurde benutzt; einmalig, deshalb ist das Token der Schluessel."""
+
+    __tablename__ = "email_confirmation_used"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    token_hash: Mapped[str] = mapped_column(
+        ForeignKey(f"{SCHEMA}.email_confirmation.token_hash"), primary_key=True
+    )
+    at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class ErasureLog(Base):
+    """D1.6 (ADR-0012): Das Loeschkommando lief. Ohne Inhalte: nur der Hash der Nutzer-ID, wer
+    loeschte und wie viele Zeilen je Tabelle."""
+
+    __tablename__ = "erasure_log"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    user_key: Mapped[str]  # SHA-256 der Nutzer-ID
+    by_admin: Mapped[str]
+    rows: Mapped[dict[str, int]] = mapped_column(JSONB)
+    at: Mapped[datetime] = mapped_column(server_default=func.now())

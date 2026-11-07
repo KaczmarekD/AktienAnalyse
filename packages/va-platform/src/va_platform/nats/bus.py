@@ -46,7 +46,15 @@ from va_contracts.rpc.v1 import RpcErrorV1
 from .. import tracing
 from ..bus import DeadLetter, _readable
 from ..messaging import OutboxMessage
-from . import ACK_WAIT, MAX_DELIVER, STREAM_NAME, JetStreamPublisher, inbox_prefix, provision
+from . import (
+    ACK_WAIT,
+    CONSUMERS_BY_NAME,
+    MAX_DELIVER,
+    ConsumerSpec,
+    JetStreamPublisher,
+    inbox_prefix,
+    provision,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
@@ -113,15 +121,19 @@ class NatsBus:
         ack_wait: float = ACK_WAIT,
         timeout: float = 10.0,
         consumers: Iterable[str] | None = None,
+        streams: Iterable[str] | None = None,
     ) -> None:
         """``consumers``: die Consumer, die der Bus beim Start anlegt (D1.5, mit einem NATS-Nutzer
-        je Dienst nur der eigene); ohne Angabe alle (Batch, Werkzeuge)."""
+        je Dienst nur der eigene); ohne Angabe alle (Batch, Werkzeuge). ``streams``: die Streams,
+        die er anlegt; ohne Angabe die seiner Consumer (D1.6, das web-api sendet nach
+        ``VA_PRIVATE``, ohne dort zu lesen)."""
         if not 1 <= max_deliver <= MAX_DELIVER:
             # Darueber verwuerfe NATS das Event still, ohne Dead Letter
             msg = f"max_deliver muss zwischen 1 und {MAX_DELIVER} liegen, nicht {max_deliver}"
             raise ValueError(msg)
         self._url = url
         self._consumers = None if consumers is None else tuple(consumers)
+        self._streams = None if streams is None else tuple(streams)
         self._max_deliver = max_deliver
         self._on_dead_letter = on_dead_letter
         self._retry_delay = retry_delay
@@ -337,7 +349,7 @@ class NatsBus:
         self._nc.options["max_reconnect_attempts"] = RECONNECT_ATTEMPTS
         self._js = self._nc.jetstream()
         self._publisher = JetStreamPublisher(self._js, timeout=self._timeout)
-        await provision(self._nc.jsm(), consumers=self._consumers)
+        await provision(self._nc.jsm(), consumers=self._consumers, streams=self._streams)
 
     async def _shutdown(self, timeout: float) -> None:
         pullers = list(self._pullers.values())
@@ -356,13 +368,30 @@ class NatsBus:
 
     # -- intern: Consumer ------------------------------------------------------------------
 
+    def _stream_of(self, consumer: str) -> str:
+        """Der Stream eines Consumers: aus der Vorgabe, sonst aus seinen Subjects (D1.6)."""
+        spec = CONSUMERS_BY_NAME.get(consumer)
+        if spec is not None:
+            return spec.stream
+        subjects = tuple(sorted(BY_TYPE_SUBJECT[t] for t in self._handlers[consumer]))
+        return ConsumerSpec(consumer, subjects).stream  # wirft bei gemischten Streams
+
+    async def _consumer_info(self, jsm: Any, consumer: str) -> Any:
+        try:
+            return await jsm.consumer_info(self._stream_of(consumer), consumer)
+        except NotFoundError:
+            return None
+
     async def _bind(self, consumer: str) -> None:
         jsm = self._client().jsm()
         subjects = sorted(BY_TYPE_SUBJECT[t] for t in self._handlers[consumer])
-        try:
-            info = await jsm.consumer_info(STREAM_NAME, consumer)
-        except NotFoundError:
-            info = None
+        info = await self._consumer_info(jsm, consumer)
+        if info is None and consumer in CONSUMERS_BY_NAME and consumer not in self._created:
+            # D1.6: ein vorgegebener Consumer, den der Start nicht angelegt hat (etwa
+            # notification-private, wenn der Dienst nur mit seinem Namen startet): anlegen wie die
+            # Provisionierung, samt seinem Stream (VA_PRIVATE)
+            await provision(jsm, consumers=(consumer,))
+            info = await self._consumer_info(jsm, consumer)
         if info is None or consumer in self._created:
             # Unbekannt (Tests): Der Bus legt ihn mit genau seinen Subjects an, ohne Altlasten
             config = ConsumerConfig(
@@ -376,7 +405,7 @@ class NatsBus:
                 config.filter_subject = subjects[0]
             else:
                 config.filter_subjects = subjects
-            await jsm.add_consumer(STREAM_NAME, config)
+            await jsm.add_consumer(self._stream_of(consumer), config)
             self._created.add(consumer)
             ack_wait = self._ack_wait
         else:
@@ -391,7 +420,9 @@ class NatsBus:
             ack_wait = info.config.ack_wait or ACK_WAIT
         if consumer not in self._pullers:
             assert self._js is not None
-            sub = await self._js.pull_subscribe_bind(durable=consumer, stream=STREAM_NAME)
+            sub = await self._js.pull_subscribe_bind(
+                durable=consumer, stream=self._stream_of(consumer)
+            )
             loop = asyncio.get_running_loop()
             self._pullers[consumer] = loop.create_task(self._pull(consumer, sub, ack_wait))
 
@@ -415,7 +446,7 @@ class NatsBus:
             return True
         jsm = self._client().jsm()
         for consumer in self._pullers:
-            info = await jsm.consumer_info(STREAM_NAME, consumer)
+            info = await jsm.consumer_info(self._stream_of(consumer), consumer)
             if info.num_pending or info.num_ack_pending:
                 return True
         return False

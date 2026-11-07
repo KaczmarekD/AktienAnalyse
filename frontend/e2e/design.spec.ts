@@ -97,6 +97,8 @@ async function pages(request: APIRequestContext): Promise<string[]> {
     // D1.4: angemeldet als Admin (auth.setup.ts); ohne Anmeldung führen beide zur Anmeldeseite
     '/account',
     '/admin/users',
+    // D1.6: ohne Token zeigt die Seite nur, dass der Link unvollständig ist
+    '/confirm-email',
   ];
 }
 

@@ -207,6 +207,63 @@ class TestVolatileEvents:
         assert received == [(1, None), (2, None)]  # fluechtig: ohne Stream-Sequenz
 
 
+class TestPrivateEvents:
+    """D1.6: priv.va. ueber VA_PRIVATE, nicht ueber VA_EVENTS."""
+
+    def test_a_private_event_reaches_its_consumer_through_va_private(self, nats_url, bus):
+        from datetime import UTC, datetime, timedelta
+
+        from va_contracts.events.v1 import (
+            EMAIL_CONFIRMATION_REQUESTED,
+            EmailConfirmationRequestedV1,
+        )
+
+        received: list[str] = []
+        bus.subscribe(
+            EMAIL_CONFIRMATION_REQUESTED,
+            "notification-private",
+            lambda env: received.append(env.data.email),
+        )
+        data = EmailConfirmationRequestedV1(
+            user_id=2,
+            email="anna@example.com",
+            link="https://va.example/confirm-email?token=x",
+            expires_at=datetime.now(UTC) + timedelta(hours=24),
+        )
+        bus.publish(new_envelope(EMAIL_CONFIRMATION_REQUESTED, data, source="va/test"))
+        bus.settle(timeout=20)
+        assert received == ["anna@example.com"]
+
+        async def counts(js: Any, jsm: Any) -> tuple[int, int]:
+            private = (await jsm.stream_info("VA_PRIVATE")).state.messages
+            public = (await jsm.stream_info("VA_EVENTS")).state.messages
+            return private, public
+
+        assert _with_nats(nats_url, counts) == (1, 0)
+
+    def test_a_provisioned_consumer_comes_with_its_stream_when_subscribed(self, nats_url):
+        """Startet ein Dienst nur mit seinem Haupt-Consumer (``run_service(name=...)``), legt das
+        Abonnieren eines weiteren vorgegebenen Consumers ihn samt Stream an, wie die
+        Provisionierung. Vorher scheiterte es an einem frischen Server mit 'stream not found'."""
+        from va_contracts.events.v1 import EMAIL_CONFIRMATION_REQUESTED
+        from va_platform.nats import NatsBus
+
+        bus = NatsBus(nats_url, consumers=("notification",))
+        bus.start()
+        try:
+            bus.subscribe(EMAIL_CONFIRMATION_REQUESTED, "notification-private", lambda env: None)
+        finally:
+            bus.close()
+
+        async def private(js: Any, jsm: Any) -> tuple[str | None, str | None]:
+            info = await jsm.consumer_info("VA_PRIVATE", "notification-private")
+            return info.config.filter_subject, str(info.config.deliver_policy)
+
+        subject, policy = _with_nats(nats_url, private)
+        assert subject == "priv.va.identity.email_confirmation.requested"
+        assert "new" not in policy.lower()  # wie provisioniert: auch aeltere Nachrichten
+
+
 class TestSequence:
     def test_handler_sees_the_stream_sequence(self, bus):
         """P4.4: Das web-api reicht sie an den WebSocket weiter (resumeFrom, P4.5)."""

@@ -9,6 +9,10 @@ Regeln aus docs/architecture/depot/nutzer.md:
 Seit D1.4 (NUT-11, Rollen): Passwort und Anzeigename aendern, Sitzungen sehen und widerrufen,
 Konten verwalten. Ein falsches bisheriges Passwort zaehlt wie ein Fehlversuch beim Anmelden. Ein
 Admin vergibt Einmal-Passwoerter (``must_change``), am eigenen Konto aber nicht.
+
+Seit D1.6 (NUT-10, NUT-12): Eine neue Mail-Adresse gilt erst nach dem Link aus der Mail
+(einmalig, 24 h, nur die juengste Anfrage). Das Event fuer die Mail geht mit der Anfrage in
+einer Transaktion in die Outbox. Export aller eigenen Zeilen ohne Hashes.
 """
 
 from __future__ import annotations
@@ -18,8 +22,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import cached_property
+from typing import Any
+
+from va_contracts import Envelope, new_envelope
+from va_contracts.events.v1 import (
+    EMAIL_CONFIRMATION_REQUESTED,
+    EmailConfirmationRequestedV1,
+)
 
 from .domain import (
+    EMAIL_CONFIRMATION_LIMIT,
+    EMAIL_CONFIRMATION_VALIDITY,
+    EMAIL_CONFIRMATION_WINDOW,
     ROLES,
     LockoutPolicy,
     PasswordHasher,
@@ -28,8 +42,11 @@ from .domain import (
     normalize_username,
     password_problems,
     token_hash,
+    valid_email,
 )
 from .ports import IdentityStore, UserRecord
+
+SOURCE = "va/web-api"
 
 
 class LoginFailed(Exception):
@@ -56,6 +73,27 @@ class WrongPassword(Exception):
 
 class UnknownUser(LookupError):
     """Kein Konto mit dieser ID."""
+
+
+class InvalidEmail(ValueError):
+    """Keine gueltige Mail-Adresse (D1.6)."""
+
+
+class NoLinkBase(Exception):
+    """Die Adresse des UI ist unbekannt, der Link fuer die Mail laesst sich nicht bauen."""
+
+
+class TooManyConfirmations(Exception):
+    """Zu viele Bestaetigungsmails in kurzer Zeit (D1.6)."""
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__(retry_after_seconds)
+        self.retry_after_seconds = retry_after_seconds
+
+
+class InvalidConfirmation(Exception):
+    """Link unbekannt, schon benutzt, abgeloest oder abgelaufen; bewusst ohne Angabe, was
+    davon (D1.6)."""
 
 
 class OwnAccount(Exception):
@@ -198,7 +236,7 @@ class IdentityService:
             raise WeakPassword(problems)
         email = email.strip() if email else None
         display = display_name.strip() if display_name else None
-        if email is not None and ("@" not in email or any(c.isspace() for c in email)):
+        if email is not None and not valid_email(email):
             msg = f"Keine gueltige Mail-Adresse: {email!r}"
             raise ValueError(msg)
         user_id = self._store.create_user(
@@ -321,6 +359,78 @@ class IdentityService:
         if record is None:
             raise UnknownUser(user.id)
         return User.of(record)
+
+    # --- Mail-Adresse und Export (D1.6, NUT-10, NUT-12) ---
+
+    def change_email(self, user: User, email: str, *, link_base: str | None) -> bool:
+        """Fordert die Bestaetigung einer neuen Adresse an; ``False``, wenn es schon die
+        bisherige ist. Die neue gilt erst nach ``confirm_email``.
+
+        ``link_base`` ist die Adresse des UI (``https://va.example``), der Link zeigt auf
+        ``/confirm-email`` dort. Wirft ``InvalidEmail``, ``NoLinkBase`` oder
+        ``TooManyConfirmations`` (hoechstens ``EMAIL_CONFIRMATION_LIMIT`` je Stunde).
+        """
+        address = email.strip()
+        if not valid_email(address):
+            raise InvalidEmail(address)
+        if user.email is not None and address.lower() == user.email.lower():
+            return False
+        if not link_base:
+            raise NoLinkBase
+        now = self.now()
+        recent = self._store.count_email_confirmations(
+            user.id, since=now - EMAIL_CONFIRMATION_WINDOW
+        )
+        if recent >= EMAIL_CONFIRMATION_LIMIT:
+            raise TooManyConfirmations(int(EMAIL_CONFIRMATION_WINDOW.total_seconds()))
+        token = new_session_token()
+        expires_at = now + EMAIL_CONFIRMATION_VALIDITY
+        envelope: Envelope[Any] = new_envelope(
+            EMAIL_CONFIRMATION_REQUESTED,
+            EmailConfirmationRequestedV1(
+                user_id=user.id,
+                email=address,
+                link=f"{link_base.rstrip('/')}/confirm-email?token={token}",
+                expires_at=expires_at,
+            ),
+            source=SOURCE,
+        )
+        self._store.add_email_confirmation(
+            user.id,
+            email=address,
+            token_hash=token_hash(token),
+            expires_at=expires_at,
+            at=now,
+            envelope=envelope,
+        )
+        return True
+
+    def confirm_email(self, token: str) -> None:
+        """Die neue Adresse gilt ab jetzt. Wirft ``InvalidConfirmation``."""
+        now = self.now()
+        id_hash = token_hash(token)
+        found = self._store.find_email_confirmation(id_hash)
+        if found is None or found.used or not found.latest or now >= found.expires_at:
+            raise InvalidConfirmation
+        record = self._store.get_user(found.user_id)
+        if record is None or not record.active:
+            raise InvalidConfirmation
+        if not self._store.confirm_email(id_hash, at=now):
+            raise InvalidConfirmation  # gleichzeitig schon benutzt
+
+    def pending_email(self, user: User) -> str | None:
+        """Die Adresse, die auf ihre Bestaetigung wartet."""
+        if user.id == LAN_USER.id:
+            return None
+        return self._store.pending_email(user.id, now=self.now())
+
+    def export(self, user: User) -> dict[str, list[dict[str, Any]]]:
+        """Alle eigenen Zeilen in ``identity``, ohne Hashes (NUT-12)."""
+        return self._store.export(user.id)
+
+    def publish_pending(self, publish: Callable[[Envelope[Any]], None]) -> int:
+        """Sendet die offenen Events der Outbox; gibt die Anzahl zurueck."""
+        return self._store.publish_pending(publish)
 
     def active_sessions(self, user: User, *, current: str | None) -> list[ActiveSession]:
         """Die gueltigen Sitzungen, zuletzt aktive zuerst. ``current``: Hash dieser Sitzung."""

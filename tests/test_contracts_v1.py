@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import asdict, fields
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -22,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
+    EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
     FETCH_PROGRESSED,
     PROFILE_ACTIVATED,
@@ -31,6 +32,7 @@ from va_contracts.events.v1 import (
     RUN_REQUESTED,
     SCORING_RUN_COMPLETED,
     SNAPSHOT_COMPLETED,
+    EmailConfirmationRequestedV1,
     FetchProgressedV1,
     FundamentalsV1,
     ProfileActivatedV1,
@@ -288,6 +290,12 @@ def _examples() -> dict[str, Contract]:
         RUN_FAILED.type: RunFailedV1(
             run_id=42, trigger="manual", options=options, stage="market-data", reason="timeout"
         ),
+        EMAIL_CONFIRMATION_REQUESTED.type: EmailConfirmationRequestedV1(
+            user_id=2,
+            email="anna@example.com",
+            link="https://va.example/confirm-email?token=abc",
+            expires_at=datetime(2026, 11, 8, 12, 0, tzinfo=UTC),
+        ),
     }
 
 
@@ -302,6 +310,7 @@ class TestEventCatalog:
             "scoring.profile.activated",
             "notification.report.sent",
             "screening.run.failed",
+            "identity.email_confirmation.requested",  # D1.6, privat
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -311,8 +320,28 @@ class TestEventCatalog:
     def test_only_progress_is_volatile(self):
         """Fluechtige Meldungen liegen ausserhalb von va.>, sonst speichert JetStream sie."""
         for spec in EVENTS.values():
-            expected = f"live.va.{spec.type}" if spec is FETCH_PROGRESSED else f"va.{spec.type}"
-            assert spec.subject == expected
+            if spec is FETCH_PROGRESSED:
+                assert spec.subject == f"live.va.{spec.type}"
+            elif not spec.private:
+                assert spec.subject == f"va.{spec.type}"
+
+    def test_private_events_stay_out_of_va_events(self):
+        """D1.6: Mail-Adressen und Links gehen ueber priv.va. (Stream VA_PRIVATE, im Speicher,
+        24 h), nicht ueber va.> mit 30 Tagen im Backup-Ordner."""
+        private = {t for t, spec in EVENTS.items() if spec.private}
+        assert private == {"identity.email_confirmation.requested"}
+        for event_type in private:
+            spec = EVENTS[event_type]
+            assert spec.subject == f"priv.va.{event_type}"
+            assert not spec.volatile
+            # Ein Link gilt 24 h: so lange darf das Event warten, nicht nur RUN_TIMEOUT_MINUTES
+            assert spec.max_age == timedelta(hours=24)
+
+    def test_no_private_data_in_public_events(self):
+        """Keine Mail-Adresse in einem Event unter va.>."""
+        for spec in EVENTS.values():
+            if not spec.private:
+                assert "email" not in spec.model.model_json_schema().get("properties", {})
 
     def test_every_event_has_an_example_and_survives_json(self):
         examples = _examples()

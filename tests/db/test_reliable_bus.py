@@ -14,9 +14,11 @@ from sqlalchemy import Engine, text
 
 from va_contracts import Envelope, new_envelope
 from va_contracts.events.v1 import (
+    EMAIL_CONFIRMATION_REQUESTED,
     FETCH_PROGRESSED,
     REPORT_SENT,
     RUN_REQUESTED,
+    EmailConfirmationRequestedV1,
     FetchProgressedV1,
     ReportSentV1,
     RunOptionsV1,
@@ -117,6 +119,26 @@ class TestDelivery:
         assert chain.calls == []
         assert chain.received == []
         assert _rows(engine, "SELECT message_id FROM scoring.inbox") == []
+
+    def test_an_event_with_its_own_max_age_waits_longer(self, engine, chain):
+        """D1.6: Ein Bestaetigungslink gilt 24 h; nach einem Neustart der NAS darf die Mail noch
+        raus, auch wenn RUN_TIMEOUT_MINUTES laengst vorbei ist."""
+        seen: list[Envelope[Any]] = []
+        chain.reliable.subscribe(EMAIL_CONFIRMATION_REQUESTED, "notification-private", seen.append)
+        data = EmailConfirmationRequestedV1(
+            user_id=2,
+            email="anna@example.com",
+            link="https://va.example/confirm-email?token=x",
+            expires_at=datetime.now(UTC) + timedelta(hours=20),
+        )
+        old = new_envelope(EMAIL_CONFIRMATION_REQUESTED, data, source="va/test")
+        chain.bus.publish(old.model_copy(update={"time": datetime.now(UTC) - timedelta(hours=4)}))
+        assert len(seen) == 1
+        too_old = new_envelope(EMAIL_CONFIRMATION_REQUESTED, data, source="va/test")
+        chain.bus.publish(
+            too_old.model_copy(update={"time": datetime.now(UTC) - timedelta(hours=25)})
+        )
+        assert len(seen) == 1
 
     def test_volatile_and_outside_events_go_directly(self, engine, chain):
         progress: list[Envelope[Any]] = []

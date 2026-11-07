@@ -177,6 +177,25 @@ Weitere Konten legt ein Admin danach im UI unter „Nutzer“ an. Seit D1.5 verl
 eine Anmeldung, und die geht nur über HTTPS, denn das Sitzungs-Cookie ist `Secure`: Vor dem ersten
 Aufruf den [Reverse-Proxy von DSM](#https-über-den-reverse-proxy-von-dsm) einrichten.
 
+**Mail-Adresse ändern (seit D1.6):** Ein Nutzer trägt die neue Adresse unter „Konto“ ein. Sie gilt
+erst, wenn er den Link aus der Bestätigungsmail öffnet (24 Stunden, einmal). Die Mail schickt
+`notification` über dasselbe SMTP wie den Report. Der Link zeigt auf die Adresse, unter der das UI
+aufgerufen wurde; hinter dem DSM-Proxy also `https://<name>`. Kommt keine Mail an: `docker compose
+logs notification` zeigt „Bestaetigungsmail fuer Nutzer … verschickt“ oder den Fehler.
+
+**Daten einer Person löschen (seit D1.6, ADR-0012):** Konten werden sonst nur deaktiviert. Nur auf
+ausdrücklichen Wunsch der Person löscht ein Kommando alle ihre Daten im Schema `identity`, ohne
+Rückweg. Es braucht die Rolle des Besitzers und läuft deshalb im Container `value-analyzer`:
+
+```bash
+docker compose run --rm value-analyzer python -m va_web_api.admin erase-user <name> --by <admin> --yes
+```
+
+Ohne `--yes` löscht es nichts. Danach steht in `identity.erasure_log`, dass gelöscht wurde, aber
+nicht wen oder was (Hash der Nutzer-ID, Admin, Zeilen je Tabelle). Backups enthalten die Daten, bis
+Hyper Backup sie nach seiner Aufbewahrungsfrist verwirft. Jeder kann seine Daten vorher unter
+„Konto“ als JSON herunterladen.
+
 ## Umstellung vom Batch mit Cron (einmalig)
 
 Bis P5.4 lief auf der NAS der Batch-Container `value-analyzer` mit einem Cron. Seit P5.4 hat er das

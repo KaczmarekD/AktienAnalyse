@@ -3,6 +3,9 @@
 Baut Mailversand, Healthcheck und Report-Speicher aus den eigenen Settings, haengt den Handler fuer
 ``scoring.run.completed`` und ``screening.run.failed`` an den ``ReliableBus`` und beantwortet
 Report und CSV per Request/Reply (``rpc``). Batch und Worker nutzen dieselben Funktionen.
+
+Seit D1.6 liest der Dienst zwei Consumer: ``notification`` (``VA_EVENTS``) und
+``notification-private`` (``VA_PRIVATE``, Bestaetigungsmails).
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from ..adapters.postgres.models import ReportingInbox, ReportingOutbox
 from ..adapters.postgres.store import PostgresReportStore
 from ..adapters.smtp import SmtpConfig, SmtpSender
 from . import rpc
-from .handlers import NotificationConfig, NotificationHandler
+from .handlers import CONSUMER, PRIVATE_CONSUMER, NotificationConfig, NotificationHandler
 from .settings import NotificationSettings
 
 if TYPE_CHECKING:
@@ -128,4 +131,5 @@ def main() -> int:
         "notification",
         NotificationSettings,  # type: ignore[arg-type] - Pflichtfelder kommen aus der Umgebung
         lambda settings: partial(setup, settings=settings),  # type: ignore[arg-type]
+        consumers=(CONSUMER, PRIVATE_CONSUMER),
     )

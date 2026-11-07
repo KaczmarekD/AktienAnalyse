@@ -7,7 +7,7 @@ Sie sind der Vertrag mit dem Frontend: Der OpenAPI-Snapshot und der daraus gener
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -278,6 +278,8 @@ class Me(_Model):
     email: str | None
     # D1.4: Einmal-Passwort; bis es ersetzt ist, antworten die anderen Endpunkte mit 403
     must_change_password: bool
+    # D1.6: neue Adresse, die auf den Link aus der Mail wartet; bis dahin gilt ``email``
+    pending_email: str | None = None
 
 
 class SessionState(_Model):
@@ -293,9 +295,30 @@ class PasswordChange(_Model):
 
 
 class ProfileUpdate(_Model):
-    """Anzeigename; leer entfernt ihn. Die Mail-Adresse folgt mit ihrer Bestaetigung (D1.6)."""
+    """Anzeigename; leer entfernt ihn. Eine neue Mail-Adresse gilt erst nach dem Link aus der Mail
+    (D1.6); ohne ``email`` bleibt die Adresse, wie sie ist."""
 
     display_name: str | None = Field(default=None, max_length=100)
+    email: str | None = Field(default=None, max_length=254)
+
+
+class EmailConfirmation(_Model):
+    """Das Token aus dem Link der Bestaetigungsmail (D1.6)."""
+
+    token: str = Field(min_length=1, max_length=200)
+
+
+class DataExport(_Model):
+    """Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens."""
+
+    exported_at: datetime
+    account: list[dict[str, Any]]
+    profiles: list[dict[str, Any]]
+    statuses: list[dict[str, Any]]
+    credentials: list[dict[str, Any]]  # wann ein Passwort gesetzt wurde, ohne Hash
+    sessions: list[dict[str, Any]]
+    logins: list[dict[str, Any]]
+    email_confirmations: list[dict[str, Any]]
 
 
 class SessionInfo(_Model):

@@ -10,20 +10,33 @@ fragt das Kommando das Passwort zweimal ab (``getpass``, ohne Echo). Es braucht
 
 Exit-Code: 0 angelegt, 1 abgelehnt (Name, Passwort, Rolle, Mail, schon vorhanden), 2 nicht
 eingerichtet.
+
+Seit D1.6 loescht ``erase-user`` auf ausdruecklichen Wunsch einer Person alle ihre Daten im Schema
+``identity`` (ADR-0012). Es braucht die Rolle des Besitzers und laeuft deshalb im Container
+``value-analyzer``, der ``DATABASE_OWNER_URL`` hat::
+
+    docker compose run --rm value-analyzer python -m va_web_api.admin erase-user anna \
+        --by dennis --yes
+
+Ohne ``--yes`` loescht es nichts. Exit-Code: 0 geloescht, 1 Konto unbekannt, 2 nicht bestaetigt
+oder nicht eingerichtet.
 """
 
 from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import TextIO
 
 from pydantic import ValidationError
 
 from va_platform.db import create_db_engine
 
+from .adapters.postgres.identity_erasure import UnknownAccount, erase_user
 from .adapters.postgres.identity_store import PostgresIdentityStore
 from .identity.ports import UserExists
 from .identity.service import IdentityService, WeakPassword
@@ -40,6 +53,14 @@ def _parser() -> argparse.ArgumentParser:
     create.add_argument("--display-name")
     create.add_argument(
         "--password-stdin", action="store_true", help="Passwort als erste Zeile von stdin"
+    )
+    erase = commands.add_parser(
+        "erase-user", help="alle Daten eines Kontos in identity loeschen (ADR-0012)"
+    )
+    erase.add_argument("username")
+    erase.add_argument("--by", required=True, help="der Admin, der loescht (fuer das Protokoll)")
+    erase.add_argument(
+        "--yes", action="store_true", help="bestaetigt: unwiderruflich, nur auf Wunsch der Person"
     )
     return parser
 
@@ -64,6 +85,39 @@ def _identity_url() -> str | None:
 
 def main(argv: Sequence[str] | None = None, *, stdin: TextIO = sys.stdin) -> int:
     args = _parser().parse_args(argv)
+    if args.command == "erase-user":
+        return _erase(args)
+    return _create(args, stdin)
+
+
+def _erase(args: argparse.Namespace) -> int:
+    name = args.username.strip().lower()
+    if not args.yes:
+        print(
+            f"Loescht alle Daten von {name} in identity, unwiderruflich (Backups ausgenommen). "
+            "Nur auf ausdruecklichen Wunsch der Person; mit --yes bestaetigen.",
+            file=sys.stderr,
+        )
+        return 2
+    url = os.environ.get("DATABASE_OWNER_URL")
+    if not url:
+        print("DATABASE_OWNER_URL muss gesetzt sein (Container value-analyzer)", file=sys.stderr)
+        return 2
+    engine = create_db_engine(url)
+    try:
+        report = erase_user(engine, name, by=args.by.strip().lower(), at=datetime.now(UTC))
+    except UnknownAccount:
+        print(f"Den Benutzer {name} gibt es nicht", file=sys.stderr)
+        return 1
+    finally:
+        engine.dispose()
+    print(f"Daten von {name} geloescht, Protokoll in identity.erasure_log:")
+    for table, count in report.rows.items():
+        print(f"  {table}: {count}")
+    return 0
+
+
+def _create(args: argparse.Namespace, stdin: TextIO) -> int:
     url = _identity_url()
     if url is None:
         print(

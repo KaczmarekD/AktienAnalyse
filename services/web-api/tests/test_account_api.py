@@ -13,6 +13,7 @@ Ohne Datenbank, mit dem Speicher im Prozess und einer steuerbaren Uhr wie in
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import ClassVar
 
 import pytest
 from fastapi.testclient import TestClient
@@ -201,13 +202,126 @@ class TestProfile:
         client.put("/api/v1/me/profile", json={"display_name": "Dennis"})
         assert client.get("/api/v1/me").json()["email"] == "dennis@example.com"
 
-    def test_the_mail_address_cannot_be_changed_here_yet(self, client):
-        """Eine neue Adresse gilt erst nach Bestaetigung (NUT-10, D1.6)."""
+
+class TestEmailChange:
+    """D1.6 (NUT-10): Eine neue Adresse gilt erst nach Bestaetigung per Link (24 h, einmalig).
+    Der Link geht ueber das private Event an notification, nie in einer Antwort zurueck."""
+
+    ORIGIN: ClassVar[dict[str, str]] = {"Origin": "https://testserver"}
+
+    def _change(self, client: TestClient, email: str = "neu@example.com"):
+        return client.put(
+            "/api/v1/me/profile",
+            json={"display_name": "Anna", "email": email},
+            headers=self.ORIGIN,
+        )
+
+    def _token(self, store: MemoryIdentityStore) -> str:
+        from urllib.parse import parse_qs, urlsplit
+
+        envelope = store.outbox()[-1]
+        assert envelope.type == "identity.email_confirmation.requested"
+        return parse_qs(urlsplit(envelope.data.link).query)["token"][0]
+
+    def test_the_new_address_waits_for_confirmation(self, client, store):
+        _login(client, username="dennis")
+        response = self._change(client)
+        assert response.status_code == 200
+        me = response.json()
+        assert (me["email"], me["pending_email"]) == ("dennis@example.com", "neu@example.com")
+        [envelope] = store.outbox()
+        assert envelope.data.email == "neu@example.com"
+        assert envelope.data.link.startswith("https://testserver/confirm-email?token=")
+        assert "token" not in response.text  # der Link steht nur in der Mail
+
+    def test_confirming_without_session_sets_the_address(self, client, second, store):
+        _login(client, username="dennis")
+        self._change(client)
+        token = self._token(store)
+        # Der Link kann in einem anderen Browser ohne Sitzung geoeffnet werden
+        response = second.post("/api/v1/auth/confirm-email", json={"token": token})
+        assert response.status_code == 204
+        me = client.get("/api/v1/me").json()
+        assert (me["email"], me["pending_email"]) == ("neu@example.com", None)
+
+    def test_a_link_works_once(self, client, second, store):
+        _login(client, username="dennis")
+        self._change(client)
+        token = self._token(store)
+        assert second.post("/api/v1/auth/confirm-email", json={"token": token}).status_code == 204
+        again = second.post("/api/v1/auth/confirm-email", json={"token": token})
+        assert again.status_code == 400
+
+    def test_a_link_expires_after_a_day(self, client, second, store, clock):
+        _login(client, username="dennis")
+        self._change(client)
+        token = self._token(store)
+        clock.now += timedelta(hours=24, minutes=1)
+        response = second.post("/api/v1/auth/confirm-email", json={"token": token})
+        assert response.status_code == 400
+        assert "abgelaufen" in response.json()["detail"]
+
+    def test_only_the_newest_link_counts(self, client, second, store):
+        _login(client, username="dennis")
+        self._change(client, "eins@example.com")
+        first = self._token(store)
+        self._change(client, "zwei@example.com")
+        assert second.post("/api/v1/auth/confirm-email", json={"token": first}).status_code == 400
+        assert client.get("/api/v1/me").json()["pending_email"] == "zwei@example.com"
+
+    def test_an_unknown_link(self, second):
+        response = second.post("/api/v1/auth/confirm-email", json={"token": "erfunden"})
+        assert response.status_code == 400
+
+    def test_the_same_address_needs_no_confirmation(self, client, store):
+        _login(client, username="dennis")
+        response = self._change(client, "dennis@example.com")
+        assert response.status_code == 200
+        assert response.json()["pending_email"] is None
+        assert store.outbox() == []
+
+    def test_at_most_five_mails_an_hour(self, client, store, clock):
+        """Gegen Mails in Serie an fremde Adressen ueber das SMTP-Konto der NAS."""
+        _login(client, username="dennis")
+        for n in range(5):
+            assert self._change(client, f"neu{n}@example.com").status_code == 200
+        refused = self._change(client, "neu5@example.com")
+        assert refused.status_code == 429
+        assert refused.headers["retry-after"] == "3600"
+        assert len(store.outbox()) == 5
+        clock.now += timedelta(hours=1, minutes=1)
+        assert self._change(client, "neu5@example.com").status_code == 200
+
+    def test_an_invalid_address_is_rejected(self, client):
+        _login(client)
+        assert self._change(client, "keine-adresse").status_code == 400
+
+    def test_without_origin_no_link_can_be_built(self, client):
+        """Ohne Browser-Herkunft und ohne WEB_API_ALLOWED_ORIGINS kennt das web-api die
+        Adresse des UI nicht und kann keinen Link bauen."""
         _login(client)
         response = client.put(
             "/api/v1/me/profile", json={"display_name": "Anna", "email": "neu@example.com"}
         )
-        assert response.status_code == 422
+        assert response.status_code == 400
+
+
+class TestExport:
+    """D1.6 (NUT-12): alle eigenen Daten als JSON-Datei, ohne Hashes und Tokens."""
+
+    def test_downloads_the_own_data(self, client, store):
+        _login(client)
+        response = client.get("/api/v1/me/export")
+        assert response.status_code == 200
+        assert "attachment" in response.headers["content-disposition"]
+        assert response.headers["content-disposition"].endswith('.json"')
+        data = response.json()
+        assert data["account"][0]["username"] == "anna"
+        assert "scrypt$" not in response.text
+        assert "dennis" not in response.text  # nichts von anderen Konten
+
+    def test_needs_a_session(self, client):
+        assert client.get("/api/v1/me/export").status_code == 401
 
 
 class TestSessions:

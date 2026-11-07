@@ -68,6 +68,12 @@ export const routes: Routes = [
     loadComponent: () => import('./account/account-page').then((m) => m.AccountPage),
   },
   {
+    // D1.6: der Link aus der Bestätigungsmail, ohne Anmeldung (das Token ist der Nachweis)
+    path: 'confirm-email',
+    title: 'Mail-Adresse bestätigen · Value-Analyzer',
+    loadComponent: () => import('./account/confirm-email-page').then((m) => m.ConfirmEmailPage),
+  },
+  {
     path: 'admin/users',
     title: 'Nutzer · Value-Analyzer',
     canActivate: [adminGuard],

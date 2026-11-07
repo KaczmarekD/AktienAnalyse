@@ -245,6 +245,9 @@ class _NoSender:
         subject: str,  # noqa: ARG002 - Signatur des Ports
         html_body: str,  # noqa: ARG002
         attachment: tuple[str, bytes] | None = None,  # noqa: ARG002
+        *,
+        recipient: str | None = None,  # noqa: ARG002
+        text: str | None = None,  # noqa: ARG002
     ) -> None:
         msg = "Ein Replay verschickt nichts"
         raise RuntimeError(msg)

@@ -51,8 +51,12 @@ def test_schema_is_not_shared_by_the_batch_grants():
     assert IDENTITY_ROLE == "va_identity"
 
 
-def test_tables_of_d1_1(engine):
+def test_tables_of_d1_1_and_d1_6(engine):
     assert _identity_tables(engine) == [
+        # D1.6: Bestaetigung der Mail-Adresse und Protokoll des Loeschkommandos
+        "identity.email_confirmation",
+        "identity.email_confirmation_used",
+        "identity.erasure_log",
         "identity.inbox",
         "identity.login_event",
         "identity.outbox",

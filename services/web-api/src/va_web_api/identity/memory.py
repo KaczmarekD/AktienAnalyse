@@ -7,12 +7,16 @@ alle Konten weg.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import count
+from typing import Any
+
+from va_contracts import Envelope
 
 from .domain import FAILURE_REASONS, Failures
-from .ports import SessionRecord, UserExists, UserRecord
+from .ports import EmailConfirmationRecord, SessionRecord, UserExists, UserRecord
 
 
 @dataclass(frozen=True)
@@ -48,12 +52,25 @@ class _Session:
     revoked: bool = False
 
 
+@dataclass
+class _Confirmation:
+    token_hash: str
+    user_id: int
+    email: str
+    expires_at: datetime
+    created_at: datetime
+    used: bool = False
+
+
 class MemoryIdentityStore:
     def __init__(self) -> None:
         self._ids = count(1)
         self._users: dict[int, _User] = {}
         self._sessions: dict[str, _Session] = {}
         self._events: list[LoginEvent] = []
+        self._confirmations: list[_Confirmation] = []
+        self._outbox: list[Envelope[Any]] = []
+        self._published = 0
 
     # Nur fuer Tests: was gespeichert ist
     def session_ids(self) -> set[str]:
@@ -61,6 +78,10 @@ class MemoryIdentityStore:
 
     def login_events(self) -> list[LoginEvent]:
         return list(self._events)
+
+    def outbox(self) -> list[Envelope[Any]]:
+        """Events fuer die Outbox (D1.6), in der Reihenfolge, in der sie kamen."""
+        return list(self._outbox)
 
     def create_user(
         self,
@@ -228,3 +249,102 @@ class MemoryIdentityStore:
                 session.revoked = True
                 revoked.append(id_hash)
         return revoked
+
+    # --- D1.6 ---
+
+    def add_email_confirmation(
+        self,
+        user_id: int,
+        *,
+        email: str,
+        token_hash: str,
+        expires_at: datetime,
+        at: datetime,
+        envelope: Envelope[Any] | None,
+    ) -> None:
+        self._confirmations.append(_Confirmation(token_hash, user_id, email, expires_at, at))
+        if envelope is not None:
+            self._outbox.append(envelope)
+
+    def _confirmation(self, token_hash: str) -> _Confirmation | None:
+        return next((c for c in self._confirmations if c.token_hash == token_hash), None)
+
+    def find_email_confirmation(self, token_hash: str) -> EmailConfirmationRecord | None:
+        found = self._confirmation(token_hash)
+        if found is None:
+            return None
+        newest = [c for c in self._confirmations if c.user_id == found.user_id][-1]
+        return EmailConfirmationRecord(
+            user_id=found.user_id,
+            email=found.email,
+            expires_at=found.expires_at,
+            created_at=found.created_at,
+            used=found.used,
+            latest=newest is found,
+        )
+
+    def count_email_confirmations(self, user_id: int, *, since: datetime) -> int:
+        return sum(1 for c in self._confirmations if c.user_id == user_id and c.created_at >= since)
+
+    def confirm_email(self, token_hash: str, *, at: datetime) -> bool:  # noqa: ARG002
+        found = self._confirmation(token_hash)
+        if found is None or found.used:
+            return False
+        found.used = True
+        self._users[found.user_id].email = found.email
+        return True
+
+    def pending_email(self, user_id: int, *, now: datetime) -> str | None:
+        own = [c for c in self._confirmations if c.user_id == user_id]
+        if not own or own[-1].used or own[-1].expires_at <= now:
+            return None
+        return own[-1].email
+
+    def export(self, user_id: int) -> dict[str, list[dict[str, Any]]]:
+        user = self._users[user_id]
+        return {
+            "account": [
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role,
+                    "created_at": user.created_at,
+                }
+            ],
+            "profiles": [{"display_name": user.display_name, "email": user.email}],
+            "statuses": [{"status": status} for status in user.statuses],
+            "credentials": [{"must_change": must} for _, must in user.passwords],
+            "sessions": [
+                {
+                    "created_at": s.created_at,
+                    "expires_at": s.expires_at,
+                    "user_agent": s.user_agent,
+                    "revoked": s.revoked,
+                }
+                for s in self._sessions.values()
+                if s.user_id == user_id
+            ],
+            "logins": [
+                {"username": e.username, "ip": e.ip, "ok": e.ok, "reason": e.reason, "at": e.at}
+                for e in self._events
+                if e.user_id == user_id or e.username == user.username
+            ],
+            "email_confirmations": [
+                {
+                    "email": c.email,
+                    "created_at": c.created_at,
+                    "expires_at": c.expires_at,
+                    "used": c.used,
+                }
+                for c in self._confirmations
+                if c.user_id == user_id
+            ],
+        }
+
+    def publish_pending(self, publish: Callable[[Envelope[Any]], None]) -> int:
+        sent = 0
+        while self._published < len(self._outbox):
+            publish(self._outbox[self._published])
+            self._published += 1
+            sent += 1
+        return sent

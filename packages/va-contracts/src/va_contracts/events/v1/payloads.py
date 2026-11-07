@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -170,3 +170,18 @@ class RunFailedV1(_RunScoped):
     scoring_run_id: PositiveId | None = None
     # Details fuer die Fehlermail, etwa der Traceback (additiv seit P1.8)
     detail: str | None = None
+
+
+class EmailConfirmationRequestedV1(Contract):
+    """web-api -> notification (privat, D1.6, NUT-10): Bestaetigungsmail an eine neue Adresse.
+
+    Laeuft ueber ``priv.va.`` (Stream ``VA_PRIVATE``, nur im Speicher, 24 h), weil Adresse und Link
+    personenbezogen sind. ``link`` enthaelt das Token; gespeichert ist beim web-api nur sein Hash.
+    """
+
+    user_id: PositiveId
+    email: str
+    # https://<ui>/confirm-email?token=...; notification setzt es in die Mail, deshalb nur dieser
+    # Aufbau: kein Pfad, Text oder fremder Link davor (Sicherheitspruefung D1.6)
+    link: str = Field(pattern=r"^https?://[^\s/?#@]+/confirm-email\?token=\S+$")
+    expires_at: datetime

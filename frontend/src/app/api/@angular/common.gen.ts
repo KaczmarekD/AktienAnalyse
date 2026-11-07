@@ -9,6 +9,8 @@ import type {
   ActivateProfileVersionResponse,
   ChangePasswordData,
   ChangePasswordResponse,
+  ConfirmEmailData,
+  ConfirmEmailResponse,
   CreateUserData,
   CreateUserResponse,
   CurrentSessionData,
@@ -17,6 +19,8 @@ import type {
   DisableUserResponse,
   EnableUserData,
   EnableUserResponse,
+  ExportDataData,
+  ExportDataResponse,
   GetInstrumentData,
   GetInstrumentResponse,
   GetProfileData,
@@ -138,6 +142,22 @@ export const resetPasswordRequest = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Confirm Email
+ *
+ * Bestaetigt eine neue Mail-Adresse mit dem Token aus dem Link (einmalig, 24 h, nur
+ * die juengste Anfrage). Ohne Sitzung: Das Token ist der Nachweis.
+ */
+export const confirmEmailRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ConfirmEmailData, ThrowOnError>,
+): HttpRequest<ConfirmEmailResponse> =>
+  (options?.client ?? client).requestOptions<ConfirmEmailResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/auth/confirm-email',
+    ...options,
+  });
+
+/**
  * Login
  *
  * Meldet an und setzt das Sitzungs-Cookie.
@@ -225,6 +245,21 @@ export const meRequest = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Export Data
+ *
+ * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.
+ */
+export const exportDataRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<ExportDataData, ThrowOnError>,
+): HttpRequest<ExportDataResponse> =>
+  (options?.client ?? client).requestOptions<ExportDataResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/me/export',
+    ...options,
+  });
+
+/**
  * Change Password
  *
  * Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.
@@ -242,7 +277,8 @@ export const changePasswordRequest = <ThrowOnError extends boolean = false>(
 /**
  * Update Profile
  *
- * Aendert den Anzeigenamen; leer entfernt ihn.
+ * Aendert den Anzeigenamen (leer entfernt ihn) und fordert fuer eine neue Mail-Adresse
+ * die Bestaetigung an. Bis zum Link aus der Mail gilt die bisherige (``pending_email``).
  */
 export const updateProfileRequest = <ThrowOnError extends boolean = false>(
   options: Options<UpdateProfileData, ThrowOnError>,
@@ -537,6 +573,20 @@ export const resetPasswordResource = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Confirm Email
+ *
+ * Bestaetigt eine neue Mail-Adresse mit dem Token aus dem Link (einmalig, 24 h, nur
+ * die juengste Anfrage). Ohne Sitzung: Das Token ist der Nachweis.
+ */
+export const confirmEmailResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<ConfirmEmailData, ThrowOnError> | undefined,
+) =>
+  httpResource<ConfirmEmailResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? confirmEmailRequest(opts) : undefined;
+  });
+
+/**
  * Login
  *
  * Meldet an und setzt das Sitzungs-Cookie.
@@ -612,6 +662,19 @@ export const meResource = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Export Data
+ *
+ * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.
+ */
+export const exportDataResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<ExportDataData, ThrowOnError> | undefined,
+) =>
+  httpResource<ExportDataResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? exportDataRequest(opts) : undefined;
+  });
+
+/**
  * Change Password
  *
  * Ersetzt das eigene Passwort. Alle anderen Sitzungen enden, diese bleibt.
@@ -627,7 +690,8 @@ export const changePasswordResource = <ThrowOnError extends boolean = false>(
 /**
  * Update Profile
  *
- * Aendert den Anzeigenamen; leer entfernt ihn.
+ * Aendert den Anzeigenamen (leer entfernt ihn) und fordert fuer eine neue Mail-Adresse
+ * die Bestaetigung an. Bis zum Link aus der Mail gilt die bisherige (``pending_email``).
  */
 export const updateProfileResource = <ThrowOnError extends boolean = false>(
   options: () => Options<UpdateProfileData, ThrowOnError> | undefined,

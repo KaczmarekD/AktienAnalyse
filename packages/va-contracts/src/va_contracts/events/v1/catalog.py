@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from ...base import Contract
 from .payloads import (
+    EmailConfirmationRequestedV1,
     FetchProgressedV1,
     ProfileActivatedV1,
     ProfileSavedV1,
@@ -23,17 +25,25 @@ class EventSpec[T: Contract]:
     """Ein Event des Katalogs.
 
     ``subject``: dauerhafte Events unter ``va.>`` (Stream ``VA_EVENTS``), fluechtige unter
-    ``live.va.``, damit JetStream sie nicht speichert. ``dataschema`` ist eine URN, weil
-    CloudEvents 1.0 dort eine absolute URI verlangt.
+    ``live.va.``, damit JetStream sie nicht speichert. Seit D1.6 private unter ``priv.va.``
+    (Stream ``VA_PRIVATE``, nur im Speicher, 24 h): Mail-Adressen, Links, spaeter Bestaende.
+    ``dataschema`` ist eine URN, weil CloudEvents 1.0 dort eine absolute URI verlangt.
+
+    ``max_age``: so lange darf das Event beim Empfaenger ankommen; ohne Angabe gilt die Grenze
+    des Empfaengers (``RUN_TIMEOUT_MINUTES`` fuer die Run-Kette).
     """
 
     type: str
     model: type[T]
     volatile: bool = False
+    private: bool = False
+    max_age: timedelta | None = None
 
     @property
     def subject(self) -> str:
-        return f"live.va.{self.type}" if self.volatile else f"va.{self.type}"
+        if self.volatile:
+            return f"live.va.{self.type}"
+        return f"priv.va.{self.type}" if self.private else f"va.{self.type}"
 
     @property
     def dataschema(self) -> str:
@@ -48,6 +58,13 @@ PROFILE_SAVED = EventSpec("scoring.profile.saved", ProfileSavedV1)
 PROFILE_ACTIVATED = EventSpec("scoring.profile.activated", ProfileActivatedV1)
 REPORT_SENT = EventSpec("notification.report.sent", ReportSentV1)
 RUN_FAILED = EventSpec("screening.run.failed", RunFailedV1)
+# D1.6: privat, der Link gilt 24 h
+EMAIL_CONFIRMATION_REQUESTED = EventSpec(
+    "identity.email_confirmation.requested",
+    EmailConfirmationRequestedV1,
+    private=True,
+    max_age=timedelta(hours=24),
+)
 
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
@@ -60,6 +77,7 @@ EVENTS: dict[str, EventSpec[Any]] = {
         PROFILE_ACTIVATED,
         REPORT_SENT,
         RUN_FAILED,
+        EMAIL_CONFIRMATION_REQUESTED,
     )
 }
 

@@ -104,10 +104,12 @@ def run_service(
     stop: threading.Event,
     max_deliver: int = MAX_DELIVER,
     all_consumers: bool = False,
+    consumers: tuple[str, ...] | None = None,
 ) -> None:
     """Startet den Bus, ruft ``setup`` und kehrt erst zurueck, wenn ``stop`` gesetzt ist.
 
-    Der Bus legt nur den Consumer ``name`` an (D1.5); ``all_consumers`` fuer ``src.worker``, der
+    Der Bus legt nur den Consumer ``name`` an (D1.5), mit ``consumers`` genau diese (D1.6:
+    notification liest auch ``notification-private``); ``all_consumers`` fuer ``src.worker``, der
     alle drei Services in einem Prozess startet (NATS-Nutzer ``batch``).
     """
     if not settings.nats_url:
@@ -130,7 +132,7 @@ def run_service(
         settings.nats_url,
         max_deliver=max_deliver,
         on_dead_letter=dead_letter,
-        consumers=None if all_consumers else (name,),
+        consumers=None if all_consumers else (consumers or (name,)),
     )
     bus.start()
     try:
@@ -147,6 +149,8 @@ def service_main(
     name: str,
     load: Callable[[], ServiceSettings],
     setup: Callable[[ServiceSettings], Callable[[NatsBus, Engine], None]],
+    *,
+    consumers: tuple[str, ...] | None = None,
 ) -> int:
     """``python -m va_<service>``: Settings laden, bis SIGTERM laufen. Exit 2 bei Konfiguration."""
     try:
@@ -169,7 +173,9 @@ def service_main(
 
     previous = {sig: signal.signal(sig, on_signal) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
-        run_service(name=name, settings=settings, setup=setup(settings), stop=stop)
+        run_service(
+            name=name, settings=settings, setup=setup(settings), stop=stop, consumers=consumers
+        )
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)

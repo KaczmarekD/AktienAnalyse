@@ -93,7 +93,7 @@ class Sender:
     def __init__(self) -> None:
         self.sent: list[tuple[str, str, tuple[str, bytes] | None]] = []
 
-    def send(self, subject, html_body, attachment=None):
+    def send(self, subject, html_body, attachment=None, *, recipient=None, text=None):
         self.sent.append((subject, html_body, attachment))
 
 

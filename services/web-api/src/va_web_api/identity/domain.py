@@ -7,6 +7,8 @@
 - Sitzungen (NUT-01): zufaellige ID mit 256 Bit im Cookie, in der Datenbank nur ihr SHA-256.
   Ablauf nach 12 h ohne Aktivitaet, spaetestens nach 30 Tagen.
 - Sperre (NUT-06): ab 5 Fehlversuchen je Konto oder je IP-Adresse, 15 Minuten.
+- Mail-Adresse (NUT-10, D1.6): eine neue gilt erst nach dem Link aus der Mail, der 24 h
+  gilt; gespeichert ist nur der SHA-256 seines Tokens.
 """
 
 from __future__ import annotations
@@ -28,6 +30,15 @@ LOGIN_REASONS = ("ok", *FAILURE_REASONS, "locked", "disabled")
 REVOKE_REASONS = ("logout", "admin", "password_changed", "disabled")
 
 USERNAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{2,31}")
+# Bewusst schlicht: genau ein @, davor etwas, dahinter eine Domain mit Punkt, kein
+# Leerzeichen und keine Steuerzeichen (die Adresse landet im Kopf einer Mail)
+_EMAIL_PART = r"[^@\s\x00-\x1f\x7f]+"
+EMAIL_PATTERN = re.compile(rf"{_EMAIL_PART}@{_EMAIL_PART}\.{_EMAIL_PART}")
+EMAIL_MAX_LENGTH = 254
+EMAIL_CONFIRMATION_VALIDITY = timedelta(hours=24)
+# Gegen Mails in Serie an fremde Adressen ueber das SMTP-Konto der NAS (Gmail: ~500 am Tag)
+EMAIL_CONFIRMATION_LIMIT = 5
+EMAIL_CONFIRMATION_WINDOW = timedelta(hours=1)
 MIN_PASSWORD_LENGTH = 12
 
 # Bewusst klein: Kurze Passwoerter scheitern schon an der Laenge. Die Liste faengt die haeufigsten
@@ -84,6 +95,10 @@ def normalize_username(raw: str) -> str:
         )
         raise InvalidUsername(msg)
     return name
+
+
+def valid_email(email: str) -> bool:
+    return len(email) <= EMAIL_MAX_LENGTH and EMAIL_PATTERN.fullmatch(email) is not None
 
 
 def password_problems(password: str, username: str | None = None) -> list[str]:

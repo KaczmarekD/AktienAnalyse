@@ -9,10 +9,20 @@ if TYPE_CHECKING:
 
 
 class ReportSender(Protocol):
-    """Verschickt den Report. ``attachment`` = (Dateiname, Inhalt)."""
+    """Verschickt eine Mail. ``attachment`` = (Dateiname, Inhalt).
+
+    Ohne ``recipient`` geht sie an ``MAIL_TO`` (Report, Fehlermail). Seit D1.6 auch an eine andere
+    Adresse (Bestaetigungsmail), dann mit eigenem Klartext ``text`` neben dem HTML.
+    """
 
     def send(
-        self, subject: str, html_body: str, attachment: tuple[str, bytes] | None = None
+        self,
+        subject: str,
+        html_body: str,
+        attachment: tuple[str, bytes] | None = None,
+        *,
+        recipient: str | None = None,
+        text: str | None = None,
     ) -> None: ...
 
 

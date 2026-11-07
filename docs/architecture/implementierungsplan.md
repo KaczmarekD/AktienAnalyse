@@ -3403,6 +3403,79 @@ Spezifikation: [depot/README.md](depot/README.md), Entscheidungen
   Empfänger als Parameter von `ReportSender`. `erase_user` zuerst für `identity`, die anderen
   Besitzer folgen mit ihren Stufen.
 - **Review:** `/code-review high`, `/security-review`.
+- **Entwurf (07.11.2026):**
+  - **Plattform:** `EventSpec.private` → Subject `priv.va.<typ>`; Stream `VA_PRIVATE`
+    (`priv.va.>`, nur im Speicher, 24 h). `ConsumerSpec` bekommt seinen Stream, Consumer-Namen sind
+    über beide Streams eindeutig (`notification-private`). Der Publisher wählt den Stream nach dem
+    Subject. `provision` legt `VA_EVENTS` immer an, `VA_PRIVATE` nur, wenn ein eigener Consumer
+    dort liegt oder der Bus es verlangt (web-api sendet dorthin). Höchstalter je Event
+    (`EventSpec.max_age`, für die Bestätigung 24 h statt `RUN_TIMEOUT_MINUTES`). Das web-api
+    abonniert keine privaten Events.
+  - **Event** `identity.email_confirmation.requested` (`user_id`, `email`, `link`, `expires_at`):
+    Das web-api baut den Link aus der geprüften Herkunft der Anfrage (`Origin`), notification
+    braucht so keine eigene URL. Er geht über die Outbox im Schema `identity`, ein Relay im
+    web-api schickt sie über den Event-Bus (wie die Outbox im Schema `web`).
+  - **Migration 0017:** `identity.email_confirmation` (Nutzer, Adresse, SHA-256 des Tokens,
+    Ablauf), `identity.email_confirmation_used` (Token, Zeitpunkt; einmalig), `identity.erasure_log`
+    (Hash der Nutzer-ID, Zeitpunkt, Admin, Zeilenzahlen je Tabelle, keine Inhalte).
+  - **API:** `PUT /me/profile` nimmt `email` an. Die neue Adresse gilt erst nach Bestätigung, `Me`
+    meldet sie als `pending_email`. `POST /auth/confirm-email` (ohne Sitzung, Token ist der
+    Nachweis; nur die jüngste Anfrage, 24 h, einmalig) legt eine Profil-Version mit
+    `email_confirmed_at` an. `GET /me/export`: alle eigenen Zeilen aus `identity` als JSON, ohne
+    Hashes.
+  - **notification:** `ReportSender.send(..., recipient=)`; Consumer `notification-private`
+    verschickt die Bestätigungsmail an die neue Adresse. Kein Eintrag im Versandprotokoll, sonst
+    stünde die Adresse im Schema `reporting`.
+  - **Löschkommando:** `python -m va_web_api.admin erase-user <name> --by <admin> --yes` mit der
+    Rolle des Besitzers (`DATABASE_OWNER_URL`, im Container `value-analyzer`). Es schaltet die
+    Trigger nur in dieser Transaktion ab (`ALTER TABLE … DISABLE TRIGGER USER`), löscht alle
+    Zeilen des Nutzers in `identity` (auch Outbox) und schreibt `erasure_log`.
+  - **NATS:** web-api sendet `priv.va.identity.>`, notification liest `VA_PRIVATE` nur über
+    `notification-private`; alle anderen Dienste sehen `VA_PRIVATE` nicht.
+  - **UI:** Mail-Adresse auf `/account` mit „Bestätigung ausstehend“, Seite `/confirm-email`
+    (ohne Anmeldung), Button „Meine Daten herunterladen“.
+  - **E2E:** Adresse ändern, Mail in Mailpit, Link aufrufen, Adresse gilt.
+- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+  - **Ohne Herkunft kein Link:** Hat die Anfrage kein `Origin` und ist `WEB_API_ALLOWED_ORIGINS`
+    leer, antwortet `PUT /me/profile` mit 400. Die Herkunft hat `OriginCheckMiddleware` schon
+    geprüft, und nginx nimmt nur die Hostnamen aus `UI_SERVER_NAMES` an; ein Link auf einen
+    fremden Host lässt sich so nicht erzeugen.
+  - **Senden:** Der Endpunkt gibt die Outbox nach der Antwort an den Event-Bus, ein Takt im
+    web-api (30 s) holt nach, was liegen blieb. Die Mail nennt die Gültigkeit in Ortszeit und enthält den
+    Link im HTML (escaped) und im Klartext.
+  - **Gleiche Adresse:** Ist die neue gleich der bisherigen (ohne Groß- und Kleinschreibung), geht
+    keine Mail raus.
+  - **Export:** Abschnitte `account`, `profiles`, `statuses`, `credentials` (wann ein Passwort
+    gesetzt wurde, ohne Hash), `sessions` (ohne ID), `logins`, `email_confirmations` (ohne Token)
+    und `exported_at`. Der Abschnitt heißt `credentials` statt `passwords`, weil der
+    Sicherheitstest aus D1.4 Antwortfelder mit „password“ im Namen verbietet. Das UI speichert die
+    Antwort so, wie sie kommt, auch mit Abschnitten, die der Client noch nicht kennt.
+  - **Löschkommando:** sperrt zuerst alle Tabellen (`ALTER TABLE … DISABLE TRIGGER va_no_delete`),
+    dann löscht es; so schreibt keine Anmeldung dazwischen. Nur dieser Trigger geht aus, die
+    Schutz-Trigger gegen `UPDATE` bleiben an. Die Inbox bleibt, sie enthält nur Event-IDs.
+  - **Dienste:** `run_service`/`service_main` nehmen eine Liste von Consumern (`consumers=`),
+    notification liest `notification` und `notification-private`.
+  - **In der CI gefunden:** Startet ein Dienst nur mit seinem Namen (`run_service(name=…)`, so der
+    Dienst-Test), fehlte auf einem frischen NATS der Stream `VA_PRIVATE`, und das Abonnieren von
+    `notification-private` scheiterte. Lokal lag der Stream noch von früheren Läufen da. Jetzt legt
+    `NatsBus` einen vorgegebenen Consumer beim Abonnieren an wie die Provisionierung, samt Stream.
+  - **Review (`/code-review high`):** behoben, dass die Profil-Anfrage auf NATS wartete (die Mail
+    geht jetzt nach der Antwort raus), dass ein Nutzer beliebig viele Bestätigungsmails an fremde
+    Adressen schicken konnte (höchstens 5 je Stunde, sonst 429), dass ohne `Origin` irgendeine der
+    erlaubten Herkünfte im Link landete (nur noch bei genau einer), dass ein unbekannter Consumer
+    mit Events aus beiden Streams still im falschen Stream entstand und dass ein geleertes
+    Mail-Feld wie Erfolg aussah. Offen gelassen: Ohne NATS (`make api`) bleibt die Mail in der
+    Outbox liegen; notification prüft den Ablauf mit der echten Uhr.
+  - **Sicherheitsprüfung (`/security-review`):** Ein angemeldeter Nutzer konnte über einen
+    `Origin` mit dem echten Host, aber mit Pfad und Text dahinter (per curl) eigenen Text und
+    einen fremden Link in die Bestätigungsmail an eine beliebige Adresse schreiben, versandt vom
+    SMTP-Konto der NAS. Behoben an drei Stellen: `origin_allowed` nimmt nur `scheme://host[:port]`
+    an (gilt auch für den WebSocket), `_link_base` baut den Link nur aus den Bestandteilen, und der
+    Contract lässt für `link` nur `http(s)://host/confirm-email?token=…` zu.
+  - **Offen für D2 und später:** notification darf den Filter seines Consumers
+    `notification-private` ändern und so alle Events in `VA_PRIVATE` lesen. Heute liegt dort nur
+    die Bestätigungsmail. Bekommt ein anderer Dienst private Events (Bestände, Berichte), dann mit
+    eigenem Stream oder eigenem NATS-Account; der Hinweis aus D1.5 zum Bank-RPC gilt weiter.
 
 **Fertig, wenn:** jeder Zugriff eine Anmeldung braucht, Admin und Nutzer getrennte Rechte haben,
 der E2E-Test mit Testnutzer grün ist und das Runbook HTTPS über DSM beschreibt. Die Samstags-Mail

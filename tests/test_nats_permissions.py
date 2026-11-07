@@ -80,8 +80,9 @@ def _run(scenario: Callable[[], Awaitable[None]]) -> None:
         # Frischer Stream mit allen Consumern, angelegt vom Nutzer mit allen Rechten
         async with Connection("batch") as admin:
             jsm = admin.nc.jsm()
-            with contextlib.suppress(NotFoundError):
-                await jsm.delete_stream("VA_EVENTS")
+            for stream in ("VA_EVENTS", "VA_PRIVATE"):
+                with contextlib.suppress(NotFoundError):
+                    await jsm.delete_stream(stream)
             await provision(jsm)
         await scenario()
 
@@ -117,12 +118,22 @@ def test_wrong_password_no_connection():
     _run(scenario)
 
 
+# Was jeder Dienst beim Start anlegt (D1.6: notification auch den privaten Consumer, das web-api
+# den privaten Stream, in den es sendet)
+OWN = {
+    "market-data": {"consumers": ("market-data",)},
+    "scoring": {"consumers": ("scoring",)},
+    "notification": {"consumers": ("notification", "notification-private")},
+    "web-api": {"consumers": ("web-api",), "streams": ("VA_EVENTS", "VA_PRIVATE")},
+}
+
+
 @pytest.mark.parametrize("service", SERVICES)
 def test_each_service_starts_its_bus_with_its_own_consumer(service):
     from va_platform.nats.bus import NatsBus
 
     def scenario_sync() -> None:
-        bus = NatsBus(url(service), consumers=(service,))
+        bus = NatsBus(url(service), **OWN[service])  # type: ignore[arg-type]
         bus.start()
         bus.close()
 
@@ -264,6 +275,57 @@ def test_a_service_starts_even_if_the_stream_drifted(service):
         await asyncio.to_thread(start_and_stop)
 
     _run(scenario)
+
+
+class TestPrivateStream:
+    """D1.6: VA_PRIVATE (priv.va.>) nur fuer die, die ihn brauchen: Das web-api sendet die
+    Bestaetigung, notification liest sie ueber notification-private. Sonst niemand."""
+
+    SUBJECT = "priv.va.identity.email_confirmation.requested"
+
+    def test_the_web_api_sends_and_notification_reads(self):
+        async def scenario() -> None:
+            async with Connection("web-api") as web:
+                ack = await web.nc.jetstream().publish(self.SUBJECT, b"{}", timeout=TIMEOUT * 3)
+                assert ack.stream == "VA_PRIVATE"
+            async with Connection("notification") as notify:
+                sub = await notify.nc.jetstream().pull_subscribe_bind(
+                    durable="notification-private", stream="VA_PRIVATE"
+                )
+                [message] = await sub.fetch(1, timeout=TIMEOUT * 3)
+                await message.ack()
+                assert not await notify.violations()
+
+        _run(scenario)
+
+    @pytest.mark.parametrize("service", ["market-data", "scoring", "notification"])
+    def test_nobody_else_sends_private_events(self, service):
+        async def scenario() -> None:
+            async with Connection(service) as c:
+                with pytest.raises(Exception):  # noqa: B017, PT011 - kein PubAck
+                    await c.nc.jetstream().publish(self.SUBJECT, b"{}", timeout=TIMEOUT)
+                assert await c.violations()
+
+        _run(scenario)
+
+    @pytest.mark.parametrize("service", ["market-data", "scoring", "web-api"])
+    def test_nobody_else_reads_the_private_stream(self, service):
+        async def scenario() -> None:
+            async with Connection("web-api") as web:
+                await web.nc.jetstream().publish(self.SUBJECT, b"{}", timeout=TIMEOUT * 3)
+            async with Connection(service) as c:
+                with pytest.raises(Exception):  # noqa: B017, PT011
+                    await asyncio.wait_for(c.nc.jsm().get_msg("VA_PRIVATE", 1), TIMEOUT)
+                with pytest.raises(Exception):  # noqa: B017, PT011
+                    await _fetch_private(c.nc.jetstream())
+                assert await c.violations()
+
+        _run(scenario)
+
+
+async def _fetch_private(js: Any) -> None:
+    sub = await js.pull_subscribe_bind(durable="notification-private", stream="VA_PRIVATE")
+    await sub.fetch(1, timeout=TIMEOUT)
 
 
 class TestRpc:
