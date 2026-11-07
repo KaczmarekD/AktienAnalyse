@@ -10,6 +10,8 @@ from ...base import Contract
 from .payloads import (
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
+    PricesCompletedV1,
+    PricesRequestedV1,
     ProfileActivatedV1,
     ProfileSavedV1,
     ReportSentV1,
@@ -66,6 +68,14 @@ EMAIL_CONFIRMATION_REQUESTED = EventSpec(
     max_age=timedelta(hours=24),
 )
 
+# D2.3: Tageskurse; wie die Bestaetigung 24 h gueltig, damit ein NAS-Neustart sie nicht verliert
+PRICES_REQUESTED = EventSpec(
+    "marketdata.prices.requested", PricesRequestedV1, max_age=timedelta(hours=24)
+)
+PRICES_COMPLETED = EventSpec(
+    "marketdata.prices.completed", PricesCompletedV1, max_age=timedelta(hours=24)
+)
+
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
     for spec in (
@@ -78,6 +88,8 @@ EVENTS: dict[str, EventSpec[Any]] = {
         REPORT_SENT,
         RUN_FAILED,
         EMAIL_CONFIRMATION_REQUESTED,
+        PRICES_REQUESTED,
+        PRICES_COMPLETED,
     )
 }
 

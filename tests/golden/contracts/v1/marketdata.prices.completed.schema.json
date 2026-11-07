@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "DailyCloseV1": {
+      "description": "Schlusskurs eines Wertpapiers in Hauptwaehrung (Pence schon durch 100).",
+      "properties": {
+        "close": {
+          "title": "Close",
+          "type": "number"
+        },
+        "currency": {
+          "title": "Currency",
+          "type": "string"
+        },
+        "isin": {
+          "title": "Isin",
+          "type": "string"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbol"
+        },
+        "trade_date": {
+          "format": "date",
+          "title": "Trade Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin",
+        "trade_date",
+        "close",
+        "currency"
+      ],
+      "title": "DailyCloseV1",
+      "type": "object"
+    },
+    "FxDailyV1": {
+      "properties": {
+        "currency": {
+          "title": "Currency",
+          "type": "string"
+        },
+        "rate_to_eur": {
+          "exclusiveMinimum": 0,
+          "title": "Rate To Eur",
+          "type": "number"
+        },
+        "trade_date": {
+          "format": "date",
+          "title": "Trade Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "currency",
+        "trade_date",
+        "rate_to_eur"
+      ],
+      "title": "FxDailyV1",
+      "type": "object"
+    }
+  },
+  "description": "market-data -> portfolio (ab D3), web-api (D2.3): die Tageskurse der Abdeckung.\n\nOhne Nutzer und Mengen (WP-09). ``missing``: ISINs der Abdeckung ohne Kurs (kein Listing, keine\nWaehrung oder Abruf gescheitert).",
+  "properties": {
+    "closes": {
+      "items": {
+        "$ref": "#/$defs/DailyCloseV1"
+      },
+      "title": "Closes",
+      "type": "array"
+    },
+    "fx": {
+      "items": {
+        "$ref": "#/$defs/FxDailyV1"
+      },
+      "title": "Fx",
+      "type": "array"
+    },
+    "missing": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+    },
+    "price_run_id": {
+      "minimum": 1,
+      "title": "Price Run Id",
+      "type": "integer"
+    },
+    "trade_date": {
+      "format": "date",
+      "title": "Trade Date",
+      "type": "string"
+    }
+  },
+  "required": [
+    "price_run_id",
+    "trade_date"
+  ],
+  "title": "PricesCompletedV1",
+  "type": "object"
+}

@@ -259,6 +259,7 @@ class TestLocalWebApi:
             "WEB_API_ALLOWED_ORIGINS",  # D1.5, leer: dieselbe Herkunft
             "FORWARDED_ALLOW_IPS",  # D1.5: uvicorn glaubt X-Forwarded-For nur von nginx
             "WEB_API_WATCHDOG_FETCH_MINUTES",  # D2.2: mit der Abdeckung erhoehen
+            "WEB_API_PRICE_SCHEDULE",  # D2.3: Termin der Tageskurse
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")
@@ -439,6 +440,7 @@ class TestNasDefinition:
             "WEB_API_ALLOWED_ORIGINS",  # D1.5: UI_ORIGINS, hinter dem DSM-Proxy
             "FORWARDED_ALLOW_IPS",  # D1.5: Vertrauenskette der Proxys
             "WEB_API_WATCHDOG_FETCH_MINUTES",  # D2.2: mit der Abdeckung erhoehen
+            "WEB_API_PRICE_SCHEDULE",  # D2.3: Termin der Tageskurse
         }
         assert env["WEB_API_DATABASE_URL"].startswith("postgresql+psycopg://va_read:")
         assert env["WEB_API_PROJECTIONS_DATABASE_URL"].startswith("postgresql+psycopg://va_web:")

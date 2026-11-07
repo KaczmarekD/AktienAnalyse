@@ -163,7 +163,9 @@ class TestProvisioning:
         assert stream.storage == StorageType.FILE
         assert stream.max_age == 30 * DAY
         assert stream.duplicate_window == 10 * 60
-        assert consumer.filter_subject == RUN_REQUESTED.subject
+        # D2.3: dazu die Tageskurse
+        filters = consumer.filter_subjects or [consumer.filter_subject]
+        assert sorted(filters) == ["va.marketdata.prices.requested", RUN_REQUESTED.subject]
         assert consumer.ack_wait == 60
         assert consumer.max_deliver == 5
 

@@ -189,3 +189,41 @@ class EmailConfirmationRequestedV1(Contract):
     # Aufbau: kein Pfad, Text oder fremder Link davor (Sicherheitspruefung D1.6)
     link: str = Field(pattern=r"^https?://[^\s/?#@]+/confirm-email\?token=\S+$")
     expires_at: datetime
+
+
+class PricesRequestedV1(Contract):
+    """web-api -> market-data (D2.3): Tageskurse holen. ``slot`` ist der Termin des Schedulers,
+    ``trade_date`` der Handelstag, fuer den die Kurse gelten sollen."""
+
+    slot: datetime
+    trade_date: date
+
+
+class DailyCloseV1(Contract):
+    """Schlusskurs eines Wertpapiers in Hauptwaehrung (Pence schon durch 100)."""
+
+    isin: str
+    symbol: str | None = None  # ohne Yahoo-Symbol etwa Bundesanleihen (D2.4)
+    trade_date: date
+    close: float
+    currency: str
+
+
+class FxDailyV1(Contract):
+    currency: str
+    trade_date: date
+    rate_to_eur: float = Field(gt=0)  # 1 Einheit der Waehrung in EUR
+
+
+class PricesCompletedV1(Contract):
+    """market-data -> portfolio (ab D3), web-api (D2.3): die Tageskurse der Abdeckung.
+
+    Ohne Nutzer und Mengen (WP-09). ``missing``: ISINs der Abdeckung ohne Kurs (kein Listing, keine
+    Waehrung oder Abruf gescheitert).
+    """
+
+    price_run_id: PositiveId
+    trade_date: date
+    closes: list[DailyCloseV1] = Field(default_factory=list)
+    fx: list[FxDailyV1] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)

@@ -256,7 +256,8 @@ ein Baustein, kommt er zuerst in den Styleguide.
 - `STATEMENT_FIELDS`: Attribute der Jahresabschlüsse (`income_stmt`, `balance_sheet`, `cashflow`)
 - `INFO_FIELDS`: Schlüssel in `info` (`marketCap`, `currentPrice` …), Reihenfolge = Vorrang
 - `FX_FIELDS`: Aufbau des FX-Symbols (`…=X`) und das Feld `lastPrice` in `fast_info`
-- `CONSENSUS_FIELDS`, `QUARTERLY_FIELDS` und `PRICE_FIELDS`: Zusatzdaten (ADR-0010)
+- `CONSENSUS_FIELDS`, `QUARTERLY_FIELDS` und `PRICE_FIELDS`: Zusatzdaten (ADR-0010), seit
+  D2.3 auch Schlusskurs im Sammelabruf und Währung in `fast_info`
 - `SEARCH_FIELDS` und `SEARCH_TYPES`: Treffer von `yf.Search` (D2.1)
 
 yfinance benennt unangekündigt um ("Total Revenue" → "TotalRevenue") – wenn
@@ -339,6 +340,12 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   bestehenden Lesewege (`get_snapshots_df`, Backfill, Replay, Vorschau, Rescore) sehen nur
   `role = 'universe'`; Ranking, CSV und Mail bleiben gleich. Der Batch im Prozess kennt keine
   Abdeckung.
+- Tageskurse (D2.3): An Handelstagen 22:30 stößt das web-api `marketdata.prices.requested` an
+  (`PriceScheduler`, `web.price_request`, `WEB_API_PRICE_SCHEDULE`). market-data holt die
+  Schlusskurse der Abdeckung per Sammelabruf (`yf.download`), rechnet Pence in Pfund um,
+  speichert sie in `market_data.price_run`, `daily_close` (je ISIN, Quelle und Tag einmal) und
+  `fx_daily` und meldet `marketdata.prices.completed`. Die Währung eines Symbols kommt aus
+  früheren Kursen, sonst einmal von Yahoo; ohne Währung fehlt der Kurs (nie geraten).
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,

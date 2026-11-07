@@ -25,6 +25,8 @@ from va_contracts.events.v1 import (
     EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
     FETCH_PROGRESSED,
+    PRICES_COMPLETED,
+    PRICES_REQUESTED,
     PROFILE_ACTIVATED,
     PROFILE_SAVED,
     REPORT_SENT,
@@ -35,6 +37,8 @@ from va_contracts.events.v1 import (
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
     FundamentalsV1,
+    PricesCompletedV1,
+    PricesRequestedV1,
     ProfileActivatedV1,
     ProfileRefV1,
     ProfileSavedV1,
@@ -259,6 +263,12 @@ def _examples() -> dict[str, Contract]:
         FETCH_PROGRESSED.type: FetchProgressedV1(
             run_id=42, done=57, total=90, symbol="SAP.DE", ok=True
         ),
+        PRICES_REQUESTED.type: PricesRequestedV1(
+            slot=datetime(2026, 11, 6, 21, 30, tzinfo=UTC), trade_date=date(2026, 11, 6)
+        ),
+        PRICES_COMPLETED.type: PricesCompletedV1(
+            price_run_id=3, trade_date=date(2026, 11, 6), closes=[], fx=[], missing=[]
+        ),
         SNAPSHOT_COMPLETED.type: SnapshotCompletedV1(
             run_id=42,
             trigger="scheduled",
@@ -311,6 +321,9 @@ class TestEventCatalog:
             "notification.report.sent",
             "screening.run.failed",
             "identity.email_confirmation.requested",  # D1.6, privat
+            # D2.3: Tageskurse
+            "marketdata.prices.requested",
+            "marketdata.prices.completed",
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -597,3 +610,44 @@ class TestCoverage:
         assert [f.identity.symbol for f in restored.fundamentals] == [
             f.identity.symbol for f in snapshot.fundamentals
         ]
+
+
+class TestPrices:
+    """D2.3: Tageskurse; beide Events warten 24 h, nicht nur RUN_TIMEOUT_MINUTES."""
+
+    def test_both_events_wait_a_day(self):
+        from datetime import timedelta
+
+        from va_contracts.events.v1 import PRICES_COMPLETED, PRICES_REQUESTED
+
+        assert PRICES_REQUESTED.subject == "va.marketdata.prices.requested"
+        assert PRICES_COMPLETED.subject == "va.marketdata.prices.completed"
+        assert PRICES_REQUESTED.max_age == PRICES_COMPLETED.max_age == timedelta(hours=24)
+
+    def test_a_result_round_trips(self):
+        from va_contracts.events.v1 import DailyCloseV1, FxDailyV1, PricesCompletedV1
+
+        completed = PricesCompletedV1(
+            price_run_id=3,
+            trade_date=date(2026, 11, 6),
+            closes=[
+                DailyCloseV1(
+                    isin="US0378331005",
+                    symbol="APC.DE",
+                    trade_date=date(2026, 11, 6),
+                    close=231.5,
+                    currency="EUR",
+                )
+            ],
+            fx=[FxDailyV1(currency="USD", trade_date=date(2026, 11, 6), rate_to_eur=0.92)],
+            missing=["DE000A383J95"],
+        )
+        assert PricesCompletedV1.model_validate_json(completed.model_dump_json()) == completed
+
+    def test_no_user_data_in_prices(self):
+        """WP-09: market-data erfaehrt nur Wertpapiere, nie Nutzer oder Mengen."""
+        from va_contracts.events.v1 import DailyCloseV1, PricesCompletedV1, PricesRequestedV1
+
+        for model in (PricesRequestedV1, PricesCompletedV1, DailyCloseV1):
+            fields = set(model.model_fields)
+            assert not fields & {"user_id", "quantity", "depot_id", "amount", "email"}

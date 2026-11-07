@@ -64,6 +64,7 @@ services:
        "--host", "0.0.0.0", "--port", "8000"]
     environment:
       WEB_API_SCHEDULE: ""  # der Test startet den Lauf selbst
+      WEB_API_PRICE_SCHEDULE: ""  # D2.3: keine Tageskurse von Yahoo im Wegwerf-Stack
 
   # P5.2: die drei Services; CI mit ihren Images aus P5.1, lokal aus dem App-Image
   market-data:

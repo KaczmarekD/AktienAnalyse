@@ -20,11 +20,16 @@ import pandas as pd
 
 from va_contracts.events.v1 import (
     FETCH_PROGRESSED,
+    PRICES_COMPLETED,
+    PRICES_REQUESTED,
     RUN_FAILED,
     RUN_REQUESTED,
     SNAPSHOT_COMPLETED,
+    DailyCloseV1,
     FetchProgressedV1,
     FundamentalsV1,
+    FxDailyV1,
+    PricesCompletedV1,
     RunFailedV1,
     SnapshotCompletedV1,
     UniverseInfoV1,
@@ -38,11 +43,12 @@ from ..application.snapshot import take_snapshot
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
-    from va_contracts.events.v1 import ScreeningRunRequestedV1
+    from va_contracts.events.v1 import PricesRequestedV1, ScreeningRunRequestedV1
     from va_platform.bus import EventBus
 
     from ..application.coverage import CoverageStore
     from ..application.ports import Fetch, SnapshotStore
+    from ..application.prices import PricesResult
     from ..domain.fundamentals import Fundamentals
     from ..domain.universe import Ticker, Universe
 
@@ -179,3 +185,42 @@ def _member(t: Ticker) -> UniverseMemberV1:
 
 def _has_value(value: float | None) -> bool:
     return value is not None and not math.isnan(value)
+
+
+class PricesRequestedHandler:
+    """D2.3: ``marketdata.prices.requested`` -> Tageskurse der Abdeckung -> ``prices.completed``.
+
+    ``collect`` holt und speichert die Kurse fuer den Handelstag (``collect_prices`` mit den
+    Adaptern, verdrahtet in ``entrypoints.service``). Wirft er, stellt der Bus erneut zu; einen Run
+    gibt es hier nicht.
+    """
+
+    def __init__(self, bus: EventBus, *, collect: Callable[[date], PricesResult]) -> None:
+        self._bus = bus
+        self._collect = collect
+
+    def subscribe(self) -> None:
+        self._bus.subscribe(PRICES_REQUESTED, CONSUMER, self)
+
+    def __call__(self, env: Envelope[PricesRequestedV1]) -> None:
+        result = self._collect(env.data.trade_date)
+        completed = PricesCompletedV1(
+            price_run_id=result.price_run_id,
+            trade_date=result.trade_date,
+            closes=[
+                DailyCloseV1(
+                    isin=c.isin,
+                    symbol=c.symbol,
+                    trade_date=c.trade_date,
+                    close=c.close,
+                    currency=c.currency,
+                )
+                for c in result.closes
+            ],
+            fx=[
+                FxDailyV1(currency=f.currency, trade_date=f.trade_date, rate_to_eur=f.rate_to_eur)
+                for f in result.fx
+            ],
+            missing=result.missing,
+        )
+        self._bus.publish(follow_up(env, PRICES_COMPLETED, completed, source=SOURCE))

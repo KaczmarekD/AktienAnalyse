@@ -3557,6 +3557,26 @@ Golden-Master und die Replay-Fixtures.
   Scheduler im web-api (Handelstage 22:30 `Europe/Berlin`) schickt `marketdata.prices.requested`,
   market-data antwortet mit `marketdata.prices.completed`.
 - **Review:** `/code-review high`.
+- **Umgesetzt (07.11.2026):** wie im Entwurf, dazu:
+  - **Kein spätes Abschließen:** `price_run` entsteht mit Ende und Ergebnis in einer Transaktion
+    mit den Kursen, braucht also keinen Eintrag in `UPDATABLE_TABLES`.
+  - **Währung:** aus früheren Kursen des Symbols, sonst einmal aus `fast_info`; ohne Währung
+    fehlt der Kurs. Raten nach der Endung des Symbols wäre falsch (London notiert manche ETFs
+    in USD).
+  - **Untereinheiten:** `GBp`/`GBX`, `ZAc` und `ILA` durch 100.
+  - **Ausfall:** Scheitert der Sammelabruf, wird ein `price_run` mit `failed` gespeichert und
+    gemeldet (alle ISINs in `missing`), kein Fehler, keine Wiederholung in Schleife.
+  - **Nebenbefund:** `_fx_rate` war „pro Run“ per `lru_cache` gecacht, im dauerhaft laufenden
+    market-data-Dienst aber über alle Wochenläufe. Jeder neue Abruf (`YahooFundamentals`)
+    leert den Cache jetzt. Die Tageskurse nutzen einen eigenen, ungecachten Abruf.
+  - **E2E und lokal:** `WEB_API_PRICE_SCHEDULE` leer, damit der Wegwerf-Stack nichts bei Yahoo
+    abruft.
+  - **Review (`/code-review high`):** behoben, dass die gespeicherte Hauptwährung (GBP) am
+    nächsten Tag als Notierung galt und Pence-Kurse 100-fach zu hoch gespeichert hätte (jetzt
+    eigene Spalte `quote_currency`), und dass der Wechselkurs das Datum des letzten Schlusskurses
+    statt des angefragten Tages bekam. Offen gelassen: Tageskurse und Wochenlauf teilen den
+    Consumer `market-data` und warten aufeinander; ohne Abdeckung entsteht je Handelstag ein
+    leerer `price_run`.
 
 **D2.4 ETF- und Anleihedaten** (WP-08, 10)
 - **Test:** `etf_composition` aus den Anbieterdateien (iShares JSON, Deka XLSX) und yfinance

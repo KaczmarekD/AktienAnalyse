@@ -80,6 +80,8 @@ haben (`EventSpec.max_age`): Der `ReliableBus` überspringt es erst danach, nich
 | `va.scoring.profile.activated` | scoring | web-api | profile_id, version |
 | `va.notification.report.sent` | notification | web-api | run_id, report_id, subject, dry_run |
 | `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id (leer genau bei Rescore), trigger, options, stage, reason (z. B. `timeout`, `no_data`), scoring_run_id, detail (Traceback für die Fehlermail) |
+| `va.marketdata.prices.requested` (D2.3, 24 h) | web-api (Scheduler, Outbox im Schema `web`) | market-data | slot (Termin), trade_date |
+| `va.marketdata.prices.completed` (D2.3, 24 h) | market-data | portfolio (ab D3), web-api | price_run_id, trade_date, closes[] (isin, symbol, trade_date, close in Hauptwährung, currency), fx[] (currency, rate_to_eur), missing[] (ISINs ohne Kurs) |
 | `priv.va.identity.email_confirmation.requested` (D1.6, privat, 24 h) | web-api (Outbox im Schema `identity`) | notification (`notification-private`) | user_id, email (die neue Adresse), link (mit Token, aus der geprüften Herkunft der Anfrage), expires_at |
 
 Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring
@@ -229,7 +231,7 @@ NATS. Er umhüllt den Bus je Service, mit Inbox und Outbox aus dessen Schema.
 
 | Consumer (durable) | Filter | Besonderheit |
 |---|---|---|
-| `market-data` | `va.screening.run.requested` | Der Abruf dauert Minuten. Währenddessen In-Progress-Acks senden, sonst stellt JetStream nach `ack_wait` erneut zu. |
+| `market-data` | `va.screening.run.requested`, seit D2.3 `va.marketdata.prices.requested` | Der Abruf dauert Minuten. Währenddessen In-Progress-Acks senden, sonst stellt JetStream nach `ack_wait` erneut zu. |
 | `scoring` | `va.marketdata.snapshot.completed` | speichert den Snapshot zusätzlich lokal, für Vorschau und Rescore |
 | `notification` | `va.scoring.run.completed`, `va.screening.run.failed` | ignoriert `trigger=rescore`, bei `dry_run` nur rendern und speichern |
 | `web-api` | `va.>` | Projektionen und WebSocket, siehe [web-api-realtime.md](web-api-realtime.md) |
@@ -271,7 +273,7 @@ Nutzername in der `NATS_URL` des Dienstes.
 | `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | seit D2.1 antwortet auf `rpc.va.marketdata.>` |
 | `scoring` | `va.scoring.>`, `va.screening.run.failed` | Consumer `scoring` | antwortet auf `rpc.va.scoring.>` |
 | `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification`, seit D1.6 `notification-private` (`VA_PRIVATE`) | antwortet auf `rpc.va.notification.>` |
-| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>`, seit D2.1 `rpc.va.marketdata.>` |
+| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>`, seit D2.3 `va.marketdata.prices.requested` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>`, seit D2.1 `rpc.va.marketdata.>` |
 | `batch` | alles | alles | alles |
 
 - **Inbox:** Antworten (JetStream-API, RPC) gehen an `_INBOX.<nutzer>`; jeder darf nur seine
@@ -300,6 +302,13 @@ Nutzername in der `NATS_URL` des Dienstes.
   ausgefallenen Zeitplan nicht verdecken.
 
 ## Scheduler und Watchdog (im web-api)
+
+**Tageskurse (seit D2.3, `va_web_api.runs.PriceScheduler`):** im selben Takt wie die Runs.
+`WEB_API_PRICE_SCHEDULE` (Standard `30 22 * * 1-5`, in `WEB_API_SCHEDULE_TIMEZONE`) stößt an
+Handelstagen nach Xetra-Schluss `marketdata.prices.requested` an. `web.price_request` hält den
+Termin fest (eindeutig), Zeile und Event entstehen in einer Transaktion. Feiertage kennt der
+Scheduler nicht; Yahoo liefert dann den letzten Handelstag, dessen Kurse schon gespeichert
+sind. Lokal und im E2E-Stack ist der Termin leer (aus).
 
 Seit P4.7 in `va_web_api.runs`. Beides läuft nur mit NATS und Projektions-Datenbank, in einer
 Hintergrund-Aufgabe des web-api (Takt 60 s). Ausgeführt werden die Runs vom Dienste-Prozess

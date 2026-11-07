@@ -69,7 +69,7 @@ from .realtime import endpoint
 from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
 from .rpc import RemoteReads, RemoteScoring, RemoteSecurities
-from .runs import RunManager
+from .runs import PriceScheduler, RunManager
 from .security import JsonOnlyMiddleware, OriginCheckMiddleware
 from .settings import WebApiSettings
 
@@ -130,14 +130,21 @@ def _rpc_bus(url: str) -> NatsBus:
     return bus
 
 
-async def _keep_runs(manager: RunManager, schedule: Schedule | None) -> None:
-    """Takt der Run-Verwaltung (P4.7): Scheduler, Watchdog, Outbox. Ein Fehler (etwa die
-    Datenbank weg) kostet nur diesen Takt."""
+async def _keep_runs(
+    manager: RunManager, schedule: Schedule | None, prices: PriceScheduler | None = None
+) -> None:
+    """Takt der Run-Verwaltung (P4.7): Scheduler, Watchdog, Outbox; seit D2.3 auch der Termin
+    der Tageskurse. Ein Fehler (etwa die Datenbank weg) kostet nur diesen Takt."""
     while True:
         try:
             await asyncio.to_thread(manager.tick, schedule)
         except Exception:
             log.warning("Takt der Run-Verwaltung fehlgeschlagen", exc_info=True)
+        if prices is not None:
+            try:
+                await asyncio.to_thread(prices.tick)
+            except Exception:
+                log.warning("Takt der Tageskurse fehlgeschlagen", exc_info=True)
         await asyncio.sleep(RUNS_TICK_SECONDS)
 
 
@@ -243,7 +250,15 @@ def create_app(
                 limits=settings.watchdog_limits,
                 publisher=lambda: _publisher(app),
             )
-            tasks.append(asyncio.create_task(_keep_runs(app.state.runs, settings.run_schedule)))
+            # D2.3: Termin der Tageskurse, im selben Takt
+            prices = PriceScheduler(
+                app.state.projections_engine,
+                settings.prices_schedule,
+                publisher=lambda: _publisher(app),
+            )
+            tasks.append(
+                asyncio.create_task(_keep_runs(app.state.runs, settings.run_schedule, prices))
+            )
             if app.state.identity is not None:
                 tasks.append(asyncio.create_task(_keep_identity_outbox(app, app.state.identity)))
         # P4.9: Mit NATS lesen die REST-Endpunkte aus den Projektionen, sonst aus den Tabellen

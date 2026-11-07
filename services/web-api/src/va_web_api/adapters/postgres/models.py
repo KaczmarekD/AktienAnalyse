@@ -70,6 +70,18 @@ class RankingRow(Base):
 RUN_TRIGGERS = ("scheduled", "manual")
 
 
+class PriceRequest(Base):
+    """D2.3: ein angestossener Termin der Tageskurse. ``slot`` ist eindeutig: Derselbe Termin
+    ergibt nur eine Anfrage, auch nach einem Neustart. Nur zum Anfuegen."""
+
+    __tablename__ = "price_request"
+    __table_args__ = {"schema": "web"}  # noqa: RUF012
+
+    slot: Mapped[datetime] = mapped_column(primary_key=True)
+    trade_date: Mapped[date]
+    requested_at: Mapped[datetime]
+
+
 class RunRequest(Base):
     """Ein Run, den das web-api angelegt hat (P4.7). Nur zum Anfuegen.
 

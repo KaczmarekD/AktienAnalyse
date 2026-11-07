@@ -1,0 +1,21 @@
+{
+  "description": "web-api -> market-data (D2.3): Tageskurse holen. ``slot`` ist der Termin des Schedulers,\n``trade_date`` der Handelstag, fuer den die Kurse gelten sollen.",
+  "properties": {
+    "slot": {
+      "format": "date-time",
+      "title": "Slot",
+      "type": "string"
+    },
+    "trade_date": {
+      "format": "date",
+      "title": "Trade Date",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slot",
+    "trade_date"
+  ],
+  "title": "PricesRequestedV1",
+  "type": "object"
+}

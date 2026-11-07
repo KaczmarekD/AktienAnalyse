@@ -151,6 +151,8 @@ def test_each_service_starts_its_bus_with_its_own_consumer(service):
         ("notification", "va.notification.report.sent"),
         ("web-api", "va.screening.run.requested"),
         ("market-data", "va.screening.run.failed"),
+        ("web-api", "va.marketdata.prices.requested"),  # D2.3: Scheduler der Tageskurse
+        ("market-data", "va.marketdata.prices.completed"),
     ],
 )
 def test_a_service_publishes_its_own_events(service, subject):
@@ -169,6 +171,8 @@ def test_a_service_publishes_its_own_events(service, subject):
         ("scoring", "va.screening.run.requested"),
         ("notification", "va.marketdata.snapshot.completed"),
         ("web-api", "va.notification.report.sent"),
+        ("web-api", "va.marketdata.prices.completed"),
+        ("scoring", "va.marketdata.prices.requested"),
     ],
 )
 def test_no_service_publishes_foreign_events(service, subject):

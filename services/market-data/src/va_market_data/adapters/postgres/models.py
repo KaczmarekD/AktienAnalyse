@@ -28,6 +28,7 @@ FETCH_ORIGINS = ("live", "import")
 STATEMENTS = ("income", "balance", "cashflow")
 FREQUENCIES = ("annual", "quarterly")  # geprueft im Repository, die Spalte ist freier Text
 SNAPSHOT_ROLES = ("universe", "coverage")  # D2.2
+PRICE_RUN_STATUSES = ("ok", "failed")  # D2.3
 
 
 class Instrument(Base):
@@ -319,6 +320,66 @@ class CoverageItem(Base):
     fundamentals_symbol: Mapped[str | None]
     price_symbol: Mapped[str | None]
     name: Mapped[str | None]
+
+
+class PriceRun(Base):
+    """D2.3: ein Abruf der Tageskurse. Nur angefuegt, mit Ende und Ergebnis in einem Schritt (kein
+    spaeteres Abschliessen wie bei ``fetch_run``)."""
+
+    __tablename__ = "price_run"
+    __table_args__ = (
+        CheckConstraint(in_values("status", PRICE_RUN_STATUSES), name="status"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    source: Mapped[str]  # yahoo, spaeter bundesbank (D2.4)
+    started_at: Mapped[datetime]
+    finished_at: Mapped[datetime]
+    status: Mapped[str]
+
+
+class DailyClose(Base):
+    """D2.3 (WP-06): Schlusskurs je ISIN, Quelle und Handelstag, in Hauptwaehrung; auch ohne
+    Yahoo-Symbol. Je Tag nur einmal."""
+
+    __tablename__ = "daily_close"
+    __table_args__ = (
+        UniqueConstraint(
+            "isin", "source", "trade_date", name="uq_daily_close_isin_source_trade_date"
+        ),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str]
+    symbol: Mapped[str | None]
+    source: Mapped[str]
+    trade_date: Mapped[date]
+    close: Mapped[float]
+    currency: Mapped[str]
+    quote_currency: Mapped[str | None]  # Notierung an der Boerse (GBp), fuer den naechsten Tag
+    price_run_id: Mapped[int] = mapped_column(ForeignKey("market_data.price_run.id"))
+    first_seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class FxDaily(Base):
+    """D2.3 (WP-11): 1 Einheit der Waehrung in EUR je Tag und Quelle, nur einmal."""
+
+    __tablename__ = "fx_daily"
+    __table_args__ = (
+        UniqueConstraint(
+            "currency", "trade_date", "source", name="uq_fx_daily_currency_trade_date_source"
+        ),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    currency: Mapped[str]
+    trade_date: Mapped[date]
+    rate_to_eur: Mapped[float]
+    source: Mapped[str]
+    price_run_id: Mapped[int] = mapped_column(ForeignKey("market_data.price_run.id"))
 
 
 class Security(Base):

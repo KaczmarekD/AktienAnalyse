@@ -22,6 +22,7 @@ from ..adapters.firds import FirdsSource
 from ..adapters.ishares import IsharesSource
 from ..adapters.openfigi import OpenFigiLookup, resolve_isins_openfigi
 from ..adapters.postgres.models import MarketDataInbox, MarketDataOutbox
+from ..adapters.postgres.prices import PostgresPriceStore
 from ..adapters.postgres.securities import PostgresSecurityCatalog
 from ..adapters.postgres.store import PostgresSnapshotStore
 from ..adapters.replay import PROVIDER as REPLAY_PROVIDER
@@ -30,15 +31,17 @@ from ..adapters.yahoo import (
     PROVIDER,
     FetcherConfig,
     YahooFundamentals,
+    YahooPrices,
     YahooTextSearch,
     provider_version,
 )
 from ..application.fetch import fetch_all
+from ..application.prices import PricesResult, collect_prices
 from ..application.securities import SecurityService
 from ..application.universe import load_universe as load_universe_chain
 from ..domain.universe import UniverseConfig
 from . import rpc
-from .handlers import RunRequestedHandler
+from .handlers import PricesRequestedHandler, RunRequestedHandler
 from .settings import MarketDataSettings
 
 if TYPE_CHECKING:
@@ -65,6 +68,9 @@ class MarketDataAdapters:
     fetch: Fetch
     # D2.2: Abdeckung im Wochenlauf; ohne (Replay, Tests) nur das Referenzuniversum
     coverage: CoverageStore | None = None
+    # D2.3: Tageskurse fuer einen Handelstag; ohne (Replay, Tests) keine Antwort auf
+    # marketdata.prices.requested
+    prices: Callable[[date], PricesResult] | None = None
 
 
 def live_universe(
@@ -135,13 +141,34 @@ def build_adapters(
         )
 
     store = PostgresSnapshotStore(engine, provider=provider_name, provider_version=version)
+    live = settings.replay_source is None
     return MarketDataAdapters(
         store=store,
         load_universe=universe,
         fetch=fetch,
-        # Eine Replay-Datei kennt nur das Universum: Abdeckung nur im echten Abruf
-        coverage=store if settings.replay_source is None else None,
+        # Eine Replay-Datei kennt nur das Universum: Abdeckung und Tageskurse nur im echten Abruf
+        coverage=store if live else None,
+        prices=daily_prices(store, PostgresPriceStore(engine)) if live else None,
     )
+
+
+def daily_prices(
+    coverage: CoverageStore, store: PostgresPriceStore
+) -> Callable[[date], PricesResult]:
+    """Tageskurse der Abdeckung fuer einen Handelstag (D2.3), ueber yfinance."""
+    yahoo = YahooPrices()
+
+    def collect(trade_date: date) -> PricesResult:
+        return collect_prices(
+            coverage.coverage(),
+            store=store,
+            quotes=yahoo.latest_closes,
+            currency_of=yahoo.currency,
+            rate_to_eur=yahoo.rate_to_eur,
+            trade_date=trade_date,
+        )
+
+    return collect
 
 
 def wire(bus: EventBus, adapters: MarketDataAdapters, settings: MarketDataSettings) -> None:
@@ -153,6 +180,8 @@ def wire(bus: EventBus, adapters: MarketDataAdapters, settings: MarketDataSettin
         coverage=adapters.coverage,
         dax_only=settings.universe == "DAX_ONLY",
     ).subscribe()
+    if adapters.prices is not None:
+        PricesRequestedHandler(bus, collect=adapters.prices).subscribe()
 
 
 def reliable(bus: EventBus, engine: Engine, settings: MarketDataSettings) -> EventBus:

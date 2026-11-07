@@ -45,6 +45,7 @@ from ..domain.metrics import (
     compute_metrics,
 )
 from ..domain.periods import period_end
+from ..domain.prices import Quote
 from ..domain.securities import AssetClass, Listing, SecurityHit
 from ..domain.universe import Ticker
 
@@ -153,9 +154,11 @@ QUARTERLY_FIELDS: dict[str, str] = {
 }
 
 # Kurshistorie (ADR-0010, F1.4): eigene Spalte -> Spalte von
-# yf.Ticker.history(auto_adjust=False, actions=True)
+# yf.Ticker.history(auto_adjust=False, actions=True); "close" auch in yf.download (D2.3).
+# "currency": Schluessel in fast_info (Notierung, z. B. GBp)
 PRICE_FIELDS: dict[str, str] = {
     "close": "Close",
+    "currency": "currency",
     "adj_close": "Adj Close",
     "dividend": "Dividends",
     "split": "Stock Splits",
@@ -737,10 +740,13 @@ def fetch_one(
 
 
 class YahooFundamentals:
-    """``FundamentalsProvider`` ueber yfinance."""
+    """``FundamentalsProvider`` ueber yfinance. Je Abruf ein neues Objekt (``build_adapters``)."""
 
     def __init__(self, cfg: FetcherConfig) -> None:
         self.cfg = cfg
+        # "Pro Run gecached": Im dauerhaft laufenden Dienst galt der Cache sonst ueber alle
+        # Wochenlaeufe, und die Umrechnung der Abschluesse nutzte alte Kurse (Nebenbefund D2.3)
+        _fx_rate.cache_clear()
 
     def fetch(self, ticker: Ticker, history: HistoryState | None = None) -> Fundamentals:
         return fetch_one(ticker, self.cfg, history=history)
@@ -795,3 +801,64 @@ class YahooTextSearch:
     def search(self, text: str, limit: int) -> list[SecurityHit]:
         quotes = yf.Search(text, max_results=limit, news_count=0, timeout=self._timeout).quotes
         return hits_from_yahoo_search(list(quotes or []))[:limit]
+
+
+# --- D2.3: Tageskurse (Sammelabruf, Waehrung, Wechselkurs) -----------------------------
+
+DOWNLOAD_PERIOD = "5d"  # reicht ueber Wochenende und Feiertage
+
+
+def quotes_from_download(frame: pd.DataFrame | None, symbols: list[str]) -> dict[str, Quote]:
+    """Letzter Schlusskurs je Symbol aus ``yf.download`` (Spalten je Symbol, bei einem Symbol
+    auch ohne MultiIndex). Symbole ohne Kurs fehlen."""
+    if frame is None or frame.empty:
+        return {}
+    close = PRICE_FIELDS["close"]
+    quotes: dict[str, Quote] = {}
+    for symbol in symbols:
+        if isinstance(frame.columns, pd.MultiIndex):
+            if (symbol, close) not in frame.columns:
+                continue
+            series = frame[(symbol, close)]
+        elif len(symbols) == 1 and close in frame.columns:
+            series = frame[close]
+        else:
+            continue
+        series = pd.to_numeric(series, errors="coerce").dropna()
+        series = series[series > 0]
+        if series.empty:
+            continue
+        day = pd.Timestamp(series.index[-1]).date()
+        quotes[symbol] = Quote(symbol, day, float(series.iloc[-1]))
+    return quotes
+
+
+class YahooPrices:
+    """Tageskurse ueber yfinance: Sammelabruf, Waehrung je Symbol, Wechselkurs nach EUR.
+
+    Ohne ``_yahoo_errors_raised``: Der Abruf laeuft im Handler-Thread neben anderen Abrufen, die
+    Einstellung von yfinance gilt global. Ein verschluckter Fehler ergibt fehlende Kurse.
+    """
+
+    def latest_closes(self, symbols: list[str]) -> dict[str, Quote]:
+        frame = yf.download(
+            symbols,
+            period=DOWNLOAD_PERIOD,
+            interval="1d",
+            group_by="ticker",
+            auto_adjust=False,
+            progress=False,
+            threads=False,
+            multi_level_index=True,
+        )
+        return quotes_from_download(frame, symbols)
+
+    def currency(self, symbol: str) -> str | None:
+        value = yf.Ticker(symbol).fast_info.get(PRICE_FIELDS["currency"])
+        return value if isinstance(value, str) and value else None
+
+    def rate_to_eur(self, currency: str) -> float | None:
+        """1 Einheit ``currency`` in EUR, ohne Cache: Jeder Tag braucht den neuen Kurs."""
+        symbol = FX_FIELDS["ticker"].format(source=currency, target="EUR")
+        rate = _to_float(yf.Ticker(symbol).fast_info.get(FX_FIELDS["price"]))
+        return rate if rate is not None and rate > 0 else None

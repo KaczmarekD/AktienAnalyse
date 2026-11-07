@@ -49,6 +49,8 @@ class WebApiSettings(BaseSettings):
     # P5.4 startet der Cron im Batch-Container die Wochenlaeufe; beides zugleich gaebe zwei Runs.
     schedule: str = ""
     schedule_timezone: str = "Europe/Berlin"
+    # D2.3: Tageskurse an Handelstagen nach Xetra-Schluss, in schedule_timezone. Leer: aus
+    price_schedule: str = "30 22 * * 1-5"
     # P4.7: So lange darf eine Stufe dauern, dann meldet der Watchdog den Run als gescheitert
     watchdog_fetch_minutes: float = Field(default=45, gt=0)
     watchdog_scoring_minutes: float = Field(default=5, gt=0)
@@ -71,7 +73,13 @@ class WebApiSettings(BaseSettings):
     @model_validator(mode="after")
     def _schedule_is_valid(self) -> Self:
         _ = self.run_schedule  # ungueltiger Ausdruck oder Zeitzone: ValueError beim Start
+        _ = self.prices_schedule
         return self
+
+    @property
+    def prices_schedule(self) -> Schedule | None:
+        expression = self.price_schedule.strip()
+        return Schedule(expression, self.schedule_timezone) if expression else None
 
     @property
     def run_schedule(self) -> Schedule | None:

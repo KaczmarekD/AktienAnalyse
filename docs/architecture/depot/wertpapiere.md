@@ -6,7 +6,8 @@
 > Datenquellen: [Recherche 11/2026](../../research/2026-11-depot-datenquellen-und-bankzugang.md).
 > Umgesetzt: Suche und Auflösung (D2.1, `security`, `security_master`, `listing`), Abdeckung im
 > Wochenlauf (D2.2, `coverage_version`, `coverage_item`, `fundamental_snapshot.role`,
-> `covered[]`; bis D3 per Kommando gepflegt).
+> `covered[]`; bis D3 per Kommando gepflegt), Tageskurse (D2.3, `price_run`, `daily_close`,
+> `fx_daily`, Scheduler im web-api; Bundesanleihen aus der Bundesbank folgen mit D2.4).
 
 ## Ausgangslage
 
