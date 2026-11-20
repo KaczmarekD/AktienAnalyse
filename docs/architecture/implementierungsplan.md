@@ -3615,7 +3615,7 @@ die Kurse der Bundesanleihen kommen als eigenes Paket D2.5)
   Stammdaten sofort bei neuer Abdeckung (kommt mit `coverage.changed` in D3), einheitliche
   Bezeichnungen der Sektoren über die Quellen (die Durchschau in D5 ordnet sie zu).
 - **Review:** `/code-review high`.
-- **Umgesetzt (20.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (20.11.2026, auf `main` als `a313371`, CI grün):** wie im Entwurf, dazu:
   - **Fondsdaten bei der Zusammensetzung:** TER, Volumen, Ausschüttung und Anbieter stehen in
     `etf_composition.facts`, nicht in `security_master`. Sie kommen aus derselben Quelle mit
     demselben Stand wie die Positionen, und das Volumen ändert sich jede Woche; in
