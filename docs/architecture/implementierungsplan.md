@@ -3659,7 +3659,7 @@ die Kurse der Bundesanleihen kommen als eigenes Paket D2.5)
   den Kurs ohne Inflationsanpassung; der Wert eines Bestands braucht die Index-Verhältniszahl
   (D4).
 - **Review:** `/code-review high`.
-- **Umgesetzt (20.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (20.11.2026, auf `main` als `f7cf1a3`, CI grün):** wie im Entwurf, dazu:
   - **Keine Migration:** `daily_close` hat Quelle und Notierung schon; die Kurse der Bundesbank
     stehen dort mit `source = 'bundesbank'` und `quote_currency = '%'`.
   - **Ein Event je Termin:** Yahoo und Bundesbank haben je einen `price_run`, das Event nennt
