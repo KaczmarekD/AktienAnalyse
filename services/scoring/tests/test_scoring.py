@@ -13,6 +13,7 @@ from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
     DEFAULT_VALUE_FACTORS,
     INDUSTRY_RULE_EXCLUDED,
+    QUALITY_FACTOR_CATALOG,
     ScoringConfig,
     _composite_mean,
     _percentile_rank,
@@ -314,6 +315,10 @@ class TestIndustryRules:
             "net_debt_ebitda",
             "operating_margin",
             "roic",
+            # F2.1: ADR-0011, Punkt 3 nennt sie mit
+            "f_score",
+            "operating_accruals",
+            "cfo_assets",
         } == (INDUSTRY_RULE_EXCLUDED)
 
     def test_off_by_default(self):
@@ -356,3 +361,46 @@ class TestIndustryRules:
 
 def _missing(value: object) -> bool:
     return value is None or (isinstance(value, float) and math.isnan(value))
+
+
+class TestBilanzqualitaetFactors:
+    """F2.1 (ADR-0011, Punkt 1): F-Score, Accruals und CFO/Bilanzsumme stehen im Katalog. Die
+    Standardauswahl (Profil v1, ``ScoringConfig()``) bleibt bei den fünf bisherigen."""
+
+    NEW: ClassVar[dict[str, tuple[str, str]]] = {
+        "f_score": ("f_score", "high"),
+        "operating_accruals": ("operating_accruals", "low"),
+        "cfo_assets": ("cfo_assets", "high"),
+    }
+
+    def test_in_the_catalog_with_direction(self):
+        for key, factor in self.NEW.items():
+            assert QUALITY_FACTOR_CATALOG[key] == factor
+
+    def test_catalog_starts_with_the_default_selection(self):
+        assert list(QUALITY_FACTOR_CATALOG)[: len(DEFAULT_QUALITY_FACTORS)] == list(
+            DEFAULT_QUALITY_FACTORS
+        )
+
+    def test_off_by_default(self):
+        assert not set(self.NEW) & set(DEFAULT_QUALITY_FACTORS)
+        assert not set(self.NEW) & set(ScoringConfig().quality_factors)
+
+    def test_ranked_when_switched_on(self):
+        frame = _frame(
+            {
+                f"Q{i}.DE": {
+                    "f_score": 9 - i,
+                    "operating_accruals": -0.05 + 0.02 * i,
+                    **_FULL_QUALITY,
+                }
+                for i in range(4)
+            }
+        )
+        factors = {
+            key: QUALITY_FACTOR_CATALOG[key] for key in ("roic", "f_score", "operating_accruals")
+        }
+        out = score(frame, ScoringConfig(quality_factors=factors)).set_index("symbol")
+        # Hoher F-Score und niedrige Accruals sind gut
+        assert out["rank_f_score"].idxmax() == "Q0.DE"
+        assert out["rank_operating_accruals"].idxmax() == "Q0.DE"

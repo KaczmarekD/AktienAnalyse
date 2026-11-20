@@ -6,15 +6,22 @@ Titel beim Umbau gleich bleiben, prueft tests/test_metrics_snapshot.py.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from va_market_data.domain.metrics import (
+    FiscalYear,
     MarketFigures,
     Metrics,
     StatementFigures,
     cagr,
+    cfo_assets,
     compute_metrics,
     earnings_stability,
+    f_score,
+    f_score_signals,
+    operating_accruals,
     roic,
     safe_div,
 )
@@ -250,3 +257,137 @@ class TestNetDebtToEbitda:
     def test_zero_ebitda_gives_none(self):
         figures = StatementFigures(total_debt=500.0, cash=100.0, ebitda=0.0)
         assert _metrics(figures).net_debt_ebitda is None
+
+
+# --- F2.1 (ADR-0011): F-Score nach Piotroski (2000), Accruals nach Sloan (1996) ---------------
+
+# Drei Geschäftsjahre, jüngstes zuerst, in denen alle neun Signale erfüllt sind. Von Hand:
+# ROA 10/100 = 0,10 (Vorjahr 5/100 = 0,05), CFO 15/100 = 0,15 > ROA, Verschuldung 10/100
+# gegen 20/100, Liquidität 60/30 = 2,0 gegen 50/30 = 1,67, Aktien 100 gegen 100, Bruttomarge
+# 40/100 = 0,40 gegen 35/90 = 0,389, Kapitalumschlag 100/100 = 1,0 gegen 90/100 = 0,9.
+_T = FiscalYear(
+    net_income=10.0,
+    revenue=100.0,
+    gross_profit=40.0,
+    total_assets=100.0,
+    long_term_debt=10.0,
+    current_assets=60.0,
+    current_liabilities=30.0,
+    shares=100.0,
+    operating_cash_flow=15.0,
+)
+_PRIOR = FiscalYear(
+    net_income=5.0,
+    revenue=90.0,
+    gross_profit=35.0,
+    total_assets=100.0,
+    long_term_debt=20.0,
+    current_assets=50.0,
+    current_liabilities=30.0,
+    shares=100.0,
+    operating_cash_flow=8.0,
+)
+_BEFORE = FiscalYear(total_assets=100.0)
+_YEARS = (_T, _PRIOR, _BEFORE)
+
+
+class TestFScore:
+    def test_all_nine_signals(self):
+        signals = f_score_signals(_YEARS)
+        assert signals is not None
+        assert set(signals) == {
+            "roa_positive",
+            "cfo_positive",
+            "roa_up",
+            "cfo_above_net_income",
+            "leverage_down",
+            "liquidity_up",
+            "no_new_shares",
+            "margin_up",
+            "turnover_up",
+        }
+        assert all(value == 1 for value in signals.values())
+        assert f_score(_YEARS) == 9
+
+    @pytest.mark.parametrize(
+        ("change", "signal"),
+        [
+            ({"net_income": -1.0}, "roa_positive"),
+            ({"operating_cash_flow": -1.0}, "cfo_positive"),
+            ({"net_income": 4.0}, "roa_up"),  # 0,04 < 0,05
+            ({"operating_cash_flow": 9.0}, "cfo_above_net_income"),  # 0,09 < 0,10
+            ({"long_term_debt": 25.0}, "leverage_down"),
+            ({"current_assets": 40.0}, "liquidity_up"),  # 1,33 < 1,67
+            ({"shares": 101.0}, "no_new_shares"),
+            ({"gross_profit": 35.0}, "margin_up"),  # 0,35 < 0,389
+            ({"revenue": 85.0}, "turnover_up"),  # 0,85 < 0,9
+        ],
+    )
+    def test_each_signal_on_its_own(self, change: dict[str, float], signal: str):
+        signals = f_score_signals((replace(_T, **change), _PRIOR, _BEFORE))
+        assert signals is not None
+        assert signals[signal] == 0
+
+    def test_unchanged_does_not_count(self):
+        # Piotroski: eine Verbesserung zählt, Gleichstand nicht
+        signals = f_score_signals((replace(_T, long_term_debt=20.0), _PRIOR, _BEFORE))
+        assert signals is not None
+        assert signals["leverage_down"] == 0
+
+    def test_equal_share_count_is_no_new_shares(self):
+        signals = f_score_signals(_YEARS)
+        assert signals is not None
+        assert signals["no_new_shares"] == 1
+
+    def test_missing_prior_value_gives_none_not_zero(self):
+        assert f_score((_T, replace(_PRIOR, current_liabilities=None), _BEFORE)) is None
+        assert f_score((_T, replace(_PRIOR, net_income=None), _BEFORE)) is None
+
+    def test_needs_three_years_of_total_assets(self):
+        # ROA des Vorjahres braucht die Bilanzsumme von davor (Jahresanfang)
+        assert f_score((_T, _PRIOR)) is None
+        assert f_score((_T, _PRIOR, FiscalYear())) is None
+
+    def test_no_long_term_debt_in_both_years_is_no_improvement(self):
+        years = (replace(_T, long_term_debt=None), replace(_PRIOR, long_term_debt=None), _BEFORE)
+        signals = f_score_signals(years)
+        assert signals is not None
+        assert signals["leverage_down"] == 0
+        assert f_score(years) == 8
+
+    def test_long_term_debt_missing_in_one_year_is_a_gap(self):
+        assert f_score((replace(_T, long_term_debt=None), _PRIOR, _BEFORE)) is None
+
+    def test_gross_profit_from_revenue_and_cost_of_revenue(self):
+        years = (replace(_T, gross_profit=None, cost_of_revenue=60.0), _PRIOR, _BEFORE)
+        assert f_score(years) == 9
+
+
+class TestAccruals:
+    def test_cash_above_earnings_is_negative(self):
+        # (10 - 15) / Ø Bilanzsumme 100
+        assert operating_accruals(_YEARS) == pytest.approx(-0.05)
+
+    def test_earnings_above_cash_is_positive(self):
+        years = (replace(_T, operating_cash_flow=4.0), _PRIOR)
+        assert operating_accruals(years) == pytest.approx(0.06)
+
+    def test_scaled_by_average_total_assets(self):
+        years = (replace(_T, total_assets=150.0), _PRIOR)  # Ø 125
+        assert operating_accruals(years) == pytest.approx(-5.0 / 125.0)
+        assert cfo_assets(years) == pytest.approx(15.0 / 125.0)
+
+    def test_cfo_assets_with_sign(self):
+        assert cfo_assets(_YEARS) == pytest.approx(0.15)
+        assert cfo_assets((replace(_T, operating_cash_flow=-3.0), _PRIOR)) == pytest.approx(-0.03)
+
+    def test_need_two_years_of_total_assets(self):
+        assert operating_accruals((_T,)) is None
+        assert cfo_assets((_T, replace(_PRIOR, total_assets=None))) is None
+
+    def test_wired_into_compute_metrics(self):
+        m = _metrics(StatementFigures(years=_YEARS))
+        assert m.f_score == 9
+        assert m.operating_accruals == pytest.approx(-0.05)
+        assert m.cfo_assets == pytest.approx(0.15)
+        assert _metrics(StatementFigures()).f_score is None

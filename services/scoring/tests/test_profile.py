@@ -22,6 +22,7 @@ from va_scoring.domain.profile import (
 from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
     DEFAULT_VALUE_FACTORS,
+    QUALITY_FACTOR_CATALOG,
     ScoringConfig,
     score,
 )
@@ -81,7 +82,7 @@ def test_params_are_plain_json():
 # --- P2b.2 ScoringProfileParams --------------------------------------------------------------
 
 ALL_VALUE = set(DEFAULT_VALUE_FACTORS)
-ALL_QUALITY = set(DEFAULT_QUALITY_FACTORS)
+ALL_QUALITY = set(QUALITY_FACTOR_CATALOG)  # F2.1: Katalog, nicht nur die Standardauswahl
 
 
 def _params(**values: Any) -> ScoringProfileParams:
@@ -242,6 +243,9 @@ def test_factor_texts_match_the_ui_glossary():
         "operating_margin": "Operative Marge",
         "net_debt_ebitda": "Net Debt/EBITDA",
         "earnings_stability": "Gewinnstabilität",
+        "f_score": "F-Score",
+        "operating_accruals": "Accruals",
+        "cfo_assets": "CFO/Bilanzsumme",
     }
     # Ersatzschreibungen der alten Texte; "Steuern" o. Ä. sind echte Wörter und bleiben erlaubt
     ascii_umlauts = ("verhaeltnis", "beschoen", "rueck", "boerse", "stabilitaet", "ueber", "fuenf")
@@ -287,3 +291,14 @@ class TestIndustryRuleParams:
     def test_round_trip_from_config(self):
         cfg = ScoringConfig(industry_rules=True, industry_prefixes=("Insurance",))
         assert ScoringProfileParams.model_validate(profile_params(cfg)).to_config() == cfg
+
+
+class TestBilanzqualitaetInTheProfile:
+    """F2.1: Die neuen Faktoren lassen sich im Profil einschalten, Standard ist aus."""
+
+    def test_default_profile_keeps_the_five_quality_factors(self):
+        assert ScoringProfileParams().quality_factors == set(DEFAULT_QUALITY_FACTORS)
+
+    def test_can_be_switched_on(self):
+        cfg = _params(quality_factors={"roic", "f_score", "cfo_assets"}).to_config()
+        assert list(cfg.quality_factors) == ["roic", "f_score", "cfo_assets"]

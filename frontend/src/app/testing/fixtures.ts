@@ -38,6 +38,9 @@ export function row(values: Partial<RankingRow> & Pick<RankingRow, 'symbol'>): R
     operating_margin: null,
     net_debt_ebitda: null,
     earnings_stability: null,
+    f_score: null,
+    operating_accruals: null,
+    cfo_assets: null,
     ...values,
   };
 }
@@ -164,6 +167,10 @@ function snapshot(values: Partial<Snapshot> = {}): Snapshot {
     operating_margin: 0.11,
     net_debt_ebitda: null,
     earnings_stability: 0.92,
+    // F2.1: Bilanzqualität, im Profil v1 abgeschaltet
+    f_score: 7,
+    operating_accruals: -0.028,
+    cfo_assets: 0.127,
     revenue_growth_5y: 0.05,
     eps_growth_5y: 0.08,
     errors: [],
@@ -324,6 +331,28 @@ export const FACTORS: Factor[] = [
     label: 'Gewinnstabilität',
     better: 'high',
     hint: 'Wie wenig der Nettogewinn über die letzten fünf Geschäftsjahre schwankt. 1 heißt sehr stabil.',
+  },
+  // F2.1 (ADR-0011): im Katalog, im Profil v1 abgeschaltet
+  {
+    key: 'f_score',
+    group: 'quality',
+    label: 'F-Score',
+    better: 'high',
+    hint: 'Neun Prüfungen nach Piotroski: ob Ertrag, Cashflow, Verschuldung, Liquidität, Marge und Kapitalumschlag besser wurden und keine neuen Aktien dazukamen. 9 ist am besten.',
+  },
+  {
+    key: 'operating_accruals',
+    group: 'quality',
+    label: 'Accruals',
+    better: 'low',
+    hint: 'Jahresüberschuss minus operativer Cashflow, je Euro Bilanzsumme. Hohe Werte heißen: Der Gewinn steht vor allem auf dem Papier.',
+  },
+  {
+    key: 'cfo_assets',
+    group: 'quality',
+    label: 'CFO/Bilanzsumme',
+    better: 'high',
+    hint: 'Operativer Cashflow je Euro Bilanzsumme: wie viel Geld das Geschäft im Verhältnis zum eingesetzten Vermögen erwirtschaftet.',
   },
 ];
 

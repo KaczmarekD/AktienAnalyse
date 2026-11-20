@@ -2777,6 +2777,28 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     Verbindlichkeiten, Aktienanzahl und Umsatzkosten.
 - **Review:** Die Definitionen sind gegen Piotroski (2000) und Sloan (1996) geprüft und im Code
   als Quelle genannt.
+- **Festgelegt vor der Umsetzung (20.11.2026):**
+  - **Jahre nach Stichtag:** Die Kennzahlen rechnen mit Geschäftsjahren, die über GuV, Bilanz und
+    Cashflow am selben Stichtag ausgerichtet sind (`FiscalYear`, jüngstes zuerst). `_latest` nimmt
+    je Zeile den ersten vorhandenen Wert und taugt für Vorjahresvergleiche nicht.
+  - **F-Score nach Piotroski (2000):** ROA, CFO und Kapitalumschlag mit der Bilanzsumme am
+    Jahresanfang, die Verschuldung (langfristige Schulden) mit der durchschnittlichen Bilanzsumme.
+    Ein Signal ist 1 bei Verbesserung, gleichbleibend zählt nicht. Keine neuen Aktien heißt: Die
+    Aktienanzahl ist nicht gestiegen. Fehlt ein Wert für eines der neun Signale, gibt es keinen
+    F-Score. Dafür braucht es drei Geschäftsjahre mit Bilanzsumme.
+  - **Langfristige Schulden:** Fehlt die Zeile in beiden Jahren, gilt das als „keine langfristigen
+    Schulden“ (Signal 0). Fehlt sie in einem Jahr, ist das eine Lücke und ergibt `None`.
+  - **Bruttomarge:** ohne „Gross Profit“ aus Umsatz minus Umsatzkosten.
+  - **Accruals und CFO/Bilanzsumme** nach Sloan (1996) mit der durchschnittlichen Bilanzsumme:
+    (Jahresüberschuss − operativer Cashflow) / Ø Bilanzsumme, operativer Cashflow / Ø Bilanzsumme.
+  - **Katalog und Profil v1:** Der Katalog (`QUALITY_FACTOR_CATALOG`, Literal `QualityFactorKey`)
+    enthält die drei neuen Faktoren. Die Standardauswahl (`DEFAULT_QUALITY_FACTORS`, Profil
+    „Standard“ und `ScoringConfig()`) bleibt bei den fünf bisherigen. Die Branchenregel (F2.4)
+    schließt die drei mit aus.
+  - **Durchgehend bis ins UI:** Contract `QualityMetricsV1`, Migration `0021` (Spalten in
+    `market_data.fundamental_snapshot` und `web.snapshot_row`), Projektion, Backfill, beide
+    Lesewege, OpenAPI und TS-Client. Das UI zeigt die drei im Ranking (Spaltenwahl), im
+    Titel-Detail und im Editor (abgeschaltet), mit Einträgen im Glossar.
 
 #### F2.2 Netto-Aktienemission
 

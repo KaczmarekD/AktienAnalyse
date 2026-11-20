@@ -239,3 +239,25 @@ class TestReports:
 class TestReadRole:
     def test_reads_with_the_read_role(self, api):
         assert api.app.state.engine.url.username == "va_read"  # type: ignore[attr-defined]
+
+
+class TestBilanzqualitaet:
+    """F2.1: F-Score, Accruals und CFO/Bilanzsumme kommen aus dem Abruf bis in Ranking und
+    Titel-Detail, aus den Tabellen wie aus den Projektionen. Von Hand für AAA (Testdaten in
+    ``test_pipeline_db``): F-Score 9, Accruals (100 - 150) / 4.900, CFO/Bilanzsumme 150 / 4.900."""
+
+    def _check(self, figures: dict) -> None:
+        assert figures["f_score"] == 9
+        assert figures["operating_accruals"] == pytest.approx(-50.0 / 4_900.0)
+        assert figures["cfo_assets"] == pytest.approx(150.0 / 4_900.0)
+
+    def test_in_the_ranking(self, api):
+        rows = api.get("/api/v1/ranking/latest").json()["rows"]
+        self._check(next(row for row in rows if row["symbol"] == "AAA.DE"))
+
+    def test_in_the_instrument_detail(self, api):
+        self._check(api.get("/api/v1/instruments/AAA.DE").json()["latest"])
+
+    def test_off_in_profile_v1(self, api):
+        params = api.get("/api/v1/ranking/latest").json()["params"]
+        assert not {"f_score", "operating_accruals", "cfo_assets"} & set(params["quality_factors"])

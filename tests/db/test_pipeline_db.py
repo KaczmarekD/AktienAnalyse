@@ -33,6 +33,8 @@ TICKERS = [
 UNIVERSE = Universe(tickers=TICKERS, source="iShares", as_of=date(2026, 9, 29))
 
 PERIODS = [pd.Timestamp("2025-12-31"), pd.Timestamp("2024-12-31")]
+# F2.1: drei Bilanzjahre, damit ein F-Score entsteht (ROA mit der Bilanzsumme vom Jahresanfang)
+BALANCE_PERIODS = [*PERIODS, pd.Timestamp("2023-12-31")]
 
 
 def _fake_ticker_data(symbol: str):
@@ -48,19 +50,70 @@ def _fake_ticker_data(symbol: str):
         "sector": "Industrials",
         "beta": float("nan"),
     }
+    nan = float("nan")
     income = pd.DataFrame(
         {
-            PERIODS[0]: [1_000.0 * base, 150.0 * base, 100.0 * base, 120.0, 30.0, 200.0 * base],
-            PERIODS[1]: [900.0 * base, 140.0 * base, 90.0 * base, 110.0, 28.0, 190.0 * base],
+            PERIODS[0]: [
+                1_000.0 * base,
+                150.0 * base,
+                100.0 * base,
+                120.0,
+                30.0,
+                200.0 * base,
+                400.0 * base,
+            ],
+            PERIODS[1]: [
+                900.0 * base,
+                140.0 * base,
+                90.0 * base,
+                110.0,
+                28.0,
+                190.0 * base,
+                350.0 * base,
+            ],
         },
-        index=["Total Revenue", "EBIT", "Net Income", "Pretax Income", "Tax Provision", "EBITDA"],
+        index=[
+            "Total Revenue",
+            "EBIT",
+            "Net Income",
+            "Pretax Income",
+            "Tax Provision",
+            "EBITDA",
+            "Gross Profit",
+        ],
     )
+    # F-Score von Hand (AAA): ROA 100/4.800 > 90/4.600, CFO 150/4.800 > ROA, Verschuldung
+    # 400/4.900 < 450/4.700, Liquidität 1,5 > 1,4, Aktien gleich, Bruttomarge 0,400 > 0,389,
+    # Kapitalumschlag 1.000/4.800 > 900/4.600: alle neun Signale, F-Score 9
     balance = pd.DataFrame(
-        {PERIODS[0]: [2_000.0 * base, 500.0, 200.0, 5_000.0]},
-        index=["Stockholders Equity", "Total Debt", "Cash And Cash Equivalents", "Total Assets"],
+        {
+            BALANCE_PERIODS[0]: [
+                2_000.0 * base,
+                500.0,
+                200.0,
+                5_000.0,
+                1_500.0,
+                1_000.0,
+                400.0,
+                100.0,
+            ],
+            BALANCE_PERIODS[1]: [nan, nan, nan, 4_800.0, 1_400.0, 1_000.0, 450.0, 100.0],
+            BALANCE_PERIODS[2]: [nan, nan, nan, 4_600.0, nan, nan, nan, nan],
+        },
+        index=[
+            "Stockholders Equity",
+            "Total Debt",
+            "Cash And Cash Equivalents",
+            "Total Assets",
+            "Current Assets",
+            "Current Liabilities",
+            "Long Term Debt",
+            "Ordinary Shares Number",
+        ],
     )
     cashflow = pd.DataFrame(
-        {PERIODS[0]: [120.0 * base, -10.0]}, index=["Free Cash Flow", "Repurchase Of Capital Stock"]
+        {PERIODS[0]: [120.0 * base, -10.0, 150.0 * base], PERIODS[1]: [nan, nan, 140.0 * base]},
+        index=["Free Cash Flow", "Repurchase Of Capital Stock", "Operating Cash Flow"],
     )
     return info, income, balance, cashflow
 

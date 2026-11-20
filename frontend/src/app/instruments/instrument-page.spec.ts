@@ -111,6 +111,16 @@ describe('InstrumentPage', () => {
     expect(plain(figure('pe_ratio'))).not.toContain('besser als');
   });
 
+  it('shows the balance sheet quality, not active in profile v1 (F2.1)', async () => {
+    const fixture = await loaded();
+    const figure = (field: string) => plain(query(fixture, `[data-figure="${field}"]`)[0]);
+    expect(figure('f_score')).toContain('F-Score 7');
+    expect(figure('operating_accruals')).toContain('Accruals -2,8 %');
+    expect(figure('cfo_assets')).toContain('CFO/Bilanzsumme 12,7 %');
+    // Das Profil des jüngsten Laufs nutzt sie nicht
+    expect(figure('f_score')).toContain('nicht aktiv');
+  });
+
   it('warns when the fetch was incomplete and shows its notes', async () => {
     const fixture = await loaded({
       ...INSTRUMENT,

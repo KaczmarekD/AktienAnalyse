@@ -100,3 +100,27 @@ def test_no_stale_metric_files():
     expected = {f"{s}.json" for s in SYMBOLS} | {"QIA.DE-ohne-Kurs.json"}
     actual = {p.name for p in (Path(__file__).parent / "golden" / "metrics").iterdir()}
     assert actual == expected
+
+
+def test_sap_bilanzqualitaet_by_hand():
+    """F2.1 mit der aufgezeichneten SAP (Geschäftsjahre 2025, 2024, 2023), von Hand gerechnet.
+
+    In Mio. EUR: Jahresüberschuss 7.161 und 3.124, operativer Cashflow 9.156, Bilanzsumme
+    70.362, 74.237 und 68.331, langfristige Schulden 4.194 und 5.300, Umlaufvermögen 20.256 und
+    21.401, kurzfristige Verbindlichkeiten 17.416 und 19.082, Aktien 1.167,6 und 1.166,6,
+    Bruttoergebnis 26.814 und 24.932, Umsatz 36.800 und 34.176.
+
+    - ROA 7.161 / 74.237 = 0,096 > 0, Vorjahr 3.124 / 68.331 = 0,046: gestiegen
+    - CFO 9.156 / 74.237 = 0,123 > 0 und über dem ROA
+    - Verschuldung 4.194 / 72.299,5 = 0,058 gegen 5.300 / 71.284 = 0,074: gesunken
+    - Liquidität 1,163 gegen 1,122: gestiegen
+    - Aktien 1.167,6 gegen 1.166,6: mehr geworden (0)
+    - Bruttomarge 0,7286 gegen 0,7295: gesunken (0)
+    - Kapitalumschlag 36.800 / 74.237 = 0,496 gegen 34.176 / 68.331 = 0,500: gesunken (0)
+
+    F-Score 6. Accruals (7.161 - 9.156) / 72.299,5, CFO/Bilanzsumme 9.156 / 72.299,5.
+    """
+    quality = _fetch("SAP.DE").quality
+    assert quality.f_score == 6
+    assert quality.operating_accruals == pytest.approx(-1995.0 / 72299.5)
+    assert quality.cfo_assets == pytest.approx(9156.0 / 72299.5)

@@ -214,6 +214,17 @@ describe('RankingPage', () => {
     expect(JSON.parse(localStorage.getItem(COLUMNS_KEY) ?? '[]')).toContain('roic');
   });
 
+  it('offers the balance sheet quality factors as columns (F2.1)', async () => {
+    const fixture = await loaded();
+    await click(fixture, query(fixture, 'button[data-action="columns"]')[0]);
+    for (const key of ['f_score', 'operating_accruals', 'cfo_assets']) {
+      expect(document.querySelector(`[data-column="${key}"]`), key).not.toBeNull();
+    }
+    const fScore = document.querySelector<HTMLElement>('[data-column="f_score"] input');
+    await click(fixture, fScore as HTMLElement);
+    expect(query(fixture, 'th.mat-column-f_score')).toHaveLength(1);
+  });
+
   it('says when a scoring run is not the current one and links to the current one', async () => {
     const fixture = await render(7);
     await respond(fixture, '/api/v1/ranking/7', {

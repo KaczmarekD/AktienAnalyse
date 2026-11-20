@@ -146,6 +146,17 @@ describe('ProfileEditorPage', () => {
     expect(pb.checked).toBe(true);
   });
 
+  it('offers the balance sheet quality factors, off in profile v1 (F2.1)', async () => {
+    const fixture = await render();
+    for (const key of ['f_score', 'operating_accruals', 'cfo_assets']) {
+      const box = query<HTMLInputElement>(
+        fixture,
+        `[data-factor="${key}"] input[type="checkbox"]`,
+      )[0];
+      expect(box?.checked, key).toBe(false);
+    }
+  });
+
   it('lists the versions with the active one marked', async () => {
     const fixture = await render();
     const [newest, first] = query(fixture, '[data-version]');
