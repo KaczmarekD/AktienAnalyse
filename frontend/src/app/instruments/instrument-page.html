@@ -115,6 +115,9 @@
             @case ('num2') {
               {{ value(figures, item.field) | num }}
             }
+            @case ('int') {
+              {{ value(figures, item.field) | num: '1.0-0' }}
+            }
             @case ('mrd') {
               {{ value(figures, item.field) | mrd }}
             }

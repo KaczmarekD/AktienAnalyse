@@ -40,11 +40,14 @@
         "quality": {
           "$ref": "#/$defs/QualityMetricsV1",
           "default": {
+            "cfo_assets": null,
             "debt_to_equity": null,
             "earnings_stability": null,
+            "f_score": null,
             "fcf_margin": null,
             "gross_margin": null,
             "net_debt_ebitda": null,
+            "operating_accruals": null,
             "operating_margin": null,
             "roa": null,
             "roic": null
@@ -301,7 +304,10 @@
               "fcf_margin",
               "operating_margin",
               "net_debt_ebitda",
-              "earnings_stability"
+              "earnings_stability",
+              "f_score",
+              "operating_accruals",
+              "cfo_assets"
             ],
             "type": "string"
           },
@@ -439,6 +445,18 @@
     },
     "QualityMetricsV1": {
       "properties": {
+        "cfo_assets": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cfo Assets"
+        },
         "debt_to_equity": {
           "anyOf": [
             {
@@ -462,6 +480,20 @@
           ],
           "default": null,
           "title": "Earnings Stability"
+        },
+        "f_score": {
+          "anyOf": [
+            {
+              "maximum": 9,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "F Score"
         },
         "fcf_margin": {
           "anyOf": [
@@ -498,6 +530,18 @@
           ],
           "default": null,
           "title": "Net Debt Ebitda"
+        },
+        "operating_accruals": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operating Accruals"
         },
         "operating_margin": {
           "anyOf": [

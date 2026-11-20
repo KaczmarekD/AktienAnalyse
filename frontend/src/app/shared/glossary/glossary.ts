@@ -189,6 +189,21 @@ export const GLOSSARY = {
     role: 'quality',
     factor: true,
   },
+  // F2.1 (ADR-0011): im Katalog, im Profil v1 abgeschaltet; Texte aus FACTOR_INFO (API)
+  f_score: { group: 'Quality-Faktoren', label: 'F-Score', role: 'quality', factor: true },
+  operating_accruals: {
+    group: 'Quality-Faktoren',
+    label: 'Accruals',
+    role: 'quality',
+    factor: true,
+  },
+  cfo_assets: {
+    group: 'Quality-Faktoren',
+    label: 'CFO/Bilanzsumme',
+    role: 'quality',
+    abbr: true,
+    factor: true,
+  },
 
   // Nur zur Information (der Store hängt „Nicht im Score.“ an, wo der Text nichts dazu sagt)
   price: {
@@ -448,6 +463,9 @@ export const FIELD_FACTOR = {
   operating_margin: 'operating_margin',
   net_debt_ebitda: 'net_debt_ebitda',
   earnings_stability: 'earnings_stability',
+  f_score: 'f_score',
+  operating_accruals: 'operating_accruals',
+  cfo_assets: 'cfo_assets',
 } as const satisfies Record<string, TermKey>;
 
 /** Was die Rolle im Score heißt, als Tooltip der Badge auf der Seite „Begriffe“. */

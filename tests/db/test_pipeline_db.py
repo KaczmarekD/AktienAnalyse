@@ -227,7 +227,8 @@ class TestFullRun:
             now = pd.Timestamp.now(tz="UTC")
             annual = md.get_statements_as_of("AAA.DE", now)
             assert len(annual) > 5
-            assert set(annual["period_end"]) == {p.date() for p in PERIODS}
+            # Alle Stichtage der Abschluesse, seit F2.1 mit dem dritten Bilanzjahr
+            assert set(annual["period_end"]) == {p.date() for p in BALANCE_PERIODS}
             quarterly = md.get_statements_as_of("AAA.DE", now, frequency="quarterly")
             assert len(quarterly) == 5  # 2 x 2 GuV-Werte + 1 Cashflow-Wert
             assert set(quarterly["period_end"]) == {q.date() for q in QUARTERS}

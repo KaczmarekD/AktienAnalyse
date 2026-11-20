@@ -55,6 +55,10 @@ class QualityMetricsV1(Contract):
     net_debt_ebitda: float | None = None
     debt_to_equity: float | None = None
     earnings_stability: float | None = None  # 0..1, hoeher = stabiler
+    # F2.1 (additiv): Piotroski-F-Score, Accruals und CFO je durchschnittlicher Bilanzsumme
+    f_score: int | None = Field(default=None, ge=0, le=9)
+    operating_accruals: float | None = None
+    cfo_assets: float | None = None
 
 
 class GrowthV1(Contract):

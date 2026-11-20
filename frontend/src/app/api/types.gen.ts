@@ -602,7 +602,14 @@ export type ProfileParamsV1Input = {
    * Aktive Quality-Faktoren, mindestens 2
    */
   quality_factors?: Array<
-    'roic' | 'fcf_margin' | 'operating_margin' | 'net_debt_ebitda' | 'earnings_stability'
+    | 'roic'
+    | 'fcf_margin'
+    | 'operating_margin'
+    | 'net_debt_ebitda'
+    | 'earnings_stability'
+    | 'f_score'
+    | 'operating_accruals'
+    | 'cfo_assets'
   >;
   /**
    * Terminal Growth
@@ -850,6 +857,10 @@ export type Ranking = {
  */
 export type RankingRow = {
   /**
+   * Cfo Assets
+   */
+  cfo_assets: number | null;
+  /**
    * Composite Score
    */
   composite_score: number | null;
@@ -865,6 +876,10 @@ export type RankingRow = {
    * Ev Ebit
    */
   ev_ebit: number | null;
+  /**
+   * F Score
+   */
+  f_score: number | null;
   /**
    * Fcf Margin
    */
@@ -885,6 +900,10 @@ export type RankingRow = {
    * Net Debt Ebitda
    */
   net_debt_ebitda: number | null;
+  /**
+   * Operating Accruals
+   */
+  operating_accruals: number | null;
   /**
    * Operating Margin
    */
@@ -1336,6 +1355,10 @@ export type SessionState = {
  */
 export type Snapshot = {
   /**
+   * Cfo Assets
+   */
+  cfo_assets: number | null;
+  /**
    * Currency
    */
   currency: string | null;
@@ -1360,6 +1383,10 @@ export type Snapshot = {
    */
   ev_ebit: number | null;
   /**
+   * F Score
+   */
+  f_score: number | null;
+  /**
    * Fcf Margin
    */
   fcf_margin: number | null;
@@ -1383,6 +1410,10 @@ export type Snapshot = {
    * Net Debt Ebitda
    */
   net_debt_ebitda: number | null;
+  /**
+   * Operating Accruals
+   */
+  operating_accruals: number | null;
   /**
    * Operating Margin
    */

@@ -21,6 +21,26 @@ MAX_TAX_RATE = 0.6
 
 
 @dataclass(frozen=True)
+class FiscalYear:
+    """Posten eines Geschaeftsjahres in Berichtswaehrung (F2.1, ADR-0011).
+
+    Ueber GuV, Bilanz und Cashflow am selben Stichtag ausgerichtet, damit Vorjahresvergleiche
+    dieselben Jahre vergleichen. ``None`` heisst: Der Posten fehlt in diesem Jahr.
+    """
+
+    net_income: float | None = None
+    revenue: float | None = None
+    gross_profit: float | None = None
+    cost_of_revenue: float | None = None
+    total_assets: float | None = None
+    long_term_debt: float | None = None
+    current_assets: float | None = None
+    current_liabilities: float | None = None
+    shares: float | None = None
+    operating_cash_flow: float | None = None
+
+
+@dataclass(frozen=True)
 class StatementFigures:
     """Jahresabschluss in Berichtswaehrung: juengste Werte und Reihen (juengstes Jahr zuerst).
 
@@ -49,6 +69,8 @@ class StatementFigures:
     revenue_history: Sequence[float | None] = ()
     eps_history: Sequence[float | None] = ()
     net_income_history: Sequence[float | None] = ()
+    # Geschaeftsjahre nach Stichtag, juengstes zuerst (F2.1: F-Score, Accruals, CFO/Bilanzsumme)
+    years: Sequence[FiscalYear] = ()
 
 
 @dataclass(frozen=True)
@@ -82,6 +104,9 @@ class Metrics:
     net_debt_ebitda: float | None
     debt_to_equity: float | None
     earnings_stability: float | None
+    f_score: int | None
+    operating_accruals: float | None
+    cfo_assets: float | None
     revenue_growth_5y: float | None
     eps_growth_5y: float | None
 
@@ -157,6 +182,131 @@ def earnings_stability(net_income: Sequence[float | None]) -> float | None:
         return None
     cv = float(np.std(arr) / mean_abs)
     return max(0.0, 1.0 - min(cv, 1.0))
+
+
+# --- F2.1 (ADR-0011): Bilanzqualitaet ---------------------------------------------------------
+
+F_SCORE_SIGNALS = (
+    "roa_positive",
+    "cfo_positive",
+    "roa_up",
+    "cfo_above_net_income",
+    "leverage_down",
+    "liquidity_up",
+    "no_new_shares",
+    "margin_up",
+    "turnover_up",
+)
+
+
+def _improved(now: float | None, before: float | None) -> int | None:
+    """1 bei einer Verbesserung, 0 sonst (Gleichstand zaehlt nicht), ``None`` ohne Werte."""
+    return None if now is None or before is None else int(now > before)
+
+
+def _positive(value: float | None) -> int | None:
+    return None if value is None else int(value > 0)
+
+
+def _average(a: float | None, b: float | None) -> float | None:
+    return None if a is None or b is None else (a + b) / 2.0
+
+
+def _gross_profit(year: FiscalYear) -> float | None:
+    """Bruttoergebnis, ohne die Zeile aus Umsatz minus Umsatzkosten."""
+    if year.gross_profit is not None:
+        return year.gross_profit
+    if year.revenue is None or year.cost_of_revenue is None:
+        return None
+    return year.revenue - year.cost_of_revenue
+
+
+def _leverage(years: Sequence[FiscalYear]) -> tuple[float | None, float | None]:
+    """Langfristige Schulden je durchschnittlicher Bilanzsumme, dieses Jahr und Vorjahr.
+
+    Fehlt die Zeile in beiden Jahren, gibt es keine langfristigen Schulden (0). Fehlt sie in
+    einem, ist das eine Luecke.
+    """
+    t, p, b = years[0], years[1], years[2]
+    if t.long_term_debt is None and p.long_term_debt is None:
+        return 0.0, 0.0
+    return (
+        safe_div(t.long_term_debt, _average(t.total_assets, p.total_assets)),
+        safe_div(p.long_term_debt, _average(p.total_assets, b.total_assets)),
+    )
+
+
+def f_score_signals(years: Sequence[FiscalYear]) -> dict[str, int] | None:
+    """Die neun Signale des F-Scores, je 1 oder 0; ``None``, wenn einem ein Wert fehlt.
+
+    Quelle: Piotroski, J. (2000), "Value Investing: The Use of Historical Financial Statement
+    Information to Separate Winners from Losers", Journal of Accounting Research 38, S. 1-41.
+    ROA, operativer Cashflow und Kapitalumschlag beziehen sich auf die Bilanzsumme am
+    Jahresanfang, die Verschuldung auf die durchschnittliche Bilanzsumme. Dafuer braucht es drei
+    Geschaeftsjahre (``years``, juengstes zuerst). Eine Verbesserung zaehlt, Gleichstand nicht;
+    keine neuen Aktien heisst: Die Aktienanzahl ist nicht gestiegen.
+    """
+    if len(years) < 3:
+        return None
+    t, p, b = years[0], years[1], years[2]
+    roa = safe_div(t.net_income, p.total_assets)
+    roa_before = safe_div(p.net_income, b.total_assets)
+    cfo = safe_div(t.operating_cash_flow, p.total_assets)
+    leverage, leverage_before = _leverage(years)
+    shares = None if t.shares is None or p.shares is None else int(t.shares <= p.shares)
+    signals = {
+        "roa_positive": _positive(roa),
+        "cfo_positive": _positive(t.operating_cash_flow),
+        "roa_up": _improved(roa, roa_before),
+        "cfo_above_net_income": _improved(cfo, roa),
+        # Weniger Verschuldung ist die Verbesserung
+        "leverage_down": _improved(leverage_before, leverage),
+        "liquidity_up": _improved(
+            safe_div(t.current_assets, t.current_liabilities),
+            safe_div(p.current_assets, p.current_liabilities),
+        ),
+        "no_new_shares": shares,
+        "margin_up": _improved(
+            safe_div(_gross_profit(t), t.revenue), safe_div(_gross_profit(p), p.revenue)
+        ),
+        "turnover_up": _improved(
+            safe_div(t.revenue, p.total_assets), safe_div(p.revenue, b.total_assets)
+        ),
+    }
+    if any(value is None for value in signals.values()):
+        return None
+    return {key: int(value) for key, value in signals.items() if value is not None}
+
+
+def f_score(years: Sequence[FiscalYear]) -> int | None:
+    """Piotroski-F-Score 0 bis 9, hoeher ist besser; ``None`` bei fehlenden Werten."""
+    signals = f_score_signals(years)
+    return None if signals is None else sum(signals.values())
+
+
+def _average_assets(years: Sequence[FiscalYear]) -> float | None:
+    if len(years) < 2:
+        return None
+    return _average(years[0].total_assets, years[1].total_assets)
+
+
+def operating_accruals(years: Sequence[FiscalYear]) -> float | None:
+    """(Jahresueberschuss - operativer Cashflow) / durchschnittliche Bilanzsumme.
+
+    Quelle: Sloan, R. (1996), "Do Stock Prices Fully Reflect Information in Accruals and Cash
+    Flows about Future Earnings?", The Accounting Review 71, S. 289-315. Niedriger ist besser:
+    Ein hoher Wert heisst, der Gewinn steht vor allem auf dem Papier.
+    """
+    if not years or years[0].net_income is None or years[0].operating_cash_flow is None:
+        return None
+    return safe_div(years[0].net_income - years[0].operating_cash_flow, _average_assets(years))
+
+
+def cfo_assets(years: Sequence[FiscalYear]) -> float | None:
+    """Operativer Cashflow / durchschnittliche Bilanzsumme (cash-basierte Profitabilitaet)."""
+    if not years:
+        return None
+    return safe_div(years[0].operating_cash_flow, _average_assets(years))
 
 
 def _growth(history: Sequence[float | None]) -> float | None:
@@ -247,6 +397,9 @@ def compute_metrics(
         ),
         debt_to_equity=safe_div(s.total_debt, s.total_equity),
         earnings_stability=earnings_stability(s.net_income_history),
+        f_score=f_score(s.years),
+        operating_accruals=operating_accruals(s.years),
+        cfo_assets=cfo_assets(s.years),
         revenue_growth_5y=_growth(s.revenue_history),
         eps_growth_5y=_growth(s.eps_history),
     )

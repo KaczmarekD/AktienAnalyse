@@ -233,7 +233,16 @@ export const zProfileParamsV1Input = z.object({
   min_value_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
   quality_factors: z
     .array(
-      z.enum(['roic', 'fcf_margin', 'operating_margin', 'net_debt_ebitda', 'earnings_stability']),
+      z.enum([
+        'roic',
+        'fcf_margin',
+        'operating_margin',
+        'net_debt_ebitda',
+        'earnings_stability',
+        'f_score',
+        'operating_accruals',
+        'cfo_assets',
+      ]),
     )
     .optional(),
   terminal_growth: z.number().gte(-0.05).lte(0.1).optional().default(0.02),
@@ -321,15 +330,18 @@ export const zProfileDetail = z.object({
  * RankingRow
  */
 export const zRankingRow = z.object({
+  cfo_assets: z.number().nullable(),
   composite_score: z.number().nullable(),
   currency: z.string().nullable(),
   earnings_stability: z.number().nullable(),
   ev_ebit: z.number().nullable(),
+  f_score: z.int().nullable(),
   fcf_margin: z.number().nullable(),
   index: z.string().nullable(),
   market_cap: z.number().nullable(),
   name: z.string().nullable(),
   net_debt_ebitda: z.number().nullable(),
+  operating_accruals: z.number().nullable(),
   operating_margin: z.number().nullable(),
   p_fcf: z.number().nullable(),
   passed_filter: z.boolean(),
@@ -533,18 +545,21 @@ export const zSessionState = z.object({
  * Snapshot
  */
 export const zSnapshot = z.object({
+  cfo_assets: z.number().nullable(),
   currency: z.string().nullable(),
   dividend_yield: z.number().nullable(),
   earnings_stability: z.number().nullable(),
   eps_growth_5y: z.number().nullable(),
   errors: z.array(z.string()),
   ev_ebit: z.number().nullable(),
+  f_score: z.int().nullable(),
   fcf_margin: z.number().nullable(),
   fetch_ok: z.boolean(),
   fetch_run_id: z.int(),
   fetched_on: z.iso.date(),
   market_cap: z.number().nullable(),
   net_debt_ebitda: z.number().nullable(),
+  operating_accruals: z.number().nullable(),
   operating_margin: z.number().nullable(),
   p_fcf: z.number().nullable(),
   pb_ratio: z.number().nullable(),

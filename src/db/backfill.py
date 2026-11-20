@@ -58,6 +58,9 @@ _METRICS = (
     "operating_margin",
     "net_debt_ebitda",
     "earnings_stability",
+    "f_score",
+    "operating_accruals",
+    "cfo_assets",
     "revenue_growth_5y",
     "eps_growth_5y",
 )

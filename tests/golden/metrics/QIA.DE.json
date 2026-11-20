@@ -21,11 +21,14 @@
   "shares_outstanding": 206495000.0
  },
  "quality": {
+  "cfo_assets": 0.1093198530363832,
   "debt_to_equity": 0.4796977571586547,
   "earnings_stability": 0.5612604019285823,
+  "f_score": 7,
   "fcf_margin": 0.21397139424468625,
   "gross_margin": 0.6217682400804977,
   "net_debt_ebitda": 1.3570497457711006,
+  "operating_accruals": -0.03833410715726714,
   "operating_margin": 0.24895227222596758,
   "roa": 0.06764278090667564,
   "roic": 0.08115528999105312

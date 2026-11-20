@@ -56,11 +56,28 @@ DEFAULT_QUALITY_FACTORS: dict[str, QualityFactor] = {
     "earnings_stability": ("earnings_stability", "high"),
 }
 
+# Der ganze Katalog: die Standardauswahl und die Faktoren aus ADR-0011, die ein Profil erst
+# einschalten muss (F2.1). Neue Faktoren kommen hinten an.
+QUALITY_FACTOR_CATALOG: dict[str, QualityFactor] = DEFAULT_QUALITY_FACTORS | {
+    "f_score": ("f_score", "high"),
+    "operating_accruals": ("operating_accruals", "low"),
+    "cfo_assets": ("cfo_assets", "high"),
+}
 
-# Faktoren, die die Branchenregel ausschliesst (ADR-0011, Punkt 3). F2.1 ergaenzt F-Score,
-# Accruals und CFO/Bilanzsumme.
+
+# Faktoren, die die Branchenregel ausschliesst (ADR-0011, Punkt 3)
 INDUSTRY_RULE_EXCLUDED: frozenset[str] = frozenset(
-    {"ev_ebit", "p_fcf", "fcf_margin", "net_debt_ebitda", "operating_margin", "roic"}
+    {
+        "ev_ebit",
+        "p_fcf",
+        "fcf_margin",
+        "net_debt_ebitda",
+        "operating_margin",
+        "roic",
+        "f_score",
+        "operating_accruals",
+        "cfo_assets",
+    }
 )
 
 

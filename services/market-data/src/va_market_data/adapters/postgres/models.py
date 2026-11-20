@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Identity,
     Index,
+    SmallInteger,
     Text,
     UniqueConstraint,
     func,
@@ -278,6 +279,10 @@ class FundamentalSnapshot(Base):
     net_debt_ebitda: Mapped[float | None]
     debt_to_equity: Mapped[float | None]
     earnings_stability: Mapped[float | None]
+    # F2.1 (Migration 0021): Bilanzqualitaet
+    f_score: Mapped[int | None] = mapped_column(SmallInteger)
+    operating_accruals: Mapped[float | None]
+    cfo_assets: Mapped[float | None]
     # Growth
     revenue_growth_5y: Mapped[float | None]
     eps_growth_5y: Mapped[float | None]

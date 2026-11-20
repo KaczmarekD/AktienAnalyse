@@ -281,6 +281,9 @@
               @case ('num2') {
                 {{ factorValue(row, column.key) | num }}
               }
+              @case ('int') {
+                {{ factorValue(row, column.key) | num: '1.0-0' }}
+              }
               @default {
                 {{ factorValue(row, column.key) | num: '1.1-1' }}
               }

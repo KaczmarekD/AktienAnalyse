@@ -77,7 +77,10 @@
               "fcf_margin",
               "operating_margin",
               "net_debt_ebitda",
-              "earnings_stability"
+              "earnings_stability",
+              "f_score",
+              "operating_accruals",
+              "cfo_assets"
             ],
             "type": "string"
           },

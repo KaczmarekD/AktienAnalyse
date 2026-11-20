@@ -36,7 +36,7 @@ type SnapshotField = keyof Omit<
   Snapshot,
   'fetch_run_id' | 'fetched_on' | 'fetch_ok' | 'errors' | 'currency'
 >;
-type Format = 'num1' | 'num2' | 'pct' | 'mrd' | 'price';
+type Format = 'int' | 'num1' | 'num2' | 'pct' | 'mrd' | 'price';
 
 interface Figure {
   field: SnapshotField;
@@ -64,6 +64,10 @@ const QUALITY = [
   figure('operating_margin', 'pct'),
   figure('net_debt_ebitda', 'num1'),
   figure('earnings_stability', 'num2'),
+  // F2.1 (ADR-0011): Bilanzqualität
+  figure('f_score', 'int'),
+  figure('operating_accruals', 'pct'),
+  figure('cfo_assets', 'pct'),
 ];
 const MARKET = [
   figure('price', 'price'),
@@ -78,6 +82,9 @@ const QUALITY_FACTORS = [
   'operating_margin',
   'net_debt_ebitda',
   'earnings_stability',
+  'f_score',
+  'operating_accruals',
+  'cfo_assets',
 ];
 
 /**

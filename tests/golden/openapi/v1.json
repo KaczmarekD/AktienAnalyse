@@ -1097,7 +1097,10 @@
                 "fcf_margin",
                 "operating_margin",
                 "net_debt_ebitda",
-                "earnings_stability"
+                "earnings_stability",
+                "f_score",
+                "operating_accruals",
+                "cfo_assets"
               ],
               "type": "string"
             },
@@ -1528,6 +1531,17 @@
       "RankingRow": {
         "additionalProperties": false,
         "properties": {
+          "cfo_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfo Assets"
+          },
           "composite_score": {
             "anyOf": [
               {
@@ -1571,6 +1585,17 @@
               }
             ],
             "title": "Ev Ebit"
+          },
+          "f_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F Score"
           },
           "fcf_margin": {
             "anyOf": [
@@ -1626,6 +1651,17 @@
               }
             ],
             "title": "Net Debt Ebitda"
+          },
+          "operating_accruals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Accruals"
           },
           "operating_margin": {
             "anyOf": [
@@ -1767,7 +1803,10 @@
           "fcf_margin",
           "operating_margin",
           "net_debt_ebitda",
-          "earnings_stability"
+          "earnings_stability",
+          "f_score",
+          "operating_accruals",
+          "cfo_assets"
         ],
         "title": "RankingRow",
         "type": "object"
@@ -2549,6 +2588,17 @@
       "Snapshot": {
         "additionalProperties": false,
         "properties": {
+          "cfo_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfo Assets"
+          },
           "currency": {
             "anyOf": [
               {
@@ -2611,6 +2661,17 @@
             ],
             "title": "Ev Ebit"
           },
+          "f_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F Score"
+          },
           "fcf_margin": {
             "anyOf": [
               {
@@ -2656,6 +2717,17 @@
               }
             ],
             "title": "Net Debt Ebitda"
+          },
+          "operating_accruals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Accruals"
           },
           "operating_margin": {
             "anyOf": [
@@ -2764,6 +2836,9 @@
           "operating_margin",
           "net_debt_ebitda",
           "earnings_stability",
+          "f_score",
+          "operating_accruals",
+          "cfo_assets",
           "revenue_growth_5y",
           "eps_growth_5y",
           "errors"

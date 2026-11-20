@@ -70,7 +70,7 @@ const ORDER = [
 ];
 
 /** Wie Faktorwerte erscheinen: Multiples mit einer Stelle, Renditen und Margen in Prozent. */
-const FACTOR_FORMAT: Record<FactorField, 'num1' | 'num2' | 'pct'> = {
+const FACTOR_FORMAT: Record<FactorField, 'int' | 'num1' | 'num2' | 'pct'> = {
   ev_ebit: 'num1',
   pb_ratio: 'num1',
   p_fcf: 'num1',
@@ -80,6 +80,9 @@ const FACTOR_FORMAT: Record<FactorField, 'num1' | 'num2' | 'pct'> = {
   operating_margin: 'pct',
   net_debt_ebitda: 'num1',
   earnings_stability: 'num2',
+  f_score: 'int',
+  operating_accruals: 'pct',
+  cfo_assets: 'pct',
 };
 
 /** Multiples und Verschuldung: niedriger ist besser, also beim ersten Klick aufsteigend. */
@@ -90,6 +93,7 @@ const ASCENDING: readonly string[] = [
   'pb_ratio',
   'p_fcf',
   'net_debt_ebitda',
+  'operating_accruals',
 ];
 
 function loadColumns(): string[] {

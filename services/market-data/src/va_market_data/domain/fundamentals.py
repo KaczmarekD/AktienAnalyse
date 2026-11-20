@@ -72,6 +72,10 @@ class QualityMetrics:
     net_debt_ebitda: float | None = None
     debt_to_equity: float | None = None
     earnings_stability: float | None = None  # 0..1, hoeher = stabiler
+    # F2.1 (ADR-0011): Piotroski-F-Score 0..9, Accruals und CFO je durchschnittlicher Bilanzsumme
+    f_score: int | None = None
+    operating_accruals: float | None = None
+    cfo_assets: float | None = None
 
 
 @dataclass

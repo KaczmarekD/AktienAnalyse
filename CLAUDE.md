@@ -449,17 +449,25 @@ ADR-0001 und ADR-0002 aufgehoben.
    Schema-Golden-Files unter `tests/golden/contracts/v1/` (additiv)
 4. Auslesen der Rohwerte in `va_market_data.adapters.yahoo.fetch_one()` (`StatementFigures`
    bzw. `MarketFigures`; `FIELD_MAP` bzw. `INFO_FIELDS` erweitern, falls yfinance-Roh-Feld
-   nötig)
-5. Eintrag in `DEFAULT_VALUE_FACTORS` oder `DEFAULT_QUALITY_FACTORS` (`va_scoring.domain.scoring`)
-   und derselbe Schlüssel im Literal `ValueFactorKey` bzw. `QualityFactorKey`
-   (`va_contracts.profile`), ein Test hält beide gleich, dazu Name und Methodik-Hinweis in
-   `FACTOR_INFO` (`va_scoring.domain.profile`, für das UI). Bestehende Profile schalten ihn
-   nicht von selbst ein: Dafür braucht es eine neue Profil-Version. Der OpenAPI-Snapshot und
-   der TS-Client ändern sich mit (`make ui-api`)
-6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und
-   Migration: `alembic revision --autogenerate -m "..."` (nur additiv) –
-   sonst lehnt `write_snapshot` die unbekannte Spalte ab
-7. Test in `services/scoring/tests/test_scoring.py`, Golden-Files der Kennzahlen
+   nötig). Vergleicht der Faktor Jahre miteinander, rechnet er mit `StatementFigures.years`
+   (`FiscalYear` nach Stichtag, seit F2.1), nicht mit `_latest`
+5. Eintrag im Katalog (`DEFAULT_VALUE_FACTORS` bzw. `QUALITY_FACTOR_CATALOG` in
+   `va_scoring.domain.scoring`) und derselbe Schlüssel im Literal `ValueFactorKey` bzw.
+   `QualityFactorKey` (`va_contracts.profile`), ein Test hält beide gleich, dazu Name und
+   Methodik-Hinweis in `FACTOR_INFO` (`va_scoring.domain.profile`, für das UI, mit Richtung und
+   Rolle höchstens 200 Zeichen). In die Standardauswahl (`DEFAULT_QUALITY_FACTORS`,
+   `DEFAULT_QUALITY_FACTOR_KEYS`) nur, wenn das Profil „Standard“ ihn sofort nutzen soll; sonst
+   schaltet ihn erst eine neue Profil-Version ein. Gehört er zu den Kennzahlen, die bei
+   Finanzwerten nichts aussagen, auch nach `INDUSTRY_RULE_EXCLUDED`
+6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und in der
+   Projektion `web.snapshot_row` (`va_web_api.adapters.postgres.models`), eine Migration für
+   beide (nur additiv) – sonst lehnt `write_snapshot` die unbekannte Spalte ab. Dazu die
+   Projektion (`va_web_api.projections`), `src/db/backfill.py`, beide Lesewege
+   (`va_web_api.read`, `va_web_api.read_models`) und die Antwortmodelle (`va_web_api.models`,
+   Pflichtfeld). OpenAPI-Snapshot und TS-Client ändern sich mit (`make ui-api`)
+7. UI: Eintrag im Glossar und in `FIELD_FACTOR` (`frontend/src/app/shared/glossary/`), Format in
+   `FACTOR_FORMAT` (Ranking) und eine Kennzahl im Titel-Detail
+8. Test in `services/scoring/tests/test_scoring.py`, Golden-Files der Kennzahlen
    (`tests/golden/metrics/`) bewusst mit `--update-golden` erneuern. Ein Faktor im Composite
    verschiebt das Ranking, dann auch die Replay-Fixtures (`tests/test_replay_fixtures.py`)
 

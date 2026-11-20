@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, Text, func, text
+from sqlalchemy import CheckConstraint, SmallInteger, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -141,6 +141,10 @@ class SnapshotRow(Base):
     operating_margin: Mapped[float | None]
     net_debt_ebitda: Mapped[float | None]
     earnings_stability: Mapped[float | None]
+    # F2.1 (Migration 0021): Bilanzqualitaet
+    f_score: Mapped[int | None] = mapped_column(SmallInteger)
+    operating_accruals: Mapped[float | None]
+    cfo_assets: Mapped[float | None]
     revenue_growth_5y: Mapped[float | None]
     eps_growth_5y: Mapped[float | None]
     errors: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))

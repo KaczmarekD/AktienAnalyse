@@ -331,7 +331,9 @@ class TestIndustryRules:
         insurer = out.loc["INS.DE"].to_dict()
         assert bool(insurer["industry_rule"]) is True
         missing = {key for key, value in insurer.items() if _missing(value)}
-        assert {f"rank_{key}" for key in INDUSTRY_RULE_EXCLUDED} <= missing
+        cfg = ScoringConfig()
+        active = set(cfg.value_factors) | set(cfg.quality_factors)
+        assert {f"rank_{key}" for key in INDUSTRY_RULE_EXCLUDED & active} <= missing
         # KBV und Shareholder Yield bleiben, Gewinnstabilität auch
         assert not {"rank_pb", "rank_shareholder_yield", "rank_earnings_stability"} & missing
         # Nur ein Quality-Faktor: kein Quality-Score, also kein Composite (M1)

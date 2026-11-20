@@ -78,6 +78,10 @@ class RankingRow(_Model):
     operating_margin: float | None
     net_debt_ebitda: float | None
     earnings_stability: float | None
+    # F2.1: Bilanzqualitaet (im Profil v1 abgeschaltet)
+    f_score: int | None
+    operating_accruals: float | None
+    cfo_assets: float | None
 
 
 class RunProfile(_Model):
@@ -121,6 +125,10 @@ class Snapshot(_Model):
     operating_margin: float | None
     net_debt_ebitda: float | None
     earnings_stability: float | None
+    # F2.1: Bilanzqualitaet (im Profil v1 abgeschaltet)
+    f_score: int | None
+    operating_accruals: float | None
+    cfo_assets: float | None
     revenue_growth_5y: float | None
     eps_growth_5y: float | None
     errors: list[str]

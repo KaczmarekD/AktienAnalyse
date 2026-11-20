@@ -39,6 +39,7 @@ from ..domain.fundamentals import (
 )
 from ..domain.history import HistoryState, split_days
 from ..domain.metrics import (
+    FiscalYear,
     MarketFigures,
     Metrics,
     StatementFigures,
@@ -93,6 +94,12 @@ FIELD_MAP: dict[str, tuple[str, ...]] = {
         "Common Stock Repurchased",
         "RepurchaseOfStock",
     ),
+    # F2.1 (ADR-0011): fuer F-Score und Accruals
+    "cost_of_revenue": ("Cost Of Revenue", "CostOfRevenue"),
+    "long_term_debt": ("Long Term Debt", "LongTermDebt"),
+    "current_assets": ("Current Assets", "CurrentAssets"),
+    "current_liabilities": ("Current Liabilities", "CurrentLiabilities"),
+    "shares_issued": ("Ordinary Shares Number", "Share Issued", "OrdinarySharesNumber"),
 }
 
 # Jahresabschluesse: Statement -> Attribut von yf.Ticker
@@ -256,6 +263,40 @@ def _history(series: pd.Series | None) -> list[float | None]:
     Welche Jahre fuer Wachstum und Stabilitaet zaehlen, entscheidet die Domain.
     """
     return [] if series is None else [_to_float(x) for x in series.tolist()]
+
+
+def _fiscal_years(
+    income: pd.DataFrame | None, balance: pd.DataFrame | None, cashflow: pd.DataFrame | None
+) -> list[FiscalYear]:
+    """Geschaeftsjahre nach Stichtag, juengstes zuerst, ueber die drei Abschluesse ausgerichtet.
+
+    ``_latest`` nimmt je Zeile den ersten vorhandenen Wert; fuer Vorjahresvergleiche (F2.1)
+    muessen aber alle Posten aus demselben Jahr stammen.
+    """
+    frames = [df for df in (income, balance, cashflow) if df is not None and not df.empty]
+    dates = sorted({column for df in frames for column in df.columns}, reverse=True)
+
+    def value(df: pd.DataFrame | None, key: str, date: Any) -> float | None:
+        row = _pick(df, key)
+        if row is None or date not in row.index:
+            return None
+        return _to_float(row[date])
+
+    return [
+        FiscalYear(
+            net_income=value(income, "net_income", date),
+            revenue=value(income, "revenue", date),
+            gross_profit=value(income, "gross_profit", date),
+            cost_of_revenue=value(income, "cost_of_revenue", date),
+            total_assets=value(balance, "total_assets", date),
+            long_term_debt=value(balance, "long_term_debt", date),
+            current_assets=value(balance, "current_assets", date),
+            current_liabilities=value(balance, "current_liabilities", date),
+            shares=value(balance, "shares_issued", date),
+            operating_cash_flow=value(cashflow, "op_cash", date),
+        )
+        for date in dates
+    ]
 
 
 def _dividend_yield(info: dict[str, Any]) -> float | None:
@@ -720,6 +761,7 @@ def fetch_one(
         revenue_history=_history(_pick(income, "revenue")),
         eps_history=_history(_pick(income, "diluted_eps")),
         net_income_history=_history(_pick(income, "net_income")),
+        years=_fiscal_years(income, balance, cashflow),
     )
     market = MarketFigures(
         market_cap=fund.market.market_cap,

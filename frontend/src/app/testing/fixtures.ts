@@ -338,7 +338,7 @@ export const FACTORS: Factor[] = [
     group: 'quality',
     label: 'F-Score',
     better: 'high',
-    hint: 'Neun Prüfungen nach Piotroski: ob Ertrag, Cashflow, Verschuldung, Liquidität, Marge und Kapitalumschlag besser wurden und keine neuen Aktien dazukamen. 9 ist am besten.',
+    hint: 'Neun Prüfungen nach Piotroski: ob Ertrag, Cashflow, Verschuldung, Liquidität, Marge und Kapitalumschlag besser wurden und keine Aktien dazukamen. 9 ist am besten.',
   },
   {
     key: 'operating_accruals',

@@ -18,7 +18,7 @@ from va_contracts.profile import (
     ValueFactorKey,
 )
 
-from .scoring import DEFAULT_QUALITY_FACTORS, DEFAULT_VALUE_FACTORS, ScoringConfig
+from .scoring import DEFAULT_VALUE_FACTORS, QUALITY_FACTOR_CATALOG, ScoringConfig
 
 __all__ = [
     "DEFAULT_PROFILE_NAME",
@@ -75,6 +75,22 @@ FACTOR_INFO: dict[str, tuple[str, str]] = {
         "Wie wenig der Nettogewinn über die letzten fünf Geschäftsjahre schwankt. 1 heißt sehr "
         "stabil.",
     ),
+    # F2.1 (ADR-0011): im Katalog, im Profil v1 abgeschaltet
+    "f_score": (
+        "F-Score",
+        "Neun Prüfungen nach Piotroski: ob Ertrag, Cashflow, Verschuldung, Liquidität, Marge und "
+        "Kapitalumschlag besser wurden und keine Aktien dazukamen. 9 ist am besten.",
+    ),
+    "operating_accruals": (
+        "Accruals",
+        "Jahresüberschuss minus operativer Cashflow, je Euro Bilanzsumme. Hohe Werte heißen: Der "
+        "Gewinn steht vor allem auf dem Papier.",
+    ),
+    "cfo_assets": (
+        "CFO/Bilanzsumme",
+        "Operativer Cashflow je Euro Bilanzsumme: wie viel Geld das Geschäft im Verhältnis zum "
+        "eingesetzten Vermögen erwirtschaftet.",
+    ),
 }
 
 
@@ -127,7 +143,7 @@ class ScoringProfileParams(ProfileParamsV1):
             },
             quality_factors={
                 key: factor
-                for key, factor in DEFAULT_QUALITY_FACTORS.items()
+                for key, factor in QUALITY_FACTOR_CATALOG.items()
                 if key in self.quality_factors
             },
             industry_rules=self.industry_rules,

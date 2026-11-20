@@ -19,8 +19,20 @@ from .base import Contract
 # und sind im UI nicht aenderbar; ein Test dort haelt beide Listen gleich.
 ValueFactorKey = Literal["ev_ebit", "pb", "p_fcf", "shareholder_yield"]
 QualityFactorKey = Literal[
-    "roic", "fcf_margin", "operating_margin", "net_debt_ebitda", "earnings_stability"
+    "roic",
+    "fcf_margin",
+    "operating_margin",
+    "net_debt_ebitda",
+    "earnings_stability",
+    # F2.1 (ADR-0011): im Katalog, im Profil v1 abgeschaltet
+    "f_score",
+    "operating_accruals",
+    "cfo_assets",
 ]
+# Standardauswahl (Profil "Standard" v1): die fuenf Quality-Faktoren vor ADR-0011
+DEFAULT_QUALITY_FACTOR_KEYS: frozenset[QualityFactorKey] = frozenset(
+    {"roic", "fcf_margin", "operating_margin", "net_debt_ebitda", "earnings_stability"}
+)
 
 # Der Composite braucht je Gruppe mindestens zwei vorhandene Faktoren
 MIN_ACTIVE_FACTORS = 2
@@ -69,7 +81,7 @@ class ProfileParamsV1(Contract):
         description="Aktive Value-Faktoren, mindestens 2",
     )
     quality_factors: frozenset[QualityFactorKey] = Field(
-        default_factory=lambda: frozenset(get_args(QualityFactorKey)),
+        default_factory=lambda: DEFAULT_QUALITY_FACTOR_KEYS,
         description="Aktive Quality-Faktoren, mindestens 2",
     )
     # F2.4 (ADR-0011, Punkt 3): zunaechst abgeschaltet, erst das Profil v2 (F2.5) schaltet sie an
