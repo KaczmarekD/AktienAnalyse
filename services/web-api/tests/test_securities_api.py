@@ -13,7 +13,14 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from va_contracts.securities import BondTermsV1, ListingV1, SecurityHitV1, SecurityV1
+from va_contracts.securities import (
+    BondTermsV1,
+    EtfHoldingV1,
+    EtfV1,
+    ListingV1,
+    SecurityHitV1,
+    SecurityV1,
+)
 from va_web_api.main import create_app
 from va_web_api.ports import RemoteUnavailable
 from va_web_api.settings import WebApiSettings
@@ -26,6 +33,7 @@ SETTINGS = WebApiSettings(
 
 APPLE = "US0378331005"
 BOND = "DE000A383J95"
+WORLD = "IE00B4L5Y983"
 
 
 @dataclass
@@ -52,6 +60,22 @@ class FakeSecurities:
         if self.down:
             raise RemoteUnavailable("market-data")
         self.resolves.append((isin, symbol))
+        if isin == WORLD:
+            return SecurityV1(
+                isin=WORLD,
+                name="ISHSIII-CORE MSCI WORLD",
+                asset_class="etf",
+                etf=EtfV1(
+                    source="ishares",
+                    as_of=date(2026, 11, 19),
+                    complete=True,
+                    name="iShares Core MSCI World UCITS ETF",
+                    ter=0.2,
+                    holdings_count=1295,
+                    top_holdings=[EtfHoldingV1(name="APPLE", weight=6.0, ticker="AAPL")],
+                    countries={"Vereinigte Staaten": 71.9},
+                ),
+            )
         if isin != BOND:
             return None
         return SecurityV1(
@@ -105,6 +129,16 @@ class TestResolve:
         body = response.json()
         assert (body["asset_class"], body["bond"]["coupon"], body["listing"]) == ("bond", 4.0, None)
         assert body["bond"]["maturity"] == "2028-07-12"
+
+    def test_an_etf_with_its_composition(self, client):
+        """D2.4: Fondsdaten, Gewichte und die groessten Positionen aus dem letzten Wochenlauf."""
+        body = client.get(f"/api/v1/securities/{WORLD}").json()
+        etf = body["etf"]
+        assert (etf["ter"], etf["complete"], etf["holdings_count"]) == (0.2, True, 1295)
+        assert etf["name"] == "iShares Core MSCI World UCITS ETF"
+        assert etf["top_holdings"][0]["ticker"] == "AAPL"
+        assert etf["countries"] == {"Vereinigte Staaten": 71.9}
+        assert body["bond"] is None
 
     def test_a_chosen_listing_is_passed_on(self, client, securities):
         client.get(f"/api/v1/securities/{BOND}", params={"symbol": "DB.F"})

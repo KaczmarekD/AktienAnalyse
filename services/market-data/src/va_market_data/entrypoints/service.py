@@ -19,8 +19,9 @@ from va_platform.service import service_main
 from ..adapters.csv_universe import load_fallback
 from ..adapters.deka import DekaSource
 from ..adapters.firds import FirdsSource
-from ..adapters.ishares import IsharesSource
+from ..adapters.ishares import IsharesFunds, IsharesSource
 from ..adapters.openfigi import OpenFigiLookup, resolve_isins_openfigi
+from ..adapters.postgres.etf import PostgresEtfStore
 from ..adapters.postgres.models import MarketDataInbox, MarketDataOutbox
 from ..adapters.postgres.prices import PostgresPriceStore
 from ..adapters.postgres.securities import PostgresSecurityCatalog
@@ -31,13 +32,14 @@ from ..adapters.yahoo import (
     PROVIDER,
     FetcherConfig,
     YahooFundamentals,
+    YahooFunds,
     YahooPrices,
     YahooTextSearch,
     provider_version,
 )
 from ..application.fetch import fetch_all
 from ..application.prices import PricesResult, collect_prices
-from ..application.securities import SecurityService
+from ..application.securities import RefreshResult, SecurityService, refresh_securities
 from ..application.universe import load_universe as load_universe_chain
 from ..domain.universe import UniverseConfig
 from . import rpc
@@ -71,6 +73,9 @@ class MarketDataAdapters:
     # D2.3: Tageskurse fuer einen Handelstag; ohne (Replay, Tests) keine Antwort auf
     # marketdata.prices.requested
     prices: Callable[[date], PricesResult] | None = None
+    # D2.4: Stammdaten und ETF-Daten der Abdeckung im Wochenlauf; ohne kein
+    # marketdata.securities.updated
+    securities: Callable[[], RefreshResult] | None = None
 
 
 def live_universe(
@@ -146,10 +151,30 @@ def build_adapters(
         store=store,
         load_universe=universe,
         fetch=fetch,
-        # Eine Replay-Datei kennt nur das Universum: Abdeckung und Tageskurse nur im echten Abruf
+        # Eine Replay-Datei kennt nur das Universum: Abdeckung, Tageskurse und Stammdaten nur im
+        # echten Abruf
         coverage=store if live else None,
         prices=daily_prices(store, PostgresPriceStore(engine)) if live else None,
+        securities=master_data(store, engine) if live else None,
     )
+
+
+def master_data(coverage: CoverageStore, engine: Engine) -> Callable[[], RefreshResult]:
+    """Stammdaten und ETF-Daten der Abdeckung (D2.4): ESMA FIRDS, iShares, dann yfinance.
+
+    Je Lauf eine neue Fondsliste von iShares (``IsharesFunds`` liest sie einmal je Instanz).
+    """
+
+    def refresh() -> RefreshResult:
+        return refresh_securities(
+            coverage.coverage(),
+            catalog=PostgresSecurityCatalog(engine),
+            master=FirdsSource(),
+            etf_sources=[IsharesFunds(), YahooFunds()],
+            compositions=PostgresEtfStore(engine),
+        )
+
+    return refresh
 
 
 def daily_prices(
@@ -178,6 +203,7 @@ def wire(bus: EventBus, adapters: MarketDataAdapters, settings: MarketDataSettin
         store=adapters.store,
         fetch=adapters.fetch,
         coverage=adapters.coverage,
+        securities=adapters.securities,
         dax_only=settings.universe == "DAX_ONLY",
     ).subscribe()
     if adapters.prices is not None:
@@ -200,6 +226,7 @@ def securities(engine: Engine) -> SecurityService:
         lookup=OpenFigiLookup(),
         text=YahooTextSearch(),
         master=FirdsSource(),
+        compositions=PostgresEtfStore(engine),  # D2.4: ETFs mit gespeicherter Zusammensetzung
     )
 
 

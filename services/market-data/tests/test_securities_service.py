@@ -17,6 +17,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from va_market_data.application.securities import LookupResult, SecurityService
+from va_market_data.domain.etf import EtfComposition, FundFacts
 from va_market_data.domain.securities import (
     BondTerms,
     Listing,
@@ -27,6 +28,7 @@ from va_market_data.domain.securities import (
 APPLE = "US0378331005"
 SAP = "DE0007164600"
 BOND = "DE000A383J95"
+WORLD = "IE00B4L5Y983"
 
 
 class Clock:
@@ -120,12 +122,29 @@ def _yahoo_hit(symbol: str, name: str = "iShares Core MSCI World") -> SecurityHi
 
 
 @dataclass
+class FakeCompositions:
+    """Gespeicherte ETF-Zusammensetzungen (D2.4)."""
+
+    latest: dict[str, EtfComposition] = field(default_factory=dict)
+    error: Exception | None = None
+
+    def latest_composition(
+        self, isin: str, *, complete_only: bool = False
+    ) -> EtfComposition | None:
+        if self.error:
+            raise self.error
+        found = self.latest.get(isin)
+        return None if found is None or (complete_only and not found.complete) else found
+
+
+@dataclass
 class World:
     catalog: FakeCatalog = field(default_factory=FakeCatalog)
     lookup: FakeLookup = field(default_factory=FakeLookup)
     text: FakeText = field(default_factory=FakeText)
     master: FakeMaster = field(default_factory=FakeMaster)
     clock: Clock = field(default_factory=Clock)
+    compositions: FakeCompositions = field(default_factory=FakeCompositions)
 
     def service(self) -> SecurityService:
         return SecurityService(
@@ -134,6 +153,7 @@ class World:
             text=self.text,
             master=self.master,
             clock=self.clock,
+            compositions=self.compositions,
         )
 
 
@@ -311,6 +331,31 @@ class TestResolve:
         world.clock.now += timedelta(hours=24, minutes=1)
         service.resolve(APPLE)
         assert world.lookup.calls == [APPLE, APPLE]
+
+    def test_an_etf_brings_its_stored_composition(self, world):
+        """D2.4: die zuletzt im Wochenlauf gespeicherte; die Aufloesung ruft keine Fondsquelle."""
+        world.master.masters[WORLD] = SecurityMaster(WORLD, "ISHSIII-CORE MSCI WORLD", "etf")
+        stored = EtfComposition(WORLD, "ishares", date(2026, 11, 19), True, FundFacts(ter=0.2))
+        world.compositions.latest[WORLD] = stored
+        resolved = world.service().resolve(WORLD)
+        assert resolved is not None
+        assert resolved.etf == stored
+
+    def test_an_unreadable_composition_is_left_out(self, world):
+        world.master.masters[WORLD] = SecurityMaster(WORLD, "ISHSIII-CORE MSCI WORLD", "etf")
+        world.compositions.error = ConnectionError("db weg")
+        resolved = world.service().resolve(WORLD)
+        assert resolved is not None
+        assert resolved.etf is None
+
+    def test_a_share_has_no_composition(self, world):
+        world.lookup.answers[APPLE] = _apple_lookup()
+        world.compositions.latest[APPLE] = EtfComposition(
+            APPLE, "yahoo", date(2026, 11, 19), False, FundFacts()
+        )
+        resolved = world.service().resolve(APPLE)
+        assert resolved is not None
+        assert resolved.etf is None
 
     def test_unknown(self, world):
         assert world.service().resolve(APPLE) is None

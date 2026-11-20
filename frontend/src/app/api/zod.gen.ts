@@ -81,6 +81,46 @@ export const zEmailConfirmation = z.object({
 });
 
 /**
+ * EtfHolding
+ *
+ * Eine Position eines Fonds; Bezeichnungen wie bei der Quelle.
+ */
+export const zEtfHolding = z.object({
+  asset_class: z.string().nullable(),
+  country: z.string().nullable(),
+  currency: z.string().nullable(),
+  isin: z.string().nullable(),
+  name: z.string(),
+  sector: z.string().nullable(),
+  ticker: z.string().nullable(),
+  weight: z.number(),
+});
+
+/**
+ * Etf
+ *
+ * Stand eines Fonds aus dem letzten Wochenlauf (D2.4): Fondsdaten, Gewichte in Prozent und
+ * die groessten Positionen. ``complete`` sagt, ob die Quelle alle Positionen kennt.
+ */
+export const zEtf = z.object({
+  as_of: z.iso.date(),
+  asset_classes: z.record(z.string(), z.number()),
+  complete: z.boolean(),
+  countries: z.record(z.string(), z.number()),
+  distribution: z.enum(['accumulating', 'distributing']).nullable(),
+  effective_duration: z.number().nullable(),
+  fund_currency: z.string().nullable(),
+  fund_size: z.number().nullable(),
+  holdings_count: z.int(),
+  name: z.string().nullable(),
+  provider: z.string().nullable(),
+  sectors: z.record(z.string(), z.number()),
+  source: z.string(),
+  ter: z.number().nullable(),
+  top_holdings: z.array(zEtfHolding),
+});
+
+/**
  * Factor
  *
  * Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.
@@ -499,6 +539,7 @@ export const zSecurity = z.object({
   bond: zBondTerms.nullable(),
   cfi: z.string().nullable(),
   currency: z.string().nullable(),
+  etf: zEtf.nullable(),
   isin: z.string(),
   lei: z.string().nullable(),
   listing: zListing.nullable(),

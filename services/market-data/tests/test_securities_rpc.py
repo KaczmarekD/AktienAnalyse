@@ -7,6 +7,7 @@ Antwort, eine ungueltige ein Fehler ``invalid``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 from va_contracts.rpc.v1 import (
     SECURITIES_RESOLVE,
@@ -17,6 +18,7 @@ from va_contracts.rpc.v1 import (
     SecuritySearchRequestV1,
 )
 from va_market_data.application.securities import ResolvedSecurity
+from va_market_data.domain.etf import EtfComposition, FundFacts, Holding
 from va_market_data.domain.securities import Listing, SecurityHit, SecurityMaster
 from va_market_data.entrypoints.rpc import handlers
 
@@ -82,3 +84,25 @@ def test_a_wrong_check_digit_is_invalid():
     reply = handlers(service)[SECURITIES_RESOLVE](SecurityResolveRequestV1(isin="DE0007164601"))
     assert reply.error is not None
     assert reply.error.code == "invalid"
+
+
+def test_an_etf_with_its_composition():
+    """D2.4: Fondsdaten, Gewichte und die groessten Positionen, nicht die ganze Liste."""
+    etf = EtfComposition(
+        isin="IE00B4L5Y983",
+        source="ishares",
+        as_of=date(2026, 11, 19),
+        complete=True,
+        facts=FundFacts(ter=0.2, currency="USD"),
+        holdings=(Holding("APPLE", 6.0, ticker="AAPL"), Holding("SAP", 0.5, ticker="SAP")),
+        countries={"Vereinigte Staaten": 6.0, "Deutschland": 0.5},
+    )
+    master = SecurityMaster(isin="IE00B4L5Y983", name="ISHSIII-CORE MSCI WORLD", asset_class="etf")
+    service = FakeService(resolved=ResolvedSecurity(master, listings=(), listing=None, etf=etf))
+    reply = handlers(service)[SECURITIES_RESOLVE](SecurityResolveRequestV1(isin="IE00B4L5Y983"))
+    assert isinstance(reply, SecurityResolveReplyV1)
+    assert reply.security is not None
+    assert reply.security.etf is not None
+    assert (reply.security.etf.ter, reply.security.etf.holdings_count) == (0.2, 2)
+    assert [h.ticker for h in reply.security.etf.top_holdings] == ["AAPL", "SAP"]
+    assert reply.security.etf.countries == {"Vereinigte Staaten": 6.0, "Deutschland": 0.5}

@@ -141,7 +141,7 @@ class SnapshotRow(Base):
     operating_margin: Mapped[float | None]
     net_debt_ebitda: Mapped[float | None]
     earnings_stability: Mapped[float | None]
-    # F2.1 (Migration 0021): Bilanzqualitaet
+    # F2.1 (Migration 0022): Bilanzqualitaet
     f_score: Mapped[int | None] = mapped_column(SmallInteger)
     operating_accruals: Mapped[float | None]
     cfo_assets: Mapped[float | None]

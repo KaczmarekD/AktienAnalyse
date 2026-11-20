@@ -181,6 +181,121 @@ export type EmailConfirmation = {
 };
 
 /**
+ * Etf
+ *
+ * Stand eines Fonds aus dem letzten Wochenlauf (D2.4): Fondsdaten, Gewichte in Prozent und
+ * die groessten Positionen. ``complete`` sagt, ob die Quelle alle Positionen kennt.
+ */
+export type Etf = {
+  /**
+   * As Of
+   */
+  as_of: string;
+  /**
+   * Asset Classes
+   */
+  asset_classes: {
+    [key: string]: number;
+  };
+  /**
+   * Complete
+   */
+  complete: boolean;
+  /**
+   * Countries
+   */
+  countries: {
+    [key: string]: number;
+  };
+  /**
+   * Distribution
+   */
+  distribution: 'accumulating' | 'distributing' | null;
+  /**
+   * Effective Duration
+   */
+  effective_duration: number | null;
+  /**
+   * Fund Currency
+   */
+  fund_currency: string | null;
+  /**
+   * Fund Size
+   */
+  fund_size: number | null;
+  /**
+   * Holdings Count
+   */
+  holdings_count: number;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Provider
+   */
+  provider: string | null;
+  /**
+   * Sectors
+   */
+  sectors: {
+    [key: string]: number;
+  };
+  /**
+   * Source
+   */
+  source: string;
+  /**
+   * Ter
+   */
+  ter: number | null;
+  /**
+   * Top Holdings
+   */
+  top_holdings: Array<EtfHolding>;
+};
+
+/**
+ * EtfHolding
+ *
+ * Eine Position eines Fonds; Bezeichnungen wie bei der Quelle.
+ */
+export type EtfHolding = {
+  /**
+   * Asset Class
+   */
+  asset_class: string | null;
+  /**
+   * Country
+   */
+  country: string | null;
+  /**
+   * Currency
+   */
+  currency: string | null;
+  /**
+   * Isin
+   */
+  isin: string | null;
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Sector
+   */
+  sector: string | null;
+  /**
+   * Ticker
+   */
+  ticker: string | null;
+  /**
+   * Weight
+   */
+  weight: number;
+};
+
+/**
  * Factor
  *
  * Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.
@@ -1266,6 +1381,7 @@ export type Security = {
    * Currency
    */
   currency: string | null;
+  etf: Etf | null;
   /**
    * Isin
    */

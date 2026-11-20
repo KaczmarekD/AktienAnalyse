@@ -27,6 +27,7 @@ from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wai
 from yfinance.exceptions import YFRateLimitError
 
 from ..domain.consensus import MAX_ERROR_LENGTH, ConsensusEntry, collect_consensus, to_payload
+from ..domain.etf import EtfComposition, FundFacts, Holding
 from ..domain.fundamentals import (
     Fundamentals,
     Growth,
@@ -181,6 +182,30 @@ SEARCH_FIELDS: dict[str, tuple[str, ...]] = {
 }
 # quoteType -> Anlageklasse; andere Typen (Index, Waehrung, Future) sind keine Wertpapiere
 SEARCH_TYPES: dict[str, AssetClass] = {"EQUITY": "equity", "ETF": "etf", "MUTUALFUND": "etf"}
+
+# Fonds (D2.4): eigener Name -> Attribut von yf.Ticker(...).funds_data bzw. Zeile, Spalte oder
+# Schluessel darin. Anteile (0.0012) statt Prozent; "Total Net Assets" ist unzuverlaessig
+# (Recherche 06.11.2026) und bleibt ungenutzt
+FUNDS_FIELDS: dict[str, str] = {
+    "operations": "fund_operations",  # Zeilen je Kennzahl, erste Spalte = der Fonds
+    "ter": "Annual Report Expense Ratio",
+    "asset_classes": "asset_classes",  # {"stockPosition": 0.99, ...}
+    "sectors": "sector_weightings",  # {"technology": 0.31, ...}
+    "top_holdings": "top_holdings",  # Index Symbol, Spalten Name und Holding Percent
+    "holding_name": "Name",
+    "holding_weight": "Holding Percent",
+    "overview": "fund_overview",
+    "provider": "family",
+}
+# Anlageklassen von yfinance -> Bezeichnungen wie bei iShares
+FUNDS_ASSET_CLASSES: dict[str, str] = {
+    "stockPosition": "Aktien",
+    "bondPosition": "Anleihen",
+    "cashPosition": "Cash",
+    "preferredPosition": "Vorzugsaktien",
+    "convertiblePosition": "Wandelanleihen",
+    "otherPosition": "Sonstige",
+}
 
 
 @dataclass
@@ -904,3 +929,93 @@ class YahooPrices:
         symbol = FX_FIELDS["ticker"].format(source=currency, target="EUR")
         rate = _to_float(yf.Ticker(symbol).fast_info.get(FX_FIELDS["price"]))
         return rate if rate is not None and rate > 0 else None
+
+
+# --- D2.4: Fonds anderer Anbieter (funds_data) -----------------------------------------
+
+FUNDS_SOURCE = "yahoo"
+
+
+def _percentages(raw: Any, labels: dict[str, str] | None = None) -> dict[str, float]:
+    """``{Schluessel: Anteil}`` -> ``{Bezeichnung: Prozent}``, ohne Nullen, die groesste zuerst."""
+    if not isinstance(raw, dict):
+        return {}
+    shares = {
+        (labels or {}).get(str(key), str(key)): share * 100
+        for key, value in raw.items()
+        if (share := _to_float(value))
+    }
+    return {key: round(value, 6) for key, value in sorted(shares.items(), key=lambda kv: -kv[1])}
+
+
+def _expense_ratio(operations: Any) -> float | None:
+    if not isinstance(operations, pd.DataFrame) or operations.empty:
+        return None
+    if FUNDS_FIELDS["ter"] not in operations.index:
+        return None
+    share = _to_float(operations.loc[FUNDS_FIELDS["ter"]].iloc[0])
+    return None if share is None else round(share * 100, 6)
+
+
+def _top_holdings(frame: Any) -> tuple[Holding, ...]:
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return ()
+    holdings: list[Holding] = []
+    for symbol, row in frame.iterrows():
+        share = _to_float(row.get(FUNDS_FIELDS["holding_weight"]))
+        if share is None:
+            continue
+        ticker = str(symbol) if symbol is not None and str(symbol).strip() else None
+        name = row.get(FUNDS_FIELDS["holding_name"])
+        holdings.append(
+            Holding(
+                name=str(name) if isinstance(name, str) and name else ticker or "-",
+                weight=round(share * 100, 6),
+                ticker=ticker,
+            )
+        )
+    return tuple(holdings)
+
+
+def composition_from_funds(isin: str, funds: Any, as_of: date) -> EtfComposition | None:
+    """``funds_data`` eines Fonds -> unvollstaendige Zusammensetzung (zehn groesste Positionen,
+    keine Laender). Ohne jede Angabe ``None``: yfinance meldet Fehler auch als leere Antwort."""
+    overview = getattr(funds, FUNDS_FIELDS["overview"], None)
+    provider = overview.get(FUNDS_FIELDS["provider"]) if isinstance(overview, dict) else None
+    ter = _expense_ratio(getattr(funds, FUNDS_FIELDS["operations"], None))
+    asset_classes = _percentages(
+        getattr(funds, FUNDS_FIELDS["asset_classes"], None), FUNDS_ASSET_CLASSES
+    )
+    sectors = _percentages(getattr(funds, FUNDS_FIELDS["sectors"], None))
+    holdings = _top_holdings(getattr(funds, FUNDS_FIELDS["top_holdings"], None))
+    if ter is None and not asset_classes and not sectors and not holdings:
+        return None
+    return EtfComposition(
+        isin=isin,
+        source=FUNDS_SOURCE,
+        as_of=as_of,
+        complete=False,
+        facts=FundFacts(ter=ter, provider=provider if isinstance(provider, str) else None),
+        holdings=holdings,
+        sectors=sectors,
+        asset_classes=asset_classes,
+    )
+
+
+class YahooFunds:
+    """``EtfSource`` (D2.4) fuer Fonds ohne Anbieterdatei: TER, Anlageklassen, Sektoren und die
+    zehn groessten Positionen aus ``funds_data``, als unvollstaendig gekennzeichnet.
+
+    Ohne ``_yahoo_errors_raised`` wie die Suche: Ein verschluckter Fehler ergibt eine leere
+    Antwort, und die ist kein Stand (``composition_from_funds``).
+    """
+
+    name = FUNDS_SOURCE
+
+    def __init__(self, *, today: Callable[[], date] = date.today) -> None:
+        self._today = today
+
+    def composition(self, isin: str, symbol: str | None) -> EtfComposition | None:
+        if not symbol:
+            return None
+        return composition_from_funds(isin, yf.Ticker(symbol).funds_data, self._today())

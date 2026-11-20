@@ -69,6 +69,44 @@ class BondTermsV1(Contract):
     floating: bool = False  # variable Verzinsung laut CFI-Code
 
 
+class EtfHoldingV1(Contract):
+    """Eine Position eines Fonds (D2.4). Bezeichnungen wie bei der Quelle."""
+
+    name: str
+    weight: float  # in Prozent des Fondsvermoegens, bei Geldmarkt auch negativ
+    isin: str | None = None
+    ticker: str | None = None
+    asset_class: str | None = None
+    sector: str | None = None
+    country: str | None = None
+    currency: str | None = None
+
+
+class EtfV1(Contract):
+    """Stand eines Fonds bei einer Quelle (D2.4, WP-10): Fondsdaten, Gewichte und die groessten
+    Positionen. Die ganze Liste bleibt in ``market_data.etf_composition``.
+
+    ``complete``: alle Positionen (Anbieterdatei, z. B. iShares) oder nur die groessten
+    (yfinance, dann ohne Laender). Gewichte je Bezeichnung in Prozent, ohne Angabe ``-``.
+    """
+
+    source: str  # ishares, yahoo
+    as_of: date
+    complete: bool
+    name: str | None = None  # Name beim Anbieter; der aus FIRDS ist oft gekuerzt
+    ter: float | None = None  # laufende Kosten in Prozent pro Jahr
+    fund_size: float | None = None  # in Millionen der Fondswaehrung
+    fund_currency: str | None = None
+    distribution: Literal["accumulating", "distributing"] | None = None
+    provider: str | None = None
+    effective_duration: float | None = None  # Anleihe-ETFs, in Jahren
+    holdings_count: int = Field(ge=0)
+    top_holdings: list[EtfHoldingV1] = Field(default_factory=list)
+    sectors: dict[str, float] = Field(default_factory=dict)
+    countries: dict[str, float] = Field(default_factory=dict)
+    asset_classes: dict[str, float] = Field(default_factory=dict)
+
+
 class SecurityV1(Contract):
     """Ein aufgeloestes Wertpapier mit Stammdaten, Listings und dem gewaehlten Listing."""
 
@@ -82,12 +120,16 @@ class SecurityV1(Contract):
     listings: list[ListingV1] = Field(default_factory=list)
     # Fuer den Datenabruf: gewaehlt, sonst Xetra, sonst Heimatboerse
     listing: ListingV1 | None = None
+    # D2.4: nur bei ETFs, sofern eine Quelle sie kennt
+    etf: EtfV1 | None = None
 
 
 __all__ = [
     "ISIN_PATTERN",
     "AssetClass",
     "BondTermsV1",
+    "EtfHoldingV1",
+    "EtfV1",
     "IsinStr",
     "ListingV1",
     "SecurityHitV1",

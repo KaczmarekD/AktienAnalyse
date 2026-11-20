@@ -279,7 +279,7 @@ class FundamentalSnapshot(Base):
     net_debt_ebitda: Mapped[float | None]
     debt_to_equity: Mapped[float | None]
     earnings_stability: Mapped[float | None]
-    # F2.1 (Migration 0021): Bilanzqualitaet
+    # F2.1 (Migration 0022): Bilanzqualitaet
     f_score: Mapped[int | None] = mapped_column(SmallInteger)
     operating_accruals: Mapped[float | None]
     cfo_assets: Mapped[float | None]
@@ -435,6 +435,32 @@ class Listing(Base):
     exchange: Mapped[str | None]
     currency: Mapped[str | None]
     first_seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class EtfCompositionRow(Base):
+    """D2.4 (WP-10): Stand eines Fonds bei einer Quelle, je ISIN, Quelle und Stand einmal.
+
+    ``facts``: Fondsdaten des Anbieters. ``holdings``: alle bekannten Positionen spaltenweise
+    (``{"name": [...], "weight": [...], ...}``), so wiederholt sich kein Schluessel je Position.
+    ``weights``: ``{"sector": {...}, "country": {...}, "asset_class": {...}}`` in Prozent.
+    """
+
+    __tablename__ = "etf_composition"
+    __table_args__ = (
+        UniqueConstraint("isin", "source", "as_of", name="uq_etf_composition_isin_source_as_of"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str] = mapped_column(ForeignKey("market_data.security.isin"))
+    source: Mapped[str]
+    as_of: Mapped[date]
+    complete: Mapped[bool]
+    holdings_count: Mapped[int]
+    facts: Mapped[dict[str, Any]]
+    holdings: Mapped[dict[str, Any]]
+    weights: Mapped[dict[str, Any]]
+    fetched_at: Mapped[datetime]
 
 
 class MarketDataOutbox(OutboxMixin, Base):

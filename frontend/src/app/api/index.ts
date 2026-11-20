@@ -77,6 +77,8 @@ export type {
   EnableUserErrors,
   EnableUserResponse,
   EnableUserResponses,
+  Etf,
+  EtfHolding,
   ExportDataData,
   ExportDataErrors,
   ExportDataResponse,

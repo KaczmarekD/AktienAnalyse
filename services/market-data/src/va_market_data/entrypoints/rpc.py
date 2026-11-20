@@ -18,7 +18,9 @@ from va_contracts.rpc.v1 import (
     SecuritySearchReplyV1,
     SecuritySearchRequestV1,
 )
-from va_contracts.securities import BondTermsV1, ListingV1, SecurityHitV1, SecurityV1
+from va_contracts.securities import SecurityHitV1
+
+from .mapping import listing_v1, security_v1
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -26,46 +28,13 @@ if TYPE_CHECKING:
     from va_contracts.rpc.v1 import RpcReplyV1, RpcSpec
 
     from ..application.securities import ResolvedSecurity
-    from ..domain.securities import Listing, SecurityHit
+    from ..domain.securities import SecurityHit
 
 
 class Securities(Protocol):
     def search(self, query: str) -> list[SecurityHit]: ...
 
     def resolve(self, isin: str, symbol: str | None = None) -> ResolvedSecurity | None: ...
-
-
-def _listing(listing: Listing) -> ListingV1:
-    return ListingV1(
-        symbol=listing.symbol,
-        ticker=listing.ticker,
-        exchange=listing.exchange,
-        currency=listing.currency,
-    )
-
-
-def _security(resolved: ResolvedSecurity) -> SecurityV1:
-    master = resolved.master
-    bond = master.bond
-    return SecurityV1(
-        isin=master.isin,
-        name=master.name,
-        asset_class=master.asset_class,
-        currency=master.currency,
-        lei=master.lei,
-        cfi=master.cfi,
-        bond=None
-        if bond is None
-        else BondTermsV1(
-            coupon=bond.coupon,
-            maturity=bond.maturity,
-            denomination=bond.denomination,
-            seniority=bond.seniority,
-            floating=bond.floating,
-        ),
-        listings=[_listing(listing) for listing in resolved.listings],
-        listing=None if resolved.listing is None else _listing(resolved.listing),
-    )
 
 
 def handlers(securities: Securities) -> dict[RpcSpec[Any, Any], Callable[[Any], RpcReplyV1]]:
@@ -76,7 +45,7 @@ def handlers(securities: Securities) -> dict[RpcSpec[Any, Any], Callable[[Any], 
                     isin=hit.isin,
                     name=hit.name,
                     asset_class=hit.asset_class,
-                    listings=[_listing(listing) for listing in hit.listings],
+                    listings=[listing_v1(listing) for listing in hit.listings],
                     source=hit.source,
                 )
                 for hit in securities.search(request.query)
@@ -88,6 +57,6 @@ def handlers(securities: Securities) -> dict[RpcSpec[Any, Any], Callable[[Any], 
             resolved = securities.resolve(request.isin, request.symbol)
         except ValueError as e:
             return SecurityResolveReplyV1(error=RpcErrorV1(code="invalid", message=str(e)))
-        return SecurityResolveReplyV1(security=None if resolved is None else _security(resolved))
+        return SecurityResolveReplyV1(security=None if resolved is None else security_v1(resolved))
 
     return {SECURITIES_SEARCH: search, SECURITIES_RESOLVE: resolve}

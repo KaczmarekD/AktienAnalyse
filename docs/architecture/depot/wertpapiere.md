@@ -7,7 +7,9 @@
 > Umgesetzt: Suche und Auflösung (D2.1, `security`, `security_master`, `listing`), Abdeckung im
 > Wochenlauf (D2.2, `coverage_version`, `coverage_item`, `fundamental_snapshot.role`,
 > `covered[]`; bis D3 per Kommando gepflegt), Tageskurse (D2.3, `price_run`, `daily_close`,
-> `fx_daily`, Scheduler im web-api; Bundesanleihen aus der Bundesbank folgen mit D2.4).
+> `fx_daily`, Scheduler im web-api), ETF-Daten und Stammdaten im Wochenlauf (D2.4,
+> `etf_composition`, `marketdata.securities.updated`). Kurse der Bundesanleihen aus der
+> Bundesbank folgen mit D2.5.
 
 ## Ausgangslage
 
@@ -130,7 +132,7 @@ market-data: eigene Wertpapiere → OpenFIGI (ISIN/WKN → Listings) → yfinanc
 |---|---|---|
 | `security` | isin, asset_class, first_seen_at | anfügen, ISIN eindeutig |
 | `security_master` | isin, source, payload (JSONB: Stammdaten je Anlageklasse), fetched_at | anfügen, neue Zeile nur bei geändertem Inhalt |
-| `etf_composition` | isin, source, as_of, complete (bool), holdings (JSONB), weights (JSONB: Sektor, Land, Anlageklasse), fetched_at | anfügen |
+| `etf_composition` | isin, source, as_of, complete (bool), holdings_count, facts (JSONB: Fondsdaten des Anbieters, seit D2.4), holdings (JSONB, spaltenweise), weights (JSONB: Sektor, Land, Anlageklasse), fetched_at | anfügen, eindeutig (isin, source, as_of) |
 | `coverage_version` | version, created_at, source_event_id | anfügen |
 | `coverage_item` | version, isin, asset_class, fundamentals_symbol, price_symbol | anfügen |
 | `listing` | isin, symbol (eindeutig), exchange, currency, first_seen_at | anfügen; weitere Listings neben `instrument` |
@@ -153,7 +155,7 @@ Liste der einmaligen UPDATEs in `va_platform.db.ddl` (`UPDATABLE_TABLES`) wie be
 | `CoverageFetchedV1` (neu) | Fundamentaldaten der neu abgedeckten Aktien (WP-13), mit ISIN |
 | `PlacementsUpdatedV1` (neu) | scoring_run_id, gegen den eingeordnet wurde, und `placements[]` |
 | `SecurityV1` (neu) | isin, asset_class, name, currency, country, listing, Stammdaten je Klasse als Untermodell |
-| `SecuritiesUpdatedV1` (neu) | Liste von `SecurityV1` mit Stand |
+| `SecuritiesUpdatedV1` (neu) | Liste von `SecurityV1` mit Stand, ISINs ohne Stammdaten; höchstens 50 Wertpapiere je Event. `SecurityV1.etf` (D2.4): Fondsdaten, Gewichte, die zehn größten Positionen und ihre Anzahl |
 | `PricesCompletedV1` (neu) | trade_date, Kurse (isin, close, currency), FX-Kurse |
 | `CoverageChangedV1` (neu) | version, items (isin, asset_class, fundamentals_symbol, price_symbol). Ein Test prüft, dass es keine Nutzer- oder Mengenfelder gibt. |
 

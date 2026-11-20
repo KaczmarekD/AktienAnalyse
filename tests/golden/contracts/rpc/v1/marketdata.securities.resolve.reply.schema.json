@@ -61,6 +61,244 @@
       "title": "BondTermsV1",
       "type": "object"
     },
+    "EtfHoldingV1": {
+      "description": "Eine Position eines Fonds (D2.4). Bezeichnungen wie bei der Quelle.",
+      "properties": {
+        "asset_class": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Class"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isin"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "sector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sector"
+        },
+        "ticker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ticker"
+        },
+        "weight": {
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "weight"
+      ],
+      "title": "EtfHoldingV1",
+      "type": "object"
+    },
+    "EtfV1": {
+      "description": "Stand eines Fonds bei einer Quelle (D2.4, WP-10): Fondsdaten, Gewichte und die groessten\nPositionen. Die ganze Liste bleibt in ``market_data.etf_composition``.\n\n``complete``: alle Positionen (Anbieterdatei, z. B. iShares) oder nur die groessten\n(yfinance, dann ohne Laender). Gewichte je Bezeichnung in Prozent, ohne Angabe ``-``.",
+      "properties": {
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "asset_classes": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Asset Classes",
+          "type": "object"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "countries": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Countries",
+          "type": "object"
+        },
+        "distribution": {
+          "anyOf": [
+            {
+              "enum": [
+                "accumulating",
+                "distributing"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distribution"
+        },
+        "effective_duration": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Duration"
+        },
+        "fund_currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fund Currency"
+        },
+        "fund_size": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fund Size"
+        },
+        "holdings_count": {
+          "minimum": 0,
+          "title": "Holdings Count",
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "sectors": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Sectors",
+          "type": "object"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "ter": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ter"
+        },
+        "top_holdings": {
+          "items": {
+            "$ref": "#/$defs/EtfHoldingV1"
+          },
+          "title": "Top Holdings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source",
+        "as_of",
+        "complete",
+        "holdings_count"
+      ],
+      "title": "EtfV1",
+      "type": "object"
+    },
     "ListingV1": {
       "description": "Handel an einem Boersenplatz. ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.",
       "properties": {
@@ -201,6 +439,17 @@
           ],
           "default": null,
           "title": "Currency"
+        },
+        "etf": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EtfV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "isin": {
           "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",

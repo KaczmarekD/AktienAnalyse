@@ -2795,7 +2795,7 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     enthält die drei neuen Faktoren. Die Standardauswahl (`DEFAULT_QUALITY_FACTORS`, Profil
     „Standard“ und `ScoringConfig()`) bleibt bei den fünf bisherigen. Die Branchenregel (F2.4)
     schließt die drei mit aus.
-  - **Durchgehend bis ins UI:** Contract `QualityMetricsV1`, Migration `0021` (Spalten in
+  - **Durchgehend bis ins UI:** Contract `QualityMetricsV1`, Migration `0022` (Spalten in
     `market_data.fundamental_snapshot` und `web.snapshot_row`), Projektion, Backfill, beide
     Lesewege, OpenAPI und TS-Client. Das UI zeigt die drei im Ranking (Spaltenwahl), im
     Titel-Detail und im Editor (abgeschaltet), mit Einträgen im Glossar.
@@ -3600,10 +3600,73 @@ Golden-Master und die Replay-Fixtures.
     Consumer `market-data` und warten aufeinander; ohne Abdeckung entsteht je Handelstag ein
     leerer `price_run`.
 
-**D2.4 ETF- und Anleihedaten** (WP-08, 10)
-- **Test:** `etf_composition` aus den Anbieterdateien (iShares JSON, Deka XLSX) und yfinance
-  `funds_data`; Anleihe-Stammdaten aus FIRDS; Kurse der Bundesanleihen aus der Liste der
-  Bundesbank; `marketdata.securities.updated`.
+**D2.4 ETF-Daten und Stammdaten im Wochenlauf** (WP-04, 07, 10; neu geschnitten am 20.11.2026
+nach der [Live-Prüfung](../research/2026-11-depot-datenquellen-und-bankzugang.md#live-prüfung-20112026-für-d24-und-d25):
+die Kurse der Bundesanleihen kommen als eigenes Paket D2.5)
+- **Test:**
+  - Domain (`va_market_data.domain.etf`): Gewichte je Sektor, Land und Anlageklasse aus den
+    Positionen (in Prozent, ohne Angabe „-“), die größten Positionen, Fondsdaten (TER in Prozent,
+    Fondsvolumen in Mio. der Fondswährung, Ausschüttung, Anbieter, Duration bei Anleihe-ETFs).
+  - iShares: Fondsliste des Produkt-Screeners (ISIN → `portfolioId`, TER, Volumen,
+    Ausschüttung, Währung) und Positionen je Fonds (`get-product-data`), vollständig
+    (`complete`); gekürzte echte Antworten vom 20.11.2026, Aktien- und Anleihe-ETF; falsche
+    Struktur ist ein Fehler der Quelle.
+  - yfinance `funds_data` für Fonds anderer Anbieter: TER, Anlageklassen, Sektoren, zehn größte
+    Positionen, Anbieter (`family`), nicht vollständig; ohne jede Angabe kein Ergebnis (yfinance
+    meldet Fehler als leere Antwort).
+  - Anwendungsfall `refresh_securities`: je Wertpapier der Abdeckung Stammdaten aus FIRDS (neue
+    Zeile nur bei Änderung, sonst die gespeicherten), bei ETFs zuerst iShares, dann yfinance,
+    sonst die zuletzt gespeicherte Zusammensetzung; ein Ausfall kostet nur dieses Wertpapier
+    (WP-07), ohne Stammdaten steht die ISIN in `missing`.
+  - DB: `market_data.etf_composition` (Migration 0021), je ISIN, Quelle und Stand einmal;
+    Löschschutz; Positionen spaltenweise als JSONB (ein Anleihe-ETF hat über 4.000).
+  - Event `marketdata.securities.updated` (`SecuritiesUpdatedV1`: Stand, `securities[]` als
+    `SecurityV1`, `missing[]`), höchstens 50 Wertpapiere je Event; `SecurityV1.etf` (neu,
+    optional): Fondsdaten, Gewichte, die zehn größten Positionen und ihre Anzahl, ohne die
+    ganze Liste. Der Wochenlauf schickt es vor `snapshot.completed`; scheitert die
+    Aktualisierung, läuft er ohne sie weiter. Golden-Schemas, NATS-Rechte (market-data sendet,
+    das web-api nicht).
+  - Auflösung (`rpc.va.marketdata.securities.resolve`, `GET /api/v1/securities/{isin}`): ein ETF
+    bringt seine zuletzt gespeicherte Zusammensetzung mit.
+- **Implementierung:** Adapter `IsharesFunds` (`adapters/ishares.py`, Feldnamen am Dateikopf),
+  `YahooFunds` (`adapters/yahoo.py`, `FUNDS_FIELDS`), Repository `PostgresEtfStore`,
+  `refresh_securities` in `application/securities.py`, Verdrahtung im `RunRequestedHandler`
+  (nur mit Abdeckung, also nicht im Batch und nicht mit Replay). OpenAPI-Snapshot und TS-Client
+  neu.
+- **Bewusst nicht:** Deka (keine Zuordnung ISIN → Datei ohne die Website), Xtrackers (robots.txt),
+  Stammdaten sofort bei neuer Abdeckung (kommt mit `coverage.changed` in D3), einheitliche
+  Bezeichnungen der Sektoren über die Quellen (die Durchschau in D5 ordnet sie zu).
+- **Review:** `/code-review high`.
+- **Umgesetzt (20.11.2026, auf `main` als `a313371`, CI grün):** wie im Entwurf, dazu:
+  - **Fondsdaten bei der Zusammensetzung:** TER, Volumen, Ausschüttung und Anbieter stehen in
+    `etf_composition.facts`, nicht in `security_master`. Sie kommen aus derselben Quelle mit
+    demselben Stand wie die Positionen, und das Volumen ändert sich jede Woche; in
+    `security_master` entstünde sonst wöchentlich eine Zeile mit der Quelle `firds`.
+  - **Vollständig vor frisch:** Fällt iShares aus, gilt die gespeicherte vollständige Liste bis
+    31 Tage weiter, auch wenn yfinance frische zehn Positionen liefert (die werden trotzdem
+    gespeichert). Danach die frische unvollständige, sonst die zuletzt gespeicherte. Dieselbe
+    Regel gilt für die Auflösung (`stored_composition`).
+  - **Zeitbudget:** Die Aktualisierung fragt die Quellen höchstens 10 Minuten
+    (`REFRESH_BUDGET`), danach gilt das Gespeicherte. Sie läuft vor `snapshot.completed`; ohne
+    Grenze könnten hängende Quellen (je Anfrage drei Versuche) den Abruf über die 45 Minuten des
+    Watchdogs ziehen.
+  - **Fondsliste einmal je Lauf:** `IsharesFunds` liest den Screener (3,8 MB) einmal; scheitert
+    er, fragt der Lauf nicht für jeden ETF neu, sondern nimmt yfinance.
+  - **Bezeichnungen:** iShares nennt Länder und Sektoren deutsch (Land des Risikos), yfinance
+    Sektoren englisch und keine Länder. Die Anlageklassen von yfinance heißen wie bei iShares
+    (`Aktien`, `Anleihen`, `Cash`). „Total Net Assets“ von yfinance bleibt ungenutzt
+    (unzuverlässig).
+  - **Ausschüttung:** nur bei iShares (`useOfProfits`); yfinance nennt sie nicht.
+  - **Speicherbedarf (live gemessen am 20.11.2026):** je Woche ein Stand. iShares Core € Corp
+    Bond (4.307 Positionen) belegt spaltenweise und von PostgreSQL komprimiert 133 KB (511 KB als
+    Text), iShares Core MSCI World (1.295) 44 KB, ein Fonds von yfinance unter 1 KB. Zehn ETFs
+    kosten so grob 40 MB im Jahr.
+
+**D2.5 Kurse der Bundesanleihen** (WP-06, 08)
+- **Test:** Monatsdatei der Bundesbank (Link aus der Seite „Kurse und Renditen“, ein Blatt je
+  Handelstag), Kurs in Prozent vom Nennwert je ISIN in `daily_close` mit Quelle `bundesbank`,
+  nur für Anleihen der Abdeckung; der Abruf der Tageskurse holt sie mit; ein Ausfall der
+  Bundesbank kostet nur diese Kurse.
 - **Review:** `/code-review high`.
 
 **Fertig, wenn:** die Suche Aktie, ETF und Anleihe findet und der Wochenlauf mit `covered[]`
