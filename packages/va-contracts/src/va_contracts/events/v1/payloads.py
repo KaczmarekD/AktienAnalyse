@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from ...base import Contract, PositiveId
 from ...profile import ProfileParamsV1
+from ...securities import SecurityV1
 from .fundamentals import FundamentalsV1
 from .ranking import RankingRowV1
 
@@ -203,7 +204,7 @@ class DailyCloseV1(Contract):
     """Schlusskurs eines Wertpapiers in Hauptwaehrung (Pence schon durch 100)."""
 
     isin: str
-    symbol: str | None = None  # ohne Yahoo-Symbol etwa Bundesanleihen (D2.4)
+    symbol: str | None = None  # ohne Yahoo-Symbol etwa Bundesanleihen (D2.5)
     trade_date: date
     close: float
     currency: str
@@ -226,4 +227,17 @@ class PricesCompletedV1(Contract):
     trade_date: date
     closes: list[DailyCloseV1] = Field(default_factory=list)
     fx: list[FxDailyV1] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+
+
+class SecuritiesUpdatedV1(Contract):
+    """market-data -> portfolio (ab D3): Stammdaten und ETF-Daten der Abdeckung (D2.4).
+
+    Aus dem Wochenlauf, vor ``snapshot.completed``, hoechstens 50 Wertpapiere je Event (die Grenze
+    von NATS liegt bei 1 MB). Ohne Nutzer und Mengen (WP-09). ``missing``: ISINs der Abdeckung
+    ohne Stammdaten, nur im ersten Event eines Laufs.
+    """
+
+    as_of: date
+    securities: list[SecurityV1] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)

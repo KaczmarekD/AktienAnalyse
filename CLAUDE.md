@@ -259,6 +259,7 @@ ein Baustein, kommt er zuerst in den Styleguide.
 - `CONSENSUS_FIELDS`, `QUARTERLY_FIELDS` und `PRICE_FIELDS`: Zusatzdaten (ADR-0010), seit
   D2.3 auch Schlusskurs im Sammelabruf und Währung in `fast_info`
 - `SEARCH_FIELDS` und `SEARCH_TYPES`: Treffer von `yf.Search` (D2.1)
+- `FUNDS_FIELDS` und `FUNDS_ASSET_CLASSES`: `funds_data` der ETFs anderer Anbieter (D2.4)
 
 yfinance benennt unangekündigt um ("Total Revenue" → "TotalRevenue") – wenn
 das passiert, ist dort die einzige zu ändernde Stelle.
@@ -346,6 +347,15 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   speichert sie in `market_data.price_run`, `daily_close` (je ISIN, Quelle und Tag einmal) und
   `fx_daily` und meldet `marketdata.prices.completed`. Die Währung eines Symbols kommt aus
   früheren Kursen, sonst einmal von Yahoo; ohne Währung fehlt der Kurs (nie geraten).
+- Stammdaten und ETF-Daten (D2.4): Nach Universum und Abdeckung frischt der Wochenlauf die
+  Stammdaten der Abdeckung auf (`refresh_securities`: ESMA FIRDS, bei ETFs zuerst iShares mit
+  allen Positionen, sonst yfinance `funds_data` mit den zehn größten, als unvollständig
+  gekennzeichnet) und schickt sie vor `snapshot.completed` als `marketdata.securities.updated`
+  (höchstens 50 je Event, ETFs ohne die ganze Liste). Die Zusammensetzung steht in
+  `market_data.etf_composition` (je ISIN, Quelle und Stand einmal, Positionen spaltenweise). Eine
+  vollständige Liste bis 31 Tage geht vor einer frischen unvollständigen. Ein Ausfall kostet nur
+  das Wertpapier oder die Events, nie den Wochenlauf; nach 10 Minuten (`REFRESH_BUDGET`) gilt
+  nur noch Gespeichertes, damit der Watchdog den Abruf nicht abbricht.
 - Neu-Berechnungen erzeugen neue Zeilen (z.B. neuer `scoring_run` auf alten
   Abruf), nie Überschreibungen. Abschlusswerte sind versioniert
   (`statement_value`: neue Zeile nur bei geändertem Wert → Restatements sichtbar,
@@ -517,7 +527,9 @@ Es landet im Versandprotokoll. Eine Mail an eine andere Adresse geht schon heute
   werfen.
 - **iShares-Holdings (EXS1/EXS3)**: undokumentierte Frontend-API von
   BlackRock, liefert Ticker + ISIN. Kann jederzeit umziehen – dann URL/Params
-  am Kopf von `va_market_data/adapters/ishares.py` anpassen.
+  am Kopf von `va_market_data/adapters/ishares.py` anpassen. Seit D2.4 auch die Fondsliste des
+  Produkt-Screeners (ISIN → `portfolioId`, TER, Volumen, Ausschüttung, rund 3,8 MB) und die
+  Positionen jedes iShares-Fonds der Abdeckung (`IsharesFunds`).
 - **Deka-ETF-XLSX**: Blatt „Indexzusammensetzung“, nur ISIN/WKN.
 - **OpenFIGI**: ISIN → Xetra-Ticker für Neuaufnahmen, die noch nicht in der
   CSV stehen; ohne API-Key (10 ISINs pro Request). Seit D2.1 auch Name, Anlageklasse und

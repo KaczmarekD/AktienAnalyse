@@ -6,18 +6,23 @@
   nichts.
 - **Aufloesung:** Stammdaten aus ESMA FIRDS (Name, Anlageklasse, LEI, Anleihe-Ausstattung),
   Listings aus OpenFIGI. Fehlt FIRDS, nennt OpenFIGI Name und Anlageklasse. Gespeichert werden
-  Wertpapier, Stammdaten und Listings. Ohne beide Quellen ist die ISIN unbekannt.
+  Wertpapier, Stammdaten und Listings. Ohne beide Quellen ist die ISIN unbekannt. Seit D2.4
+  bringt ein ETF seine zuletzt gespeicherte Zusammensetzung mit.
+- **Aktualisierung im Wochenlauf (D2.4, ``refresh_securities``):** Stammdaten und ETF-Daten
+  aller Wertpapiere der Abdeckung, fuer ``marketdata.securities.updated``.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-from typing import Protocol
+import time
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, timedelta
+from typing import TYPE_CHECKING, Protocol
 
+from ..domain.etf import EtfComposition
 from ..domain.securities import (
     AssetClass,
     Listing,
@@ -28,12 +33,23 @@ from ..domain.securities import (
     isin_from_wkn,
     valid_isin,
 )
+from ..domain.universe import SourceError
+
+if TYPE_CHECKING:
+    from ..domain.coverage import CoverageItem
 
 log = logging.getLogger(__name__)
 
 CACHE_TTL = timedelta(hours=24)
 CACHE_SIZE = 2000  # Eintraege je Speicher; danach fallen die aeltesten weg
 SEARCH_LIMIT = 10
+# Eine vollstaendige Liste geht vor einer unvollstaendigen, gespeichert bis zu diesem Alter
+COMPLETE_STAYS = timedelta(days=31)
+# Hoechstens so lange fragt die Aktualisierung im Wochenlauf die Quellen; danach gilt, was
+# gespeichert ist. Universum und Abdeckung brauchen rund 15 Minuten, der Watchdog des web-api
+# meldet einen Abruf nach WATCHDOG_FETCH_MINUTES (Standard 45) als gescheitert. Wer diese Grenze
+# senkt, muss Abruf plus dieses Budget darunter halten (Runbook, Abschnitt Watchdog).
+REFRESH_BUDGET = timedelta(minutes=10)
 
 
 @dataclass(frozen=True)
@@ -50,6 +66,15 @@ class ResolvedSecurity:
     master: SecurityMaster
     listings: tuple[Listing, ...]
     listing: Listing | None  # fuer den Datenabruf (WP-03)
+    etf: EtfComposition | None = None  # D2.4: nur bei ETFs, sofern bekannt
+
+
+@dataclass(frozen=True)
+class RefreshResult:
+    """Stammdaten der Abdeckung (D2.4); ``missing``: ISINs ohne Stammdaten."""
+
+    securities: list[ResolvedSecurity] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)
 
 
 class SecurityCatalog(Protocol):
@@ -82,6 +107,43 @@ class MasterSource(Protocol):
     def master(self, isin: str) -> SecurityMaster | None: ...
 
 
+class CompositionReader(Protocol):
+    """Gespeicherte ETF-Zusammensetzungen (D2.4)."""
+
+    def latest_composition(
+        self, isin: str, *, complete_only: bool = False
+    ) -> EtfComposition | None:
+        """Der juengste Stand; ``complete_only``: der juengste mit allen Positionen."""
+        ...
+
+
+class CompositionStore(CompositionReader, Protocol):
+    def write_composition(self, composition: EtfComposition, *, at: datetime) -> bool:
+        """``False``, wenn derselbe Stand dieser Quelle schon gespeichert ist."""
+        ...
+
+
+class EtfSource(Protocol):
+    """ISIN (und Symbol) -> Zusammensetzung eines Fonds; ``None``, wenn die Quelle ihn nicht
+    kennt. Wirft bei Ausfall."""
+
+    name: str
+
+    def composition(self, isin: str, symbol: str | None) -> EtfComposition | None: ...
+
+
+class RefreshCatalog(Protocol):
+    """Was die Aktualisierung vom Katalog braucht."""
+
+    def get(self, isin: str) -> SecurityHit | None: ...
+
+    def master(self, isin: str) -> SecurityMaster | None: ...
+
+    def save(
+        self, master: SecurityMaster, listings: tuple[Listing, ...], *, at: datetime
+    ) -> None: ...
+
+
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -97,11 +159,13 @@ class SecurityService:
         clock: Callable[[], datetime] = _utcnow,
         cache_ttl: timedelta = CACHE_TTL,
         limit: int = SEARCH_LIMIT,
+        compositions: CompositionReader | None = None,
     ) -> None:
         self._catalog = catalog
         self._lookup = lookup
         self._text = text
         self._master = master
+        self._compositions = compositions
         self._clock = clock
         self._ttl = cache_ttl
         self._limit = limit
@@ -200,8 +264,8 @@ class SecurityService:
         cached = self._recall(self._resolved, (isin, symbol))
         if cached is not None:
             return cached
-        master = self._safe(self._master.master, isin, "ESMA FIRDS")
-        found = self._safe(self._lookup.lookup, isin, "OpenFIGI")
+        master = _safe(self._master.master, isin, "ESMA FIRDS")
+        found = _safe(self._lookup.lookup, isin, "OpenFIGI")
         if master is None and found is None:
             return None
         if master is None:
@@ -211,14 +275,159 @@ class SecurityService:
             )
         listings = found.listings if found is not None else ()
         self._catalog.save(master, listings, at=self._clock())
-        resolved = ResolvedSecurity(master, listings, choose_listing(listings, preferred=symbol))
+        etf = None
+        if master.asset_class == "etf" and self._compositions is not None:
+            etf = stored_composition(self._compositions, isin, today=self._clock().date())
+        resolved = ResolvedSecurity(
+            master, listings, choose_listing(listings, preferred=symbol), etf
+        )
         self._remember(self._resolved, (isin, symbol), resolved)
         return resolved
 
-    @staticmethod
-    def _safe[T](fetch: Callable[[str], T | None], isin: str, source: str) -> T | None:
+
+def _safe[T](fetch: Callable[[str], T | None], isin: str, source: str) -> T | None:
+    try:
+        return fetch(isin)
+    except Exception:
+        log.warning("%s fuer %s nicht erreichbar", source, isin, exc_info=True)
+        return None
+
+
+# --- Aktualisierung im Wochenlauf (D2.4) ------------------------------------------------
+
+
+def stored_composition(
+    store: CompositionReader, isin: str, *, today: date
+) -> EtfComposition | None:
+    """Die gespeicherte Zusammensetzung, die gilt: die juengste vollstaendige, wenn sie hoechstens
+    ``COMPLETE_STAYS`` alt ist (iShares faellt eine Woche aus, yfinance kennt nur zehn
+    Positionen), sonst die juengste. Ein Lesefehler ergibt ``None``."""
+    complete = _safe(
+        lambda i: store.latest_composition(i, complete_only=True), isin, "Gespeicherte ETF-Daten"
+    )
+    if complete is not None and today - complete.as_of <= COMPLETE_STAYS:
+        return complete
+    return _safe(store.latest_composition, isin, "Gespeicherte ETF-Daten")
+
+
+class _Budget:
+    """Zeitbudget der Aktualisierung; meldet die Ueberschreitung einmal."""
+
+    def __init__(self, budget: timedelta, timer: Callable[[], float]) -> None:
+        self._seconds = budget.total_seconds()
+        self._timer = timer
+        self._start = timer()
+        self._reported = False
+
+    def left(self) -> bool:
+        if self._timer() - self._start < self._seconds:
+            return True
+        if not self._reported:
+            log.warning(
+                "Stammdaten: Zeitbudget von %s erschoepft - fuer den Rest gelten die gespeicherten",
+                timedelta(seconds=self._seconds),
+            )
+            self._reported = True
+        return False
+
+
+def refresh_securities(
+    items: Sequence[CoverageItem],
+    *,
+    catalog: RefreshCatalog,
+    master: MasterSource,
+    etf_sources: Sequence[EtfSource],
+    compositions: CompositionStore,
+    clock: Callable[[], datetime] = _utcnow,
+    budget: timedelta = REFRESH_BUDGET,
+    timer: Callable[[], float] = time.monotonic,
+) -> RefreshResult:
+    """Stammdaten und ETF-Daten jedes Wertpapiers der Abdeckung; wirft nicht (WP-07).
+
+    - Stammdaten aus FIRDS, gespeichert (der Katalog legt nur bei Aenderung eine Zeile an);
+      ohne FIRDS die gespeicherten; ohne beides steht die ISIN in ``missing``.
+    - ETFs: die Quellen der Reihe nach, siehe ``_composition``.
+    - Nach ``budget`` fragt sie keine Quelle mehr und nimmt nur noch Gespeichertes: Haengen FIRDS
+      oder iShares, wartet ``snapshot.completed`` sonst bis zum Watchdog.
+    """
+    now = clock()
+    in_budget = _Budget(budget, timer).left
+    result = RefreshResult()
+    seen: set[str] = set()
+    for item in items:
+        if item.isin in seen:
+            continue
+        seen.add(item.isin)
+        current = _current_master(
+            item.isin, catalog=catalog, master=master, now=now, fetch=in_budget()
+        )
+        if current is None:
+            result.missing.append(item.isin)
+            continue
+        hit = _safe(catalog.get, item.isin, "Gespeicherte Listings")
+        listings = hit.listings if hit is not None else ()
+        etf = None
+        if "etf" in (current.asset_class, item.asset_class):
+            etf = _composition(item, etf_sources, compositions, now=now, in_budget=in_budget)
+        result.securities.append(
+            ResolvedSecurity(
+                current, listings, choose_listing(listings, preferred=item.price_symbol), etf
+            )
+        )
+    log.info(
+        "Stammdaten: %d Wertpapiere, %d ohne Stammdaten",
+        len(result.securities),
+        len(result.missing),
+    )
+    return result
+
+
+def _current_master(
+    isin: str, *, catalog: RefreshCatalog, master: MasterSource, now: datetime, fetch: bool
+) -> SecurityMaster | None:
+    fresh = _safe(master.master, isin, "ESMA FIRDS") if fetch else None
+    if fresh is None:
+        return _safe(catalog.master, isin, "Gespeicherte Stammdaten")
+    try:
+        catalog.save(fresh, (), at=now)
+    except Exception:
+        log.warning("Stammdaten von %s nicht gespeichert", isin, exc_info=True)
+    return fresh
+
+
+def _composition(
+    item: CoverageItem,
+    sources: Sequence[EtfSource],
+    store: CompositionStore,
+    *,
+    now: datetime,
+    in_budget: Callable[[], bool],
+) -> EtfComposition | None:
+    """Die erste vollstaendige frische Zusammensetzung; sonst eine gespeicherte vollstaendige bis
+    ``COMPLETE_STAYS``; sonst die frische unvollstaendige; sonst die zuletzt gespeicherte. Jede
+    frische wird gespeichert."""
+    fresh: EtfComposition | None = None
+    for source in sources:
+        if not in_budget():
+            break
         try:
-            return fetch(isin)
+            found = source.composition(item.isin, item.price_symbol)
+        except SourceError as e:  # erwartbar (Struktur, Alter, Fondsliste weg): ohne Traceback
+            log.warning("%s fuer %s: %s", source.name, item.isin, e)
+            continue
         except Exception:
-            log.warning("%s fuer %s nicht erreichbar", source, isin, exc_info=True)
-            return None
+            log.warning("%s fuer %s nicht erreichbar", source.name, item.isin, exc_info=True)
+            continue
+        if found is None:
+            continue
+        try:
+            store.write_composition(found, at=now)
+        except Exception:
+            log.warning("ETF-Daten von %s nicht gespeichert", item.isin, exc_info=True)
+        if found.complete:
+            return found
+        fresh = fresh or found
+    stored = stored_composition(store, item.isin, today=now.date())
+    if stored is not None and stored.complete:
+        return stored
+    return fresh or stored

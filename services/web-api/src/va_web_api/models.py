@@ -393,6 +393,40 @@ class BondTerms(_Model):
     floating: bool
 
 
+class EtfHolding(_Model):
+    """Eine Position eines Fonds; Bezeichnungen wie bei der Quelle."""
+
+    name: str
+    weight: float  # in Prozent des Fondsvermoegens, bei Geldmarkt auch negativ
+    isin: str | None
+    ticker: str | None
+    asset_class: str | None
+    sector: str | None
+    country: str | None
+    currency: str | None
+
+
+class Etf(_Model):
+    """Stand eines Fonds aus dem letzten Wochenlauf (D2.4): Fondsdaten, Gewichte in Prozent und
+    die groessten Positionen. ``complete`` sagt, ob die Quelle alle Positionen kennt."""
+
+    source: str  # ishares, yahoo
+    as_of: date
+    complete: bool
+    name: str | None  # Name beim Anbieter; der aus FIRDS ist oft gekuerzt
+    ter: float | None  # laufende Kosten in Prozent pro Jahr
+    fund_size: float | None  # in Millionen der Fondswaehrung
+    fund_currency: str | None
+    distribution: Literal["accumulating", "distributing"] | None
+    provider: str | None
+    effective_duration: float | None  # Anleihe-ETFs, in Jahren
+    holdings_count: int
+    top_holdings: list[EtfHolding]
+    sectors: dict[str, float]
+    countries: dict[str, float]
+    asset_classes: dict[str, float]
+
+
 class Security(_Model):
     """Ein Wertpapier mit Stammdaten, Listings und dem Listing fuer den Datenabruf."""
 
@@ -405,3 +439,4 @@ class Security(_Model):
     bond: BondTerms | None
     listings: list[Listing]
     listing: Listing | None
+    etf: Etf | None  # D2.4: nur bei ETFs, sofern eine Quelle sie kennt

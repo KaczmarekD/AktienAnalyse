@@ -5,6 +5,10 @@ wirft nicht, damit der Bus nicht den ganzen Abruf wiederholt.
 
 Seit D2.2 ruft er nach dem Referenzuniversum die Aktien der Abdeckung ab und schickt sie in
 ``covered[]``. Ein Fehler dort kostet nur die Abdeckung, nicht den Lauf.
+
+Seit D2.4 frischt er danach die Stammdaten der Abdeckung auf und schickt sie vor
+``snapshot.completed`` als ``marketdata.securities.updated``, hoechstens 50 Wertpapiere je Event.
+Auch ein Fehler dort kostet nur diese Events.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from va_contracts.events.v1 import (
     PRICES_REQUESTED,
     RUN_FAILED,
     RUN_REQUESTED,
+    SECURITIES_UPDATED,
     SNAPSHOT_COMPLETED,
     DailyCloseV1,
     FetchProgressedV1,
@@ -31,6 +36,7 @@ from va_contracts.events.v1 import (
     FxDailyV1,
     PricesCompletedV1,
     RunFailedV1,
+    SecuritiesUpdatedV1,
     SnapshotCompletedV1,
     UniverseInfoV1,
     UniverseMemberV1,
@@ -40,6 +46,7 @@ from va_platform.bus import follow_up
 from ..application.coverage import Covered, plan_coverage, take_coverage
 from ..application.fetch import success_share
 from ..application.snapshot import take_snapshot
+from .mapping import security_v1
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
@@ -49,6 +56,7 @@ if TYPE_CHECKING:
     from ..application.coverage import CoverageStore
     from ..application.ports import Fetch, SnapshotStore
     from ..application.prices import PricesResult
+    from ..application.securities import RefreshResult
     from ..domain.fundamentals import Fundamentals
     from ..domain.universe import Ticker, Universe
 
@@ -56,6 +64,24 @@ log = logging.getLogger(__name__)
 
 CONSUMER = "market-data"
 SOURCE = "va/market-data"
+# D2.4: Ein ETF braucht im Event rund 4 KB; 50 bleiben weit unter 1 MB, der Grenze von NATS
+SECURITIES_PER_EVENT = 50
+
+
+def securities_updated(result: RefreshResult, as_of: date) -> list[SecuritiesUpdatedV1]:
+    """Die Stammdaten eines Laufs in Events zu hoechstens ``SECURITIES_PER_EVENT``;
+    ``missing`` im ersten. Ohne beides kein Event."""
+    securities = [security_v1(resolved) for resolved in result.securities]
+    chunks = [
+        securities[start : start + SECURITIES_PER_EVENT]
+        for start in range(0, len(securities), SECURITIES_PER_EVENT)
+    ] or ([[]] if result.missing else [])
+    return [
+        SecuritiesUpdatedV1(
+            as_of=as_of, securities=chunk, missing=list(result.missing) if i == 0 else []
+        )
+        for i, chunk in enumerate(chunks)
+    ]
 
 
 class RunRequestedHandler:
@@ -67,6 +93,7 @@ class RunRequestedHandler:
         store: SnapshotStore,
         fetch: Fetch,
         coverage: CoverageStore | None = None,
+        securities: Callable[[], RefreshResult] | None = None,
         dax_only: bool = False,
         today: Callable[[], date] = date.today,
     ) -> None:
@@ -75,6 +102,7 @@ class RunRequestedHandler:
         self._store = store
         self._fetch = fetch
         self._coverage = coverage
+        self._securities = securities
         self._dax_only = dax_only
         self._today = today
 
@@ -157,7 +185,19 @@ class RunRequestedHandler:
             )
             self._bus.publish(follow_up(env, RUN_FAILED, failed, source=SOURCE))
             return
+        for updated in self._refresh_securities(today):
+            self._bus.publish(follow_up(env, SECURITIES_UPDATED, updated, source=SOURCE))
         self._bus.publish(follow_up(env, SNAPSHOT_COMPLETED, completed, source=SOURCE))
+
+    def _refresh_securities(self, today: date) -> list[SecuritiesUpdatedV1]:
+        """D2.4: Stammdaten der Abdeckung; ein Fehler kostet nur diese Events (WP-07)."""
+        if self._securities is None:
+            return []
+        try:
+            return securities_updated(self._securities(), today)
+        except Exception:
+            log.warning("Stammdaten nicht aufgefrischt - der Lauf geht weiter", exc_info=True)
+            return []
 
     def _progress(
         self, env: Envelope[ScreeningRunRequestedV1], total: int

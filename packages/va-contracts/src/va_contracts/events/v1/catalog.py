@@ -18,6 +18,7 @@ from .payloads import (
     RunFailedV1,
     ScoringRunCompletedV1,
     ScreeningRunRequestedV1,
+    SecuritiesUpdatedV1,
     SnapshotCompletedV1,
 )
 
@@ -75,6 +76,10 @@ PRICES_REQUESTED = EventSpec(
 PRICES_COMPLETED = EventSpec(
     "marketdata.prices.completed", PricesCompletedV1, max_age=timedelta(hours=24)
 )
+# D2.4: Stammdaten aus dem Wochenlauf; sie gelten bis zum naechsten, auch verspaetet
+SECURITIES_UPDATED = EventSpec(
+    "marketdata.securities.updated", SecuritiesUpdatedV1, max_age=timedelta(days=7)
+)
 
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
@@ -90,6 +95,7 @@ EVENTS: dict[str, EventSpec[Any]] = {
         EMAIL_CONFIRMATION_REQUESTED,
         PRICES_REQUESTED,
         PRICES_COMPLETED,
+        SECURITIES_UPDATED,
     )
 }
 

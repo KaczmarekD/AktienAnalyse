@@ -263,6 +263,41 @@ braucht die Anfrage den `exchCode` (Xetra: `GY`).
 **Yahoo und Anleihen:** `yf.Ticker("DE0001102580")` bricht mit „Invalid ISIN number“ ab. Yahoo
 kennt die Bundesanleihe nicht.
 
+## Live-Prüfung (20.11.2026, für D2.4 und D2.5)
+
+Alle Punkte **[B]** durch eigenen Abruf, ohne Schlüssel und ohne Anmeldung.
+
+**iShares, Zuordnung ISIN → Fonds:** Die Produktseite von iShares lädt ihre Fondsliste aus
+`www.ishares.com/varnish-api/blk-product-screener-server/api/v1/product-screener/product-data`
+(GET, Pflichtparameter `language=de`, `country=de`, dazu `userType=individual`,
+`siteName=de-ishares-v2`). Antwort rund 780 KB JSON: 1.330 Fonds, Schlüssel ist die
+`portfolioId`. Je Fonds unter anderem `isin`, `fundName`, `localExchangeTicker`,
+`aladdinAssetClass` (Aktien, Anleihen …), `ter` (`{"d": "0,20", "r": 0.2}`, in Prozent),
+`totalFundSizeInMillions` (in der Fondswährung `seriesBaseCurrencyCode`), `useOfProfits`
+(thesaurierend/ausschüttend), `effectiveDuration` bei Anleihe-Fonds, `productPageUrl`. Ohne die
+Pflichtparameter antwortet der Dienst mit 400 und nennt sie.
+
+**iShares, Positionen:** Dieselbe Schnittstelle wie für EXS1/EXS3 (`get-product-data`,
+`component=holdings`) liefert für jede `portfolioId` alle Positionen. Beispiel iShares Core MSCI
+World (251882): 1.295 Positionen, Stand des Vortags, Gewichte summieren sich auf 100 %. Spalten
+`ticker`, `isin`, `issueName`, `assetClass`, `sectorName`, `countryOfRisk` (deutsch, z. B.
+„Vereinigte Staaten“), `holdingPercent` (in Prozent), `marketCurrencyCode`, `exchange`,
+`marketValue`, `asOfDate`.
+
+**yfinance `funds_data` (1.7):** wie am 06.11.: TER, Anlageklassen, Sektoren (bei Anleihe-ETFs
+leer, dafür Ratings) und die zehn größten Positionen. Länder gibt es nicht. Für Fonds außerhalb
+von iShares die einzige freie Quelle der Struktur, als unvollständig gekennzeichnet.
+
+**Deka:** Die XLSX je Fonds hängt am Namen des Fonds in der URL; eine Zuordnung ISIN → URL gibt es
+ohne die Website nicht. Zurückgestellt.
+
+**Bundesbank, Kurse der Bundeswertpapiere:** Die Seite
+`www.bundesbank.de/de/service/bundeswertpapiere/kurse-und-renditen` verlinkt je Monat eine XLSX
+(`…/<JJJJ>-<MM>-excel-data.xlsx`, Pfad mit wechselnder Blob-ID). Ein Blatt je Handelstag
+(Name `TT.MM.JJJJ`), Kopf in Zeile 2: ISIN, Kupon, Bezeichnung, Fälligkeit, Restlaufzeit,
+Emissionsvolumen, Kurs (in Prozent vom Nennwert), Rendite in %, Kurs plus Stückzinsen. November
+2026: 15 Blätter, je rund 85 Anleihen.
+
 ## Empfehlungen
 
 Stand nach der Live-Prüfung vom 06.11.2026.

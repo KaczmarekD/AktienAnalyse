@@ -295,6 +295,249 @@
         "title": "EmailConfirmation",
         "type": "object"
       },
+      "Etf": {
+        "additionalProperties": false,
+        "description": "Stand eines Fonds aus dem letzten Wochenlauf (D2.4): Fondsdaten, Gewichte in Prozent und\ndie groessten Positionen. ``complete`` sagt, ob die Quelle alle Positionen kennt.",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "asset_classes": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Asset Classes",
+            "type": "object"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "countries": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Countries",
+            "type": "object"
+          },
+          "distribution": {
+            "anyOf": [
+              {
+                "enum": [
+                  "accumulating",
+                  "distributing"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distribution"
+          },
+          "effective_duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Duration"
+          },
+          "fund_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Currency"
+          },
+          "fund_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Size"
+          },
+          "holdings_count": {
+            "title": "Holdings Count",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "sectors": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Sectors",
+            "type": "object"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ter": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ter"
+          },
+          "top_holdings": {
+            "items": {
+              "$ref": "#/components/schemas/EtfHolding"
+            },
+            "title": "Top Holdings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "as_of",
+          "complete",
+          "name",
+          "ter",
+          "fund_size",
+          "fund_currency",
+          "distribution",
+          "provider",
+          "effective_duration",
+          "holdings_count",
+          "top_holdings",
+          "sectors",
+          "countries",
+          "asset_classes"
+        ],
+        "title": "Etf",
+        "type": "object"
+      },
+      "EtfHolding": {
+        "additionalProperties": false,
+        "description": "Eine Position eines Fonds; Bezeichnungen wie bei der Quelle.",
+        "properties": {
+          "asset_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Class"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "weight",
+          "isin",
+          "ticker",
+          "asset_class",
+          "sector",
+          "country",
+          "currency"
+        ],
+        "title": "EtfHolding",
+        "type": "object"
+      },
       "Factor": {
         "additionalProperties": false,
         "description": "Ein Faktor des Katalogs. Welche aktiv sind, steht im Profil; die Richtung ist fest.",
@@ -2378,6 +2621,16 @@
             ],
             "title": "Currency"
           },
+          "etf": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Etf"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "isin": {
             "title": "Isin",
             "type": "string"
@@ -2424,7 +2677,8 @@
           "cfi",
           "bond",
           "listings",
-          "listing"
+          "listing",
+          "etf"
         ],
         "title": "Security",
         "type": "object"

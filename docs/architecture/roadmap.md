@@ -283,7 +283,8 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D2.1 Wertpapiere und Suche (`1b295f3`; Migration 0018, `/securities`)
   - [x] D2.2 Abdeckung im Wochenlauf (`647a9b5`; Migration 0019, `covered[]`, Kommando bis D3)
   - [x] D2.3 Tageskurse (`2966508`; Migration 0020, Scheduler im web-api; NAS: nichts Neues in der `.env`)
-  - [ ] D2.4 ETF- und Anleihedaten
+  - [ ] D2.4 ETF-Daten und Stammdaten im Wochenlauf
+  - [ ] D2.5 Kurse der Bundesanleihen
 - [ ] D3 Dienst portfolio, Depots und Depotstände
 - [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
 - [ ] D5 Hinweise

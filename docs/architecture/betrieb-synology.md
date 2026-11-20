@@ -194,6 +194,8 @@ docker compose exec market-data python -m va_market_data.coverage set US03783310
 `show` statt `set` zeigt die aktuelle Menge, `clear` leert sie. Der nächste Wochenlauf holt die Aktien darin
 zusätzlich ab; Ranking und Mail ändern sich dadurch nicht. Jeder Titel verlängert den Abruf um
 einige Sekunden; bei vielen Titeln `WATCHDOG_FETCH_MINUTES` in der `.env` (Standard 45) erhöhen.
+Seit D2.4 frischt der Wochenlauf danach die Stammdaten und ETF-Daten der Abdeckung auf, höchstens
+10 Minuten lang. Die Grenze muss Abruf und diese 10 Minuten zusammen abdecken; nie unter 30 setzen.
 
 **Daten einer Person löschen (seit D1.6, ADR-0012):** Konten werden sonst nur deaktiviert. Nur auf
 ausdrücklichen Wunsch der Person löscht ein Kommando alle ihre Daten im Schema `identity`, ohne

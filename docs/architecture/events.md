@@ -82,6 +82,7 @@ haben (`EventSpec.max_age`): Der `ReliableBus` überspringt es erst danach, nich
 | `va.screening.run.failed` | jede Stufe, Watchdog | notification, web-api | run_id (leer genau bei Rescore), trigger, options, stage, reason (z. B. `timeout`, `no_data`), scoring_run_id, detail (Traceback für die Fehlermail) |
 | `va.marketdata.prices.requested` (D2.3, 24 h) | web-api (Scheduler, Outbox im Schema `web`) | market-data | slot (Termin), trade_date |
 | `va.marketdata.prices.completed` (D2.3, 24 h) | market-data | portfolio (ab D3), web-api | price_run_id, trade_date, closes[] (isin, symbol, trade_date, close in Hauptwährung, currency), fx[] (currency, rate_to_eur), missing[] (ISINs ohne Kurs) |
+| `va.marketdata.securities.updated` (D2.4, 7 Tage) | market-data (Wochenlauf, vor `snapshot.completed`) | portfolio (ab D3), web-api | as_of, securities[] (`SecurityV1`: Stammdaten, Listings, bei Anleihen `bond`, bei ETFs `etf` mit Fondsdaten, Gewichten je Sektor, Land und Anlageklasse, den zehn größten Positionen und ihrer Anzahl), missing[] (ISINs ohne Stammdaten, nur im ersten Event); höchstens 50 Wertpapiere je Event |
 | `priv.va.identity.email_confirmation.requested` (D1.6, privat, 24 h) | web-api (Outbox im Schema `identity`) | notification (`notification-private`) | user_id, email (die neue Adresse), link (mit Token, aus der geprüften Herkunft der Anfrage), expires_at |
 
 Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring

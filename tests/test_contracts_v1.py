@@ -33,6 +33,7 @@ from va_contracts.events.v1 import (
     RUN_FAILED,
     RUN_REQUESTED,
     SCORING_RUN_COMPLETED,
+    SECURITIES_UPDATED,
     SNAPSHOT_COMPLETED,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
@@ -48,6 +49,7 @@ from va_contracts.events.v1 import (
     RunOptionsV1,
     ScoringRunCompletedV1,
     ScreeningRunRequestedV1,
+    SecuritiesUpdatedV1,
     SnapshotCompletedV1,
     UniverseInfoV1,
     UniverseMemberV1,
@@ -269,6 +271,9 @@ def _examples() -> dict[str, Contract]:
         PRICES_COMPLETED.type: PricesCompletedV1(
             price_run_id=3, trade_date=date(2026, 11, 6), closes=[], fx=[], missing=[]
         ),
+        SECURITIES_UPDATED.type: SecuritiesUpdatedV1(
+            as_of=date(2026, 11, 21), securities=[_world_etf()], missing=["DE000A383J95"]
+        ),
         SNAPSHOT_COMPLETED.type: SnapshotCompletedV1(
             run_id=42,
             trigger="scheduled",
@@ -309,6 +314,49 @@ def _examples() -> dict[str, Contract]:
     }
 
 
+def _world_etf() -> Any:
+    """D2.4: ein ETF mit Fondsdaten, Gewichten und den groessten Positionen."""
+    from va_contracts.securities import EtfHoldingV1, EtfV1, ListingV1, SecurityV1
+
+    listing = ListingV1(symbol="EUNL.DE", ticker="EUNL", exchange="GY", currency="EUR")
+    return SecurityV1(
+        isin="IE00B4L5Y983",
+        name="ISHSIII-CORE MSCI WORLD",
+        asset_class="etf",
+        currency="USD",
+        cfi="CEOGMS",
+        listings=[listing],
+        listing=listing,
+        etf=EtfV1(
+            source="ishares",
+            as_of=date(2026, 11, 19),
+            complete=True,
+            name="iShares Core MSCI World UCITS ETF",
+            ter=0.2,
+            fund_size=142076.32,
+            fund_currency="USD",
+            distribution="accumulating",
+            provider="iShares",
+            holdings_count=1295,
+            top_holdings=[
+                EtfHoldingV1(
+                    name="APPLE",
+                    weight=6.0,
+                    isin="US0378331005",
+                    ticker="AAPL",
+                    asset_class="Aktien",
+                    sector="IT",
+                    country="Vereinigte Staaten",
+                    currency="USD",
+                )
+            ],
+            sectors={"IT": 27.1},
+            countries={"Vereinigte Staaten": 71.9},
+            asset_classes={"Aktien": 99.6},
+        ),
+    )
+
+
 class TestEventCatalog:
     def test_catalog_matches_events_md(self):
         assert set(EVENTS) == {
@@ -324,6 +372,7 @@ class TestEventCatalog:
             # D2.3: Tageskurse
             "marketdata.prices.requested",
             "marketdata.prices.completed",
+            "marketdata.securities.updated",  # D2.4: Stammdaten und ETF-Daten
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -651,3 +700,33 @@ class TestPrices:
         for model in (PricesRequestedV1, PricesCompletedV1, DailyCloseV1):
             fields = set(model.model_fields)
             assert not fields & {"user_id", "quantity", "depot_id", "amount", "email"}
+
+
+class TestSecurities:
+    """D2.4: Stammdaten und ETF-Daten der Abdeckung; ohne Nutzer und Mengen (WP-09)."""
+
+    def test_master_data_waits_a_week(self):
+        """Die naechste Woche bringt neue Stammdaten; bis dahin gilt auch eine verspaetete."""
+        assert SECURITIES_UPDATED.subject == "va.marketdata.securities.updated"
+        assert SECURITIES_UPDATED.max_age == timedelta(days=7)
+
+    def test_no_users_or_quantities(self):
+        """Kein Feld nennt Nutzer, Depot oder Menge, auch nicht in den Untermodellen."""
+        schema = SecuritiesUpdatedV1.model_json_schema()
+        models = [schema, *schema.get("$defs", {}).values()]
+        names = {name.lower() for model in models for name in model.get("properties", {})}
+        assert "isin" in names  # die Untermodelle sind dabei
+        for word in ("user", "quantity", "depot", "portfolio", "position"):
+            assert not [name for name in names if word in name]
+
+    def test_etf_is_optional(self):
+        from va_contracts.securities import SecurityV1
+
+        share = SecurityV1(isin="DE0007164600", name="SAP SE", asset_class="equity")
+        assert share.etf is None
+
+    def test_the_number_of_holdings_is_not_negative(self):
+        from va_contracts.securities import EtfV1
+
+        with pytest.raises(ValidationError):
+            EtfV1(source="yahoo", as_of=date(2026, 11, 21), complete=False, holdings_count=-1)
