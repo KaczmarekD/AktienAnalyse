@@ -254,6 +254,7 @@ class PricesRequestedHandler:
                     trade_date=c.trade_date,
                     close=c.close,
                     currency=c.currency,
+                    percent_of_par=c.percent_of_par,
                 )
                 for c in result.closes
             ],
@@ -262,5 +263,6 @@ class PricesRequestedHandler:
                 for f in result.fx
             ],
             missing=result.missing,
+            price_run_ids=result.price_run_ids or [result.price_run_id],
         )
         self._bus.publish(follow_up(env, PRICES_COMPLETED, completed, source=SOURCE))

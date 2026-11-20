@@ -702,6 +702,41 @@ class TestPrices:
             assert not fields & {"user_id", "quantity", "depot_id", "amount", "email"}
 
 
+class TestBondPrices:
+    """D2.5: Kurse der Bundesanleihen in Prozent vom Nennwert, alle Abrufe des Termins."""
+
+    def test_percent_and_runs_are_optional(self):
+        from va_contracts.events.v1 import DailyCloseV1, PricesCompletedV1
+
+        close = DailyCloseV1(
+            isin="DE0001141851", trade_date=date(2026, 11, 20), close=98.94, currency="EUR"
+        )
+        assert close.percent_of_par is False
+        completed = PricesCompletedV1(price_run_id=7, trade_date=date(2026, 11, 20))
+        assert completed.price_run_ids == []
+
+    def test_a_bond_close_round_trips(self):
+        from va_contracts.events.v1 import DailyCloseV1, PricesCompletedV1
+
+        completed = PricesCompletedV1(
+            price_run_id=7,
+            trade_date=date(2026, 11, 20),
+            closes=[
+                DailyCloseV1(
+                    isin="DE0001141851",
+                    trade_date=date(2026, 11, 20),
+                    close=98.94,
+                    currency="EUR",
+                    percent_of_par=True,
+                )
+            ],
+            price_run_ids=[7, 8],
+        )
+        restored = PricesCompletedV1.model_validate_json(completed.model_dump_json())
+        assert restored == completed
+        assert restored.closes[0].percent_of_par
+
+
 class TestSecurities:
     """D2.4: Stammdaten und ETF-Daten der Abdeckung; ohne Nutzer und Mengen (WP-09)."""
 

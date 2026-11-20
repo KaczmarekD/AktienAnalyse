@@ -15,6 +15,11 @@
           "title": "Isin",
           "type": "string"
         },
+        "percent_of_par": {
+          "default": false,
+          "title": "Percent Of Par",
+          "type": "boolean"
+        },
         "symbol": {
           "anyOf": [
             {
@@ -95,6 +100,14 @@
       "minimum": 1,
       "title": "Price Run Id",
       "type": "integer"
+    },
+    "price_run_ids": {
+      "items": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "title": "Price Run Ids",
+      "type": "array"
     },
     "trade_date": {
       "format": "date",

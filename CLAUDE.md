@@ -346,7 +346,10 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   Schlusskurse der Abdeckung per Sammelabruf (`yf.download`), rechnet Pence in Pfund um,
   speichert sie in `market_data.price_run`, `daily_close` (je ISIN, Quelle und Tag einmal) und
   `fx_daily` und meldet `marketdata.prices.completed`. Die Währung eines Symbols kommt aus
-  früheren Kursen, sonst einmal von Yahoo; ohne Währung fehlt der Kurs (nie geraten).
+  früheren Kursen, sonst einmal von Yahoo; ohne Währung fehlt der Kurs (nie geraten). Seit D2.5
+  kommen die Anleihen der Abdeckung aus der Kursliste der Bundesbank (`collect_bond_prices`,
+  eigener `price_run` mit Quelle `bundesbank`, Kurs in Prozent vom Nennwert, Notierung `%`, im
+  Event `percent_of_par`); andere Anleihen fehlen mit ISIN.
 - Stammdaten und ETF-Daten (D2.4): Nach Universum und Abdeckung frischt der Wochenlauf die
   Stammdaten der Abdeckung auf (`refresh_securities`: ESMA FIRDS, bei ETFs zuerst iShares mit
   allen Positionen, sonst yfinance `funds_data` mit den zehn größten, als unvollständig
@@ -531,6 +534,9 @@ Es landet im Versandprotokoll. Eine Mail an eine andere Adresse geht schon heute
   Produkt-Screeners (ISIN → `portfolioId`, TER, Volumen, Ausschüttung, rund 3,8 MB) und die
   Positionen jedes iShares-Fonds der Abdeckung (`IsharesFunds`).
 - **Deka-ETF-XLSX**: Blatt „Indexzusammensetzung“, nur ISIN/WKN.
+- **Bundesbank, Kurse der Bundeswertpapiere** (seit D2.5): Monatsdatei (XLSX, ein Blatt je
+  Handelstag) über die Seite „Kurse und Renditen“; URL, Muster der Links und Spalten nur am Kopf
+  von `va_market_data/adapters/bundesbank.py`.
 - **OpenFIGI**: ISIN → Xetra-Ticker für Neuaufnahmen, die noch nicht in der
   CSV stehen; ohne API-Key (10 ISINs pro Request). Seit D2.1 auch Name, Anlageklasse und
   Listings je ISIN für die Suche (`OpenFigiLookup`). Zur WKN liefert OpenFIGI keine ISIN;

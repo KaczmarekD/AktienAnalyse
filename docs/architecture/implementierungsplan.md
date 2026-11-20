@@ -3641,11 +3641,38 @@ die Kurse der Bundesanleihen kommen als eigenes Paket D2.5)
     kosten so grob 40 MB im Jahr.
 
 **D2.5 Kurse der Bundesanleihen** (WP-06, 08)
-- **Test:** Monatsdatei der Bundesbank (Link aus der Seite „Kurse und Renditen“, ein Blatt je
-  Handelstag), Kurs in Prozent vom Nennwert je ISIN in `daily_close` mit Quelle `bundesbank`,
-  nur für Anleihen der Abdeckung; der Abruf der Tageskurse holt sie mit; ein Ausfall der
-  Bundesbank kostet nur diese Kurse.
+- **Test:**
+  - Adapter (`adapters/bundesbank.py`, Feldnamen und URL am Dateikopf): die Links der
+    Monatsdateien aus der Seite „Kurse und Renditen“ (`…/JJJJ-MM-excel-data.xlsx`), je Datei ein
+    Blatt je Handelstag (`TT.MM.JJJJ`). Das Blatt des angefragten Tages, sonst das jüngste davor;
+    hat die Datei des Monats noch keins (am Monatsersten), die des Vormonats. Kopfzeile über
+    `ISIN` gefunden, die Spalte „Kurs“ (in Prozent vom Nennwert, ohne Stückzinsen), Fußnoten am
+    Ende übersprungen; eine andere Struktur ist ein Fehler der Quelle. Gekürzte echte Datei vom
+    20.11.2026 als Fixture (im Test erzeugt).
+  - Anwendungsfall `collect_bond_prices`: alle Anleihen der Abdeckung, ein eigener `price_run`
+    mit Quelle `bundesbank`, Kurse in `daily_close` mit Notierung `%`; nicht gelistete stehen in
+    `missing`; ein Ausfall ist ein `price_run` mit `failed`; ohne Anleihen kein Abruf.
+  - `marketdata.prices.completed` additiv: `closes[].percent_of_par` und `price_run_ids` (alle
+    Abrufe des Termins); `missing` ohne die Anleihen mit Kurs der Bundesbank. Golden-Schema neu.
+- **Bewusst nicht:** andere Anleihen (keine freie Quelle, WP-08: Bankabruf oder Hand), Rendite
+  und Zinskurve (D4, Analyse). Bei inflationsindexierten Bundeswertpapieren nennt die Bundesbank
+  den Kurs ohne Inflationsanpassung; der Wert eines Bestands braucht die Index-Verhältniszahl
+  (D4).
 - **Review:** `/code-review high`.
+- **Umgesetzt (20.11.2026):** wie im Entwurf, dazu:
+  - **Keine Migration:** `daily_close` hat Quelle und Notierung schon; die Kurse der Bundesbank
+    stehen dort mit `source = 'bundesbank'` und `quote_currency = '%'`.
+  - **Ein Event je Termin:** Yahoo und Bundesbank haben je einen `price_run`, das Event nennt
+    beide (`price_run_ids`); `price_run_id` bleibt der Abruf bei Yahoo.
+  - **Live geprüft (20.11.2026):** 80 Bundeswertpapiere je Blatt; am Sonntag gilt der Freitag, am
+    Monatsersten die Datei des Vormonats.
+  - **Review (`/code-review high`):** behoben, dass ein Ausfall der Bundesbank zusätzlich als
+    „keine Kurse bis …“ im Log stand. Offen gelassen: Erscheint das Blatt eines Tages erst nach
+    22:30, fehlt dieser Tag in `daily_close` (der Lauf nimmt das jüngste Blatt; am 20.11. lag es
+    schon um 21:45 vor). Die Datei wird auch geladen, wenn die Abdeckung nur
+    Unternehmensanleihen enthält (eine Seite und rund 110 KB je Handelstag). Scheitert das
+    Speichern des Abrufs der Bundesbank, stellt der Bus erneut zu, und Yahoo bekommt einen
+    zweiten, leeren `price_run`, wie schon in D2.3.
 
 **Fertig, wenn:** die Suche Aktie, ETF und Anleihe findet und der Wochenlauf mit `covered[]`
 dieselbe Mail liefert.

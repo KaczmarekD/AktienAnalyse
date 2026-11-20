@@ -15,7 +15,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
 from va_market_data.adapters.postgres.prices import PostgresPriceStore
-from va_market_data.domain.prices import DailyClose, FxDaily
+from va_market_data.domain.prices import PERCENT_OF_PAR, DailyClose, FxDaily
 
 NOW = datetime(2026, 11, 6, 21, 35, tzinfo=UTC)
 FRIDAY = date(2026, 11, 6)
@@ -86,10 +86,20 @@ def test_the_quote_unit_is_known_not_the_major_currency(store):
 
 
 def test_a_bond_price_without_symbol(store):
-    """Spaeter aus der Bundesbank (D2.4) oder von Hand: nach ISIN, ohne Yahoo-Symbol."""
-    bund = DailyClose("DE0001102580", None, FRIDAY, 84.31, "EUR")
-    _write(store, [bund], [])
-    assert store.latest_closes(["DE0001102580"])["DE0001102580"] == bund
+    """Aus der Bundesbank (D2.5): nach ISIN, ohne Yahoo-Symbol, in Prozent vom Nennwert."""
+    bund = DailyClose("DE0001102580", None, FRIDAY, 84.31, "EUR", PERCENT_OF_PAR)
+    store.write_prices(
+        source="bundesbank",
+        started_at=NOW,
+        finished_at=NOW + timedelta(seconds=5),
+        status="ok",
+        closes=[bund],
+        fx=[],
+    )
+    latest = store.latest_closes(["DE0001102580"])["DE0001102580"]
+    assert latest == bund
+    assert latest.percent_of_par
+    assert store.known_currencies(["DE0001102580"]) == {}  # ohne Symbol keine Notierung
 
 
 @pytest.mark.parametrize("table", ["price_run", "daily_close", "fx_daily"])
