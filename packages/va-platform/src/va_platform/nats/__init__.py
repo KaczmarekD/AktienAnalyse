@@ -94,6 +94,10 @@ CONSUMERS = (
         ),
     ),
     ConsumerSpec("scoring", ("va.marketdata.snapshot.completed",)),
+    # D3.4: Kopien von Stammdaten und Kursen fuer die Bewertung der Depots
+    ConsumerSpec(
+        "portfolio", ("va.marketdata.securities.updated", "va.marketdata.prices.completed")
+    ),
     ConsumerSpec("notification", ("va.scoring.run.completed", "va.screening.run.failed")),
     ConsumerSpec("web-api", ("va.>",)),
     # P4.3: der RunTracker des Batches, Vorlaeufer der Run-Projektion im web-api

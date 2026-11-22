@@ -1,4 +1,4 @@
-"""Depots im Speicher (Port ``DepotStore``), fuer Tests und den Betrieb ohne Datenbank.
+"""Depots und Marktdaten im Speicher (Ports ``DepotStore``, ``MarketStore``), fuer Tests.
 
 Verhaelt sich wie ``PostgresDepotStore``: Daten und Event einer Aenderung gemeinsam, eine
 vergebene Version ergibt ``VersionConflict``. Die Events sammelt ``events`` (statt der Outbox).
@@ -11,14 +11,18 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from ..domain.depots import Depot, Snapshot, VersionConflict
+from ..domain.valuation import Market, Quote, SecurityInfo
 
 if TYPE_CHECKING:
-    from datetime import datetime
+    from collections.abc import Collection, Sequence
+    from datetime import date, datetime
+    from decimal import Decimal
 
     from va_contracts import Envelope
     from va_contracts.portfolio import DepotKind, DepotState
 
     from ..application.depots import CoverageFactory, EventFactory
+    from ..application.market import FxRate, SecurityCopy
 
 
 class MemoryDepotStore:
@@ -125,3 +129,44 @@ class MemoryDepotStore:
                 raise VersionConflict(snaps[-1].version)
             snaps.append(snapshot)
             self.events.append(event)
+
+
+class MemoryMarketStore:
+    """Kopien der Marktdaten (D3.4): je ISIN bzw. Waehrung gilt das Juengste."""
+
+    def __init__(self) -> None:
+        self.securities: dict[str, tuple[date, SecurityInfo]] = {}
+        self.quotes: dict[str, Quote] = {}
+        self.fx: dict[str, tuple[date, Decimal]] = {}
+        self.payloads: dict[str, dict[str, Any]] = {}
+
+    def record_securities(
+        self, copies: Sequence[SecurityCopy], *, as_of: date, at: datetime
+    ) -> None:
+        del at
+        for copy in copies:
+            known = self.securities.get(copy.info.isin)
+            if known is None or known[0] <= as_of:
+                self.securities[copy.info.isin] = (as_of, copy.info)
+                self.payloads[copy.info.isin] = copy.payload
+
+    def record_prices(
+        self, quotes: Sequence[Quote], rates: Sequence[FxRate], *, at: datetime
+    ) -> None:
+        del at
+        for quote in quotes:
+            known = self.quotes.get(quote.isin)
+            if known is None or known.trade_date <= quote.trade_date:
+                self.quotes[quote.isin] = quote
+        for rate in rates:
+            known_rate = self.fx.get(rate.currency)
+            if known_rate is None or known_rate[0] <= rate.trade_date:
+                self.fx[rate.currency] = (rate.trade_date, rate.rate_to_eur)
+
+    def market(self, isins: Collection[str]) -> Market:
+        wanted = set(isins)
+        return Market(
+            securities={i: s for i, (_, s) in self.securities.items() if i in wanted},
+            quotes={i: q for i, q in self.quotes.items() if i in wanted},
+            fx={c: rate for c, (_, rate) in self.fx.items()},
+        )

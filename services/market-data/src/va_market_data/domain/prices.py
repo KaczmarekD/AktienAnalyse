@@ -41,6 +41,7 @@ class DailyClose:
     # Notierung an der Boerse (z. B. GBp), fuer den naechsten Tag; seit D2.5 ``%`` fuer Anleihen.
     # Im Event nur als ``percent_of_par``
     quote_currency: str | None = None
+    source: str | None = None  # D3.4: yahoo, bundesbank (wie ``price_run.source``)
 
     @property
     def percent_of_par(self) -> bool:

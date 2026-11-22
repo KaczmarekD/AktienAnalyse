@@ -4,8 +4,9 @@ portfolio laeuft wie in seinem Image: eigene Settings, Rolle ``va_portfolio``, E
 ``va_portfolio.entrypoints.service.setup``, ``run_service`` aus ``va_platform``. Ein Client fragt
 per Request/Reply; jede Aenderung kommt als ``portfolio.depot.changed`` in den Stream, ohne Namen
 und Mengen. Seit D3.3 dazu die Abdeckung (``portfolio.coverage.changed``), beim Start und nach
-der Aenderung; market-data uebernimmt sie als neue Fassung. Ohne ``TEST_DATABASE_URL`` oder
-``TEST_NATS_URL`` uebersprungen.
+der Aenderung; market-data uebernimmt sie als neue Fassung. Seit D3.4 liest portfolio Kurse
+ueber seinen Consumer und bewertet das Depot. Ohne ``TEST_DATABASE_URL`` oder ``TEST_NATS_URL``
+uebersprungen.
 """
 
 from __future__ import annotations
@@ -23,13 +24,17 @@ from sqlalchemy.engine import make_url
 
 from tests.db.conftest import ROLE_PASSWORDS, _url_for
 from tests.db.test_services_nats import _settings
+from va_contracts import new_envelope
+from va_contracts.events.v1 import PRICES_COMPLETED, DailyCloseV1, PricesCompletedV1
 from va_contracts.portfolio import HoldingLineV1
 from va_contracts.rpc.v1 import (
     DEPOTS_CREATE,
+    DEPOTS_GET,
     DEPOTS_LIST,
     HOLDINGS_SAVE,
     DepotCreateRequestV1,
     DepotListRequestV1,
+    DepotRefRequestV1,
     HoldingsSaveRequestV1,
 )
 from va_market_data.adapters.postgres.store import PostgresSnapshotStore
@@ -208,3 +213,57 @@ def test_holdings_reach_the_coverage_of_market_data(db_url, db_settings, nats_ur
         for service in services:
             service.join(timeout=30)
         md_engine.dispose()
+
+
+def test_prices_reach_the_valuation(db_url, nats_url):
+    """D3.4: market-data meldet Kurse, portfolio bewertet das Depot daraus."""
+    from datetime import date
+
+    stop = threading.Event()
+    service = _portfolio(db_url, nats_url, stop)
+    service.start()
+    client = NatsBus(nats_url, consumers=())
+    client.start()
+    try:
+        _wait_for_portfolio(client)
+        depot = client.call(DEPOTS_CREATE, DepotCreateRequestV1(user_id=ANNA, name="DKB")).depot
+        assert depot is not None
+        client.call(
+            HOLDINGS_SAVE,
+            HoldingsSaveRequestV1(
+                user_id=ANNA,
+                depot_id=depot.id,
+                base_version=0,
+                lines=[HoldingLineV1(isin=SAP, quantity=Decimal("10"))],
+            ),
+        )
+        close = DailyCloseV1(
+            isin=SAP,
+            symbol="SAP.DE",
+            trade_date=date.today(),
+            close=231.5,
+            currency="EUR",
+            source="yahoo",
+        )
+        client.publish(
+            new_envelope(
+                PRICES_COMPLETED,
+                PricesCompletedV1(price_run_id=1, trade_date=date.today(), closes=[close]),
+                source="va/market-data",
+            )
+        )
+        deadline = time.monotonic() + 60
+        while True:
+            reply = client.call(DEPOTS_GET, DepotRefRequestV1(user_id=ANNA, depot_id=depot.id))
+            assert reply.depot is not None
+            valuation = reply.depot.valuation
+            if valuation is not None and valuation.complete:
+                break
+            assert time.monotonic() < deadline, "Kurs nicht angekommen"
+            time.sleep(0.5)
+        assert valuation.value_eur == Decimal("2315.00")
+        assert valuation.positions[0].price_source == "yahoo"
+    finally:
+        client.close()
+        stop.set()
+        service.join(timeout=30)

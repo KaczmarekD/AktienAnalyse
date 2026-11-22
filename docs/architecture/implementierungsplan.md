@@ -3849,6 +3849,34 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   Kursdatum und Quelle; Einstand und Differenz je Position und Depot; „wird geprüft“ ohne
   Stammdaten. In `GET /depots` und `GET /depots/{id}`.
 - **Review:** `/code-review high`.
+- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+  - **Migration 0025:** F2.2 hat 0024 zuerst gemergt. Neu sind `security_view` (mit dem ganzen
+    `SecurityV1` für die Analyse in D5), `price_view` und `fx_view`, nur zum Anfügen, nur für
+    `va_portfolio`. Gültig ist je ISIN bzw. Währung das Jüngste; ein spät zugestelltes älteres
+    Event überschreibt nichts.
+  - **Consumer `portfolio`** (Rechte in `nats.conf`) über den `ReliableBus` mit der Inbox im Schema
+    `portfolio`. Keine Folge-Events: Die Bewertung entsteht bei jeder Anfrage aus den Kopien.
+  - **Quelle je Kurs:** `DailyCloseV1.source` (optional, `yahoo`/`bundesbank`), gesetzt von
+    market-data, angezeigt je Position (DEP-07).
+  - **Rechenregeln:** Werte auf Cent gerundet; ein Prozentkurs je Stück oder ein Stückkurs auf
+    Nennwert ergibt keinen Wert (`missing = unit`). Ohne Kurs `price`, ohne Währungskurs `fx`. Das
+    Depot zählt sie (`unvalued`, `complete`) und zeigt den Wert der übrigen plus Kasse.
+    `price_date` ist der älteste Kurs der bewerteten Positionen. Es zählt der jüngste Währungskurs,
+    nicht der vom Tag des Kurses.
+  - **Liste ohne Positionen:** `GET /depots` trägt die Summen, `GET /depots/{id}` jede Position. Der
+    Export bleibt ohne Bewertung (nur Erfasstes). Sind die Kopien nicht lesbar, fehlt nur
+    `valuation`.
+  - **Startwerte:** Ein neuer Consumer liest die Events, die noch im Stream liegen, soweit sie
+    nicht älter als ihr Höchstalter sind (Kurse 24 h, Stammdaten 7 Tage); der Rest kommt mit dem
+    nächsten Tageskurs bzw. Wochenlauf.
+  - **NAS:** `docker compose restart nats` nach dem Update (neue Rechte in `nats.conf`), nichts
+    Neues in der `.env`.
+  - **Review (`/code-review high`):** behoben, dass das web-api die Anlageklassen doppelt führte
+    (jetzt `AssetClass` aus dem Contract) und Differenzen nicht auf Cent rundete. Offen gelassen:
+    Ein Kurs, den market-data nicht mehr liefert (`missing[]`), bleibt der letzte; das Alter zeigt
+    `price_date`, warnen wird HIN-D01 (D5). Die Liste lädt je Depot den neuesten Depotstand
+    (Seiten mit D3.6). Der Worker würde wie bei D3.3 die Events des Consumers `portfolio` ungelesen
+    bestätigen.
 
 **D3.5 Datei im eigenen Format** (DEP-05)
 - **Test:** CSV `isin;menge;einstand;notiz` (`;`, Dezimalkomma, BOM erlaubt, höchstens 1 MB als

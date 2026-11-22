@@ -226,6 +226,8 @@ export type DataExport = {
  * Depot
  *
  * Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
+ *
+ * ``valuation`` (D3.4): fehlt, solange portfolio keine Marktdaten hat oder sie nicht lesbar sind.
  */
 export type Depot = {
   /**
@@ -256,6 +258,7 @@ export type Depot = {
    * Status
    */
   status: 'active' | 'archived';
+  valuation: DepotValuation | null;
   /**
    * Version
    */
@@ -273,6 +276,58 @@ export type DepotExport = {
    * Versions
    */
   versions: Array<Holdings>;
+};
+
+/**
+ * DepotValuation
+ *
+ * Bewertung eines Depots (D3.4): bewertete Positionen plus Kasse, in EUR.
+ *
+ * ``complete`` falsch heisst: ``unvalued`` Positionen haben keinen Wert, ``value_eur`` enthaelt
+ * sie nicht. ``price_date``: der aelteste Kurs der bewerteten Positionen. Einstand und Differenz
+ * nur, wo bekannt. ``positions`` nur bei ``GET /depots/{id}``.
+ */
+export type DepotValuation = {
+  /**
+   * Cash Eur
+   */
+  cash_eur: string;
+  /**
+   * Complete
+   */
+  complete: boolean;
+  /**
+   * Cost Basis Eur
+   */
+  cost_basis_eur: string | null;
+  /**
+   * Difference Eur
+   */
+  difference_eur: string | null;
+  /**
+   * Pending
+   */
+  pending: number;
+  /**
+   * Positions
+   */
+  positions: Array<PositionValue>;
+  /**
+   * Positions Eur
+   */
+  positions_eur: string | null;
+  /**
+   * Price Date
+   */
+  price_date: string | null;
+  /**
+   * Unvalued
+   */
+  unvalued: number;
+  /**
+   * Value Eur
+   */
+  value_eur: string | null;
 };
 
 /**
@@ -770,6 +825,83 @@ export type PasswordReset = {
    * One Time Password
    */
   one_time_password: string;
+};
+
+/**
+ * PositionValue
+ *
+ * Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.
+ *
+ * ``price`` in ``price_currency``, bei ``percent_of_par`` in Prozent vom Nennwert; ``fx_rate``
+ * ist 1 Einheit dieser Waehrung in EUR. Ohne Wert nennt ``missing`` den Grund (``price``,
+ * ``fx``, ``unit``), in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch ohne
+ * Stammdaten ("wird geprueft").
+ */
+export type PositionValue = {
+  /**
+   * Asset Class
+   */
+  asset_class: 'equity' | 'etf' | 'bond' | 'other' | null;
+  /**
+   * Cost Basis Eur
+   */
+  cost_basis_eur: string | null;
+  /**
+   * Difference Eur
+   */
+  difference_eur: string | null;
+  /**
+   * Fx Rate
+   */
+  fx_rate: string | null;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Missing
+   */
+  missing: 'price' | 'fx' | 'unit' | null;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Pending
+   */
+  pending: boolean;
+  /**
+   * Percent Of Par
+   */
+  percent_of_par: boolean;
+  /**
+   * Price
+   */
+  price: string | null;
+  /**
+   * Price Currency
+   */
+  price_currency: string | null;
+  /**
+   * Price Date
+   */
+  price_date: string | null;
+  /**
+   * Price Source
+   */
+  price_source: string | null;
+  /**
+   * Quantity
+   */
+  quantity: string | null;
+  /**
+   * Unit
+   */
+  unit: 'pieces' | 'nominal';
+  /**
+   * Value Eur
+   */
+  value_eur: string | null;
 };
 
 /**

@@ -20,6 +20,18 @@
           "title": "Percent Of Par",
           "type": "boolean"
         },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
         "symbol": {
           "anyOf": [
             {

@@ -2,8 +2,9 @@
 
 Beantwortet die Depots per Request/Reply (``rpc.va.portfolio.*``, Queue-Gruppe ``portfolio``).
 Jede Aenderung legt ``portfolio.depot.changed`` in die Outbox; nach jeder Aenderung und im Takt
-``OUTBOX_INTERVAL`` leert der Dienst sie (falls NATS kurz weg war). Events liest er in D3.1 noch
-keine; einen Consumer bekommt er mit den Kopien der Stammdaten und Kurse (D3.4).
+``OUTBOX_INTERVAL`` leert der Dienst sie (falls NATS kurz weg war). Seit D3.4 liest er ueber den
+Consumer ``portfolio`` Stammdaten und Kurse von market-data in seine Kopien
+(``entrypoints.handlers``, ``ReliableBus`` mit Inbox) und bewertet daraus die Depots.
 
 Seit D3.3 meldet er market-data die Abdeckung (``portfolio.coverage.changed``): bei jeder
 Aenderung der Menge, beim Start und alle ``COVERAGE_INTERVAL`` auch unveraendert.
@@ -18,13 +19,14 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from va_contracts import parse_envelope
-from va_platform.messaging import Outbox, drain_outbox
+from va_platform.messaging import Outbox, ReliableBus, drain_outbox
 from va_platform.service import service_main
 
-from ..adapters.postgres.models import PortfolioOutbox
+from ..adapters.postgres.market import PostgresMarketStore
+from ..adapters.postgres.models import PortfolioInbox, PortfolioOutbox
 from ..adapters.postgres.store import PostgresDepotStore
 from ..application.depots import DepotService
-from . import rpc
+from . import handlers, rpc
 from .settings import PortfolioSettings
 
 if TYPE_CHECKING:
@@ -103,7 +105,10 @@ def setup(
     """``settings``: heute nur fuer die Verbindungen, die ``run_service`` schon gebaut hat."""
     del settings
     flush = outbox_flusher(bus, engine)
-    service = DepotService(PostgresDepotStore(engine), flush=flush)
+    market = PostgresMarketStore(engine)
+    # D3.4: Stammdaten und Kurse; jedes Event einmal (Inbox), das Hoechstalter steht am Event
+    handlers.wire(ReliableBus(bus, engine, inbox=PortfolioInbox, outbox=PortfolioOutbox), market)
+    service = DepotService(PostgresDepotStore(engine), flush=flush, market=market)
     for spec, handler in rpc.handlers(service).items():
         bus.serve(spec, handler, queue=QUEUE)
     try:

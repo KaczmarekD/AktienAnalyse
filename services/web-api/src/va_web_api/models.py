@@ -7,6 +7,7 @@ Sie sind der Vertrag mit dem Frontend: Der OpenAPI-Snapshot und der daraus gener
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -465,8 +466,58 @@ class Security(_Model):
 DepotKindName = Literal["depot", "watchlist"]
 
 
+class PositionValue(_Model):
+    """Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.
+
+    ``price`` in ``price_currency``, bei ``percent_of_par`` in Prozent vom Nennwert; ``fx_rate``
+    ist 1 Einheit dieser Waehrung in EUR. Ohne Wert nennt ``missing`` den Grund (``price``,
+    ``fx``, ``unit``), in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch ohne
+    Stammdaten ("wird geprueft").
+    """
+
+    isin: str
+    name: str | None
+    asset_class: AssetClass | None
+    pending: bool
+    quantity: Decimal | None
+    unit: Literal["pieces", "nominal"]
+    price: Decimal | None
+    price_currency: str | None
+    price_date: date | None
+    price_source: str | None
+    percent_of_par: bool
+    fx_rate: Decimal | None
+    value_eur: Decimal | None
+    cost_basis_eur: Decimal | None
+    difference_eur: Decimal | None
+    missing: Literal["price", "fx", "unit"] | None
+
+
+class DepotValuation(_Model):
+    """Bewertung eines Depots (D3.4): bewertete Positionen plus Kasse, in EUR.
+
+    ``complete`` falsch heisst: ``unvalued`` Positionen haben keinen Wert, ``value_eur`` enthaelt
+    sie nicht. ``price_date``: der aelteste Kurs der bewerteten Positionen. Einstand und Differenz
+    nur, wo bekannt. ``positions`` nur bei ``GET /depots/{id}``.
+    """
+
+    value_eur: Decimal | None
+    positions_eur: Decimal | None
+    cash_eur: Decimal
+    complete: bool
+    unvalued: int
+    pending: int
+    cost_basis_eur: Decimal | None
+    difference_eur: Decimal | None
+    price_date: date | None
+    positions: list[PositionValue]
+
+
 class Depot(_Model):
-    """Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert."""
+    """Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
+
+    ``valuation`` (D3.4): fehlt, solange portfolio keine Marktdaten hat oder sie nicht lesbar sind.
+    """
 
     id: int
     kind: DepotKindName
@@ -476,6 +527,7 @@ class Depot(_Model):
     created_at: datetime
     version: int
     positions: int
+    valuation: DepotValuation | None
 
 
 class HoldingLine(_Model):

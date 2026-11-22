@@ -375,7 +375,7 @@
       },
       "Depot": {
         "additionalProperties": false,
-        "description": "Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.",
+        "description": "Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.\n\n``valuation`` (D3.4): fehlt, solange portfolio keine Marktdaten hat oder sie nicht lesbar sind.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -421,6 +421,16 @@
             "title": "Status",
             "type": "string"
           },
+          "valuation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DepotValuation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -434,7 +444,8 @@
           "status",
           "created_at",
           "version",
-          "positions"
+          "positions",
+          "valuation"
         ],
         "title": "Depot",
         "type": "object"
@@ -459,6 +470,110 @@
           "versions"
         ],
         "title": "DepotExport",
+        "type": "object"
+      },
+      "DepotValuation": {
+        "additionalProperties": false,
+        "description": "Bewertung eines Depots (D3.4): bewertete Positionen plus Kasse, in EUR.\n\n``complete`` falsch heisst: ``unvalued`` Positionen haben keinen Wert, ``value_eur`` enthaelt\nsie nicht. ``price_date``: der aelteste Kurs der bewerteten Positionen. Einstand und Differenz\nnur, wo bekannt. ``positions`` nur bei ``GET /depots/{id}``.",
+        "properties": {
+          "cash_eur": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Eur",
+            "type": "string"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "cost_basis_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Eur"
+          },
+          "difference_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Eur"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionValue"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "positions_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions Eur"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "unvalued": {
+            "title": "Unvalued",
+            "type": "integer"
+          },
+          "value_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Eur"
+          }
+        },
+        "required": [
+          "value_eur",
+          "positions_eur",
+          "cash_eur",
+          "complete",
+          "unvalued",
+          "pending",
+          "cost_basis_eur",
+          "difference_eur",
+          "price_date",
+          "positions"
+        ],
+        "title": "DepotValuation",
         "type": "object"
       },
       "EmailConfirmation": {
@@ -1450,6 +1565,202 @@
           "one_time_password"
         ],
         "title": "PasswordReset",
+        "type": "object"
+      },
+      "PositionValue": {
+        "additionalProperties": false,
+        "description": "Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.\n\n``price`` in ``price_currency``, bei ``percent_of_par`` in Prozent vom Nennwert; ``fx_rate``\nist 1 Einheit dieser Waehrung in EUR. Ohne Wert nennt ``missing`` den Grund (``price``,\n``fx``, ``unit``), in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch ohne\nStammdaten (\"wird geprueft\").",
+        "properties": {
+          "asset_class": {
+            "anyOf": [
+              {
+                "enum": [
+                  "equity",
+                  "etf",
+                  "bond",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Class"
+          },
+          "cost_basis_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Eur"
+          },
+          "difference_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Eur"
+          },
+          "fx_rate": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Rate"
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "missing": {
+            "anyOf": [
+              {
+                "enum": [
+                  "price",
+                  "fx",
+                  "unit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "percent_of_par": {
+            "title": "Percent Of Par",
+            "type": "boolean"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Source"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "unit": {
+            "enum": [
+              "pieces",
+              "nominal"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "value_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Eur"
+          }
+        },
+        "required": [
+          "isin",
+          "name",
+          "asset_class",
+          "pending",
+          "quantity",
+          "unit",
+          "price",
+          "price_currency",
+          "price_date",
+          "price_source",
+          "percent_of_par",
+          "fx_rate",
+          "value_eur",
+          "cost_basis_eur",
+          "difference_eur",
+          "missing"
+        ],
+        "title": "PositionValue",
         "type": "object"
       },
       "Preview": {

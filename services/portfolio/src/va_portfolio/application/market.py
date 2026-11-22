@@ -1,0 +1,53 @@
+"""Kopien der Marktdaten in portfolio (D3.4, ADR-0013; docs/architecture/depot/depots.md).
+
+portfolio liest keine Tabellen von market-data. Es haelt eigene Kopien aus den Events:
+
+- ``marketdata.securities.updated`` -> ``security_view`` (Stammdaten, das ganze ``SecurityV1``
+  fuer die Analyse in D5), gueltig ist je ISIN der juengste Stand (``as_of``).
+- ``marketdata.prices.completed`` -> ``price_view`` und ``fx_view``, gueltig ist je ISIN bzw.
+  Waehrung der juengste Handelstag.
+
+Alles nur angefuegt. Ein Event kommt einmal (Inbox des ``ReliableBus``); kommt es nach einem
+Absturz doch zweimal, stehen dieselben Zeilen doppelt da, gelesen wird ohnehin das Juengste.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import Collection, Sequence
+    from datetime import date, datetime
+    from decimal import Decimal
+
+    from ..domain.valuation import Market, Quote, SecurityInfo
+
+
+@dataclass(frozen=True)
+class SecurityCopy:
+    info: SecurityInfo
+    payload: dict[str, Any]  # ``SecurityV1`` als JSON
+
+
+@dataclass(frozen=True)
+class FxRate:
+    currency: str
+    trade_date: date
+    rate_to_eur: Decimal  # 1 Einheit der Waehrung in EUR
+
+
+class MarketReader(Protocol):
+    def market(self, isins: Collection[str]) -> Market:
+        """Je ISIN die juengsten Stammdaten und Kurse, dazu der juengste Kurs jeder Waehrung."""
+        ...
+
+
+class MarketStore(MarketReader, Protocol):
+    def record_securities(
+        self, copies: Sequence[SecurityCopy], *, as_of: date, at: datetime
+    ) -> None: ...
+
+    def record_prices(
+        self, quotes: Sequence[Quote], rates: Sequence[FxRate], *, at: datetime
+    ) -> None: ...

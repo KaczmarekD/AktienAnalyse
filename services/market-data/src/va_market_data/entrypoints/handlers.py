@@ -267,6 +267,7 @@ class PricesRequestedHandler:
                     close=c.close,
                     currency=c.currency,
                     percent_of_par=c.percent_of_par,
+                    source=c.source,
                 )
                 for c in result.closes
             ],
