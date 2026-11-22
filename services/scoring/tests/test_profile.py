@@ -59,6 +59,10 @@ def test_params_of_todays_defaults():
         "industry_prefixes": ["Banks", "Insurance", "Capital Markets", "Real Estate", "REIT"],
         "cost_of_capital": 0.08,
         "terminal_growth": 0.02,
+        # F2.3 (ADR-0011, Punkt 5): abgeschaltet
+        "trap_momentum_rule": False,
+        "trap_momentum_max_rank": 0.30,
+        "trap_fscore_max": 3,
     }
 
 
@@ -152,6 +156,10 @@ class TestRules:
             ("cost_of_capital", 0.6),
             ("terminal_growth", -0.1),
             ("terminal_growth", 0.2),
+            ("trap_momentum_max_rank", -0.1),
+            ("trap_momentum_max_rank", 1.1),
+            ("trap_fscore_max", -1),
+            ("trap_fscore_max", 10),
         ],
     )
     def test_bounds(self, field: str, value: Any):
@@ -315,3 +323,28 @@ class TestNetShareIssuanceInTheProfile:
     def test_can_be_switched_on(self):
         cfg = _params(value_factors={"ev_ebit", "net_share_issuance"}).to_config()
         assert list(cfg.value_factors) == ["ev_ebit", "net_share_issuance"]
+
+
+class TestMomentumTrapParams:
+    """F2.3: die Value-Trap-Regel mit Momentum, im Profil v1 aus."""
+
+    def test_stored_params_without_them_get_the_defaults(self):
+        stored = {"value_weight": 0.6, "min_market_cap": 300_000_000.0}
+        params = ScoringProfileParams.model_validate(stored)
+        assert params.trap_momentum_rule is False
+        assert params.trap_momentum_max_rank == 0.30
+        assert params.trap_fscore_max == 3
+
+    def test_are_passed_to_score(self):
+        cfg = _params(
+            trap_momentum_rule=True, trap_momentum_max_rank=0.2, trap_fscore_max=2
+        ).to_config()
+        assert (cfg.trap_momentum_rule, cfg.trap_momentum_max_rank, cfg.trap_fscore_max) == (
+            True,
+            0.2,
+            2,
+        )
+
+    def test_round_trip_from_config(self):
+        cfg = ScoringConfig(trap_momentum_rule=True, trap_momentum_max_rank=0.25, trap_fscore_max=4)
+        assert ScoringProfileParams.model_validate(profile_params(cfg)).to_config() == cfg

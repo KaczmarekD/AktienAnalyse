@@ -11,6 +11,7 @@ import '../../locale';
 import { apiTestingProviders } from '../../testing/api';
 import { FACTORS } from '../../testing/fixtures';
 
+import type { TipParams } from '../glossary/glossary';
 import type { Progress } from '../realtime/live.store';
 import { BackLink } from './back-link';
 import { ColumnGroup, ColumnPicker } from './column-picker';
@@ -87,11 +88,17 @@ class RunStatusHost {
 
 @Component({
   imports: [ValueTrapBadge],
-  template: `<app-value-trap-badge [flagged]="flagged()" />`,
+  template: `<app-value-trap-badge
+    [flagged]="flagged()"
+    [reason]="reason()"
+    [params]="params()"
+  />`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class BadgeHost {
   readonly flagged = signal<boolean | null>(true);
+  readonly reason = signal<'quality' | 'momentum' | null>(null);
+  readonly params = signal<TipParams | undefined>(undefined);
 }
 
 @Component({
@@ -297,6 +304,27 @@ describe('ValueTrapBadge', () => {
       fixture.detectChanges();
       expect(badge()).toBe('');
     }
+  });
+
+  it('names the rule that set the flag (F2.3)', () => {
+    const { fixture, element } = render(BadgeHost);
+    const tip = () =>
+      tooltip(fixture, element.querySelector('app-value-trap-badge [tabindex="0"]'));
+    // Ohne Grund (ältere Läufe) und mit "quality": die bisherige Regel
+    expect(tip()).toContain('schwache Qualität');
+    fixture.componentInstance.reason.set('momentum');
+    fixture.componentInstance.params.set({
+      value_trap_value_threshold: 0.7,
+      trap_momentum_max_rank: 0.3,
+      trap_fscore_max: 3,
+    });
+    fixture.detectChanges();
+    expect(tip()).toContain('Momentum');
+    expect(tip()).toContain('F-Score ≤ 3');
+    expect(tip()).not.toContain('schwache Qualität');
+    fixture.componentInstance.params.set(undefined);
+    fixture.detectChanges();
+    expect(tip()).toContain('Momentum');
   });
 });
 

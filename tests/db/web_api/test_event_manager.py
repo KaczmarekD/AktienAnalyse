@@ -105,6 +105,7 @@ def _completed(
                 quality_score=0.1,
                 composite_score=0.61,
                 value_trap_flag=True,
+                value_trap_reason="momentum",
             ),
             RankingRowV1(fundamentals=_fund("C"), rank_overall=3),  # ohne Composite
         ],
@@ -257,6 +258,12 @@ class TestRanking:
             (20, 1, "C", "C AG", "DAX", 3, None, None, None, False),
         ]
         assert [m.topic for m in recorder.messages] == ["runs", "ranking"]
+
+    def test_value_trap_reason_comes_along(self, engine):
+        """F2.3: Der Grund des Flags steht in der Projektion."""
+        _manager(engine, Recorder(engine)).dispatch(_completed())
+        rows = _rows(engine, "SELECT symbol, value_trap_reason FROM web.ranking_row")
+        assert dict(tuple(r) for r in rows) == {"A": None, "B": "momentum", "C": None}
 
     def test_rescore_has_a_ranking_but_no_run(self, engine):
         recorder = Recorder(engine)

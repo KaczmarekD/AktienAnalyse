@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from va_market_data.adapters.yahoo import normalize_prices
 from va_market_data.domain.history import (
@@ -14,7 +15,9 @@ from va_market_data.domain.history import (
     PriceBar,
     daily_price_bars,
     daily_share_counts,
+    momentum_12_1,
     split_days,
+    total_return,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "shares"
@@ -195,3 +198,107 @@ class TestHistoryState:
         assert state.last_share_date is None
         assert state.last_price_date is None
         assert state.price_split_days == frozenset()
+        assert state.stored_shares == {}
+        assert state.stored_prices == {}
+
+
+# --- F2.3 (ADR-0011, Punkt 5): Gesamtrendite und 12-1-Momentum ---------------------------------
+
+
+def _adj_return(frame: pd.DataFrame, start: date, end: date) -> float:
+    """Rendite aus ``adj_close`` eines einzigen Abrufs: dort ist sie in sich stimmig."""
+    adj = frame["adj_close"]
+    days = [d.date() for d in adj.index]
+    return float(adj.iloc[days.index(end)] / adj.iloc[days.index(start)] - 1)
+
+
+class TestTotalReturn:
+    """Aus ``close`` und ``dividend``. Gegenprobe mit echten Kursen von SAP: ``adj_close``
+    desselben Abrufs ergibt dieselbe Rendite bis auf die Art, wie Yahoo die Dividende
+    einrechnet (Faktor 1 - D/C statt Wiederanlage, weniger als 0,1 Prozentpunkte)."""
+
+    def test_with_the_dividend(self):
+        frame = _recorded_prices("SAP.DE_dividende_2025")
+        bars = daily_price_bars(frame, fetched_at=AFTER)
+        start, end = min(bars), max(bars)
+        assert start < date(2025, 5, 14) < end  # die Dividende liegt im Fenster
+        expected = _adj_return(frame, start, end)
+        assert total_return(bars, start, end) == pytest.approx(expected, abs=1e-3)
+        without = bars[end].close / bars[start].close - 1
+        assert total_return(bars, start, end) > without  # 2,35 EUR Dividende zählen mit
+
+    def test_split_is_already_in_close(self):
+        # Yahoo bereinigt close um Splits; den Split noch einmal anzuwenden, zählte ihn doppelt
+        frame = _recorded_prices("SAP.DE_split_2000")
+        bars = daily_price_bars(frame, fetched_at=AFTER)
+        start, end = min(bars), max(bars)
+        assert start < date(2000, 6, 26) < end
+        expected = _adj_return(frame, start, end)
+        assert total_return(bars, start, end) == pytest.approx(expected, abs=1e-3)
+
+
+_LAST = date(2026, 11, 20)  # Freitag, letzter Handelstag vor dem Abruf
+
+
+def _bar(close: float, dividend: float = 0.0, *, adj: float | None = None) -> PriceBar:
+    return PriceBar(close=close, adj_close=adj, dividend=dividend, split=0.0)
+
+
+def _momentum(bars: dict[date, PriceBar], as_of: date = _LAST + timedelta(days=1)):
+    return momentum_12_1(bars, as_of=as_of)
+
+
+class TestMomentum:
+    """12-1: von 365 bis 30 Tage vor dem jüngsten Handelstag, der letzte Monat zählt nicht."""
+
+    START = _LAST - timedelta(days=365)
+    END = _LAST - timedelta(days=30)
+
+    def test_twelve_months_without_the_last_one(self):
+        bars = {self.START: _bar(100.0), self.END: _bar(120.0), _LAST: _bar(60.0)}
+        assert _momentum(bars) == pytest.approx(0.20)
+
+    def test_dividends_count(self):
+        middle = self.START + timedelta(days=100)
+        bars = {
+            self.START: _bar(100.0),
+            middle: _bar(97.0, dividend=3.0),
+            self.END: _bar(97.0),
+            _LAST: _bar(97.0),
+        }
+        assert _momentum(bars) == pytest.approx(0.0)
+
+    def test_adj_close_is_not_used(self):
+        bars = {
+            self.START: _bar(100.0, adj=50.0),
+            self.END: _bar(110.0, adj=110.0),
+            _LAST: _bar(110.0),
+        }
+        assert _momentum(bars) == pytest.approx(0.10)
+
+    def test_last_trading_day_before_the_target(self):
+        # Zieltage am Wochenende: es gilt der Handelstag davor, höchstens 7 Tage
+        bars = {
+            self.START - timedelta(days=2): _bar(100.0),
+            self.END - timedelta(days=3): _bar(90.0),
+            _LAST: _bar(95.0),
+        }
+        assert _momentum(bars) == pytest.approx(-0.10)
+
+    def test_too_short_a_history_gives_none(self):
+        bars = {_LAST - timedelta(days=200): _bar(100.0), self.END: _bar(90.0), _LAST: _bar(95.0)}
+        assert _momentum(bars) is None
+        assert _momentum({}) is None
+
+    def test_a_gap_at_the_start_gives_none(self):
+        bars = {
+            self.START - timedelta(days=8): _bar(100.0),
+            self.END: _bar(90.0),
+            _LAST: _bar(95.0),
+        }
+        assert _momentum(bars) is None
+
+    def test_stale_prices_give_none(self):
+        bars = {self.START: _bar(100.0), self.END: _bar(120.0), _LAST: _bar(60.0)}
+        assert _momentum(bars, as_of=_LAST + timedelta(days=15)) is None
+        assert _momentum(bars, as_of=_LAST + timedelta(days=14)) == pytest.approx(0.20)

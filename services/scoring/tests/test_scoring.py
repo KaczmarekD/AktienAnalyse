@@ -445,3 +445,135 @@ class TestNetShareIssuanceFactor:
         assert ranks.idxmax() == "BUY.DE"  # zurückgekauft: am besten
         # Negative Multiples bleiben ausgeschlossen
         assert out["rank_ev_ebit"].isna()["ISSUE.DE"]
+
+
+# --- F2.3 (ADR-0011, Punkt 5): Momentum als Anker-Prüfung -------------------------------------
+
+
+def _trap_universe(**cheap: Any) -> pd.DataFrame:
+    """Fünf Titel. CHEAP.DE ist billig (Value 0,87), mittlere Quality (0,6), das schwächste
+    Momentum (Rang 0,2) und F-Score 2: ein fallendes Messer."""
+    rows: dict[str, dict[str, Any]] = {
+        "CHEAP.DE": {
+            "ev_ebit": 5.0,
+            "pb_ratio": 0.5,
+            "shareholder_yield": 0.10,
+            "roic": 0.10,
+            "fcf_margin": 0.10,
+            "momentum_12_1": -0.40,
+            "f_score": 2,
+        },
+        "B.DE": {
+            "ev_ebit": 8.0,
+            "pb_ratio": 1.0,
+            "shareholder_yield": 0.05,
+            "roic": 0.05,
+            "fcf_margin": 0.05,
+            "momentum_12_1": 0.05,
+            "f_score": 6,
+        },
+        "C.DE": {
+            "ev_ebit": 10.0,
+            "pb_ratio": 1.5,
+            "shareholder_yield": 0.04,
+            "roic": 0.15,
+            "fcf_margin": 0.15,
+            "momentum_12_1": 0.10,
+            "f_score": 7,
+        },
+        "D.DE": {
+            "ev_ebit": 12.0,
+            "pb_ratio": 2.0,
+            "shareholder_yield": 0.03,
+            "roic": 0.02,
+            "fcf_margin": 0.02,
+            "momentum_12_1": 0.20,
+            "f_score": 5,
+        },
+        "E.DE": {
+            "ev_ebit": 15.0,
+            "pb_ratio": 3.0,
+            "shareholder_yield": 0.02,
+            "roic": 0.20,
+            "fcf_margin": 0.20,
+            "momentum_12_1": 0.30,
+            "f_score": 8,
+        },
+    }
+    rows["CHEAP.DE"].update(cheap)
+    return _frame(rows)
+
+
+def _trap_config(**values: Any) -> ScoringConfig:
+    value = {k: DEFAULT_VALUE_FACTORS[k] for k in ("ev_ebit", "pb", "shareholder_yield")}
+    quality = {k: DEFAULT_QUALITY_FACTORS[k] for k in ("roic", "fcf_margin")}
+    return ScoringConfig(value_factors=value, quality_factors=quality, **values)
+
+
+def _trap(frame: pd.DataFrame, **values: Any) -> pd.DataFrame:
+    return score(frame, _trap_config(**values)).set_index("symbol")
+
+
+class TestMomentumTrapRule:
+    """Das Flag kommt zusätzlich bei hohem Value-Score, schwachem Momentum und schwachem
+    F-Score. Das Ergebnis nennt die Regel; Momentum geht nicht in den Composite ein."""
+
+    def test_off_by_default(self):
+        cfg = ScoringConfig()
+        assert (cfg.trap_momentum_rule, cfg.trap_momentum_max_rank, cfg.trap_fscore_max) == (
+            False,
+            0.30,
+            3,
+        )
+        out = _trap(_trap_universe())
+        assert not out.loc["CHEAP.DE", "value_trap_flag"]
+        assert out["value_trap_reason"].isna().all()
+
+    def test_the_combination_sets_the_flag(self):
+        out = _trap(_trap_universe(), trap_momentum_rule=True)
+        assert out.loc["CHEAP.DE", "value_score"] >= 0.70
+        assert out.loc["CHEAP.DE", "momentum_rank"] == pytest.approx(0.2)
+        assert out.loc["CHEAP.DE", "value_trap_flag"]
+        assert out.loc["CHEAP.DE", "value_trap_reason"] == "momentum"
+        others = out.drop(index="CHEAP.DE")
+        assert not others["value_trap_flag"].any()
+        assert others["value_trap_reason"].isna().all()
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            {"f_score": 4},  # F-Score über trap_fscore_max
+            {"momentum_12_1": 0.50},  # starkes Momentum
+            {"ev_ebit": 20.0, "pb_ratio": 4.0, "shareholder_yield": 0.0},  # nicht billig
+            {"momentum_12_1": None},  # ohne Kurshistorie
+            {"f_score": None},  # ohne F-Score
+        ],
+    )
+    def test_each_condition_is_needed(self, change: dict[str, Any]):
+        out = _trap(_trap_universe(**change), trap_momentum_rule=True)
+        assert not out.loc["CHEAP.DE", "value_trap_flag"]
+        assert pd.isna(out.loc["CHEAP.DE", "value_trap_reason"])
+
+    def test_thresholds_come_from_the_config(self):
+        loose = _trap(_trap_universe(f_score=4), trap_momentum_rule=True, trap_fscore_max=4)
+        assert loose.loc["CHEAP.DE", "value_trap_reason"] == "momentum"
+        strict = _trap(_trap_universe(), trap_momentum_rule=True, trap_momentum_max_rank=0.1)
+        assert not strict.loc["CHEAP.DE", "value_trap_flag"]
+
+    def test_the_quality_rule_comes_first(self):
+        weak = {"roic": 0.01, "fcf_margin": 0.01}
+        assert _trap(_trap_universe(**weak)).loc["CHEAP.DE", "value_trap_reason"] == "quality"
+        both = _trap(_trap_universe(**weak), trap_momentum_rule=True)
+        assert both.loc["CHEAP.DE", "value_trap_reason"] == "quality"
+
+    def test_momentum_is_not_in_the_composite(self):
+        with_momentum = _trap(_trap_universe(), trap_momentum_rule=True)
+        without = _trap(_trap_universe().drop(columns=["momentum_12_1"]))
+        pd.testing.assert_series_equal(with_momentum["composite_score"], without["composite_score"])
+        assert not any(c.startswith("rank_momentum") for c in with_momentum.columns)
+
+    def test_no_f_score_under_the_industry_rule(self):
+        frame = _trap_universe(industry="Banks - Regional")
+        out = _trap(frame, trap_momentum_rule=True, industry_rules=True)
+        assert out.loc["CHEAP.DE", "value_score"] >= 0.70  # KBV und Shareholder Yield bleiben
+        assert not out.loc["CHEAP.DE", "value_trap_flag"]

@@ -27,6 +27,7 @@ export function row(values: Partial<RankingRow> & Pick<RankingRow, 'symbol'>): R
     value_score: null,
     quality_score: null,
     value_trap_flag: false,
+    value_trap_reason: null,
     market_cap: null,
     currency: 'EUR',
     ev_ebit: null,
@@ -68,6 +69,10 @@ export const PARAMS: ProfileParamsV1Output = {
   industry_prefixes: ['Banks', 'Insurance', 'Capital Markets', 'Real Estate', 'REIT'],
   cost_of_capital: 0.08,
   terminal_growth: 0.02,
+  // F2.3 (ADR-0011): Value-Trap-Regel mit Momentum, abgeschaltet bis zum Profil v2
+  trap_momentum_rule: false,
+  trap_momentum_max_rank: 0.3,
+  trap_fscore_max: 3,
 };
 
 export const RANKING: Ranking = {
@@ -111,6 +116,7 @@ export const RANKING: Ranking = {
       value_score: 0.8,
       quality_score: 0.64,
       value_trap_flag: true,
+      value_trap_reason: 'quality',
     }),
     row({ rank: 4, symbol: 'DBK.DE', name: 'Deutsche Bank', value_score: 0.82 }),
     row({ symbol: 'TINY.DE', name: 'Tiny', index: 'MDAX', passed_filter: false }),
@@ -157,6 +163,8 @@ function snapshot(values: Partial<Snapshot> = {}): Snapshot {
     price: 381.5,
     currency: 'EUR',
     market_cap: 140_000_000_000,
+    // F2.3: 12-1-Momentum, nur für die Value-Trap-Regel
+    momentum_12_1: 0.123,
     ev_ebit: null,
     pe_ratio: 14.383607,
     pb_ratio: 2.1,
@@ -191,6 +199,7 @@ function point(values: Partial<ScorePoint> & Pick<ScorePoint, 'scoring_run_id'>)
     value_score: 0.7,
     quality_score: 0.9,
     value_trap_flag: false,
+    value_trap_reason: null,
     ranked_count: 84, // G3: Titel mit Rang im selben Lauf
     ...values,
   };
@@ -378,6 +387,7 @@ function previewRow(values: Partial<PreviewRow> & Pick<PreviewRow, 'symbol'>): P
     value_score: null,
     quality_score: null,
     value_trap_flag: false,
+    value_trap_reason: null,
     value_trap_flag_active: false,
     ...values,
   };

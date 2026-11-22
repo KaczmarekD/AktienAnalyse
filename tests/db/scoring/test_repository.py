@@ -44,6 +44,30 @@ class TestScoring:
             {"symbol": "SAP.DE", "factor_key": "ev_ebit", "raw_value": 22.0, "percentile_rank": 0.8}
         ]
 
+    def test_value_trap_reason_is_stored(self, session):
+        """F2.3: Das Ergebnis hält fest, welche Regel das Flag gesetzt hat."""
+        from sqlalchemy import text
+
+        ids = MarketDataRepository(session).get_or_create_instruments(["BAD.DE", "OK.DE"])
+        repo = ScoringRepository(session)
+        sid = repo.write_scoring_run(fetch_run_id=7, config={}, app_version="x", origin="live")
+        repo.write_score_results(
+            sid,
+            [
+                ScoreRow(ids["BAD.DE"], True, 0.9, 0.6, 0.78, True, 1, "momentum"),
+                ScoreRow(ids["OK.DE"], True, 0.5, 0.5, 0.5, False, 2),
+            ],
+        )
+        session.commit()
+        rows = session.execute(
+            text(
+                "SELECT instrument_id, value_trap_reason FROM scoring.score_result "
+                "WHERE scoring_run_id = :sid"
+            ),
+            {"sid": sid},
+        ).all()
+        assert dict(rows) == {ids["BAD.DE"]: "momentum", ids["OK.DE"]: None}
+
     def test_same_config_same_hash(self, session):
         repo = ScoringRepository(session)
         a = repo.write_scoring_run(fetch_run_id=1, config={"b": 1, "a": 2}, app_version="x")

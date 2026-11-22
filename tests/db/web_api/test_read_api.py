@@ -300,3 +300,51 @@ class TestNettoEmission:
     def test_off_in_profile_v1(self, issuance_api):
         params = issuance_api.get("/api/v1/ranking/latest").json()["params"]
         assert "net_share_issuance" not in params["value_factors"]
+
+
+def _prices_over_a_year(symbol: str, start: date | None, known_splits: frozenset[date]):
+    """F2.3: drei Handelstage relativ zu heute, 12-1-Momentum +20 %; CCC.DE ohne Kurse."""
+    import pandas as pd
+
+    if symbol == "CCC.DE":
+        return None
+    today = date.today()
+    days = [today - timedelta(days=370), today - timedelta(days=35), today - timedelta(days=3)]
+    index = pd.DatetimeIndex([pd.Timestamp(d) for d in days]).tz_localize("Europe/Berlin")
+    closes = [100.0, 120.0, 110.0]
+    return pd.DataFrame(
+        {"close": closes, "adj_close": closes, "dividend": 0.0, "split": 0.0}, index=index
+    )
+
+
+@pytest.fixture(params=["tables", "projections"])
+def momentum_api(request, db_settings, db_url, engine):
+    rc, _, _ = _patched_run(db_settings, prices=_prices_over_a_year)
+    assert rc == 0
+    with _client(request, db_settings, db_url, engine) as client:
+        yield client
+
+
+class TestMomentumAndTrapReason:
+    """F2.3: Momentum im Titel-Detail, der Grund des Flags in Ranking und Score-Verlauf, aus den
+    Tabellen wie aus den Projektionen; im Profil v1 ist die Regel aus."""
+
+    def test_momentum_in_the_instrument_detail(self, momentum_api):
+        latest = momentum_api.get("/api/v1/instruments/AAA.DE").json()["latest"]
+        assert latest["momentum_12_1"] == pytest.approx(0.20)
+
+    def test_reason_in_the_ranking(self, momentum_api):
+        rows = momentum_api.get("/api/v1/ranking/latest").json()["rows"]
+        for row in rows:
+            assert row["value_trap_reason"] == ("quality" if row["value_trap_flag"] else None)
+
+    def test_reason_in_the_score_history(self, momentum_api):
+        history = momentum_api.get("/api/v1/instruments/AAA.DE").json()["score_history"]
+        assert history
+        for point in history:
+            assert "value_trap_reason" in point
+            assert point["value_trap_reason"] == ("quality" if point["value_trap_flag"] else None)
+
+    def test_rule_off_in_profile_v1(self, momentum_api):
+        params = momentum_api.get("/api/v1/ranking/latest").json()["params"]
+        assert params["trap_momentum_rule"] is False

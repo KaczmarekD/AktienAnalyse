@@ -2848,6 +2848,36 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
 - **Implementierung:** Die Kennzahl `momentum_12_1` entsteht in `market-data` aus `price_bar` und
   reist im Snapshot mit. Neue Profil-Parameter: `trap_momentum_rule` (an/aus),
   `trap_momentum_max_rank` und `trap_fscore_max`. Momentum geht nicht in den Composite ein.
+- **Festgelegt vor der Umsetzung (22.11.2026):**
+  - **Kurse:** Yahoo liefert `close` schon um Splits bereinigt, und ein neuer Split lädt die
+    ganze Kurshistorie neu (F1.4). Die jüngsten Versionen der gespeicherten Tage stehen deshalb auf
+    einer Basis. Gerechnet wird aus `close` und `dividend`, ohne `split` noch einmal anzuwenden
+    (das zählte den Split doppelt) und ohne `adj_close` (siehe oben).
+  - **Definition:** Stichtag ist der jüngste Handelstag, höchstens 14 Tage vor dem Abruf.
+    Momentum ist die Gesamtrendite mit Dividenden vom letzten Handelstag bis 365 Tage vor dem
+    Stichtag bis zum letzten Handelstag bis 30 Tage davor, also ohne den letzten Monat (JKP
+    `ret_12_1`, Jegadeesh und Titman 1993). Liegt der jeweilige Handelstag mehr als 7 Tage vor
+    seinem Zieltag, fehlt die Historie: `None`.
+  - **Daten:** Wie bei der Netto-Emission holt der Abruf nur die neuen Tage. `HistoryState`
+    bekommt die gespeicherten Kurse der letzten 550 Tage (`stored_prices`, jüngste Version je
+    Tag); die Splits für die Netto-Emission kommen daraus, `stored_splits` und
+    `get_splits_since` entfallen. Die Kennzahl gehört zu den Marktdaten (`MarketData`,
+    `MarketDataV1`), nicht zu Value oder Quality.
+  - **Regel im Scoring:** `momentum_rank` ist der Perzentilrang des Momentums (hoch ist gut) über
+    alle Titel nach dem Größenfilter. Mit `trap_momentum_rule` setzt das Flag zusätzlich, wer
+    Value-Score ≥ `value_trap_value_threshold`, Momentum-Rang ≤ `trap_momentum_max_rank` (0,30)
+    und F-Score ≤ `trap_fscore_max` (3) hat. Fehlt Momentum oder F-Score, greift die Regel nicht;
+    unter der Branchenregel fehlt der F-Score. Die Regel ist im Profil v1 aus.
+  - **Grund:** `value_trap_reason` ist „quality“ (die bisherige Regel, sie hat Vorrang) oder
+    „momentum“. Er steht in `scoring.score_result`, im Event (`RankingRowV1`), in der Projektion
+    `web.ranking_row`, in Ranking, Score-Verlauf und Vorschau. Ältere Läufe haben keinen Grund,
+    ihr Flag gilt als „quality“. Der Tooltip des Badges nennt den Grund. Mail und CSV bleiben
+    unverändert.
+  - **Durchgehend:** eine Migration für `momentum_12_1` (`market_data.fundamental_snapshot`,
+    `web.snapshot_row`) und `value_trap_reason` (`scoring.score_result`, `web.ranking_row`),
+    Nummer vor dem Merge mit der Depot-Session abstimmen (D3.4 hat `0025`). Das Titel-Detail
+    zeigt das Momentum, der Editor die Regel noch nicht (wie die Branchenregel; F2.5 schaltet sie
+    über das Profil v2 ein).
 
 #### F2.4 Branchenregeln und Abschnitt „Finanzwerte“
 

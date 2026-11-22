@@ -126,3 +126,29 @@ def test_covered_titles_are_not_projected(db_settings, engine):
     store.record_covered(fetch_run_id, covered, "US0378331005")
     backfill_projections(engine)
     assert _count(engine, "SELECT count(*) FROM web.snapshot_row WHERE symbol = 'AAPL'") == 0
+
+
+def test_value_trap_reason_comes_along(db_settings, engine):
+    """F2.3: Der Grund des Flags kommt aus ``scoring.score_result`` in die Projektion."""
+    _patched_run(db_settings)
+    backfill_projections(engine)
+    assert (
+        _count(
+            engine,
+            "SELECT count(*) FROM web.ranking_row r "
+            "JOIN market_data.instrument i ON i.symbol = r.symbol "
+            "JOIN scoring.score_result res "
+            "  ON res.scoring_run_id = r.scoring_run_id AND res.instrument_id = i.id "
+            "WHERE r.value_trap_reason IS DISTINCT FROM res.value_trap_reason",
+        )
+        == 0
+    )
+    # Das Flag der bisherigen Regel hat den Grund "quality", ohne Flag gibt es keinen
+    assert (
+        _count(
+            engine,
+            "SELECT count(*) FROM scoring.score_result WHERE passed_filter "
+            "AND (value_trap_reason IS NOT NULL) IS DISTINCT FROM COALESCE(value_trap_flag, false)",
+        )
+        == 0
+    )

@@ -45,7 +45,7 @@ from va_market_data.adapters.yahoo import (
     share_count_series,
 )
 from va_market_data.domain.consensus import CONSENSUS_KINDS, ConsensusEntry
-from va_market_data.domain.history import HistoryState
+from va_market_data.domain.history import HistoryState, PriceBar
 from va_market_data.domain.universe import Ticker
 
 # Vor dem Patchen der Fixture gemerkt: einige Tests brauchen den echten Ablauf
@@ -1007,12 +1007,33 @@ class TestFetchOneProvenanceAndRaw:
 
     def test_stored_split_counts_too(self, no_shares_network):
         today = date.today()
+        # F2.3: Die gespeicherten Splits kommen aus den gespeicherten Kursen
+        split = PriceBar(close=50.0, adj_close=None, dividend=0.0, split=2.0)
         state = HistoryState(
             stored_shares={today - timedelta(days=370): 100_000_000},
-            stored_splits={today - timedelta(days=100): 2.0},
+            stored_prices={today - timedelta(days=100): split},
         )
         no_shares_network.return_value = _share_series({today - timedelta(days=5): 200_000_000})
         assert self._fetch(history=state).value.net_share_issuance == pytest.approx(0.0)
+
+    def test_momentum_from_stored_and_new_prices(self, no_prices_network):
+        """F2.3: Der Abruf holt die Kurse nur ab dem letzten gespeicherten Tag."""
+        today = date.today()
+        state = HistoryState(
+            last_price_date=today - timedelta(days=60),
+            stored_prices={
+                today - timedelta(days=370): PriceBar(100.0, None, 0.0, 0.0),
+                # Derselbe Tag kommt neu mit: Es gilt der neue Wert
+                today - timedelta(days=35): PriceBar(999.0, None, 0.0, 0.0),
+            },
+        )
+        no_prices_network.return_value = _price_frame(
+            {today - timedelta(days=35): 120.0, today - timedelta(days=3): 110.0}
+        )
+        assert self._fetch(history=state).market.momentum_12_1 == pytest.approx(0.20)
+
+    def test_momentum_without_history_is_none(self):
+        assert self._fetch().market.momentum_12_1 is None
 
 
 class TestRateLimitPerTicker:
@@ -1163,3 +1184,12 @@ def _share_series(counts: dict[date, int]) -> pd.Series:
     """Antwort von ``get_shares_full`` (F2.2): ein Wert je Tag, Zeitzone der Börse."""
     index = pd.DatetimeIndex([pd.Timestamp(day) for day in counts]).tz_localize("Europe/Berlin")
     return pd.Series(list(counts.values()), index=index)
+
+
+def _price_frame(closes: dict[date, float]) -> pd.DataFrame:
+    """Antwort von ``fetch_prices`` (F2.3): eigene Spaltennamen, Zeitzone der Börse."""
+    index = pd.DatetimeIndex([pd.Timestamp(day) for day in closes]).tz_localize("Europe/Berlin")
+    values = list(closes.values())
+    return pd.DataFrame(
+        {"close": values, "adj_close": values, "dividend": 0.0, "split": 0.0}, index=index
+    )

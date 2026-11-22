@@ -810,3 +810,46 @@ class TestCoverageChanged:
         assert COVERAGE_CHANGED.subject == "va.portfolio.coverage.changed"
         assert COVERAGE_CHANGED.max_age == timedelta(days=7)
         assert not COVERAGE_CHANGED.private
+
+
+def test_ranking_row_carries_the_value_trap_reason():
+    """F2.3: scoring sagt, welche Regel das Flag gesetzt hat. Ältere Events haben keinen Grund."""
+    from pydantic import ValidationError
+
+    from va_contracts.events.v1.ranking import RankingRowV1
+
+    flat = {
+        "symbol": "BAD.DE",
+        "name": "Bad",
+        "index": "MDAX",
+        "rank_overall": 70,
+        "value_trap_flag": True,
+        "value_trap_reason": "momentum",
+        "momentum_12_1": -0.4,
+    }
+    row = RankingRowV1.from_flat(flat)
+    assert row.value_trap_reason == "momentum"
+    assert row.fundamentals.market.momentum_12_1 == -0.4
+    assert row.to_flat()["value_trap_reason"] == "momentum"
+    flat.pop("value_trap_reason")
+    assert RankingRowV1.from_flat(flat).value_trap_reason is None
+    with pytest.raises(ValidationError):
+        RankingRowV1.from_flat({**flat, "value_trap_reason": "gut"})
+
+
+def test_ranked_title_of_the_preview_carries_the_reason():
+    from va_contracts.rpc.v1 import RankedTitleV1
+
+    title = {
+        "symbol": "BAD.DE",
+        "name": None,
+        "index": None,
+        "passed_filter": True,
+        "rank": 3,
+        "composite_score": 0.5,
+        "value_score": 0.9,
+        "quality_score": 0.6,
+        "value_trap_flag": True,
+    }
+    assert RankedTitleV1.model_validate(title).value_trap_reason is None
+    assert RankedTitleV1(**title, value_trap_reason="momentum").value_trap_reason == "momentum"

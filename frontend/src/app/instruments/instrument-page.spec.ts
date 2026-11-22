@@ -128,6 +128,14 @@ describe('InstrumentPage', () => {
     expect(figure).toContain('nicht aktiv');
   });
 
+  it('shows the momentum as information, not as a factor (F2.3)', async () => {
+    const fixture = await loaded();
+    const figure = plain(query(fixture, '[data-figure="momentum_12_1"]')[0]);
+    expect(figure).toContain('Momentum 12-1');
+    expect(figure).toContain('12,3 %');
+    expect(figure).not.toContain('besser als');
+  });
+
   it('warns when the fetch was incomplete and shows its notes', async () => {
     const fixture = await loaded({
       ...INSTRUMENT,
