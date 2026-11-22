@@ -10,11 +10,15 @@ Speicher im Speicher, wie in ``services/web-api/tests/test_authz.py``.
 - Mengen im JSON als Zahl im String.
 - ``/me/export`` enthaelt die eigenen Depots mit allen Depotstaenden.
 - ``portfolio.depot.changed`` geht an das Topic ``user:<id>`` des Besitzers.
+- D3.4: Liste und Depot tragen die Bewertung, das Depot dazu jede Position; Betraege als
+  Zahl im String, ein fehlender Kurs sichtbar.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,8 +27,9 @@ from pydantic import SecretStr
 from va_contracts import new_envelope
 from va_contracts.events.v1 import DEPOT_CHANGED, DepotChangedV1
 from va_platform.service import LocalCaller
-from va_portfolio.adapters.memory import MemoryDepotStore
+from va_portfolio.adapters.memory import MemoryDepotStore, MemoryMarketStore
 from va_portfolio.application.depots import DepotService
+from va_portfolio.domain.valuation import Quote
 from va_portfolio.entrypoints.rpc import handlers
 from va_web_api.events import topics_for
 from va_web_api.identity.domain import PasswordHasher
@@ -54,12 +59,19 @@ def store() -> MemoryDepotStore:
     return MemoryDepotStore()
 
 
-def _client(identity: IdentityService, store: MemoryDepotStore | None, user: str) -> TestClient:
+def _client(
+    identity: IdentityService,
+    store: MemoryDepotStore | None,
+    user: str,
+    market: MemoryMarketStore | None = None,
+) -> TestClient:
     client = TestClient(create_app(SETTINGS), base_url="https://testserver")
     client.__enter__()
     client.app.state.identity = identity  # type: ignore[attr-defined]
     client.app.state.depots = (  # type: ignore[attr-defined]
-        None if store is None else RemoteDepots(lambda: LocalCaller(handlers(DepotService(store))))
+        None
+        if store is None
+        else RemoteDepots(lambda: LocalCaller(handlers(DepotService(store, market=market))))
     )
     response = client.post(
         "/api/v1/auth/login",
@@ -260,3 +272,59 @@ def test_a_depot_change_goes_to_its_owner_only():
     data = DepotChangedV1(depot_id=3, owner_user_id=7, change="holdings", version=2)
     envelope = new_envelope(DEPOT_CHANGED, data, source="va/portfolio")
     assert topics_for(envelope) == ("user:7",)
+
+
+class TestValuation:
+    """D3.4: Bewertung aus den Kopien der Marktdaten in portfolio."""
+
+    @pytest.fixture
+    def valued(self, identity, store) -> Iterator[TestClient]:
+        market = MemoryMarketStore()
+        quote = Quote(SAP, date(2026, 11, 20), Decimal("231.5"), "EUR", source="yahoo")
+        market.record_prices([quote], [], at=None)  # type: ignore[arg-type]
+        client = _client(identity, store, "anna", market)
+        yield client
+        client.__exit__(None, None, None)
+
+    def _depot(self, client: TestClient) -> int:
+        depot_id = _create(client)
+        response = _write(
+            client,
+            "PUT",
+            f"/api/v1/depots/{depot_id}/holdings",
+            json={
+                "lines": [
+                    {"isin": SAP, "quantity": "10", "cost_basis_eur": "2000"},
+                    {"isin": BUND, "quantity": "5000", "unit": "nominal"},
+                ],
+                "cash": [{"amount": "100"}],
+            },
+            headers={"If-Match": '"0"'},
+        )
+        assert response.status_code == 200, response.text
+        return depot_id
+
+    def test_the_list_carries_the_value(self, valued):
+        self._depot(valued)
+        [depot] = valued.get("/api/v1/depots").json()
+        valuation = depot["valuation"]
+        assert valuation["value_eur"] == "2415.00"  # SAP plus Kasse; die Anleihe ohne Kurs
+        assert (valuation["complete"], valuation["unvalued"]) == (False, 1)
+        assert valuation["positions"] == []
+
+    def test_the_depot_carries_each_position(self, valued):
+        depot_id = self._depot(valued)
+        valuation = valued.get(f"/api/v1/depots/{depot_id}").json()["valuation"]
+        sap, bund = valuation["positions"]
+        assert (sap["price"], sap["price_date"], sap["price_source"]) == (
+            "231.5",
+            "2026-11-20",
+            "yahoo",
+        )
+        assert (sap["value_eur"], sap["difference_eur"]) == ("2315.00", "315.00")
+        assert (bund["value_eur"], bund["missing"], bund["pending"]) == (None, "price", True)
+        assert (valuation["cost_basis_eur"], valuation["difference_eur"]) == ("2000.00", "315.00")
+
+    def test_without_market_data_no_valuation(self, anna):
+        depot_id = _create(anna)
+        assert anna.get(f"/api/v1/depots/{depot_id}").json()["valuation"] is None

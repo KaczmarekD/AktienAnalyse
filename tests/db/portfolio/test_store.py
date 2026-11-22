@@ -45,6 +45,9 @@ TABLES = (
     "cash_line",
     "outbox",
     "inbox",
+    "security_view",  # D3.4
+    "price_view",
+    "fx_view",
 )
 
 

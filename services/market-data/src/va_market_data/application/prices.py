@@ -104,7 +104,7 @@ def collect_prices(
             log.warning("Keine Waehrung fuer %s - der Kurs fehlt", symbol)
             continue
         close, unit = to_major_unit(quote.close, currency)
-        closes.append(DailyClose(isin, symbol, quote.trade_date, close, unit, currency))
+        closes.append(DailyClose(isin, symbol, quote.trade_date, close, unit, currency, SOURCE))
     newest = max((c.trade_date for c in closes), default=trade_date)
     fx: list[FxDaily] = []
     for currency in sorted({c.currency for c in closes} - {EUR}):
@@ -152,7 +152,7 @@ def collect_bond_prices(
             log.warning("Keine Kurse der Bundesbank bis %s", trade_date)
     listed = found.closes if found is not None else {}
     closes = [
-        DailyClose(isin, None, found.trade_date, listed[isin], EUR, PERCENT_OF_PAR)
+        DailyClose(isin, None, found.trade_date, listed[isin], EUR, PERCENT_OF_PAR, BOND_SOURCE)
         for isin in bonds
         if found is not None and isin in listed
     ]

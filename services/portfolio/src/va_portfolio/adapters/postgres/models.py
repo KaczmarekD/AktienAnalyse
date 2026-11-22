@@ -4,15 +4,26 @@ Alles nur zum Anfuegen (Migration 0023, ``protect_table``). Gueltig ist je Depot
 Zeile in ``depot_version`` (Name) und ``depot_status``, der neueste Depotstand ist der mit der
 hoechsten Version. Fremdschluessel nur im Schema; ``owner_user_id`` verweist per ID auf
 ``identity.user_account``. Mengen und Betraege als ``numeric``.
+
+Seit D3.4 die Kopien der Marktdaten (Migration 0025): ``security_view``, ``price_view``,
+``fx_view``, ohne Bezug zu Nutzern; gueltig ist je ISIN bzw. Waehrung das Juengste.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-from typing import get_args
+from typing import Any, get_args
 
-from sqlalchemy import CheckConstraint, ForeignKey, Identity, Index, Numeric, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Identity,
+    Index,
+    Numeric,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from va_contracts.portfolio import DepotKind, DepotState, HoldingUnit, SnapshotSource
@@ -118,6 +129,61 @@ class CashLine(Base):
     snapshot_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.holding_snapshot.id"))
     currency: Mapped[str]
     amount: Mapped[Decimal] = mapped_column(Numeric)
+
+
+class SecurityView(Base):
+    """D3.4: Kopie der Stammdaten aus ``marketdata.securities.updated``; gueltig ist je ISIN die
+    Zeile mit dem juengsten ``as_of``. ``payload``: das ganze ``SecurityV1`` (Analyse, D5)."""
+
+    __tablename__ = "security_view"
+    __table_args__ = (Index("ix_security_view_isin_as_of", "isin", "as_of"), {"schema": SCHEMA})
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str]
+    as_of: Mapped[date]
+    name: Mapped[str]
+    asset_class: Mapped[str]
+    currency: Mapped[str | None]
+    payload: Mapped[Any] = mapped_column(JSONB)
+    received_at: Mapped[datetime]
+
+
+class PriceView(Base):
+    """D3.4: Kopie der Schlusskurse aus ``marketdata.prices.completed``; gueltig ist je ISIN der
+    juengste Handelstag. Kurs in Hauptwaehrung, bei ``percent_of_par`` in Prozent vom Nennwert."""
+
+    __tablename__ = "price_view"
+    __table_args__ = (
+        Index("ix_price_view_isin_trade_date", "isin", "trade_date"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str]
+    trade_date: Mapped[date]
+    close: Mapped[Decimal] = mapped_column(Numeric)
+    currency: Mapped[str]
+    percent_of_par: Mapped[bool]
+    source: Mapped[str | None]
+    symbol: Mapped[str | None]
+    received_at: Mapped[datetime]
+
+
+class FxView(Base):
+    """D3.4: Kopie der Waehrungskurse (1 Einheit in EUR); gueltig ist je Waehrung der juengste."""
+
+    __tablename__ = "fx_view"
+    __table_args__ = (
+        Index("ix_fx_view_currency_trade_date", "currency", "trade_date"),
+        CheckConstraint("rate_to_eur > 0", name="rate_to_eur"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    currency: Mapped[str]
+    trade_date: Mapped[date]
+    rate_to_eur: Mapped[Decimal] = mapped_column(Numeric)
+    received_at: Mapped[datetime]
 
 
 class PortfolioOutbox(OutboxMixin, Base):

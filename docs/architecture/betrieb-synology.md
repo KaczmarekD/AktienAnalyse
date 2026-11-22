@@ -291,7 +291,9 @@ make up            # migrate läuft zuerst, dann starten die geänderten Dienste
 ```
 
 Das Volume `./data` verdeckt die Fallback-CSV im Image, neue Fassungen kommen deshalb mit
-`git pull`. Neue Variablen nennt `.env.example`.
+`git pull`. Neue Variablen nennt `.env.example`. Ändert `git pull` die Rechte in
+`docker/nats/nats.conf` (etwa D3.1, D3.4), danach `docker compose restart nats`: NATS liest die
+Datei nur beim Start, `make up` startet den Container nicht neu, wenn sich nur die Datei ändert.
 
 **Update auf D1.5 (einmalig):** Vor `make up` die fünf `NATS_*_PASSWORD` in die `.env` (sonst
 bricht Compose mit einem Hinweis ab), `UI_LAN_BIND` aus der `.env` entfernen und den [Reverse-Proxy von

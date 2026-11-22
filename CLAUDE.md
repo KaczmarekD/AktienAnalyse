@@ -29,7 +29,7 @@ Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-
 | `market-data` | Universum, yfinance, Kennzahlen | `va-market-data` |
 | `scoring` | Cross-sektionales Ranking, Scoring-Profile, Vorschau | `va-scoring` |
 | `notification` | HTML + CSV, SMTP, Healthcheck | `va-notification` |
-| `portfolio` | Depots und Depotstände (D3.1, ADR-0013), nur Request/Reply und eigene Events | `va-portfolio` |
+| `portfolio` | Depots und Depotstände (D3.1, ADR-0013), Request/Reply, eigene Events, seit D3.4 Bewertung aus Kopien der Marktdaten | `va-portfolio` |
 | `web-api` | REST, WebSocket, Projektionen, Runs mit Scheduler und Watchdog, Anmeldung (D1.1) | `va-web-api` |
 | `frontend` | Angular hinter nginx, einziger Port (8080 über `UI_LAN_BIND`) | `va-frontend` |
 | `value-analyzer` | Batch und Werkzeuge, nur auf Wunsch (Profil `run`) | App-Image |
@@ -88,7 +88,11 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   `/depots`, `/depots/{id}`, `…/archive`, `…/restore`, `…/holdings` (`ETag`/`If-Match`, 409, 428),
   `…/history`; immer mit echter Sitzung (`depot_owner`), ein fremdes Depot ist 404, ohne
   portfolio 503. `portfolio.depot.changed` geht an das Topic `user:<id>` des Besitzers,
-  `/me/export` enthält die eigenen Depots mit allen Depotständen.
+  `/me/export` enthält die eigenen Depots mit allen Depotständen. Seit D3.4 tragen Liste und
+  Depot ihre Bewertung (`valuation`, beim Depot mit jeder Position). portfolio rechnet sie aus
+  seinen Kopien (Consumer `portfolio`: `securities.updated`, `prices.completed` →
+  `security_view`, `price_view`, `fx_view`). Wert = Menge × letzter Kurs × Währungskurs,
+  Anleihen Nennwert × Kurs / 100. Ein fehlender Kurs fehlt sichtbar (`missing`, `complete`).
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.
@@ -426,8 +430,8 @@ bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgese
 (D1.1 bis D1.6: Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI,
 HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando), D2
 (Wertpapiere, Abdeckung, Tageskurse, ETF- und Anleihedaten) und von D3 der Dienst portfolio mit
-Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2) und der Abdeckung aus den
-Depots (D3.3). Das
+Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2), der Abdeckung aus den
+Depots (D3.3) und der Bewertung (D3.4). Das
 Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`

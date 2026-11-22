@@ -124,7 +124,7 @@ OWN = {
     "market-data": {"consumers": ("market-data",)},
     "scoring": {"consumers": ("scoring",)},
     "notification": {"consumers": ("notification", "notification-private")},
-    "portfolio": {"consumers": ("portfolio",)},  # D3.1: noch ohne Consumer, nur der Stream
+    "portfolio": {"consumers": ("portfolio",)},  # D3.4: Stammdaten und Kurse
     "web-api": {"consumers": ("web-api",), "streams": ("VA_EVENTS", "VA_PRIVATE")},
 }
 
@@ -209,7 +209,13 @@ def test_no_service_listens_to_the_events_directly(service):
 
 @pytest.mark.parametrize(
     ("service", "consumer"),
-    [("market-data", "scoring"), ("scoring", "notification"), ("notification", "web-api")],
+    [
+        ("market-data", "scoring"),
+        ("scoring", "notification"),
+        ("notification", "web-api"),
+        ("portfolio", "market-data"),  # D3.4
+        ("market-data", "portfolio"),
+    ],
 )
 def test_no_service_reads_a_foreign_consumer(service, consumer):
     async def scenario() -> None:

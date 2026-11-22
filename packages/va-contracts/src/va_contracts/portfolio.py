@@ -4,23 +4,29 @@ Ein Depot gehoert einem Nutzer. Sein Bestand ist eine Folge vollstaendiger Depot
 fortlaufender Version; jede Aenderung ergibt einen neuen. Mengen und Betraege sind ``Decimal``
 und stehen im JSON als Zahl im String, nie als ``float``. Diese Modelle reisen nur per
 Request/Reply (``rpc.va.portfolio.*``), nicht in ``VA_EVENTS``: Dort stehen keine Mengen.
+
+Seit D3.4 traegt ``DepotV1`` seine Bewertung (``DepotValuationV1``): Wert in EUR aus den
+letzten Kursen, Einstand und Differenz, bei ``depots.get`` dazu jede Position.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import Field
 
 from .base import Contract, PositiveId
-from .securities import IsinStr
+from .securities import AssetClass, IsinStr
 
 DepotKind = Literal["depot", "watchlist"]  # Beobachtungsliste: ohne Mengen und Kasse
 DepotState = Literal["active", "archived"]
 HoldingUnit = Literal["pieces", "nominal"]  # Stueck; bei Anleihen der Nennwert
 SnapshotSource = Literal["manual", "import", "bank"]
+# D3.4: Warum eine Position mit Menge keinen Wert hat: kein Kurs, kein Waehrungskurs, oder der
+# Kurs passt nicht zur Einheit (Prozent vom Nennwert je Stueck)
+ValueMissing = Literal["price", "fx", "unit"]
 
 MAX_NAME = 100
 MAX_TEXT = 500
@@ -33,8 +39,59 @@ DepotName = Annotated[str, Field(min_length=1, max_length=MAX_NAME)]
 Text = Annotated[str, Field(max_length=MAX_TEXT)]
 
 
+class PositionValueV1(Contract):
+    """Eine bewertete Position (D3.4, DEP-07): Kurs mit Datum und Quelle, Wert in EUR.
+
+    ``price`` in ``price_currency`` (Hauptwaehrung), bei ``percent_of_par`` in Prozent vom
+    Nennwert. ``fx_rate``: 1 Einheit ``price_currency`` in EUR. ``value_eur`` fehlt mit Grund
+    (``missing``), nie als 0; in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch
+    ohne Stammdaten ("wird geprueft", WP-13).
+    """
+
+    isin: IsinStr
+    name: str | None = None
+    asset_class: AssetClass | None = None
+    pending: bool = False
+    quantity: Quantity | None = None
+    unit: HoldingUnit = "pieces"
+    price: Decimal | None = None
+    price_currency: str | None = None
+    price_date: date | None = None
+    price_source: str | None = None  # yahoo, bundesbank
+    percent_of_par: bool = False
+    fx_rate: Decimal | None = None
+    value_eur: Decimal | None = None
+    cost_basis_eur: Decimal | None = None
+    difference_eur: Decimal | None = None
+    missing: ValueMissing | None = None
+
+
+class DepotValuationV1(Contract):
+    """Bewertung eines Depots (D3.4, DEP-07, DEP-13).
+
+    ``value_eur`` = bewertete Positionen + Kasse; ohne Wert bei einer Beobachtungsliste.
+    ``complete`` heisst: jede Position mit Menge hat einen Wert; sonst zaehlt ``unvalued`` die
+    fehlenden. ``price_date``: der aelteste Kurs der bewerteten Positionen. Einstand und Differenz
+    nur ueber Positionen, fuer die sie bekannt sind. ``positions`` nur bei ``depots.get``.
+    """
+
+    value_eur: Decimal | None = None
+    positions_eur: Decimal | None = None
+    cash_eur: Decimal = Decimal(0)
+    complete: bool = True
+    unvalued: int = Field(default=0, ge=0)
+    pending: int = Field(default=0, ge=0)
+    cost_basis_eur: Decimal | None = None
+    difference_eur: Decimal | None = None
+    price_date: date | None = None
+    positions: list[PositionValueV1] = Field(default_factory=list)
+
+
 class DepotV1(Contract):
-    """Ein Depot mit dem Stand seines Bestands; ``version`` 0 heisst: noch nichts erfasst."""
+    """Ein Depot mit dem Stand seines Bestands; ``version`` 0 heisst: noch nichts erfasst.
+
+    ``valuation`` (D3.4): fehlt, wenn portfolio keine Marktdaten hat oder sie nicht lesbar sind.
+    """
 
     id: PositiveId
     kind: DepotKind
@@ -44,6 +101,7 @@ class DepotV1(Contract):
     created_at: datetime
     version: int = Field(ge=0)
     positions: int = Field(ge=0)
+    valuation: DepotValuationV1 | None = None
 
 
 class HoldingLineV1(Contract):
@@ -106,11 +164,14 @@ __all__ = [
     "DepotName",
     "DepotState",
     "DepotV1",
+    "DepotValuationV1",
     "HistoryEntryV1",
     "HoldingLineV1",
     "HoldingUnit",
     "HoldingsV1",
+    "PositionValueV1",
     "Quantity",
     "SnapshotSource",
     "Text",
+    "ValueMissing",
 ]

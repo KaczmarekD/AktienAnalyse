@@ -211,6 +211,8 @@ class DailyCloseV1(Contract):
     # D2.5: Anleihen in Prozent vom Nennwert (Bundesbank: ohne Stueckzinsen, inflationsindexierte
     # ohne Inflationsanpassung)
     percent_of_par: bool = False
+    # D3.4: Herkunft des Kurses (yahoo, bundesbank), fuer die Anzeige im Depot (DEP-07)
+    source: str | None = None
 
 
 class FxDailyV1(Contract):

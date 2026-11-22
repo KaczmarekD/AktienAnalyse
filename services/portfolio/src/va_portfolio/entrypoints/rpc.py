@@ -1,6 +1,9 @@
 """Request/Reply von portfolio (D3.1): Depots lesen und aendern fuer das web-api; seit D3.2
 auch der Datenexport aller eigenen Depots (``portfolio.depots.export``).
 
+Seit D3.4 traegt jedes Depot seine Bewertung (``DepotValuationV1``), ``depots.get`` dazu jede
+Position; der Export nicht.
+
 Fehler gehen als Antwort zurueck: ``not_found`` (kein Depot dieses Nutzers), ``archived``,
 ``invalid`` (Eingabe), ``conflict`` mit der neuesten Version. Ein unerwarteter Fehler wird beim
 Transport zu ``internal`` (``va_platform.nats.answer_request``).
@@ -15,9 +18,11 @@ from va_contracts.portfolio import (
     CashLineV1,
     DepotExportV1,
     DepotV1,
+    DepotValuationV1,
     HistoryEntryV1,
     HoldingLineV1,
     HoldingsV1,
+    PositionValueV1,
 )
 from va_contracts.rpc.v1 import (
     DEPOTS_ARCHIVE,
@@ -56,10 +61,49 @@ if TYPE_CHECKING:
 
     from ..application.depots import DepotService, DepotSummary, HistoryEntry
     from ..domain.depots import Snapshot
+    from ..domain.valuation import DepotValue, PositionValue
 
 
-def _depot(summary: DepotSummary) -> DepotV1:
+def _position(position: PositionValue) -> PositionValueV1:
+    line, security, quote = position.line, position.security, position.quote
+    return PositionValueV1(
+        isin=line.isin,
+        name=security.name if security else None,
+        asset_class=security.asset_class if security else None,  # type: ignore[arg-type]
+        pending=position.pending,
+        quantity=line.quantity,
+        unit=line.unit,
+        price=quote.close if quote else None,
+        price_currency=quote.currency if quote else None,
+        price_date=quote.trade_date if quote else None,
+        price_source=quote.source if quote else None,
+        percent_of_par=quote.percent_of_par if quote else False,
+        fx_rate=position.fx_rate,
+        value_eur=position.value_eur,
+        cost_basis_eur=line.cost_basis_eur,
+        difference_eur=position.difference_eur,
+        missing=position.missing,
+    )
+
+
+def _valuation(value: DepotValue, *, positions: bool) -> DepotValuationV1:
+    return DepotValuationV1(
+        value_eur=value.value_eur,
+        positions_eur=value.positions_eur,
+        cash_eur=value.cash_eur,
+        complete=value.complete,
+        unvalued=value.unvalued,
+        pending=value.pending,
+        cost_basis_eur=value.cost_basis_eur,
+        difference_eur=value.difference_eur,
+        price_date=value.price_date,
+        positions=[_position(p) for p in value.positions] if positions else [],
+    )
+
+
+def _depot(summary: DepotSummary, *, positions: bool = False) -> DepotV1:
     depot = summary.depot
+    valuation = summary.valuation
     return DepotV1(
         id=depot.id,
         kind=depot.kind,
@@ -69,6 +113,7 @@ def _depot(summary: DepotSummary) -> DepotV1:
         created_at=depot.created_at,
         version=summary.version,
         positions=summary.positions,
+        valuation=None if valuation is None else _valuation(valuation, positions=positions),
     )
 
 
@@ -138,7 +183,9 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
     def get(request: DepotRefRequestV1) -> DepotReplyV1:
         return _guarded(
             DepotReplyV1,
-            lambda: DepotReplyV1(depot=_depot(service.get(request.user_id, request.depot_id))),
+            lambda: DepotReplyV1(
+                depot=_depot(service.get(request.user_id, request.depot_id), positions=True)
+            ),
         )
 
     def update(request: DepotUpdateRequestV1) -> DepotReplyV1:

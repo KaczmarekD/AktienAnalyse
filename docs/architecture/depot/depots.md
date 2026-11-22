@@ -6,8 +6,9 @@
 > Umgesetzt: Dienst portfolio mit Schema `portfolio` (Depots, Depotstände, Kasse, Verlauf),
 > Request/Reply `rpc.va.portfolio.*` und `portfolio.depot.changed` (D3.1), die Endpunkte im
 > web-api aus der Tabelle unten ohne Import und Zielallokation (D3.2), die Abdeckung aus den
-> Depots (D3.3, `portfolio.coverage.changed`). Bewertung, Import und Oberfläche folgen mit D3.4
-> bis D3.6.
+> Depots (D3.3, `portfolio.coverage.changed`), die Bewertung aus den Kopien der Marktdaten (D3.4,
+> `security_view`, `price_view`, `fx_view`, `valuation` in `GET /depots` und `GET /depots/{id}`).
+> Import und Oberfläche folgen mit D3.5 und D3.6.
 
 ## Begriffe
 
@@ -84,7 +85,8 @@ wird nur angefügt.
 | `cash_line` | snapshot_id, currency, amount | anfügen |
 | `target_allocation` | depot_id, version, params (JSONB), created_at | anfügen, gültig ist die jüngste Zeile |
 | `security_view` | isin, payload (JSONB), received_at | lokale Kopie der Stammdaten aus market-data, anfügen |
-| `price_view` | isin, trade_date, close, currency, received_at | lokale Kopie der Kurse, anfügen |
+| `price_view` | isin, trade_date, close, currency, percent_of_par, source, symbol, received_at | lokale Kopie der Kurse, anfügen |
+| `fx_view` | currency, trade_date, rate_to_eur, received_at | lokale Kopie der Währungskurse (1 Einheit in EUR), anfügen (D3.4) |
 | `score_view` | scoring_run_id, isin, payload (JSONB) | lokale Kopie der Scores und Einordnungen (`PlacementV1`) aus scoring, anfügen |
 | `depot_link` | depot_id, connection_id, account_id (aus `bank.account`), at, active | anfügen, gültig ist die jüngste Zeile je Depot (ab D8) || `outbox`, `inbox` | wie in den anderen Schemas | wie dort |
 

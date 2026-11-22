@@ -11,6 +11,9 @@
   Menge raus, ohne Nutzer und Mengen; dazu beim Start und taeglich (``announce_coverage``).
   Das Event entsteht in einer eigenen Transaktion nach der Aenderung. Geht es dazwischen
   verloren, holt es die naechste Meldung nach.
+- Bewertung (D3.4, DEP-07, DEP-13): Mit ``market`` (Kopien der Marktdaten) tragen Liste und
+  Depot ihren Wert aus dem neuesten Depotstand (``value_depot``). Sind die Kopien nicht lesbar,
+  fehlt nur die Bewertung, nicht das Depot.
 """
 
 from __future__ import annotations
@@ -41,10 +44,13 @@ from ..domain.depots import (
     diff,
     next_version,
 )
+from ..domain.valuation import DepotValue, value_depot
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
     from va_contracts.portfolio import DepotKind, DepotState, SnapshotSource
+
+    from .market import MarketReader
 
 log = logging.getLogger(__name__)
 
@@ -130,6 +136,7 @@ class DepotSummary:
     depot: Depot
     version: int  # 0: noch kein Depotstand
     positions: int
+    valuation: DepotValue | None = None  # D3.4: ohne Marktdaten keine
 
 
 @dataclass(frozen=True)
@@ -162,18 +169,17 @@ class DepotService:
         *,
         clock: Callable[[], datetime] = _utcnow,
         flush: Callable[[], object] | None = None,
+        market: MarketReader | None = None,
     ) -> None:
         self._store = store
         self._clock = clock
         self._flush = flush
+        self._market = market
 
     # --- Depots -----------------------------------------------------------------------
 
     def list(self, user_id: int, *, include_archived: bool = False) -> list[DepotSummary]:
-        return [
-            self._summary(depot)
-            for depot in self._store.depots(user_id, include_archived=include_archived)
-        ]
+        return self._summaries(self._store.depots(user_id, include_archived=include_archived))
 
     def create(
         self, user_id: int, kind: DepotKind, name: str, description: str | None
@@ -191,7 +197,7 @@ class DepotService:
         return DepotSummary(depot, 0, 0)
 
     def get(self, user_id: int, depot_id: int) -> DepotSummary:
-        return self._summary(self._owned(user_id, depot_id))
+        return self._summaries([self._owned(user_id, depot_id)])[0]
 
     def update(
         self, user_id: int, depot_id: int, name: str, description: str | None
@@ -298,7 +304,7 @@ class DepotService:
 
     def export(self, user_id: int) -> list[tuple[DepotSummary, list[Snapshot]]]:
         """D3.2 (NUT-12): alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden."""
-        return [
+        return [  # ohne Bewertung: der Export enthaelt nur, was der Nutzer erfasst hat
             (self._summary(depot), self._store.snapshots(depot.id))
             for depot in self._store.depots(user_id, include_archived=True)
         ]
@@ -347,6 +353,33 @@ class DepotService:
     def _summary(self, depot: Depot) -> DepotSummary:
         version, positions = self._store.summary(depot.id)
         return DepotSummary(depot, version, positions)
+
+    def _summaries(self, depots: Sequence[Depot]) -> list[DepotSummary]:
+        """Mit Bewertung, wenn es Marktdaten gibt: je Depot der neueste Depotstand, die Kopien
+        der Marktdaten einmal fuer alle zusammen."""
+        if self._market is None:
+            return [self._summary(depot) for depot in depots]
+        snapshots = {d.id: self._store.snapshot(d.id) or Snapshot(d.id, 0) for d in depots}
+        try:
+            market = self._market.market(
+                {line.isin for snap in snapshots.values() for line in snap.lines}
+            )
+        except Exception:
+            log.warning("Marktdaten nicht lesbar - Depots ohne Bewertung", exc_info=True)
+            market = None
+        return [
+            DepotSummary(
+                depot,
+                snapshots[depot.id].version,
+                len(snapshots[depot.id].lines),
+                None
+                if market is None
+                else value_depot(
+                    depot.kind, snapshots[depot.id].lines, snapshots[depot.id].cash, market
+                ),
+            )
+            for depot in depots
+        ]
 
     def _after_write(self) -> None:
         if self._flush is None:

@@ -90,22 +90,6 @@ export const zCreateDepot = z.object({
 });
 
 /**
- * Depot
- *
- * Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
- */
-export const zDepot = z.object({
-  created_at: z.iso.datetime(),
-  description: z.string().nullable(),
-  id: z.int(),
-  kind: z.enum(['depot', 'watchlist']),
-  name: z.string(),
-  positions: z.int(),
-  status: z.enum(['active', 'archived']),
-  version: z.int(),
-});
-
-/**
  * EmailConfirmation
  *
  * Das Token aus dem Link der Bestaetigungsmail (D1.6).
@@ -260,33 +244,6 @@ export const zHoldings = z.object({
 });
 
 /**
- * DepotExport
- *
- * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
- */
-export const zDepotExport = z.object({
-  depot: zDepot,
-  versions: z.array(zHoldings),
-});
-
-/**
- * DataExport
- *
- * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
- */
-export const zDataExport = z.object({
-  account: z.array(z.record(z.string(), z.unknown())),
-  credentials: z.array(z.record(z.string(), z.unknown())),
-  depots: z.array(zDepotExport).optional(),
-  email_confirmations: z.array(z.record(z.string(), z.unknown())),
-  exported_at: z.iso.datetime(),
-  logins: z.array(z.record(z.string(), z.unknown())),
-  profiles: z.array(z.record(z.string(), z.unknown())),
-  sessions: z.array(z.record(z.string(), z.unknown())),
-  statuses: z.array(z.record(z.string(), z.unknown())),
-});
-
-/**
  * Listing
  *
  * Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.
@@ -349,6 +306,133 @@ export const zPasswordChange = z.object({
  */
 export const zPasswordReset = z.object({
   one_time_password: z.string().min(1).max(1024),
+});
+
+/**
+ * PositionValue
+ *
+ * Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.
+ *
+ * ``price`` in ``price_currency``, bei ``percent_of_par`` in Prozent vom Nennwert; ``fx_rate``
+ * ist 1 Einheit dieser Waehrung in EUR. Ohne Wert nennt ``missing`` den Grund (``price``,
+ * ``fx``, ``unit``), in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch ohne
+ * Stammdaten ("wird geprueft").
+ */
+export const zPositionValue = z.object({
+  asset_class: z.enum(['equity', 'etf', 'bond', 'other']).nullable(),
+  cost_basis_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  difference_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  fx_rate: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  isin: z.string(),
+  missing: z.enum(['price', 'fx', 'unit']).nullable(),
+  name: z.string().nullable(),
+  pending: z.boolean(),
+  percent_of_par: z.boolean(),
+  price: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  price_currency: z.string().nullable(),
+  price_date: z.iso.date().nullable(),
+  price_source: z.string().nullable(),
+  quantity: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  unit: z.enum(['pieces', 'nominal']),
+  value_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+});
+
+/**
+ * DepotValuation
+ *
+ * Bewertung eines Depots (D3.4): bewertete Positionen plus Kasse, in EUR.
+ *
+ * ``complete`` falsch heisst: ``unvalued`` Positionen haben keinen Wert, ``value_eur`` enthaelt
+ * sie nicht. ``price_date``: der aelteste Kurs der bewerteten Positionen. Einstand und Differenz
+ * nur, wo bekannt. ``positions`` nur bei ``GET /depots/{id}``.
+ */
+export const zDepotValuation = z.object({
+  cash_eur: z.string().regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/),
+  complete: z.boolean(),
+  cost_basis_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  difference_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  pending: z.int(),
+  positions: z.array(zPositionValue),
+  positions_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  price_date: z.iso.date().nullable(),
+  unvalued: z.int(),
+  value_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+});
+
+/**
+ * Depot
+ *
+ * Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
+ *
+ * ``valuation`` (D3.4): fehlt, solange portfolio keine Marktdaten hat oder sie nicht lesbar sind.
+ */
+export const zDepot = z.object({
+  created_at: z.iso.datetime(),
+  description: z.string().nullable(),
+  id: z.int(),
+  kind: z.enum(['depot', 'watchlist']),
+  name: z.string(),
+  positions: z.int(),
+  status: z.enum(['active', 'archived']),
+  valuation: zDepotValuation.nullable(),
+  version: z.int(),
+});
+
+/**
+ * DepotExport
+ *
+ * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
+ */
+export const zDepotExport = z.object({
+  depot: zDepot,
+  versions: z.array(zHoldings),
+});
+
+/**
+ * DataExport
+ *
+ * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
+ */
+export const zDataExport = z.object({
+  account: z.array(z.record(z.string(), z.unknown())),
+  credentials: z.array(z.record(z.string(), z.unknown())),
+  depots: z.array(zDepotExport).optional(),
+  email_confirmations: z.array(z.record(z.string(), z.unknown())),
+  exported_at: z.iso.datetime(),
+  logins: z.array(z.record(z.string(), z.unknown())),
+  profiles: z.array(z.record(z.string(), z.unknown())),
+  sessions: z.array(z.record(z.string(), z.unknown())),
+  statuses: z.array(z.record(z.string(), z.unknown())),
 });
 
 /**
