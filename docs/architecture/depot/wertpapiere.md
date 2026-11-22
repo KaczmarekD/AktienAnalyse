@@ -8,8 +8,8 @@
 > Wochenlauf (D2.2, `coverage_version`, `coverage_item`, `fundamental_snapshot.role`,
 > `covered[]`; bis D3 per Kommando gepflegt), Tageskurse (D2.3, `price_run`, `daily_close`,
 > `fx_daily`, Scheduler im web-api), ETF-Daten und Stammdaten im Wochenlauf (D2.4,
-> `etf_composition`, `marketdata.securities.updated`). Kurse der Bundesanleihen aus der
-> Bundesbank folgen mit D2.5.
+> `etf_composition`, `marketdata.securities.updated`), Kurse der Bundesanleihen aus der
+> Bundesbank (D2.5, `daily_close` mit Quelle `bundesbank`, in Prozent vom Nennwert).
 
 ## Ausgangslage
 

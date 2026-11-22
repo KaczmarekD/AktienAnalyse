@@ -5,6 +5,10 @@ dazu die Waehrungskurse nach EUR. Die Waehrung eines Symbols kommt aus frueheren
 von Yahoo; ohne Waehrung fehlt der Titel, statt geraten zu werden (London notiert manche ETFs in
 USD). Robustheit vor Vollstaendigkeit: Ein Titel ohne Kurs fehlt mit seiner ISIN, ein gescheiterter
 Abruf wird als ``failed`` gespeichert und gemeldet, nicht als Fehler geworfen.
+
+Seit D2.5 kommen die Kurse der Anleihen der Abdeckung aus der Liste der Bundesbank
+(``collect_bond_prices``), in Prozent vom Nennwert und mit eigenem ``price_run``. ``with_bonds``
+fuehrt beide Abrufe zu einem Ergebnis fuer ``marketdata.prices.completed`` zusammen.
 """
 
 from __future__ import annotations
@@ -16,11 +20,20 @@ from datetime import UTC, date, datetime
 from typing import Protocol
 
 from ..domain.coverage import CoverageItem
-from ..domain.prices import EUR, DailyClose, FxDaily, Quote, to_major_unit
+from ..domain.prices import EUR, PERCENT_OF_PAR, DailyClose, FxDaily, Quote, to_major_unit
 
 log = logging.getLogger(__name__)
 
 SOURCE = "yahoo"
+BOND_SOURCE = "bundesbank"  # D2.5
+
+
+@dataclass(frozen=True)
+class BondQuotes:
+    """Ein Blatt der Bundesbank: Handelstag und Kurs je ISIN in Prozent vom Nennwert."""
+
+    trade_date: date
+    closes: Mapping[str, float]
 
 
 class PriceStore(Protocol):
@@ -49,6 +62,8 @@ class PricesResult:
     closes: list[DailyClose] = field(default_factory=list)
     fx: list[FxDaily] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)  # ISINs ohne Kurs
+    # D2.5: alle Abrufe des Termins; leer heisst nur ``price_run_id``
+    price_run_ids: list[int] = field(default_factory=list)
 
 
 def _utcnow() -> datetime:
@@ -110,6 +125,65 @@ def collect_prices(
     )
     log.info("Tageskurse: %d Kurse, %d fehlen (Abruf #%d)", len(closes), len(missing), run_id)
     return PricesResult(run_id, newest, closes, fx, missing)
+
+
+def collect_bond_prices(
+    items: Sequence[CoverageItem],
+    *,
+    store: PriceStore,
+    quotes: Callable[[date], BondQuotes | None],
+    trade_date: date,
+    clock: Callable[[], datetime] = _utcnow,
+) -> PricesResult | None:
+    """D2.5: Kurse der Anleihen der Abdeckung aus der Liste der Bundesbank; ``None`` ohne
+    Anleihen. Nicht gelistete (Unternehmensanleihen) fehlen mit ISIN; ein Ausfall oder eine Liste
+    ohne Blatt bis ``trade_date`` ist ein ``price_run`` mit ``failed``, kein Fehler."""
+    bonds = sorted({item.isin for item in items if item.asset_class == "bond"})
+    if not bonds:
+        return None
+    started = clock()
+    found: BondQuotes | None = None
+    try:
+        found = quotes(trade_date)
+    except Exception:
+        log.warning("Kurse der Bundesbank nicht abrufbar", exc_info=True)
+    else:
+        if found is None:
+            log.warning("Keine Kurse der Bundesbank bis %s", trade_date)
+    listed = found.closes if found is not None else {}
+    closes = [
+        DailyClose(isin, None, found.trade_date, listed[isin], EUR, PERCENT_OF_PAR)
+        for isin in bonds
+        if found is not None and isin in listed
+    ]
+    run_id = store.write_prices(
+        source=BOND_SOURCE,
+        started_at=started,
+        finished_at=clock(),
+        status="ok" if found is not None else "failed",
+        closes=closes,
+        fx=[],
+    )
+    missing = sorted(set(bonds) - {c.isin for c in closes})
+    log.info("Bundesanleihen: %d Kurse, %d fehlen (Abruf #%d)", len(closes), len(missing), run_id)
+    return PricesResult(
+        run_id, found.trade_date if found is not None else trade_date, closes, [], missing
+    )
+
+
+def with_bonds(prices: PricesResult, bonds: PricesResult | None) -> PricesResult:
+    """Ein Ergebnis fuer das Event: alle Kurse, alle Abrufe; fehlend ist, was keiner hat."""
+    if bonds is None:
+        return prices
+    priced = {c.isin for c in prices.closes} | {c.isin for c in bonds.closes}
+    return PricesResult(
+        price_run_id=prices.price_run_id,
+        trade_date=prices.trade_date,
+        closes=[*prices.closes, *bonds.closes],
+        fx=list(prices.fx),
+        missing=sorted((set(prices.missing) | set(bonds.missing)) - priced),
+        price_run_ids=[prices.price_run_id, bonds.price_run_id],
+    )
 
 
 def _safe_currency(currency_of: Callable[[str], str | None], symbol: str) -> str | None:

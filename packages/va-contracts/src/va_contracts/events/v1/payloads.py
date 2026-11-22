@@ -208,6 +208,9 @@ class DailyCloseV1(Contract):
     trade_date: date
     close: float
     currency: str
+    # D2.5: Anleihen in Prozent vom Nennwert (Bundesbank: ohne Stueckzinsen, inflationsindexierte
+    # ohne Inflationsanpassung)
+    percent_of_par: bool = False
 
 
 class FxDailyV1(Contract):
@@ -228,6 +231,8 @@ class PricesCompletedV1(Contract):
     closes: list[DailyCloseV1] = Field(default_factory=list)
     fx: list[FxDailyV1] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)
+    # D2.5: alle Abrufe dieses Termins (Yahoo, Bundesbank); price_run_id ist der erste
+    price_run_ids: list[PositiveId] = Field(default_factory=list)
 
 
 class SecuritiesUpdatedV1(Contract):

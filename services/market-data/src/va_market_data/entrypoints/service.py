@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from va_platform.messaging import ReliableBus
 from va_platform.service import service_main
 
+from ..adapters.bundesbank import BundesbankPrices
 from ..adapters.csv_universe import load_fallback
 from ..adapters.deka import DekaSource
 from ..adapters.firds import FirdsSource
@@ -38,7 +39,12 @@ from ..adapters.yahoo import (
     provider_version,
 )
 from ..application.fetch import fetch_all
-from ..application.prices import PricesResult, collect_prices
+from ..application.prices import (
+    PricesResult,
+    collect_bond_prices,
+    collect_prices,
+    with_bonds,
+)
 from ..application.securities import RefreshResult, SecurityService, refresh_securities
 from ..application.universe import load_universe as load_universe_chain
 from ..domain.universe import UniverseConfig
@@ -180,18 +186,25 @@ def master_data(coverage: CoverageStore, engine: Engine) -> Callable[[], Refresh
 def daily_prices(
     coverage: CoverageStore, store: PostgresPriceStore
 ) -> Callable[[date], PricesResult]:
-    """Tageskurse der Abdeckung fuer einen Handelstag (D2.3), ueber yfinance."""
+    """Tageskurse der Abdeckung fuer einen Handelstag (D2.3) ueber yfinance, seit D2.5 dazu die
+    Bundesanleihen aus der Liste der Bundesbank."""
     yahoo = YahooPrices()
+    bundesbank = BundesbankPrices()
 
     def collect(trade_date: date) -> PricesResult:
-        return collect_prices(
-            coverage.coverage(),
+        items = coverage.coverage()
+        prices = collect_prices(
+            items,
             store=store,
             quotes=yahoo.latest_closes,
             currency_of=yahoo.currency,
             rate_to_eur=yahoo.rate_to_eur,
             trade_date=trade_date,
         )
+        bonds = collect_bond_prices(
+            items, store=store, quotes=bundesbank.closes, trade_date=trade_date
+        )
+        return with_bonds(prices, bonds)
 
     return collect
 

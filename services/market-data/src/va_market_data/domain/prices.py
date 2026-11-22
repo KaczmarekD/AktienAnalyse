@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import date
 
 EUR = "EUR"
+# D2.5: Notierung von Anleihen in Prozent vom Nennwert (``quote_currency`` der Bundesbank-Kurse)
+PERCENT_OF_PAR = "%"
 # Untereinheit -> (Hauptwaehrung, Teiler)
 MINOR_UNITS: dict[str, tuple[str, float]] = {
     "GBp": ("GBP", 100.0),
@@ -36,8 +38,14 @@ class DailyClose:
     trade_date: date
     close: float
     currency: str  # Hauptwaehrung
-    # Notierung an der Boerse (z. B. GBp), fuer den naechsten Tag; nicht Teil des Events
+    # Notierung an der Boerse (z. B. GBp), fuer den naechsten Tag; seit D2.5 ``%`` fuer Anleihen.
+    # Im Event nur als ``percent_of_par``
     quote_currency: str | None = None
+
+    @property
+    def percent_of_par(self) -> bool:
+        """Kurs in Prozent vom Nennwert (Anleihen), nicht je Stueck."""
+        return self.quote_currency == PERCENT_OF_PAR
 
 
 @dataclass(frozen=True)
