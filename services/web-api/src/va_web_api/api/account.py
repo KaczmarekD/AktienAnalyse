@@ -26,7 +26,7 @@ from ..identity.service import (
     WeakPassword,
     WrongPassword,
 )
-from ..models import DataExport, Me, PasswordChange, ProfileUpdate, SessionInfo
+from ..models import DataExport, DepotExport, Me, PasswordChange, ProfileUpdate, SessionInfo
 from .auth import (
     ME_RESPONSES,
     Identity,
@@ -151,10 +151,17 @@ def publish_confirmations(app: FastAPI) -> None:
         **ME_RESPONSES,
     },
 )
-def export_data(user: SessionUser, identity: Identity) -> JSONResponse:
-    """Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens."""
+def export_data(request: Request, user: SessionUser, identity: Identity) -> JSONResponse:
+    """Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens; seit D3.2 mit den
+    eigenen Depots aus portfolio (ist portfolio eingerichtet, aber weg: 503, kein halber Export)."""
     now = identity.now()
-    data = DataExport(exported_at=now, **identity.export(user))
+    directory = getattr(request.app.state, "depots", None)
+    depots = (
+        []
+        if directory is None
+        else [DepotExport.model_validate(d.model_dump()) for d in directory.export(user.id)]
+    )
+    data = DataExport(exported_at=now, depots=depots, **identity.export(user))
     filename = f"va-daten-{user.username}-{now:%Y-%m-%d}.json"
     return JSONResponse(
         jsonable_encoder(data),

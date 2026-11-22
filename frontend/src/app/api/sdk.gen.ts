@@ -8,17 +8,26 @@ import type {
   ActivateProfileVersionData,
   ActivateProfileVersionErrors,
   ActivateProfileVersionResponses,
+  ArchiveDepotData,
+  ArchiveDepotErrors,
+  ArchiveDepotResponses,
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
   ConfirmEmailData,
   ConfirmEmailErrors,
   ConfirmEmailResponses,
+  CreateDepotData,
+  CreateDepotErrors,
+  CreateDepotResponses,
   CreateUserData,
   CreateUserErrors,
   CreateUserResponses,
   CurrentSessionData,
   CurrentSessionResponses,
+  DepotHistoryData,
+  DepotHistoryErrors,
+  DepotHistoryResponses,
   DisableUserData,
   DisableUserErrors,
   DisableUserResponses,
@@ -28,6 +37,12 @@ import type {
   ExportDataData,
   ExportDataErrors,
   ExportDataResponses,
+  GetDepotData,
+  GetDepotErrors,
+  GetDepotResponses,
+  GetHoldingsData,
+  GetHoldingsErrors,
+  GetHoldingsResponses,
   GetInstrumentData,
   GetInstrumentErrors,
   GetInstrumentResponses,
@@ -54,6 +69,9 @@ import type {
   LatestRankingData,
   LatestRankingErrors,
   LatestRankingResponses,
+  ListDepotsData,
+  ListDepotsErrors,
+  ListDepotsResponses,
   ListFactorsData,
   ListFactorsErrors,
   ListFactorsResponses,
@@ -84,9 +102,15 @@ import type {
   ResetPasswordData,
   ResetPasswordErrors,
   ResetPasswordResponses,
+  RestoreDepotData,
+  RestoreDepotErrors,
+  RestoreDepotResponses,
   RevokeAllSessionsData,
   RevokeAllSessionsErrors,
   RevokeAllSessionsResponses,
+  SaveHoldingsData,
+  SaveHoldingsErrors,
+  SaveHoldingsResponses,
   SaveProfileVersionData,
   SaveProfileVersionErrors,
   SaveProfileVersionResponses,
@@ -96,6 +120,9 @@ import type {
   StartRunData,
   StartRunErrors,
   StartRunResponses,
+  UpdateDepotData,
+  UpdateDepotErrors,
+  UpdateDepotResponses,
   UpdateProfileData,
   UpdateProfileErrors,
   UpdateProfileResponses,
@@ -104,18 +131,29 @@ import {
   zActivateProfileVersionBody,
   zActivateProfileVersionPath,
   zActivateProfileVersionResponse,
+  zArchiveDepotPath,
+  zArchiveDepotResponse,
   zChangePasswordBody,
   zChangePasswordResponse,
   zConfirmEmailBody,
   zConfirmEmailResponse,
+  zCreateDepotBody,
+  zCreateDepotResponse,
   zCreateUserBody,
   zCreateUserResponse,
   zCurrentSessionResponse,
+  zDepotHistoryPath,
+  zDepotHistoryResponse,
   zDisableUserPath,
   zDisableUserResponse,
   zEnableUserPath,
   zEnableUserResponse,
   zExportDataResponse,
+  zGetDepotPath,
+  zGetDepotResponse,
+  zGetHoldingsPath,
+  zGetHoldingsQuery,
+  zGetHoldingsResponse,
   zGetInstrumentPath,
   zGetInstrumentResponse,
   zGetProfilePath,
@@ -132,6 +170,8 @@ import {
   zGetSecurityResponse,
   zHealthResponse,
   zLatestRankingResponse,
+  zListDepotsQuery,
+  zListDepotsResponse,
   zListFactorsResponse,
   zListProfilesResponse,
   zListRunsQuery,
@@ -148,7 +188,13 @@ import {
   zResetPasswordBody,
   zResetPasswordPath,
   zResetPasswordResponse,
+  zRestoreDepotPath,
+  zRestoreDepotResponse,
   zRevokeAllSessionsResponse,
+  zSaveHoldingsBody,
+  zSaveHoldingsHeaders,
+  zSaveHoldingsPath,
+  zSaveHoldingsResponse,
   zSaveProfileVersionBody,
   zSaveProfileVersionHeaders,
   zSaveProfileVersionPath,
@@ -157,6 +203,9 @@ import {
   zSearchSecuritiesResponse,
   zStartRunBody,
   zStartRunResponse,
+  zUpdateDepotBody,
+  zUpdateDepotPath,
+  zUpdateDepotResponse,
   zUpdateProfileBody,
   zUpdateProfileResponse,
 } from './zod.gen';
@@ -396,6 +445,213 @@ export const currentSession = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List Depots
+ *
+ * Die eigenen Depots, archivierte nur auf Wunsch.
+ */
+export const listDepots = <ThrowOnError extends boolean = false>(
+  options?: Options<ListDepotsData, ThrowOnError>,
+): RequestResult<ListDepotsResponses, ListDepotsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListDepotsResponses, ListDepotsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: zListDepotsQuery.optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zListDepotsResponse.parseAsync(data),
+    url: '/api/v1/depots',
+    ...options,
+  });
+
+/**
+ * Create Depot
+ *
+ * Ein neues Depot oder eine Beobachtungsliste, mit dem leeren Depotstand 0.
+ */
+export const createDepot = <ThrowOnError extends boolean = false>(
+  options: Options<CreateDepotData, ThrowOnError>,
+): RequestResult<CreateDepotResponses, CreateDepotErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateDepotResponses, CreateDepotErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zCreateDepotBody,
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zCreateDepotResponse.parseAsync(data),
+    url: '/api/v1/depots',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get Depot
+ */
+export const getDepot = <ThrowOnError extends boolean = false>(
+  options: Options<GetDepotData, ThrowOnError>,
+): RequestResult<GetDepotResponses, GetDepotErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetDepotResponses, GetDepotErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zGetDepotPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zGetDepotResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}',
+    ...options,
+  });
+
+/**
+ * Update Depot
+ *
+ * Name und Beschreibung (neue Zeile, der Verlauf bleibt).
+ */
+export const updateDepot = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateDepotData, ThrowOnError>,
+): RequestResult<UpdateDepotResponses, UpdateDepotErrors, ThrowOnError> =>
+  (options.client ?? client).put<UpdateDepotResponses, UpdateDepotErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zUpdateDepotBody,
+          path: zUpdateDepotPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zUpdateDepotResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Archive Depot
+ *
+ * Archivieren (DEP-06): schreibgeschuetzt und aus der Liste, geloescht wird nichts.
+ */
+export const archiveDepot = <ThrowOnError extends boolean = false>(
+  options: Options<ArchiveDepotData, ThrowOnError>,
+): RequestResult<ArchiveDepotResponses, ArchiveDepotErrors, ThrowOnError> =>
+  (options.client ?? client).post<ArchiveDepotResponses, ArchiveDepotErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zArchiveDepotPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zArchiveDepotResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/archive',
+    ...options,
+  });
+
+/**
+ * Depot History
+ *
+ * Alle Depotstaende, neueste zuerst, mit dem Unterschied zum vorherigen.
+ */
+export const depotHistory = <ThrowOnError extends boolean = false>(
+  options: Options<DepotHistoryData, ThrowOnError>,
+): RequestResult<DepotHistoryResponses, DepotHistoryErrors, ThrowOnError> =>
+  (options.client ?? client).get<DepotHistoryResponses, DepotHistoryErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zDepotHistoryPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zDepotHistoryResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/history',
+    ...options,
+  });
+
+/**
+ * Get Holdings
+ *
+ * Ein Depotstand, ohne ``version`` der neueste. ``ETag``: seine Version.
+ */
+export const getHoldings = <ThrowOnError extends boolean = false>(
+  options: Options<GetHoldingsData, ThrowOnError>,
+): RequestResult<GetHoldingsResponses, GetHoldingsErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetHoldingsResponses, GetHoldingsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zGetHoldingsPath,
+          query: zGetHoldingsQuery.optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zGetHoldingsResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/holdings',
+    ...options,
+  });
+
+/**
+ * Save Holdings
+ *
+ * Ein neuer, vollstaendiger Depotstand auf Grundlage des Stands aus ``If-Match``.
+ */
+export const saveHoldings = <ThrowOnError extends boolean = false>(
+  options: Options<SaveHoldingsData, ThrowOnError>,
+): RequestResult<SaveHoldingsResponses, SaveHoldingsErrors, ThrowOnError> =>
+  (options.client ?? client).put<SaveHoldingsResponses, SaveHoldingsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zSaveHoldingsBody,
+          headers: zSaveHoldingsHeaders.optional(),
+          path: zSaveHoldingsPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zSaveHoldingsResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/holdings',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Restore Depot
+ */
+export const restoreDepot = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreDepotData, ThrowOnError>,
+): RequestResult<RestoreDepotResponses, RestoreDepotErrors, ThrowOnError> =>
+  (options.client ?? client).post<RestoreDepotResponses, RestoreDepotErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zRestoreDepotPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zRestoreDepotResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/restore',
+    ...options,
+  });
+
+/**
  * Health
  */
 export const health = <ThrowOnError extends boolean = false>(
@@ -460,7 +716,8 @@ export const me = <ThrowOnError extends boolean = false>(
 /**
  * Export Data
  *
- * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.
+ * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens; seit D3.2 mit den
+ * eigenen Depots aus portfolio (ist portfolio eingerichtet, aber weg: 503, kein halber Export).
  */
 export const exportData = <ThrowOnError extends boolean = false>(
   options?: Options<ExportDataData, ThrowOnError>,

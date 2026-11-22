@@ -56,19 +56,53 @@ export const zBondTerms = z.object({
 });
 
 /**
- * DataExport
+ * CashLine
  *
- * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
+ * Guthaben auf dem Verrechnungskonto, in EUR.
  */
-export const zDataExport = z.object({
-  account: z.array(z.record(z.string(), z.unknown())),
-  credentials: z.array(z.record(z.string(), z.unknown())),
-  email_confirmations: z.array(z.record(z.string(), z.unknown())),
-  exported_at: z.iso.datetime(),
-  logins: z.array(z.record(z.string(), z.unknown())),
-  profiles: z.array(z.record(z.string(), z.unknown())),
-  sessions: z.array(z.record(z.string(), z.unknown())),
-  statuses: z.array(z.record(z.string(), z.unknown())),
+export const zCashLineInput = z.object({
+  amount: z.union([
+    z.number(),
+    z.string().regex(/^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,21}0*$)\d{0,12}\.\d{0,8}0*$)/),
+  ]),
+  currency: z.literal('EUR').optional().default('EUR'),
+});
+
+/**
+ * CashLine
+ *
+ * Guthaben auf dem Verrechnungskonto, in EUR.
+ */
+export const zCashLineOutput = z.object({
+  amount: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,21}0*$)\d{0,12}\.\d{0,8}0*$)/),
+  currency: z.literal('EUR').optional().default('EUR'),
+});
+
+/**
+ * CreateDepot
+ */
+export const zCreateDepot = z.object({
+  description: z.string().max(500).nullish(),
+  kind: z.enum(['depot', 'watchlist']).optional().default('depot'),
+  name: z.string().min(1).max(100),
+});
+
+/**
+ * Depot
+ *
+ * Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
+ */
+export const zDepot = z.object({
+  created_at: z.iso.datetime(),
+  description: z.string().nullable(),
+  id: z.int(),
+  kind: z.enum(['depot', 'watchlist']),
+  name: z.string(),
+  positions: z.int(),
+  status: z.enum(['active', 'archived']),
+  version: z.int(),
 });
 
 /**
@@ -150,6 +184,106 @@ export const zHealth = z.object({
   auth_required: z.boolean(),
   status: z.literal('ok'),
   version: z.string(),
+});
+
+/**
+ * HistoryEntry
+ *
+ * Ein Depotstand im Verlauf, mit dem Unterschied zum vorherigen.
+ */
+export const zHistoryEntry = z.object({
+  added: z.int(),
+  changed: z.int(),
+  created_at: z.iso.datetime(),
+  created_by: z.int().nullable(),
+  positions: z.int(),
+  removed: z.int(),
+  source: z.enum(['manual', 'import', 'bank']),
+  version: z.int(),
+});
+
+/**
+ * HoldingLine
+ *
+ * Eine Position; in einer Beobachtungsliste ohne Menge und Einstand.
+ */
+export const zHoldingLineInput = z.object({
+  cost_basis_eur: z
+    .union([
+      z.number().gte(0),
+      z.string().regex(/^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,21}0*$)\d{0,12}\.\d{0,8}0*$)/),
+    ])
+    .nullish(),
+  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/),
+  note: z.string().max(500).nullish(),
+  quantity: z
+    .union([
+      z.number().gt(0),
+      z.string().regex(/^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,21}0*$)\d{0,12}\.\d{0,8}0*$)/),
+    ])
+    .nullish(),
+  unit: z.enum(['pieces', 'nominal']).optional().default('pieces'),
+});
+
+/**
+ * HoldingLine
+ *
+ * Eine Position; in einer Beobachtungsliste ohne Menge und Einstand.
+ */
+export const zHoldingLineOutput = z.object({
+  cost_basis_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,21}0*$)\d{0,12}\.\d{0,8}0*$)/)
+    .nullish(),
+  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/),
+  note: z.string().max(500).nullish(),
+  quantity: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*(?:\d{0,12}|(?=[\d.]{1,21}0*$)\d{0,12}\.\d{0,8}0*$)/)
+    .nullish(),
+  unit: z.enum(['pieces', 'nominal']).optional().default('pieces'),
+});
+
+/**
+ * Holdings
+ *
+ * Ein Depotstand; ``version`` 0 ist der leere Stand vor der ersten Speicherung.
+ */
+export const zHoldings = z.object({
+  cash: z.array(zCashLineOutput),
+  created_at: z.iso.datetime().nullable(),
+  created_by: z.int().nullable(),
+  depot_id: z.int(),
+  lines: z.array(zHoldingLineOutput),
+  source: z.enum(['manual', 'import', 'bank']).nullable(),
+  version: z.int(),
+});
+
+/**
+ * DepotExport
+ *
+ * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
+ */
+export const zDepotExport = z.object({
+  depot: zDepot,
+  versions: z.array(zHoldings),
+});
+
+/**
+ * DataExport
+ *
+ * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
+ */
+export const zDataExport = z.object({
+  account: z.array(z.record(z.string(), z.unknown())),
+  credentials: z.array(z.record(z.string(), z.unknown())),
+  depots: z.array(zDepotExport).optional(),
+  email_confirmations: z.array(z.record(z.string(), z.unknown())),
+  exported_at: z.iso.datetime(),
+  logins: z.array(z.record(z.string(), z.unknown())),
+  profiles: z.array(z.record(z.string(), z.unknown())),
+  sessions: z.array(z.record(z.string(), z.unknown())),
+  statuses: z.array(z.record(z.string(), z.unknown())),
 });
 
 /**
@@ -497,6 +631,16 @@ export const zRunSummary = z.object({
 });
 
 /**
+ * SaveHoldings
+ *
+ * Der ganze neue Depotstand; die Basisversion steht in ``If-Match``.
+ */
+export const zSaveHoldings = z.object({
+  cash: z.array(zCashLineInput).max(1).optional(),
+  lines: z.array(zHoldingLineInput).max(1000).optional(),
+});
+
+/**
  * SaveProfileVersion
  */
 export const zSaveProfileVersion = z.object({
@@ -627,6 +771,14 @@ export const zInstrument = z.object({
 });
 
 /**
+ * UpdateDepot
+ */
+export const zUpdateDepot = z.object({
+  description: z.string().max(500).nullish(),
+  name: z.string().min(1).max(100),
+});
+
+/**
  * ValidationError
  */
 export const zValidationError = z.object({
@@ -710,6 +862,101 @@ export const zLogoutResponse = z.void();
  * Successful Response
  */
 export const zCurrentSessionResponse = zSessionState;
+
+export const zListDepotsQuery = z.object({
+  include_archived: z.boolean().optional().default(false),
+});
+
+/**
+ * Response List Depots
+ *
+ * Successful Response
+ */
+export const zListDepotsResponse = z.array(zDepot);
+
+export const zCreateDepotBody = zCreateDepot;
+
+/**
+ * Successful Response
+ */
+export const zCreateDepotResponse = zDepot;
+
+export const zGetDepotPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zGetDepotResponse = zDepot;
+
+export const zUpdateDepotBody = zUpdateDepot;
+
+export const zUpdateDepotPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zUpdateDepotResponse = zDepot;
+
+export const zArchiveDepotPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zArchiveDepotResponse = zDepot;
+
+export const zDepotHistoryPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Response Depot History
+ *
+ * Successful Response
+ */
+export const zDepotHistoryResponse = z.array(zHistoryEntry);
+
+export const zGetHoldingsPath = z.object({
+  depot_id: z.int(),
+});
+
+export const zGetHoldingsQuery = z.object({
+  version: z.int().gte(0).nullish(),
+});
+
+/**
+ * Successful Response
+ */
+export const zGetHoldingsResponse = zHoldings;
+
+export const zSaveHoldingsBody = zSaveHoldings;
+
+export const zSaveHoldingsHeaders = z.object({
+  'if-match': z.string().nullish(),
+});
+
+export const zSaveHoldingsPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zSaveHoldingsResponse = zHoldings;
+
+export const zRestoreDepotPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zRestoreDepotResponse = zDepot;
 
 /**
  * Successful Response

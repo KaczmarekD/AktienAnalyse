@@ -1,0 +1,15 @@
+{
+  "description": "D3.2: alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden (NUT-12).",
+  "properties": {
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id"
+  ],
+  "title": "DepotExportRequestV1",
+  "type": "object"
+}

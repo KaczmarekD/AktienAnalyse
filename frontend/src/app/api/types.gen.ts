@@ -115,6 +115,56 @@ export type BondTerms = {
 };
 
 /**
+ * CashLine
+ *
+ * Guthaben auf dem Verrechnungskonto, in EUR.
+ */
+export type CashLineInput = {
+  /**
+   * Amount
+   */
+  amount: number | string;
+  /**
+   * Currency
+   */
+  currency?: 'EUR';
+};
+
+/**
+ * CashLine
+ *
+ * Guthaben auf dem Verrechnungskonto, in EUR.
+ */
+export type CashLineOutput = {
+  /**
+   * Amount
+   */
+  amount: string;
+  /**
+   * Currency
+   */
+  currency?: 'EUR';
+};
+
+/**
+ * CreateDepot
+ */
+export type CreateDepot = {
+  /**
+   * Description
+   */
+  description?: string | null;
+  /**
+   * Kind
+   */
+  kind?: 'depot' | 'watchlist';
+  /**
+   * Name
+   */
+  name: string;
+};
+
+/**
  * DataExport
  *
  * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
@@ -132,6 +182,10 @@ export type DataExport = {
   credentials: Array<{
     [key: string]: unknown;
   }>;
+  /**
+   * Depots
+   */
+  depots?: Array<DepotExport>;
   /**
    * Email Confirmations
    */
@@ -166,6 +220,59 @@ export type DataExport = {
   statuses: Array<{
     [key: string]: unknown;
   }>;
+};
+
+/**
+ * Depot
+ *
+ * Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
+ */
+export type Depot = {
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Description
+   */
+  description: string | null;
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Kind
+   */
+  kind: 'depot' | 'watchlist';
+  /**
+   * Name
+   */
+  name: string;
+  /**
+   * Positions
+   */
+  positions: number;
+  /**
+   * Status
+   */
+  status: 'active' | 'archived';
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
+ * DepotExport
+ *
+ * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
+ */
+export type DepotExport = {
+  depot: Depot;
+  /**
+   * Versions
+   */
+  versions: Array<Holdings>;
 };
 
 /**
@@ -367,6 +474,138 @@ export type Health = {
    * Version
    */
   version: string;
+};
+
+/**
+ * HistoryEntry
+ *
+ * Ein Depotstand im Verlauf, mit dem Unterschied zum vorherigen.
+ */
+export type HistoryEntry = {
+  /**
+   * Added
+   */
+  added: number;
+  /**
+   * Changed
+   */
+  changed: number;
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Created By
+   */
+  created_by: number | null;
+  /**
+   * Positions
+   */
+  positions: number;
+  /**
+   * Removed
+   */
+  removed: number;
+  /**
+   * Source
+   */
+  source: 'manual' | 'import' | 'bank';
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
+ * HoldingLine
+ *
+ * Eine Position; in einer Beobachtungsliste ohne Menge und Einstand.
+ */
+export type HoldingLineInput = {
+  /**
+   * Cost Basis Eur
+   */
+  cost_basis_eur?: number | string | null;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Note
+   */
+  note?: string | null;
+  /**
+   * Quantity
+   */
+  quantity?: number | string | null;
+  /**
+   * Unit
+   */
+  unit?: 'pieces' | 'nominal';
+};
+
+/**
+ * HoldingLine
+ *
+ * Eine Position; in einer Beobachtungsliste ohne Menge und Einstand.
+ */
+export type HoldingLineOutput = {
+  /**
+   * Cost Basis Eur
+   */
+  cost_basis_eur?: string | null;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Note
+   */
+  note?: string | null;
+  /**
+   * Quantity
+   */
+  quantity?: string | null;
+  /**
+   * Unit
+   */
+  unit?: 'pieces' | 'nominal';
+};
+
+/**
+ * Holdings
+ *
+ * Ein Depotstand; ``version`` 0 ist der leere Stand vor der ersten Speicherung.
+ */
+export type Holdings = {
+  /**
+   * Cash
+   */
+  cash: Array<CashLineOutput>;
+  /**
+   * Created At
+   */
+  created_at: string | null;
+  /**
+   * Created By
+   */
+  created_by: number | null;
+  /**
+   * Depot Id
+   */
+  depot_id: number;
+  /**
+   * Lines
+   */
+  lines: Array<HoldingLineOutput>;
+  /**
+   * Source
+   */
+  source: 'manual' | 'import' | 'bank' | null;
+  /**
+   * Version
+   */
+  version: number;
 };
 
 /**
@@ -1288,6 +1527,22 @@ export type RunSummary = {
 };
 
 /**
+ * SaveHoldings
+ *
+ * Der ganze neue Depotstand; die Basisversion steht in ``If-Match``.
+ */
+export type SaveHoldings = {
+  /**
+   * Cash
+   */
+  cash?: Array<CashLineInput>;
+  /**
+   * Lines
+   */
+  lines?: Array<HoldingLineInput>;
+};
+
+/**
  * SaveProfileVersion
  */
 export type SaveProfileVersion = {
@@ -1562,6 +1817,20 @@ export type Snapshot = {
    * Shareholder Yield
    */
   shareholder_yield: number | null;
+};
+
+/**
+ * UpdateDepot
+ */
+export type UpdateDepot = {
+  /**
+   * Description
+   */
+  description?: string | null;
+  /**
+   * Name
+   */
+  name: string;
 };
 
 /**
@@ -1932,6 +2201,396 @@ export type CurrentSessionResponses = {
 };
 
 export type CurrentSessionResponse = CurrentSessionResponses[keyof CurrentSessionResponses];
+
+export type ListDepotsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Include Archived
+     */
+    include_archived?: boolean;
+  };
+  url: '/api/v1/depots';
+};
+
+export type ListDepotsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type ListDepotsError = ListDepotsErrors[keyof ListDepotsErrors];
+
+export type ListDepotsResponses = {
+  /**
+   * Response List Depots
+   *
+   * Successful Response
+   */
+  200: Array<Depot>;
+};
+
+export type ListDepotsResponse = ListDepotsResponses[keyof ListDepotsResponses];
+
+export type CreateDepotData = {
+  body: CreateDepot;
+  path?: never;
+  query?: never;
+  url: '/api/v1/depots';
+};
+
+export type CreateDepotErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)
+   */
+  422: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type CreateDepotResponses = {
+  /**
+   * Successful Response
+   */
+  201: Depot;
+};
+
+export type CreateDepotResponse = CreateDepotResponses[keyof CreateDepotResponses];
+
+export type GetDepotData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}';
+};
+
+export type GetDepotErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type GetDepotError = GetDepotErrors[keyof GetDepotErrors];
+
+export type GetDepotResponses = {
+  /**
+   * Successful Response
+   */
+  200: Depot;
+};
+
+export type GetDepotResponse = GetDepotResponses[keyof GetDepotResponses];
+
+export type UpdateDepotData = {
+  body: UpdateDepot;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}';
+};
+
+export type UpdateDepotErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)
+   */
+  422: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type UpdateDepotResponses = {
+  /**
+   * Successful Response
+   */
+  200: Depot;
+};
+
+export type UpdateDepotResponse = UpdateDepotResponses[keyof UpdateDepotResponses];
+
+export type ArchiveDepotData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/archive';
+};
+
+export type ArchiveDepotErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type ArchiveDepotError = ArchiveDepotErrors[keyof ArchiveDepotErrors];
+
+export type ArchiveDepotResponses = {
+  /**
+   * Successful Response
+   */
+  200: Depot;
+};
+
+export type ArchiveDepotResponse = ArchiveDepotResponses[keyof ArchiveDepotResponses];
+
+export type DepotHistoryData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/history';
+};
+
+export type DepotHistoryErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type DepotHistoryError = DepotHistoryErrors[keyof DepotHistoryErrors];
+
+export type DepotHistoryResponses = {
+  /**
+   * Response Depot History
+   *
+   * Successful Response
+   */
+  200: Array<HistoryEntry>;
+};
+
+export type DepotHistoryResponse = DepotHistoryResponses[keyof DepotHistoryResponses];
+
+export type GetHoldingsData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: {
+    /**
+     * Version
+     */
+    version?: number | null;
+  };
+  url: '/api/v1/depots/{depot_id}/holdings';
+};
+
+export type GetHoldingsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type GetHoldingsError = GetHoldingsErrors[keyof GetHoldingsErrors];
+
+export type GetHoldingsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Holdings;
+};
+
+export type GetHoldingsResponse = GetHoldingsResponses[keyof GetHoldingsResponses];
+
+export type SaveHoldingsData = {
+  body: SaveHoldings;
+  headers?: {
+    /**
+     * If-Match
+     */
+    'if-match'?: string | null;
+  };
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/holdings';
+};
+
+export type SaveHoldingsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)
+   */
+  422: unknown;
+  /**
+   * If-Match fehlt
+   */
+  428: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type SaveHoldingsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Holdings;
+};
+
+export type SaveHoldingsResponse = SaveHoldingsResponses[keyof SaveHoldingsResponses];
+
+export type RestoreDepotData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/restore';
+};
+
+export type RestoreDepotErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type RestoreDepotError = RestoreDepotErrors[keyof RestoreDepotErrors];
+
+export type RestoreDepotResponses = {
+  /**
+   * Successful Response
+   */
+  200: Depot;
+};
+
+export type RestoreDepotResponse = RestoreDepotResponses[keyof RestoreDepotResponses];
 
 export type HealthData = {
   body?: never;

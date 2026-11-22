@@ -7,20 +7,30 @@ import type { Options } from '../sdk.gen';
 import type {
   ActivateProfileVersionData,
   ActivateProfileVersionResponse,
+  ArchiveDepotData,
+  ArchiveDepotResponse,
   ChangePasswordData,
   ChangePasswordResponse,
   ConfirmEmailData,
   ConfirmEmailResponse,
+  CreateDepotData,
+  CreateDepotResponse,
   CreateUserData,
   CreateUserResponse,
   CurrentSessionData,
   CurrentSessionResponse,
+  DepotHistoryData,
+  DepotHistoryResponse,
   DisableUserData,
   DisableUserResponse,
   EnableUserData,
   EnableUserResponse,
   ExportDataData,
   ExportDataResponse,
+  GetDepotData,
+  GetDepotResponse,
+  GetHoldingsData,
+  GetHoldingsResponse,
   GetInstrumentData,
   GetInstrumentResponse,
   GetProfileData,
@@ -38,6 +48,8 @@ import type {
   HealthResponse,
   LatestRankingData,
   LatestRankingResponse,
+  ListDepotsData,
+  ListDepotsResponse,
   ListFactorsData,
   ListFactorsResponse,
   ListProfilesData,
@@ -58,14 +70,20 @@ import type {
   PreviewProfileResponse,
   ResetPasswordData,
   ResetPasswordResponse,
+  RestoreDepotData,
+  RestoreDepotResponse,
   RevokeAllSessionsData,
   RevokeAllSessionsResponse,
+  SaveHoldingsData,
+  SaveHoldingsResponse,
   SaveProfileVersionData,
   SaveProfileVersionResponse,
   SearchSecuritiesData,
   SearchSecuritiesResponse,
   StartRunData,
   StartRunResponse,
+  UpdateDepotData,
+  UpdateDepotResponse,
   UpdateProfileData,
   UpdateProfileResponse,
 } from '../types.gen';
@@ -208,6 +226,137 @@ export const currentSessionRequest = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List Depots
+ *
+ * Die eigenen Depots, archivierte nur auf Wunsch.
+ */
+export const listDepotsRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<ListDepotsData, ThrowOnError>,
+): HttpRequest<ListDepotsResponse> =>
+  (options?.client ?? client).requestOptions<ListDepotsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots',
+    ...options,
+  });
+
+/**
+ * Create Depot
+ *
+ * Ein neues Depot oder eine Beobachtungsliste, mit dem leeren Depotstand 0.
+ */
+export const createDepotRequest = <ThrowOnError extends boolean = false>(
+  options: Options<CreateDepotData, ThrowOnError>,
+): HttpRequest<CreateDepotResponse> =>
+  (options?.client ?? client).requestOptions<CreateDepotResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/depots',
+    ...options,
+  });
+
+/**
+ * Get Depot
+ */
+export const getDepotRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetDepotData, ThrowOnError>,
+): HttpRequest<GetDepotResponse> =>
+  (options?.client ?? client).requestOptions<GetDepotResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}',
+    ...options,
+  });
+
+/**
+ * Update Depot
+ *
+ * Name und Beschreibung (neue Zeile, der Verlauf bleibt).
+ */
+export const updateDepotRequest = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateDepotData, ThrowOnError>,
+): HttpRequest<UpdateDepotResponse> =>
+  (options?.client ?? client).requestOptions<UpdateDepotResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/depots/{depot_id}',
+    ...options,
+  });
+
+/**
+ * Archive Depot
+ *
+ * Archivieren (DEP-06): schreibgeschuetzt und aus der Liste, geloescht wird nichts.
+ */
+export const archiveDepotRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ArchiveDepotData, ThrowOnError>,
+): HttpRequest<ArchiveDepotResponse> =>
+  (options?.client ?? client).requestOptions<ArchiveDepotResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/depots/{depot_id}/archive',
+    ...options,
+  });
+
+/**
+ * Depot History
+ *
+ * Alle Depotstaende, neueste zuerst, mit dem Unterschied zum vorherigen.
+ */
+export const depotHistoryRequest = <ThrowOnError extends boolean = false>(
+  options: Options<DepotHistoryData, ThrowOnError>,
+): HttpRequest<DepotHistoryResponse> =>
+  (options?.client ?? client).requestOptions<DepotHistoryResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/history',
+    ...options,
+  });
+
+/**
+ * Get Holdings
+ *
+ * Ein Depotstand, ohne ``version`` der neueste. ``ETag``: seine Version.
+ */
+export const getHoldingsRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetHoldingsData, ThrowOnError>,
+): HttpRequest<GetHoldingsResponse> =>
+  (options?.client ?? client).requestOptions<GetHoldingsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/holdings',
+    ...options,
+  });
+
+/**
+ * Save Holdings
+ *
+ * Ein neuer, vollstaendiger Depotstand auf Grundlage des Stands aus ``If-Match``.
+ */
+export const saveHoldingsRequest = <ThrowOnError extends boolean = false>(
+  options: Options<SaveHoldingsData, ThrowOnError>,
+): HttpRequest<SaveHoldingsResponse> =>
+  (options?.client ?? client).requestOptions<SaveHoldingsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/depots/{depot_id}/holdings',
+    ...options,
+  });
+
+/**
+ * Restore Depot
+ */
+export const restoreDepotRequest = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreDepotData, ThrowOnError>,
+): HttpRequest<RestoreDepotResponse> =>
+  (options?.client ?? client).requestOptions<RestoreDepotResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/depots/{depot_id}/restore',
+    ...options,
+  });
+
+/**
  * Health
  */
 export const healthRequest = <ThrowOnError extends boolean = false>(
@@ -251,7 +400,8 @@ export const meRequest = <ThrowOnError extends boolean = false>(
 /**
  * Export Data
  *
- * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.
+ * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens; seit D3.2 mit den
+ * eigenen Depots aus portfolio (ist portfolio eingerichtet, aber weg: 503, kein halber Export).
  */
 export const exportDataRequest = <ThrowOnError extends boolean = false>(
   options?: Options<ExportDataData, ThrowOnError>,
@@ -661,6 +811,119 @@ export const currentSessionResource = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List Depots
+ *
+ * Die eigenen Depots, archivierte nur auf Wunsch.
+ */
+export const listDepotsResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<ListDepotsData, ThrowOnError> | undefined,
+) =>
+  httpResource<ListDepotsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? listDepotsRequest(opts) : undefined;
+  });
+
+/**
+ * Create Depot
+ *
+ * Ein neues Depot oder eine Beobachtungsliste, mit dem leeren Depotstand 0.
+ */
+export const createDepotResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<CreateDepotData, ThrowOnError> | undefined,
+) =>
+  httpResource<CreateDepotResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? createDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Get Depot
+ */
+export const getDepotResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<GetDepotData, ThrowOnError> | undefined,
+) =>
+  httpResource<GetDepotResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? getDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Update Depot
+ *
+ * Name und Beschreibung (neue Zeile, der Verlauf bleibt).
+ */
+export const updateDepotResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<UpdateDepotData, ThrowOnError> | undefined,
+) =>
+  httpResource<UpdateDepotResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? updateDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Archive Depot
+ *
+ * Archivieren (DEP-06): schreibgeschuetzt und aus der Liste, geloescht wird nichts.
+ */
+export const archiveDepotResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<ArchiveDepotData, ThrowOnError> | undefined,
+) =>
+  httpResource<ArchiveDepotResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? archiveDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Depot History
+ *
+ * Alle Depotstaende, neueste zuerst, mit dem Unterschied zum vorherigen.
+ */
+export const depotHistoryResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<DepotHistoryData, ThrowOnError> | undefined,
+) =>
+  httpResource<DepotHistoryResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? depotHistoryRequest(opts) : undefined;
+  });
+
+/**
+ * Get Holdings
+ *
+ * Ein Depotstand, ohne ``version`` der neueste. ``ETag``: seine Version.
+ */
+export const getHoldingsResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<GetHoldingsData, ThrowOnError> | undefined,
+) =>
+  httpResource<GetHoldingsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? getHoldingsRequest(opts) : undefined;
+  });
+
+/**
+ * Save Holdings
+ *
+ * Ein neuer, vollstaendiger Depotstand auf Grundlage des Stands aus ``If-Match``.
+ */
+export const saveHoldingsResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<SaveHoldingsData, ThrowOnError> | undefined,
+) =>
+  httpResource<SaveHoldingsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? saveHoldingsRequest(opts) : undefined;
+  });
+
+/**
+ * Restore Depot
+ */
+export const restoreDepotResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<RestoreDepotData, ThrowOnError> | undefined,
+) =>
+  httpResource<RestoreDepotResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? restoreDepotRequest(opts) : undefined;
+  });
+
+/**
  * Health
  */
 export const healthResource = <ThrowOnError extends boolean = false>(
@@ -698,7 +961,8 @@ export const meResource = <ThrowOnError extends boolean = false>(
 /**
  * Export Data
  *
- * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.
+ * Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens; seit D3.2 mit den
+ * eigenen Depots aus portfolio (ist portfolio eingerichtet, aber weg: 503, kein halber Export).
  */
 export const exportDataResource = <ThrowOnError extends boolean = false>(
   options?: () => Options<ExportDataData, ThrowOnError> | undefined,

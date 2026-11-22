@@ -55,6 +55,8 @@ ADMIN_ONLY = {
 # D1.4: auch im Uebergang nur mit echter Sitzung; mit Einmal-Passwort erlaubt (ausser /admin)
 OWN_ACCOUNT = "/api/v1/me"
 ADMIN = "/api/v1/admin"
+# D3.2: Depots gehoeren einer Person: auch im Uebergang nur mit echter Sitzung
+DEPOTS = "/api/v1/depots"
 PATH_VALUES = {
     "{run_id}": "1",
     "{scoring_run_id}": "1",
@@ -62,6 +64,7 @@ PATH_VALUES = {
     "{report_id}": "1",
     "{profile_id}": "1",
     "{user_id}": "2",
+    "{depot_id}": "1",
 }
 
 
@@ -261,7 +264,7 @@ class TestLanTransition:
 
     @pytest.mark.parametrize(
         ("method", "path"),
-        [r for r in _routes() if r[1].startswith((OWN_ACCOUNT, ADMIN))],
+        [r for r in _routes() if r[1].startswith((OWN_ACCOUNT, ADMIN, DEPOTS))],
     )
     def test_own_account_and_user_management_need_a_real_session(
         self, identity, runs, method, path

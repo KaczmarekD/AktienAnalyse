@@ -88,11 +88,20 @@ class HistoryEntryV1(Contract):
     removed: int = Field(ge=0)
 
 
+class DepotExportV1(Contract):
+    """Ein Depot mit allen seinen Depotstaenden, aelteste zuerst (Datenexport, NUT-12, D3.2)."""
+
+    depot: DepotV1
+    versions: list[HoldingsV1] = Field(default_factory=list)
+
+
 __all__ = [
     "MAX_LINES",
     "MAX_NAME",
     "MAX_TEXT",
+    "Amount",
     "CashLineV1",
+    "DepotExportV1",
     "DepotKind",
     "DepotName",
     "DepotState",
@@ -101,6 +110,7 @@ __all__ = [
     "HoldingLineV1",
     "HoldingUnit",
     "HoldingsV1",
+    "Quantity",
     "SnapshotSource",
     "Text",
 ]

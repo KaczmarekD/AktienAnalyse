@@ -7,11 +7,13 @@ Sie sind der Vertrag mit dem Frontend: Der OpenAPI-Snapshot und der daraus gener
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from va_contracts.portfolio import MAX_LINES, MAX_NAME, MAX_TEXT, Amount, Quantity
 from va_contracts.profile import ProfileParamsV1
+from va_contracts.securities import IsinStr
 
 
 class _Model(BaseModel):
@@ -327,6 +329,8 @@ class DataExport(_Model):
     sessions: list[dict[str, Any]]
     logins: list[dict[str, Any]]
     email_confirmations: list[dict[str, Any]]
+    # D3.2: die eigenen Depots aus portfolio, auch archivierte, mit allen Depotstaenden
+    depots: list[DepotExport] = Field(default_factory=list)
 
 
 class SessionInfo(_Model):
@@ -448,3 +452,90 @@ class Security(_Model):
     listings: list[Listing]
     listing: Listing | None
     etf: Etf | None  # D2.4: nur bei ETFs, sofern eine Quelle sie kennt
+
+
+# --- Depots (D3.2, docs/architecture/depot/depots.md) ------------------------------------
+# Mengen und Betraege als Decimal: im JSON eine Zahl im String ("12.5"), nie float. Eingaben
+# duerfen Zahl oder String sein. Die Grenzen sind die der Contracts (va_contracts.portfolio).
+
+DepotKindName = Literal["depot", "watchlist"]
+
+
+class Depot(_Model):
+    """Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert."""
+
+    id: int
+    kind: DepotKindName
+    name: str
+    description: str | None
+    status: Literal["active", "archived"]
+    created_at: datetime
+    version: int
+    positions: int
+
+
+class HoldingLine(_Model):
+    """Eine Position; in einer Beobachtungsliste ohne Menge und Einstand."""
+
+    isin: IsinStr
+    quantity: Quantity | None = None  # Stueck, bei Anleihen der Nennwert
+    unit: Literal["pieces", "nominal"] = "pieces"
+    cost_basis_eur: Annotated[Amount, Field(ge=0)] | None = None  # Einstand der ganzen Position
+    note: Annotated[str, Field(max_length=MAX_TEXT)] | None = None
+
+
+class CashLine(_Model):
+    """Guthaben auf dem Verrechnungskonto, in EUR."""
+
+    currency: Literal["EUR"] = "EUR"
+    amount: Amount
+
+
+class Holdings(_Model):
+    """Ein Depotstand; ``version`` 0 ist der leere Stand vor der ersten Speicherung."""
+
+    depot_id: int
+    version: int
+    source: Literal["manual", "import", "bank"] | None
+    created_at: datetime | None
+    created_by: int | None
+    lines: list[HoldingLine]
+    cash: list[CashLine]
+
+
+class HistoryEntry(_Model):
+    """Ein Depotstand im Verlauf, mit dem Unterschied zum vorherigen."""
+
+    version: int
+    source: Literal["manual", "import", "bank"]
+    created_at: datetime
+    created_by: int | None
+    positions: int
+    added: int
+    changed: int
+    removed: int
+
+
+class CreateDepot(_Model):
+    kind: DepotKindName = "depot"
+    name: Annotated[str, Field(min_length=1, max_length=MAX_NAME)]
+    description: Annotated[str, Field(max_length=MAX_TEXT)] | None = None
+
+
+class UpdateDepot(_Model):
+    name: Annotated[str, Field(min_length=1, max_length=MAX_NAME)]
+    description: Annotated[str, Field(max_length=MAX_TEXT)] | None = None
+
+
+class SaveHoldings(_Model):
+    """Der ganze neue Depotstand; die Basisversion steht in ``If-Match``."""
+
+    lines: list[HoldingLine] = Field(default_factory=list, max_length=MAX_LINES)
+    cash: list[CashLine] = Field(default_factory=list, max_length=1)
+
+
+class DepotExport(_Model):
+    """Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport)."""
+
+    depot: Depot
+    versions: list[Holdings]

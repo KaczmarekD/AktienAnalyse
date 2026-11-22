@@ -1,4 +1,5 @@
-"""Request/Reply von portfolio (D3.1): Depots lesen und aendern fuer das web-api.
+"""Request/Reply von portfolio (D3.1): Depots lesen und aendern fuer das web-api; seit D3.2
+auch der Datenexport aller eigenen Depots (``portfolio.depots.export``).
 
 Fehler gehen als Antwort zurueck: ``not_found`` (kein Depot dieses Nutzers), ``archived``,
 ``invalid`` (Eingabe), ``conflict`` mit der neuesten Version. Ein unerwarteter Fehler wird beim
@@ -10,10 +11,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from va_contracts.portfolio import CashLineV1, DepotV1, HistoryEntryV1, HoldingLineV1, HoldingsV1
+from va_contracts.portfolio import (
+    CashLineV1,
+    DepotExportV1,
+    DepotV1,
+    HistoryEntryV1,
+    HoldingLineV1,
+    HoldingsV1,
+)
 from va_contracts.rpc.v1 import (
     DEPOTS_ARCHIVE,
     DEPOTS_CREATE,
+    DEPOTS_EXPORT,
     DEPOTS_GET,
     DEPOTS_LIST,
     DEPOTS_RESTORE,
@@ -21,6 +30,7 @@ from va_contracts.rpc.v1 import (
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
     HOLDINGS_SAVE,
+    DepotExportReplyV1,
     DepotListReplyV1,
     DepotReplyV1,
     HistoryReplyV1,
@@ -34,6 +44,7 @@ from ..domain.depots import CashLine, DepotError, HoldingLine, VersionConflict
 if TYPE_CHECKING:
     from va_contracts.rpc.v1 import (
         DepotCreateRequestV1,
+        DepotExportRequestV1,
         DepotListRequestV1,
         DepotRefRequestV1,
         DepotUpdateRequestV1,
@@ -186,6 +197,14 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
             ),
         )
 
+    def export(request: DepotExportRequestV1) -> DepotExportReplyV1:
+        return DepotExportReplyV1(
+            depots=[
+                DepotExportV1(depot=_depot(summary), versions=[_holdings(s) for s in snapshots])
+                for summary, snapshots in service.export(request.user_id)
+            ]
+        )
+
     def history(request: DepotRefRequestV1) -> HistoryReplyV1:
         return _guarded(
             HistoryReplyV1,
@@ -204,4 +223,5 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         HOLDINGS_GET: holdings,
         HOLDINGS_SAVE: save,
         HOLDINGS_HISTORY: history,
+        DEPOTS_EXPORT: export,
     }

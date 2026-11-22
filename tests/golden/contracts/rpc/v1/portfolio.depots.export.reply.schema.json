@@ -1,0 +1,331 @@
+{
+  "$defs": {
+    "CashLineV1": {
+      "description": "Guthaben auf dem Verrechnungskonto; vorerst nur EUR (DEP-04).",
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            }
+          ],
+          "title": "Amount"
+        },
+        "currency": {
+          "const": "EUR",
+          "default": "EUR",
+          "title": "Currency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount"
+      ],
+      "title": "CashLineV1",
+      "type": "object"
+    },
+    "DepotExportV1": {
+      "description": "Ein Depot mit allen seinen Depotstaenden, aelteste zuerst (Datenexport, NUT-12, D3.2).",
+      "properties": {
+        "depot": {
+          "$ref": "#/$defs/DepotV1"
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/HoldingsV1"
+          },
+          "title": "Versions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "depot"
+      ],
+      "title": "DepotExportV1",
+      "type": "object"
+    },
+    "DepotV1": {
+      "description": "Ein Depot mit dem Stand seines Bestands; ``version`` 0 heisst: noch nichts erfasst.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "id": {
+          "minimum": 1,
+          "title": "Id",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "depot",
+            "watchlist"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "positions": {
+          "minimum": 0,
+          "title": "Positions",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "archived"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "status",
+        "created_at",
+        "version",
+        "positions"
+      ],
+      "title": "DepotV1",
+      "type": "object"
+    },
+    "HoldingLineV1": {
+      "description": "Eine Position. In einer Beobachtungsliste ohne Menge und Einstand.",
+      "properties": {
+        "cost_basis_eur": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Basis Eur"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "unit": {
+          "default": "pieces",
+          "enum": [
+            "pieces",
+            "nominal"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin"
+      ],
+      "title": "HoldingLineV1",
+      "type": "object"
+    },
+    "HoldingsV1": {
+      "description": "Ein Depotstand. ``version`` 0 ist der leere Stand vor der ersten Speicherung.",
+      "properties": {
+        "cash": {
+          "items": {
+            "$ref": "#/$defs/CashLineV1"
+          },
+          "title": "Cash",
+          "type": "array"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "depot_id": {
+          "minimum": 1,
+          "title": "Depot Id",
+          "type": "integer"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/HoldingLineV1"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "enum": [
+                "manual",
+                "import",
+                "bank"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "version": {
+          "minimum": 0,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "depot_id",
+        "version"
+      ],
+      "title": "HoldingsV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal",
+            "not_found",
+            "archived"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "depots": {
+      "items": {
+        "$ref": "#/$defs/DepotExportV1"
+      },
+      "title": "Depots",
+      "type": "array"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "DepotExportReplyV1",
+  "type": "object"
+}

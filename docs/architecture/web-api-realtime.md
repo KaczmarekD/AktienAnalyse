@@ -179,7 +179,7 @@ inkompatiblen Protokollversion wird schon beim Handshake abgelehnt.
 | `ranking` | neues Ranking (Run oder Rescore) |
 | `profiles` | Profil gespeichert oder aktiviert |
 | `instrument:<SYMBOL>` | neue Daten zu einem Titel |
-| `user:<id>` | seit D1.3: Meldungen nur für diesen Nutzer (später Depots, Berichte). Abonnieren darf nur er selbst, sonst `error` mit Code `forbidden`. |
+| `user:<id>` | seit D1.3: Meldungen nur für diesen Nutzer, seit D3.2 `portfolio.depot.changed` seiner Depots (nur ID, Art, Version; der Tab lädt per REST nach), später Berichte. Abonnieren darf nur er selbst, sonst `error` mit Code `forbidden`. |
 
 **Client → Server**
 

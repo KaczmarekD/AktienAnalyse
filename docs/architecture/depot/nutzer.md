@@ -170,7 +170,7 @@ Das Löschkommando hat der User mit ADR-0012 am 06.11.2026 angenommen.
 | `PUT /api/v1/me/password` | Passwort ändern (altes Passwort nötig, Fehlversuche zählen wie beim Anmelden) | angemeldet |
 | `PUT /api/v1/me/profile` | Anzeigename (D1.4), Mail mit Bestätigung (D1.6) | angemeldet |
 | `GET /api/v1/me/sessions`, `POST /api/v1/me/sessions/revoke-all` | Sitzungen, überall abmelden (auch diese) | angemeldet |
-| `GET /api/v1/me/export` | alle eigenen Daten als JSON (NUT-12) | angemeldet |
+| `GET /api/v1/me/export` | alle eigenen Daten als JSON (NUT-12), seit D3.2 mit den Depots | angemeldet |
 | `GET /api/v1/admin/users`, `POST /api/v1/admin/users` | Nutzer auflisten, mit Einmal-Passwort anlegen | Admin |
 | `POST /api/v1/admin/users/{id}/disable`, `…/enable`, `…/reset-password` | verwalten (nicht am eigenen Konto) | Admin |
 

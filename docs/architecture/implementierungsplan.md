@@ -3771,6 +3771,18 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   `test_authz.py`; WebSocket: `depot.changed` an `user:<id>` des Besitzers; `/me/export` mit den
   eigenen Depots.
 - **Review:** `/code-review high`, `/security-review`.
+- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+  - **Echte Sitzung:** `depot_owner` verlangt sie auch im Übergang ohne Sitzungspflicht (Depots
+    gehören einer Person, nicht `LAN_USER`), mit Einmal-Passwort 403. Die Prüfung hängt am Router,
+    läuft also vor Body und Ports (401 vor 422 und 503).
+  - **Fehler:** `not_found` → 404, `archived` und `conflict` → 409 (mit der neuesten Version im
+    Text), `invalid` → 422 mit der Meldung von portfolio; ohne `If-Match` 428, ohne Zahl 400.
+  - **Export:** neuer Befehl `portfolio.depots.export`; ist portfolio eingerichtet, aber nicht
+    erreichbar, antwortet `/me/export` mit 503 statt mit einem halben Export. Ohne NATS
+    (`make api`) gibt es keine Depots, der Export hat dann eine leere Liste.
+  - **Test der Kette:** `tests/test_depots_api.py` verbindet das web-api über `LocalCaller` mit
+    den echten Handlern von portfolio, ohne NATS.
+  - **Zielallokation und Import** bleiben bei D3.5 und später; die Tabelle in depots.md nennt sie.
 
 **D3.3 Abdeckung aus portfolio** (WP-09, 13 teilweise)
 - **Test:** portfolio meldet die Menge aller Wertpapiere aktiver Depots und Beobachtungslisten

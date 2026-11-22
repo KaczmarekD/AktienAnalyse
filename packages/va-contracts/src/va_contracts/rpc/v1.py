@@ -17,6 +17,7 @@ from ..base import Contract, PositiveId
 from ..portfolio import (
     MAX_LINES,
     CashLineV1,
+    DepotExportV1,
     DepotKind,
     DepotName,
     DepotV1,
@@ -295,6 +296,16 @@ class HistoryReplyV1(RpcReplyV1):
     entries: list[HistoryEntryV1] = Field(default_factory=list)  # neueste zuerst
 
 
+class DepotExportRequestV1(Contract):
+    """D3.2: alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden (NUT-12)."""
+
+    user_id: PositiveId
+
+
+class DepotExportReplyV1(RpcReplyV1):
+    depots: list[DepotExportV1] = Field(default_factory=list)
+
+
 # -- Katalog ------------------------------------------------------------------------------
 
 
@@ -336,6 +347,8 @@ DEPOTS_RESTORE = RpcSpec("portfolio.depots.restore", DepotRefRequestV1, DepotRep
 HOLDINGS_GET = RpcSpec("portfolio.holdings.get", HoldingsGetRequestV1, HoldingsReplyV1)
 HOLDINGS_SAVE = RpcSpec("portfolio.holdings.save", HoldingsSaveRequestV1, HoldingsReplyV1)
 HOLDINGS_HISTORY = RpcSpec("portfolio.holdings.history", DepotRefRequestV1, HistoryReplyV1)
+# D3.2: Datenexport (NUT-12)
+DEPOTS_EXPORT = RpcSpec("portfolio.depots.export", DepotExportRequestV1, DepotExportReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -359,12 +372,14 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         HOLDINGS_GET,
         HOLDINGS_SAVE,
         HOLDINGS_HISTORY,
+        DEPOTS_EXPORT,
     )
 }
 
 __all__ = [
     "DEPOTS_ARCHIVE",
     "DEPOTS_CREATE",
+    "DEPOTS_EXPORT",
     "DEPOTS_GET",
     "DEPOTS_LIST",
     "DEPOTS_RESTORE",
@@ -386,6 +401,8 @@ __all__ = [
     "ActivateReplyV1",
     "ActivateRequestV1",
     "DepotCreateRequestV1",
+    "DepotExportReplyV1",
+    "DepotExportRequestV1",
     "DepotListReplyV1",
     "DepotListRequestV1",
     "DepotRefRequestV1",

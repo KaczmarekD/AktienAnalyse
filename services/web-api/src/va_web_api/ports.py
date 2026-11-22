@@ -16,6 +16,15 @@ if TYPE_CHECKING:
     from datetime import date
 
     from va_contracts.events.v1 import RunOptionsV1
+    from va_contracts.portfolio import (
+        CashLineV1,
+        DepotExportV1,
+        DepotKind,
+        DepotV1,
+        HistoryEntryV1,
+        HoldingLineV1,
+        HoldingsV1,
+    )
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.securities import SecurityHitV1, SecurityV1
 
@@ -108,6 +117,69 @@ class SecurityDirectory(Protocol):
     def resolve(self, isin: str, symbol: str | None = None) -> SecurityV1 | None:
         """Stammdaten und Listings; ``None`` fuer eine unbekannte ISIN."""
         ...
+
+
+class PortfolioUnavailable(RemoteUnavailable):
+    """Depots (D3.2)."""
+
+    service = "portfolio"
+
+
+class DepotNotFound(LookupError):
+    """Kein Depot dieses Nutzers (oder keine solche Version): 404 wie unbekannt."""
+
+
+class DepotArchived(Exception):
+    """Ein archiviertes Depot aendert sich erst nach dem Wiederherstellen (409)."""
+
+
+class DepotConflict(Exception):
+    """Der Depotstand ist nicht mehr der aus ``If-Match`` (409); ``newest`` ist der neueste."""
+
+    def __init__(self, newest: int | None) -> None:
+        super().__init__(f"neuester Depotstand: {newest}")
+        self.newest = newest
+
+
+class DepotInvalid(ValueError):
+    """Eine Eingabe passt nicht (422), etwa eine ISIN doppelt oder ohne Menge."""
+
+
+class DepotDirectory(Protocol):
+    """Depots bei portfolio (D3.2), immer fuer einen Nutzer. Wirft ``PortfolioUnavailable``,
+    ``DepotNotFound``, ``DepotArchived``, ``DepotConflict``, ``DepotInvalid``."""
+
+    def list(self, user_id: int, *, include_archived: bool) -> list[DepotV1]: ...
+
+    def create(
+        self, user_id: int, *, kind: DepotKind, name: str, description: str | None
+    ) -> DepotV1: ...
+
+    def get(self, user_id: int, depot_id: int) -> DepotV1: ...
+
+    def update(
+        self, user_id: int, depot_id: int, *, name: str, description: str | None
+    ) -> DepotV1: ...
+
+    def archive(self, user_id: int, depot_id: int) -> DepotV1: ...
+
+    def restore(self, user_id: int, depot_id: int) -> DepotV1: ...
+
+    def holdings(self, user_id: int, depot_id: int, version: int | None) -> HoldingsV1: ...
+
+    def save(
+        self,
+        user_id: int,
+        depot_id: int,
+        *,
+        base_version: int,
+        lines: list[HoldingLineV1],
+        cash: list[CashLineV1],
+    ) -> HoldingsV1: ...
+
+    def history(self, user_id: int, depot_id: int) -> list[HistoryEntryV1]: ...
+
+    def export(self, user_id: int) -> list[DepotExportV1]: ...
 
 
 class ProfileConflict(Exception):
