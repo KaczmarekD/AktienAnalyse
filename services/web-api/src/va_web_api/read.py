@@ -43,7 +43,7 @@ _RANKING_ROWS = text("""
            res.value_trap_flag, fs.market_cap, fs.currency, fs.ev_ebit, fs.pb_ratio, fs.p_fcf,
            fs.shareholder_yield, fs.roic, fs.fcf_margin, fs.operating_margin,
            fs.net_debt_ebitda, fs.earnings_stability, fs.f_score, fs.operating_accruals,
-           fs.cfo_assets
+           fs.cfo_assets, fs.net_share_issuance
     FROM scoring.score_result res
     JOIN market_data.instrument i ON i.id = res.instrument_id
     LEFT JOIN market_data.fundamental_snapshot fs
@@ -56,7 +56,8 @@ _SNAPSHOT_COLUMNS = """
     fs.fetch_run_id, fs.fetch_ok, fs.price, fs.currency, fs.market_cap, fs.ev_ebit, fs.pe_ratio,
     fs.pb_ratio, fs.p_fcf, fs.dividend_yield, fs.shareholder_yield, fs.roic, fs.fcf_margin,
     fs.operating_margin, fs.net_debt_ebitda, fs.earnings_stability, fs.f_score,
-    fs.operating_accruals, fs.cfo_assets, fs.revenue_growth_5y, fs.eps_growth_5y, fs.errors
+    fs.operating_accruals, fs.cfo_assets, fs.net_share_issuance, fs.revenue_growth_5y,
+    fs.eps_growth_5y, fs.errors
 """
 
 

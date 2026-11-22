@@ -193,7 +193,9 @@ durch Verlust-Quartale zu kappen.
 
 **Negative Bewertungs-Multiples werden aus dem Value-Ranking
 ausgeschlossen**, nicht mit 0 bestraft. Sonst sähen Pleitekandidaten mit
-negativem EV/EBIT wie Schnäppchen aus.
+negativem EV/EBIT wie Schnäppchen aus. Value-Faktoren ohne Multiple
+(`NON_MULTIPLE_FACTORS`, seit F2.2 die Netto-Emission) behalten negative Werte:
+Dort heißt negativ „Aktien zurückgekauft“.
 
 **`MIN_MARKET_CAP=300 Mio EUR`** – schließt Micro-Caps aus, in denen
 yfinance-Fundamentaldaten oft fehlerhaft oder veraltet sind und die
@@ -471,14 +473,15 @@ ADR-0001 und ADR-0002 aufgehoben.
    bzw. `MarketFigures`; `FIELD_MAP` bzw. `INFO_FIELDS` erweitern, falls yfinance-Roh-Feld
    nötig). Vergleicht der Faktor Jahre miteinander, rechnet er mit `StatementFigures.years`
    (`FiscalYear` nach Stichtag, seit F2.1), nicht mit `_latest`
-5. Eintrag im Katalog (`DEFAULT_VALUE_FACTORS` bzw. `QUALITY_FACTOR_CATALOG` in
+5. Eintrag im Katalog (`VALUE_FACTOR_CATALOG` bzw. `QUALITY_FACTOR_CATALOG` in
    `va_scoring.domain.scoring`) und derselbe Schlüssel im Literal `ValueFactorKey` bzw.
    `QualityFactorKey` (`va_contracts.profile`), ein Test hält beide gleich, dazu Name und
    Methodik-Hinweis in `FACTOR_INFO` (`va_scoring.domain.profile`, für das UI, mit Richtung und
-   Rolle höchstens 200 Zeichen). In die Standardauswahl (`DEFAULT_QUALITY_FACTORS`,
-   `DEFAULT_QUALITY_FACTOR_KEYS`) nur, wenn das Profil „Standard“ ihn sofort nutzen soll; sonst
-   schaltet ihn erst eine neue Profil-Version ein. Gehört er zu den Kennzahlen, die bei
-   Finanzwerten nichts aussagen, auch nach `INDUSTRY_RULE_EXCLUDED`
+   Rolle höchstens 200 Zeichen). In die Standardauswahl (`DEFAULT_VALUE_FACTORS` und
+   `DEFAULT_VALUE_FACTOR_KEYS` bzw. die Quality-Gegenstücke) nur, wenn das Profil „Standard“ ihn
+   sofort nutzen soll; sonst schaltet ihn erst eine neue Profil-Version ein. Gehört er zu den
+   Kennzahlen, die bei Finanzwerten nichts aussagen, auch nach `INDUSTRY_RULE_EXCLUDED`. Ein
+   Value-Faktor, der kein Multiple ist und negativ sein darf, gehört nach `NON_MULTIPLE_FACTORS`
 6. Spalte in `FundamentalSnapshot` (`va_market_data.adapters.postgres.models`) und in der
    Projektion `web.snapshot_row` (`va_web_api.adapters.postgres.models`), eine Migration für
    beide (nur additiv) – sonst lehnt `write_snapshot` die unbekannte Spalte ab. Dazu die

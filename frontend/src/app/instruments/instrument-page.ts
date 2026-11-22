@@ -56,6 +56,8 @@ const VALUATION = [
   figure('pb_ratio', 'num1'),
   figure('p_fcf', 'num1'),
   figure('shareholder_yield', 'pct'),
+  // F2.2 (ADR-0011): Netto-Emission
+  figure('net_share_issuance', 'pct'),
 ];
 const VALUATION_INFO = [figure('pe_ratio', 'num1'), figure('dividend_yield', 'pct')];
 const QUALITY = [
@@ -75,7 +77,7 @@ const MARKET = [
   figure('revenue_growth_5y', 'pct'),
   figure('eps_growth_5y', 'pct'),
 ];
-const VALUE_FACTORS = ['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield'];
+const VALUE_FACTORS = ['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield', 'net_share_issuance'];
 const QUALITY_FACTORS = [
   'roic',
   'fcf_margin',

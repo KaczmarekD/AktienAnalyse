@@ -53,6 +53,7 @@ _METRICS = (
     "p_fcf",
     "dividend_yield",
     "shareholder_yield",
+    "net_share_issuance",
     "roic",
     "fcf_margin",
     "operating_margin",

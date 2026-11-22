@@ -75,6 +75,7 @@ const FACTOR_FORMAT: Record<FactorField, 'int' | 'num1' | 'num2' | 'pct'> = {
   pb_ratio: 'num1',
   p_fcf: 'num1',
   shareholder_yield: 'pct',
+  net_share_issuance: 'pct',
   roic: 'pct',
   fcf_margin: 'pct',
   operating_margin: 'pct',
@@ -94,6 +95,7 @@ const ASCENDING: readonly string[] = [
   'p_fcf',
   'net_debt_ebitda',
   'operating_accruals',
+  'net_share_issuance',
 ];
 
 function loadColumns(): string[] {

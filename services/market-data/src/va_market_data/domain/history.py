@@ -9,7 +9,7 @@ Die Parser kennen keine yfinance-Namen: Der Abruf benennt die Spalten vorher um
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -17,6 +17,7 @@ import pandas as pd
 from .periods import period_end
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from datetime import date, datetime
 
 # Groesste Zahl in einer BIGINT-Spalte; darueber scheiterte das Speichern des Titels
@@ -24,6 +25,10 @@ MAX_BIGINT = 2**63 - 1
 
 # Spalten der Kurshistorie nach dem Abruf
 PRICE_COLUMNS = ("close", "adj_close", "dividend", "split")
+
+# So weit zurueck liest der Abruf die gespeicherte Aktienanzahl und die Splits (F2.2): ein Jahr
+# fuer die Netto-Emission, ihr Fenster und das hoechste Alter des Stichtags, mit Reserve
+ISSUANCE_HISTORY_DAYS = 550
 
 # Yahoo rechnet Adj Close bei jedem Abruf minimal anders (gemessen: bis 6e-7 relativ).
 # Korrekturen, Splits und Dividendenanpassungen liegen um Groessenordnungen darueber.
@@ -41,6 +46,10 @@ class HistoryState:
     last_price_date: date | None = None
     # Tage mit gespeichertem Split: Ein neuer Split im Abruffenster laedt alle Kurse neu
     price_split_days: frozenset[date] = frozenset()
+    # Gespeicherte Aktienanzahl und Splits der letzten Zeit (``ISSUANCE_HISTORY_DAYS``): Der
+    # Abruf holt nur die neuen Tage, die Netto-Emission braucht das Jahr davor (F2.2)
+    stored_shares: Mapping[date, int] = field(default_factory=dict)
+    stored_splits: Mapping[date, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -145,12 +154,17 @@ def daily_price_bars(frame: pd.DataFrame | None, *, fetched_at: datetime) -> dic
     return bars
 
 
+def split_ratios(frame: pd.DataFrame | None) -> dict[date, float]:
+    """Splits einer Kurshistorie (Spalten ``PRICE_COLUMNS``) je Tag: 2.0 = 2:1, 0.1 = 1:10."""
+    if frame is None or frame.empty or "split" not in frame.columns:
+        return {}
+    return {
+        day: ratio
+        for stamp, split in frame["split"].items()
+        if (day := period_end(stamp)) is not None and (ratio := _finite(split) or 0.0) > 0
+    }
+
+
 def split_days(frame: pd.DataFrame | None) -> set[date]:
     """Tage mit Split in einer Kurshistorie (Spalten ``PRICE_COLUMNS``)."""
-    if frame is None or frame.empty or "split" not in frame.columns:
-        return set()
-    return {
-        day
-        for stamp, split in frame["split"].items()
-        if (day := period_end(stamp)) is not None and (_finite(split) or 0.0) > 0
-    }
+    return set(split_ratios(frame))

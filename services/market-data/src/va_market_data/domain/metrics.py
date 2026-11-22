@@ -8,8 +8,9 @@ Keine Ein-/Ausgabe, kein Provider: Der Abruf (Adapter
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 import numpy as np
 
@@ -18,6 +19,11 @@ HISTORY_YEARS = 5
 MIN_HISTORY = max(2, HISTORY_YEARS - 1)
 # Effektive Steuerquote begrenzen: Verlustjahre und Einmaleffekte sonst als Ausreisser
 MAX_TAX_RATE = 0.6
+# Netto-Emission (F2.2): Abstand der beiden Zeitpunkte, Fenster der Mediane und hoechstes Alter
+# der juengsten Aktienanzahl
+ISSUANCE_LAG_DAYS = 365
+ISSUANCE_WINDOW_DAYS = 30
+ISSUANCE_MAX_AGE_DAYS = 120
 
 
 @dataclass(frozen=True)
@@ -85,6 +91,20 @@ class MarketFigures:
 
 
 @dataclass(frozen=True)
+class ShareHistory:
+    """Aktienanzahl und Splits eines Titels je Tag (F2.2, ADR-0011).
+
+    ``counts`` ist roh, wie Yahoo sie liefert: Am Tag eines 2:1-Splits verdoppelt sie sich.
+    ``splits`` sind die Verhaeltnisse aus der Kurshistorie (2.0 = 2:1, 0.1 = 1:10), ``as_of``
+    der Tag des Abrufs.
+    """
+
+    counts: Mapping[date, float]
+    splits: Mapping[date, float]
+    as_of: date
+
+
+@dataclass(frozen=True)
 class Metrics:
     """Kennzahlen eines Titels. Value-Multiples in Handelswaehrung, Quality waehrungsfrei."""
 
@@ -96,6 +116,7 @@ class Metrics:
     dividend_yield: float | None
     buyback_yield: float | None
     shareholder_yield: float | None
+    net_share_issuance: float | None
     roic: float | None
     roa: float | None
     fcf_margin: float | None
@@ -309,6 +330,42 @@ def cfo_assets(years: Sequence[FiscalYear]) -> float | None:
     return safe_div(years[0].operating_cash_flow, _average_assets(years))
 
 
+def _window_median(counts: Mapping[date, float], end: date) -> float | None:
+    window = [
+        value
+        for day, value in counts.items()
+        if end - timedelta(days=ISSUANCE_WINDOW_DAYS) < day <= end
+    ]
+    return float(np.median(window)) if window else None
+
+
+def net_share_issuance(history: ShareHistory | None) -> float | None:
+    """Veraenderung der Aktienanzahl ueber 12 Monate, um Splits bereinigt (JKP ``chcsho_12m``).
+
+    - Stichtag ist der juengste Tag mit Aktienanzahl, hoechstens ``ISSUANCE_MAX_AGE_DAYS`` vor
+      dem Abruf. Jede Aktienanzahl wird mit den Splits danach bis zum Stichtag auf dessen
+      Basis gebracht.
+    - Verglichen werden die Mediane der ``ISSUANCE_WINDOW_DAYS`` Tage bis zum Stichtag und bis
+      ``ISSUANCE_LAG_DAYS`` davor. Der Median faengt doppelte und abweichende Tage von Yahoo ab.
+    - Negativ heisst: Aktien zurueckgekauft. ``None`` ohne Werte in einem der Fenster.
+    """
+    if history is None or not history.counts:
+        return None
+    latest = max(history.counts)
+    if (history.as_of - latest).days > ISSUANCE_MAX_AGE_DAYS:
+        return None
+    splits = [(day, ratio) for day, ratio in history.splits.items() if ratio > 0]
+
+    def adjusted(day: date, count: float) -> float:
+        return count * math.prod(ratio for split, ratio in splits if day < split <= latest)
+
+    counts = {day: adjusted(day, count) for day, count in history.counts.items()}
+    now = _window_median(counts, latest)
+    before = _window_median(counts, latest - timedelta(days=ISSUANCE_LAG_DAYS))
+    change = safe_div(now, before)
+    return None if change is None else change - 1
+
+
 def _growth(history: Sequence[float | None]) -> float | None:
     values = _recent(history)
     return None if values is None else cagr(values)
@@ -326,8 +383,11 @@ def compute_metrics(
     *,
     fx: float | None,
     default_tax_rate: float,
+    shares: ShareHistory | None = None,
 ) -> Metrics:
     """Alle Kennzahlen eines Titels.
+
+    ``shares`` ist die Historie der Aktienanzahl fuer die Netto-Emission (F2.2).
 
     ``fx`` rechnet Berichts- in Handelswaehrung um (1.0 = gleich, ``None`` = unbekannt).
     Marktdaten sind in Handelswaehrung, Abschluesse in Berichtswaehrung (z. B. Qiagen:
@@ -378,6 +438,7 @@ def compute_metrics(
         dividend_yield=div_yield,
         buyback_yield=buyback_yield,
         shareholder_yield=sum(yields) if yields else None,
+        net_share_issuance=net_share_issuance(shares),
         roic=roic(
             ebit=s.ebit,
             equity=s.total_equity,

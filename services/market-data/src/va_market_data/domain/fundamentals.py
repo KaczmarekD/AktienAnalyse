@@ -58,6 +58,8 @@ class ValueMetrics:
     dividend_yield: float | None = None  # Dezimal, 0.03 = 3 %
     buyback_yield: float | None = None
     shareholder_yield: float | None = None  # dividend + buyback
+    # Veraenderung der Aktienanzahl in 12 Monaten, um Splits bereinigt (F2.2); negativ = Rueckkauf
+    net_share_issuance: float | None = None
 
 
 @dataclass

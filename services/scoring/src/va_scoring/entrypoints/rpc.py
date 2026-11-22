@@ -56,7 +56,7 @@ from va_platform.db import session_scope
 
 from ..adapters.postgres import ScoringRepository
 from ..domain.profile import FACTOR_INFO, ScoringProfileParams
-from ..domain.scoring import DEFAULT_VALUE_FACTORS, QUALITY_FACTOR_CATALOG, score
+from ..domain.scoring import QUALITY_FACTOR_CATALOG, VALUE_FACTOR_CATALOG, score
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -78,7 +78,7 @@ type Handlers = dict[RpcSpec[Any, Any], Callable[[Any], RpcReplyV1]]
 def factor_catalog() -> list[FactorV1]:
     """Alle Faktoren mit Richtung und Methodik-Hinweis, Value vor Quality."""
     factors: list[FactorV1] = []
-    for group, catalog in (("value", DEFAULT_VALUE_FACTORS), ("quality", QUALITY_FACTOR_CATALOG)):
+    for group, catalog in (("value", VALUE_FACTOR_CATALOG), ("quality", QUALITY_FACTOR_CATALOG)):
         for key, (_column, direction) in catalog.items():
             label, hint = FACTOR_INFO[key]
             factors.append(

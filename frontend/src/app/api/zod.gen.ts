@@ -286,7 +286,9 @@ export const zProfileParamsV1Input = z.object({
     )
     .optional(),
   terminal_growth: z.number().gte(-0.05).lte(0.1).optional().default(0.02),
-  value_factors: z.array(z.enum(['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield'])).optional(),
+  value_factors: z
+    .array(z.enum(['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield', 'net_share_issuance']))
+    .optional(),
   value_trap_quality_threshold: z.number().gte(0).lte(1).optional().default(0.3),
   value_trap_value_threshold: z.number().gte(0).lte(1).optional().default(0.7),
   value_weight: z.number().gte(0).lte(1).optional().default(0.6),
@@ -381,6 +383,7 @@ export const zRankingRow = z.object({
   market_cap: z.number().nullable(),
   name: z.string().nullable(),
   net_debt_ebitda: z.number().nullable(),
+  net_share_issuance: z.number().nullable(),
   operating_accruals: z.number().nullable(),
   operating_margin: z.number().nullable(),
   p_fcf: z.number().nullable(),
@@ -600,6 +603,7 @@ export const zSnapshot = z.object({
   fetched_on: z.iso.date(),
   market_cap: z.number().nullable(),
   net_debt_ebitda: z.number().nullable(),
+  net_share_issuance: z.number().nullable(),
   operating_accruals: z.number().nullable(),
   operating_margin: z.number().nullable(),
   p_fcf: z.number().nullable(),

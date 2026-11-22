@@ -38,11 +38,12 @@ from ..domain.fundamentals import (
     RawFetch,
     ValueMetrics,
 )
-from ..domain.history import HistoryState, split_days
+from ..domain.history import HistoryState, daily_share_counts, split_days, split_ratios
 from ..domain.metrics import (
     FiscalYear,
     MarketFigures,
     Metrics,
+    ShareHistory,
     StatementFigures,
     compute_metrics,
 )
@@ -703,9 +704,10 @@ def fetch_one(
 ) -> Fundamentals:
     """Ein Titel. ``history`` sagt, bis wann seine Zeitreihen schon gespeichert sind."""
     _RATE_LIMIT.hit = False
+    fetched_at = datetime.now(UTC)
     fund = Fundamentals(
         identity=Identity(symbol=ticker.symbol, name=ticker.name, index=ticker.index),
-        provenance=Provenance(fetched_at=datetime.now(UTC)),
+        provenance=Provenance(fetched_at=fetched_at),
     )
 
     try:
@@ -797,7 +799,19 @@ def fetch_one(
     )
     fx = _statement_fx(info, fund.errors)
     fund.provenance.statement_fx = fx
-    metrics = compute_metrics(statements, market, fx=fx, default_tax_rate=cfg.default_tax_rate)
+    # Netto-Emission (F2.2): gespeicherte Tage plus die neuen aus diesem Abruf
+    share_history = ShareHistory(
+        counts={**state.stored_shares, **daily_share_counts(shares)},
+        splits={**state.stored_splits, **split_ratios(prices)},
+        as_of=fetched_at.date(),
+    )
+    metrics = compute_metrics(
+        statements,
+        market,
+        fx=fx,
+        default_tax_rate=cfg.default_tax_rate,
+        shares=share_history,
+    )
     # Bei abweichender Berichtswaehrung aus umgerechneten Abschluessen neu berechnet
     fund.market.enterprise_value = metrics.enterprise_value
     fund.value = ValueMetrics(**_fields_of(metrics, ValueMetrics))

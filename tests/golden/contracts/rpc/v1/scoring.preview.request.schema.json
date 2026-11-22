@@ -103,7 +103,8 @@
               "ev_ebit",
               "pb",
               "p_fcf",
-              "shareholder_yield"
+              "shareholder_yield",
+              "net_share_issuance"
             ],
             "type": "string"
           },

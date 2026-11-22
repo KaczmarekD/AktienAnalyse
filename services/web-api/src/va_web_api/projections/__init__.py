@@ -179,6 +179,7 @@ def snapshot_values(
         "p_fcf": value.p_fcf,
         "dividend_yield": value.dividend_yield,
         "shareholder_yield": value.shareholder_yield,
+        "net_share_issuance": value.net_share_issuance,
         "roic": quality.roic,
         "fcf_margin": quality.fcf_margin,
         "operating_margin": quality.operating_margin,

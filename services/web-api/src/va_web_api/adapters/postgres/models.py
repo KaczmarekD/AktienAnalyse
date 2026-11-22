@@ -136,6 +136,8 @@ class SnapshotRow(Base):
     p_fcf: Mapped[float | None]
     dividend_yield: Mapped[float | None]
     shareholder_yield: Mapped[float | None]
+    # F2.2 (Migration 0024): Netto-Emission
+    net_share_issuance: Mapped[float | None]
     roic: Mapped[float | None]
     fcf_margin: Mapped[float | None]
     operating_margin: Mapped[float | None]

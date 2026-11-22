@@ -270,6 +270,8 @@ class FundamentalSnapshot(Base):
     dividend_yield: Mapped[float | None]
     buyback_yield: Mapped[float | None]
     shareholder_yield: Mapped[float | None]
+    # F2.2 (Migration 0024): Netto-Emission
+    net_share_issuance: Mapped[float | None]
     # QualityMetrics
     roic: Mapped[float | None]
     roa: Mapped[float | None]

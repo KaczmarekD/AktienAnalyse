@@ -44,6 +44,8 @@ class ValueMetricsV1(Contract):
     dividend_yield: float | None = None  # Dezimal, 0.03 = 3 %
     buyback_yield: float | None = None
     shareholder_yield: float | None = None
+    # F2.2 (additiv): Veraenderung der Aktienanzahl in 12 Monaten, um Splits bereinigt
+    net_share_issuance: float | None = None
 
 
 class QualityMetricsV1(Contract):

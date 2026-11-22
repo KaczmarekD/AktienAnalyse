@@ -73,6 +73,8 @@ class RankingRow(_Model):
     pb_ratio: float | None
     p_fcf: float | None
     shareholder_yield: float | None
+    # F2.2: Netto-Emission (im Profil v1 abgeschaltet)
+    net_share_issuance: float | None
     roic: float | None
     fcf_margin: float | None
     operating_margin: float | None
@@ -120,6 +122,8 @@ class Snapshot(_Model):
     p_fcf: float | None
     dividend_yield: float | None
     shareholder_yield: float | None
+    # F2.2: Netto-Emission (im Profil v1 abgeschaltet)
+    net_share_issuance: float | None
     roic: float | None
     fcf_margin: float | None
     operating_margin: float | None

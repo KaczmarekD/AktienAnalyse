@@ -9,15 +9,22 @@ bekommt einen Standardwert, gespeicherte Versionen ohne ihn erhalten ihn beim Le
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, Self, get_args
+from typing import Any, Literal, Self
 
 from pydantic import ConfigDict, Field, ValidationError, field_serializer, model_validator
 
 from .base import Contract
 
-# Der Faktor-Katalog als Schluessel. Spalte und Richtung stehen in scoring (DEFAULT_*_FACTORS)
+# Der Faktor-Katalog als Schluessel. Spalte und Richtung stehen in scoring (*_FACTOR_CATALOG)
 # und sind im UI nicht aenderbar; ein Test dort haelt beide Listen gleich.
-ValueFactorKey = Literal["ev_ebit", "pb", "p_fcf", "shareholder_yield"]
+ValueFactorKey = Literal[
+    "ev_ebit",
+    "pb",
+    "p_fcf",
+    "shareholder_yield",
+    # F2.2 (ADR-0011): im Katalog, im Profil v1 abgeschaltet
+    "net_share_issuance",
+]
 QualityFactorKey = Literal[
     "roic",
     "fcf_margin",
@@ -29,7 +36,10 @@ QualityFactorKey = Literal[
     "operating_accruals",
     "cfo_assets",
 ]
-# Standardauswahl (Profil "Standard" v1): die fuenf Quality-Faktoren vor ADR-0011
+# Standardauswahl (Profil "Standard" v1): die Faktoren vor ADR-0011
+DEFAULT_VALUE_FACTOR_KEYS: frozenset[ValueFactorKey] = frozenset(
+    {"ev_ebit", "pb", "p_fcf", "shareholder_yield"}
+)
 DEFAULT_QUALITY_FACTOR_KEYS: frozenset[QualityFactorKey] = frozenset(
     {"roic", "fcf_margin", "operating_margin", "net_debt_ebitda", "earnings_stability"}
 )
@@ -77,7 +87,7 @@ class ProfileParamsV1(Contract):
         default=True, description="Negative Multiples aus dem Value-Ranking ausschliessen"
     )
     value_factors: frozenset[ValueFactorKey] = Field(
-        default_factory=lambda: frozenset(get_args(ValueFactorKey)),
+        default_factory=lambda: DEFAULT_VALUE_FACTOR_KEYS,
         description="Aktive Value-Faktoren, mindestens 2",
     )
     quality_factors: frozenset[QualityFactorKey] = Field(

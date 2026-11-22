@@ -18,7 +18,7 @@ from va_contracts.profile import (
     ValueFactorKey,
 )
 
-from .scoring import DEFAULT_VALUE_FACTORS, QUALITY_FACTOR_CATALOG, ScoringConfig
+from .scoring import QUALITY_FACTOR_CATALOG, VALUE_FACTOR_CATALOG, ScoringConfig
 
 __all__ = [
     "DEFAULT_PROFILE_NAME",
@@ -57,6 +57,12 @@ FACTOR_INFO: dict[str, tuple[str, str]] = {
         "Shareholder Yield",
         "Dividenden plus Aktienrückkäufe im Verhältnis zum Börsenwert: Wie viel fließt an die "
         "Aktionäre zurück?",
+    ),
+    # F2.2 (ADR-0011): im Katalog, im Profil v1 abgeschaltet
+    "net_share_issuance": (
+        "Netto-Emission",
+        "Veränderung der Aktienanzahl in zwölf Monaten, um Splits bereinigt. Rückkäufe senken "
+        "sie, Kapitalerhöhungen und Mitarbeiteraktien erhöhen sie.",
     ),
     "roic": (
         "ROIC",
@@ -138,7 +144,7 @@ class ScoringProfileParams(ProfileParamsV1):
             drop_negative_value_metrics=self.drop_negative_value_metrics,
             value_factors={
                 key: factor
-                for key, factor in DEFAULT_VALUE_FACTORS.items()
+                for key, factor in VALUE_FACTOR_CATALOG.items()
                 if key in self.value_factors
             },
             quality_factors={

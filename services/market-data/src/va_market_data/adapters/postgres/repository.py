@@ -583,6 +583,27 @@ class MarketDataRepository:
         )
         return dict(self.session.execute(stmt).all())
 
+    def get_share_counts_since(
+        self, symbols: Collection[str], since: date
+    ) -> dict[str, dict[date, int]]:
+        """Aktienanzahl ab ``since`` je Symbol und Tag, aktuellste Version (F2.2)."""
+        stmt = (
+            select(Instrument.symbol, ShareCount.as_of, ShareCount.shares)
+            .join(ShareCount, ShareCount.instrument_id == Instrument.id)
+            .where(Instrument.symbol.in_(list(symbols)), ShareCount.as_of >= since)
+            .ext(distinct_on(Instrument.symbol, ShareCount.as_of))
+            .order_by(
+                Instrument.symbol,
+                ShareCount.as_of,
+                ShareCount.first_seen_at.desc(),
+                ShareCount.id.desc(),
+            )
+        )
+        counts: dict[str, dict[date, int]] = {}
+        for symbol, day, shares in self.session.execute(stmt):
+            counts.setdefault(symbol, {})[day] = shares
+        return counts
+
     # --- Kurshistorie (F1.4) -----------------------------------------------------
 
     def write_price_bars(
@@ -708,6 +729,31 @@ class MarketDataRepository:
         for symbol, day in self.session.execute(stmt):
             days.setdefault(symbol, set()).add(day)
         return {symbol: frozenset(found) for symbol, found in days.items()}
+
+    def get_splits_since(
+        self, symbols: Collection[str], since: date
+    ) -> dict[str, dict[date, float]]:
+        """Splits ab ``since`` je Symbol und Tag, aus der aktuellsten Version des Tages (F2.2)."""
+        latest = (
+            select(Instrument.symbol, PriceBarRow.trade_date, PriceBarRow.split)
+            .join(PriceBarRow, PriceBarRow.instrument_id == Instrument.id)
+            .where(Instrument.symbol.in_(list(symbols)), PriceBarRow.trade_date >= since)
+            .ext(distinct_on(Instrument.symbol, PriceBarRow.trade_date))
+            .order_by(
+                Instrument.symbol,
+                PriceBarRow.trade_date,
+                PriceBarRow.first_seen_at.desc(),
+                PriceBarRow.id.desc(),
+            )
+            .subquery()
+        )
+        stmt = select(latest.c.symbol, latest.c.trade_date, latest.c.split).where(
+            latest.c.split > 0
+        )
+        splits: dict[str, dict[date, float]] = {}
+        for symbol, day, ratio in self.session.execute(stmt):
+            splits.setdefault(symbol, {})[day] = ratio
+        return splits
 
     # --- Wechselkurse -----------------------------------------------------------
 

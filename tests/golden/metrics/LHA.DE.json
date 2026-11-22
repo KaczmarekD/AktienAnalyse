@@ -38,6 +38,7 @@
   "buyback_yield": 0.0,
   "dividend_yield": 0.04592263,
   "ev_ebit": 6.242053292257803,
+  "net_share_issuance": null,
   "p_fcf": -19.364482922374428,
   "pb_ratio": 0.70069516,
   "pe_ratio": 12.6,

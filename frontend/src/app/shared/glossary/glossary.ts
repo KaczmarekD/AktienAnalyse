@@ -160,6 +160,13 @@ export const GLOSSARY = {
     role: 'value',
     factor: true,
   },
+  // F2.2 (ADR-0011): im Katalog, im Profil v1 abgeschaltet; Text aus FACTOR_INFO (API)
+  net_share_issuance: {
+    group: 'Value-Faktoren',
+    label: 'Netto-Emission',
+    role: 'value',
+    factor: true,
+  },
 
   // Quality-Faktoren
   roic: { group: 'Quality-Faktoren', label: 'ROIC', role: 'quality', abbr: true, factor: true },
@@ -458,6 +465,7 @@ export const FIELD_FACTOR = {
   pb_ratio: 'pb',
   p_fcf: 'p_fcf',
   shareholder_yield: 'shareholder_yield',
+  net_share_issuance: 'net_share_issuance',
   roic: 'roic',
   fcf_margin: 'fcf_margin',
   operating_margin: 'operating_margin',

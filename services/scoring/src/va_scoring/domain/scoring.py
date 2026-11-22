@@ -48,6 +48,16 @@ DEFAULT_VALUE_FACTORS: dict[str, ValueFactor] = {
     "shareholder_yield": ("shareholder_yield", "high"),
 }
 
+# Der ganze Value-Katalog: die Standardauswahl und die Netto-Emission aus ADR-0011, die ein
+# Profil erst einschalten muss (F2.2). Neue Faktoren kommen hinten an.
+VALUE_FACTOR_CATALOG: dict[str, ValueFactor] = DEFAULT_VALUE_FACTORS | {
+    "net_share_issuance": ("net_share_issuance", "low"),
+}
+
+# Value-Faktoren, die kein Multiple sind: Ein negativer Wert ist ein echter Messwert (Rueckkauf)
+# und bleibt im Ranking, auch wenn ``drop_negative_value_metrics`` negative Multiples ausschliesst
+NON_MULTIPLE_FACTORS: frozenset[str] = frozenset({"net_share_issuance"})
+
 DEFAULT_QUALITY_FACTORS: dict[str, QualityFactor] = {
     "roic": ("roic", "high"),
     "fcf_margin": ("fcf_margin", "high"),
@@ -172,7 +182,7 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
             value_ranks[f"rank_{name}"] = _percentile_rank(
                 inputs[col],
                 direction,
-                cfg.drop_negative_value_metrics,
+                cfg.drop_negative_value_metrics and name not in NON_MULTIPLE_FACTORS,
             )
 
     quality_ranks = pd.DataFrame(index=out.index)

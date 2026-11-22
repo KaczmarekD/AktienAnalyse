@@ -1366,7 +1366,8 @@
                 "ev_ebit",
                 "pb",
                 "p_fcf",
-                "shareholder_yield"
+                "shareholder_yield",
+                "net_share_issuance"
               ],
               "type": "string"
             },
@@ -1895,6 +1896,17 @@
             ],
             "title": "Net Debt Ebitda"
           },
+          "net_share_issuance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Share Issuance"
+          },
           "operating_accruals": {
             "anyOf": [
               {
@@ -2042,6 +2054,7 @@
           "pb_ratio",
           "p_fcf",
           "shareholder_yield",
+          "net_share_issuance",
           "roic",
           "fcf_margin",
           "operating_margin",
@@ -2972,6 +2985,17 @@
             ],
             "title": "Net Debt Ebitda"
           },
+          "net_share_issuance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Share Issuance"
+          },
           "operating_accruals": {
             "anyOf": [
               {
@@ -3085,6 +3109,7 @@
           "p_fcf",
           "dividend_yield",
           "shareholder_yield",
+          "net_share_issuance",
           "roic",
           "fcf_margin",
           "operating_margin",

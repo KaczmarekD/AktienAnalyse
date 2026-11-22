@@ -737,7 +737,7 @@ export type ProfileParamsV1Input = {
    *
    * Aktive Value-Faktoren, mindestens 2
    */
-  value_factors?: Array<'ev_ebit' | 'pb' | 'p_fcf' | 'shareholder_yield'>;
+  value_factors?: Array<'ev_ebit' | 'pb' | 'p_fcf' | 'shareholder_yield' | 'net_share_issuance'>;
   /**
    * Value Trap Quality Threshold
    *
@@ -1015,6 +1015,10 @@ export type RankingRow = {
    * Net Debt Ebitda
    */
   net_debt_ebitda: number | null;
+  /**
+   * Net Share Issuance
+   */
+  net_share_issuance: number | null;
   /**
    * Operating Accruals
    */
@@ -1526,6 +1530,10 @@ export type Snapshot = {
    * Net Debt Ebitda
    */
   net_debt_ebitda: number | null;
+  /**
+   * Net Share Issuance
+   */
+  net_share_issuance: number | null;
   /**
    * Operating Accruals
    */

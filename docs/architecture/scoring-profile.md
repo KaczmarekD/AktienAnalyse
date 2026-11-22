@@ -36,7 +36,7 @@ Die Standardwerte entsprechen dem heutigen `ScoringConfig`:
 | `value_trap_quality_threshold` | 0.30 | 0–1 |
 | `min_factor_count` | 2 | ≥ 1: so viele Faktoren muss ein Titel je Gruppe mindestens haben. Im UI nicht änderbar, steht aber im Profil, damit es das Scoring vollständig beschreibt (seit P2b.1). |
 | `drop_negative_value_metrics` | an | negative Multiples aus dem Value-Ranking ausschließen |
-| `value_factors` | EV/EBIT, P/B, P/FCF, Shareholder Yield | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv |
+| `value_factors` | EV/EBIT, P/B, P/FCF, Shareholder Yield | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv. Seit F2.2 enthält der Katalog auch die Netto-Emission (ADR-0011); sie ist standardmäßig aus und behält negative Werte, auch mit `drop_negative_value_metrics`. |
 | `quality_factors` | ROIC, FCF-Marge, Operating Margin, Net Debt/EBITDA, Earnings Stability | Teilmenge des Katalogs, mindestens 2 und mindestens `min_factor_count` aktiv. Seit F2.1 enthält der Katalog auch F-Score, Accruals und CFO/Bilanzsumme (ADR-0011); sie sind standardmäßig aus. |
 | `industry_rules` | aus | Branchenregel (seit F2.4, ADR-0011): Bei passender Branche zählen EV/EBIT, P/FCF, FCF-Marge, Net Debt/EBITDA, operative Marge und ROIC nicht; die Titel stehen im Abschnitt „Finanzwerte“ der Mail. Erst das Profil v2 (F2.5) schaltet sie an. |
 | `industry_prefixes` | Banks, Insurance, Capital Markets, Real Estate, REIT | Anfänge der Yahoo-`industry`, für die die Branchenregel gilt; keine leeren Einträge |
