@@ -9,6 +9,9 @@ Seit D2.2 ruft er nach dem Referenzuniversum die Aktien der Abdeckung ab und sch
 Seit D2.4 frischt er danach die Stammdaten der Abdeckung auf und schickt sie vor
 ``snapshot.completed`` als ``marketdata.securities.updated``, hoechstens 50 Wertpapiere je Event.
 Auch ein Fehler dort kostet nur diese Events.
+
+Seit D3.3 uebernimmt ``CoverageChangedHandler`` die Abdeckung von portfolio und frischt die
+Stammdaten der neuen Wertpapiere sofort auf (``marketdata.securities.updated``).
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from va_contracts.events.v1 import (
+    COVERAGE_CHANGED,
     FETCH_PROGRESSED,
     PRICES_COMPLETED,
     PRICES_REQUESTED,
@@ -49,14 +53,22 @@ from ..application.snapshot import take_snapshot
 from .mapping import security_v1
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from datetime import datetime
+
     from va_contracts import Envelope
-    from va_contracts.events.v1 import PricesRequestedV1, ScreeningRunRequestedV1
+    from va_contracts.events.v1 import (
+        CoverageChangedV1,
+        PricesRequestedV1,
+        ScreeningRunRequestedV1,
+    )
     from va_platform.bus import EventBus
 
-    from ..application.coverage import CoverageStore
+    from ..application.coverage import CoverageStore, CoverageUpdate
     from ..application.ports import Fetch, SnapshotStore
     from ..application.prices import PricesResult
     from ..application.securities import RefreshResult
+    from ..domain.coverage import CoverageItem
     from ..domain.fundamentals import Fundamentals
     from ..domain.universe import Ticker, Universe
 
@@ -266,3 +278,45 @@ class PricesRequestedHandler:
             price_run_ids=result.price_run_ids or [result.price_run_id],
         )
         self._bus.publish(follow_up(env, PRICES_COMPLETED, completed, source=SOURCE))
+
+
+class CoverageChangedHandler:
+    """D3.3: ``portfolio.coverage.changed`` -> neue Fassung der Abdeckung -> Stammdaten der neuen
+    Wertpapiere (``marketdata.securities.updated``, WP-09).
+
+    ``follow`` uebernimmt die Menge (``follow_portfolio`` mit den Adaptern, verdrahtet in
+    ``entrypoints.service``); wirft er (Datenbank weg), stellt der Bus erneut zu. ``refresh`` holt
+    die Stammdaten der neuen Wertpapiere; ein Fehler dort kostet nur diese Events, der Wochenlauf
+    frischt alle auf.
+    """
+
+    def __init__(
+        self,
+        bus: EventBus,
+        *,
+        follow: Callable[[Sequence[str], datetime], CoverageUpdate],
+        refresh: Callable[[Sequence[CoverageItem]], RefreshResult] | None = None,
+        today: Callable[[], date] = date.today,
+    ) -> None:
+        self._bus = bus
+        self._follow = follow
+        self._refresh = refresh
+        self._today = today
+
+    def subscribe(self) -> None:
+        self._bus.subscribe(COVERAGE_CHANGED, CONSUMER, self)
+
+    def __call__(self, env: Envelope[CoverageChangedV1]) -> None:
+        update = self._follow(env.data.isins, env.time)
+        if not update.added or self._refresh is None:
+            return
+        try:
+            events = securities_updated(self._refresh(update.added), self._today())
+        except Exception:
+            log.warning(
+                "Stammdaten der neuen Wertpapiere nicht aufgefrischt - der Wochenlauf holt sie",
+                exc_info=True,
+            )
+            return
+        for updated in events:
+            self._bus.publish(follow_up(env, SECURITIES_UPDATED, updated, source=SOURCE))

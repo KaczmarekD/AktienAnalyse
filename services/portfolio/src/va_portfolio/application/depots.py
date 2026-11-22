@@ -6,6 +6,11 @@
   im Speicher); danach leert ``flush`` die Outbox. Scheitert das, bleibt das Event liegen und geht
   mit der naechsten Aenderung oder dem Takt des Dienstes raus.
 - Archivierte Depots sind schreibgeschuetzt, bis sie wiederhergestellt sind (DEP-06).
+- Abdeckung (D3.3, WP-09): Aendert eine Speicherung, Archivierung oder Wiederherstellung die
+  Menge der gehaltenen ISINs (aller Nutzer), geht ``portfolio.coverage.changed`` mit der ganzen
+  Menge raus, ohne Nutzer und Mengen; dazu beim Start und taeglich (``announce_coverage``).
+  Das Event entsteht in einer eigenen Transaktion nach der Aenderung. Geht es dazwischen
+  verloren, holt es die naechste Meldung nach.
 """
 
 from __future__ import annotations
@@ -17,7 +22,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
 from va_contracts import new_envelope
-from va_contracts.events.v1 import DEPOT_CHANGED, DepotChange, DepotChangedV1
+from va_contracts.events.v1 import (
+    COVERAGE_CHANGED,
+    DEPOT_CHANGED,
+    CoverageChangedV1,
+    DepotChange,
+    DepotChangedV1,
+)
 
 from ..domain.depots import (
     CashLine,
@@ -40,6 +51,7 @@ log = logging.getLogger(__name__)
 SOURCE = "va/portfolio"
 
 EventFactory = Callable[[int], "Envelope[Any]"]  # Depot-ID -> Event
+CoverageFactory = Callable[[list[str]], "Envelope[Any]"]  # ISINs -> Event
 
 
 class DepotNotFound(LookupError):
@@ -90,6 +102,16 @@ class DepotStore(Protocol):
         """(neueste Version, Zahl ihrer Positionen), ohne die Positionen zu laden; (0, 0) leer."""
         ...
 
+    def held_isins(self) -> list[str]:
+        """D3.3: die ISINs der neuesten Depotstaende aktiver Depots, aller Nutzer, sortiert."""
+        ...
+
+    def add_coverage(self, make: CoverageFactory, *, unless: list[str] | None = None) -> bool:
+        """D3.3: liest ``held_isins`` und legt ``make(isins)`` in die Outbox, ausser die Menge ist
+        gleich ``unless``. Nacheinander (eine Sperre), damit das juengste Event die juengste Menge
+        nennt; ``False``, wenn nichts in die Outbox kam."""
+        ...
+
     def snapshot(self, depot_id: int, version: int | None = None) -> Snapshot | None:
         """Der Depotstand ``version``, ohne Angabe der neueste; ``None``, wenn es ihn nicht gibt."""
         ...
@@ -122,6 +144,10 @@ class HistoryEntry:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _coverage(isins: list[str]) -> Envelope[Any]:
+    return new_envelope(COVERAGE_CHANGED, CoverageChangedV1(isins=isins), source=SOURCE)
 
 
 def _changed(depot_id: int, owner: int, change: DepotChange, version: int) -> Envelope[Any]:
@@ -193,12 +219,14 @@ class DepotService:
         depot = self._owned(user_id, depot_id)
         if depot.status != status:
             change: DepotChange = "archived" if status == "archived" else "restored"
+            before = self._held()
             self._store.set_status(
                 depot.id,
                 status,
                 at=self._clock(),
                 event=_changed(depot.id, user_id, change, self._store.newest_version(depot.id)),
             )
+            self._coverage_since(before)
             self._after_write()
         return self.get(user_id, depot_id)
 
@@ -240,7 +268,9 @@ class DepotService:
             lines=checked,
             cash=cash_lines,
         )
+        before = self._held()
         self._store.save_snapshot(snapshot, event=_changed(depot.id, user_id, "holdings", version))
+        self._coverage_since(before)
         self._after_write()
         return snapshot
 
@@ -272,6 +302,31 @@ class DepotService:
             (self._summary(depot), self._store.snapshots(depot.id))
             for depot in self._store.depots(user_id, include_archived=True)
         ]
+
+    # --- Abdeckung (D3.3) ---------------------------------------------------------------
+
+    def announce_coverage(self) -> None:
+        """Die ganze Abdeckung melden, auch unveraendert (Start und taeglich): So kommt eine
+        verlorene Meldung an, und market-data loest eine ISIN, die einmal scheiterte, neu auf."""
+        self._store.add_coverage(_coverage)
+        self._after_write()
+
+    def _held(self) -> list[str] | None:
+        try:
+            return self._store.held_isins()
+        except Exception:
+            log.warning("Abdeckung nicht lesbar - sie geht nach der Aenderung raus", exc_info=True)
+            return None
+
+    def _coverage_since(self, before: list[str] | None) -> None:
+        """Meldet die Abdeckung, wenn sie sich seit ``before`` geaendert hat (``None``: immer).
+        Ein Fehler hier kostet nicht die Aenderung selbst; die naechste Meldung holt ihn nach."""
+        try:
+            self._store.add_coverage(_coverage, unless=before)
+        except Exception:
+            log.warning(
+                "Abdeckung nicht gemeldet - die naechste Meldung holt es nach", exc_info=True
+            )
 
     # --- intern -----------------------------------------------------------------------
 

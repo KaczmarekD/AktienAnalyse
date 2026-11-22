@@ -151,7 +151,11 @@ class TestHoldings:
         assert service.holdings(ANNA, depot.id, version=1).lines == first.lines
         summary = service.get(ANNA, depot.id)
         assert (summary.version, summary.positions) == (2, 2)
-        holdings_events = [e.data for e in world.store.events if e.data.change == "holdings"]
+        holdings_events = [
+            e.data
+            for e in world.store.events
+            if e.type == DEPOT_CHANGED.type and e.data.change == "holdings"
+        ]
         assert [e.version for e in holdings_events] == [1, 2]
 
     def test_an_unknown_version_is_not_found(self, world):

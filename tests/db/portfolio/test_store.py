@@ -5,6 +5,7 @@ Mit der Rolle des Dienstes (``va_portfolio``): lesen und anfuegen, nie aendern o
 - Mengen und Betraege als ``numeric``, zurueck als ``Decimal``, Reihenfolge der Eingabe.
 - Zwei Speicherungen auf dieselbe Version: die zweite ist ein Konflikt mit der neuesten.
 - Jede Aenderung legt ``portfolio.depot.changed`` in dieselbe Transaktion (Outbox).
+- D3.3: Die Abdeckung sind die ISINs der neuesten Staende aktiver Depots, aller Nutzer.
 - Persoenliche Daten: ``va_read``, ``va_app`` und die anderen Rollen sehen nichts.
 """
 
@@ -18,7 +19,12 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
 from va_contracts import new_envelope
-from va_contracts.events.v1 import DEPOT_CHANGED, DepotChangedV1
+from va_contracts.events.v1 import (
+    COVERAGE_CHANGED,
+    DEPOT_CHANGED,
+    CoverageChangedV1,
+    DepotChangedV1,
+)
 from va_platform.db.ddl import SERVICE_ROLES
 from va_portfolio.adapters.postgres.store import PostgresDepotStore
 from va_portfolio.application.depots import DepotService
@@ -28,6 +34,7 @@ T0 = datetime(2026, 11, 22, 10, 0, tzinfo=UTC)
 ANNA, BEN = 1, 2
 SAP = "DE0007164600"
 BUND = "DE0001102580"
+APPLE = "US0378331005"
 OTHER_ROLES = ("va_app", "va_read", "va_web", "va_profiles", "va_identity", *SERVICE_ROLES)
 TABLES = (
     "depot",
@@ -153,6 +160,64 @@ class TestSnapshots:
         service.save(ANNA, depot.id, 1, [HoldingLine(SAP, Decimal("4"))], [])
         [newest, first] = service.history(ANNA, depot.id)
         assert (newest.version, newest.diff.changed, first.diff.added) == (2, 1, 1)
+
+
+def _coverage_event(isins: list[str]):
+    return new_envelope(COVERAGE_CHANGED, CoverageChangedV1(isins=isins), source="va/test")
+
+
+def _outbox(engine: Engine, subject: str) -> list[dict]:
+    with engine.connect() as conn:
+        return list(
+            conn.execute(
+                text(
+                    "SELECT payload FROM portfolio.outbox WHERE subject = :s"
+                    " ORDER BY created_at, id"
+                ),
+                {"s": subject},
+            ).scalars()
+        )
+
+
+class TestCoverage:
+    def _save(self, store, depot_id: int, version: int, *isins: str) -> None:
+        store.save_snapshot(
+            Snapshot(
+                depot_id=depot_id,
+                version=version,
+                source="manual",
+                created_at=T0,
+                created_by=ANNA,
+                lines=tuple(HoldingLine(isin, Decimal(1)) for isin in isins),
+            ),
+            event=_event(depot_id, version=version),
+        )
+
+    def test_newest_snapshots_of_active_depots_of_all_users(self, store):
+        annas, bens, archived = _depot(store, ANNA), _depot(store, BEN), _depot(store, ANNA)
+        self._save(store, annas.id, 1, SAP, BUND)
+        self._save(store, annas.id, 2, SAP)  # BUND verkauft
+        self._save(store, bens.id, 1, APPLE, SAP)
+        self._save(store, archived.id, 1, BUND)
+        store.set_status(archived.id, "archived", at=T0, event=_event(archived.id))
+        assert store.held_isins() == sorted({SAP, APPLE})
+
+    def test_add_coverage_only_on_change(self, store, engine):
+        depot = _depot(store)
+        self._save(store, depot.id, 1, SAP)
+        assert store.add_coverage(_coverage_event, unless=[SAP]) is False
+        assert store.add_coverage(_coverage_event, unless=[]) is True
+        assert store.add_coverage(_coverage_event) is True  # ohne Vergleich immer
+        events = _outbox(engine, "va.portfolio.coverage.changed")
+        assert [e["data"]["isins"] for e in events] == [[SAP], [SAP]]
+
+    def test_the_service_reports_coverage_on_postgres(self, store, engine):
+        service = DepotService(store, clock=lambda: T0)
+        depot = service.create(ANNA, "watchlist", "Ideen", None).depot
+        service.save(ANNA, depot.id, 0, [HoldingLine(SAP, None)], [])
+        service.archive(ANNA, depot.id)
+        events = _outbox(engine, "va.portfolio.coverage.changed")
+        assert [e["data"]["isins"] for e in events] == [[SAP], []]
 
 
 class TestRoles:

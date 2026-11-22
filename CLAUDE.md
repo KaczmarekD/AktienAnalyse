@@ -346,8 +346,12 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   (`portfolio_grant_statements`, `VA_PORTFOLIO_PASSWORD`). Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Abdeckung (D2.2): Aktien außerhalb des Referenzuniversums, die in Depots stehen
-  (`market_data.coverage_version`/`coverage_item`, bis D3 gepflegt mit
-  `python -m va_market_data.coverage`). Der Wochenlauf der Services holt sie im selben Abruf
+  (`market_data.coverage_version`/`coverage_item`). Seit D3.3 meldet portfolio die Menge der ISINs
+  (`portfolio.coverage.changed`: bei Änderung, beim Start und täglich, ohne Nutzer und Mengen).
+  market-data übernimmt bekannte Einträge, löst neue auf (eigene Wertpapiere, sonst FIRDS und
+  OpenFIGI, `follow_portfolio`), übergeht ältere Meldungen und frischt die Stammdaten neuer
+  Wertpapiere sofort auf. `python -m va_market_data.coverage` bleibt für Tests und Notfälle.
+  Der Wochenlauf der Services holt sie im selben Abruf
   mit `fundamental_snapshot.role = 'coverage'` und schickt sie in `covered[]`. Alle
   bestehenden Lesewege (`get_snapshots_df`, Backfill, Replay, Vorschau, Rescore) sehen nur
   `role = 'universe'`; Ranking, CSV und Mail bleiben gleich. Der Batch im Prozess kennt keine
@@ -417,7 +421,8 @@ bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgese
 (D1.1 bis D1.6: Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI,
 HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando), D2
 (Wertpapiere, Abdeckung, Tageskurse, ETF- und Anleihedaten) und von D3 der Dienst portfolio mit
-Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2). Das
+Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2) und der Abdeckung aus den
+Depots (D3.3). Das
 Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`

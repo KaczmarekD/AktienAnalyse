@@ -220,6 +220,12 @@ class MarketDataRepository:
             for row in rows
         ]
 
+    def get_coverage_as_of(self) -> datetime | None:
+        """D3.3: Zeitpunkt der juengsten Fassung (``created_at``, bei portfolio der der Meldung)."""
+        return self.session.scalar(
+            select(CoverageVersion.created_at).order_by(CoverageVersion.id.desc()).limit(1)
+        )
+
     def write_coverage(self, items: Sequence[Coverage], *, source: str, at: datetime) -> bool:
         """Neue Fassung, wenn sich die Menge aendert; ``False``, wenn sie gleich bleibt."""
         wanted = sorted(items, key=lambda item: item.isin)

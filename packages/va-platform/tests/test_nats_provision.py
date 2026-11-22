@@ -24,8 +24,12 @@ pytestmark = pytest.mark.skipif(not URL, reason="TEST_NATS_URL nicht gesetzt (ma
 
 DAY = 24 * 60 * 60
 CONSUMERS = {
-    # D2.3: dazu die Tageskurse
-    "market-data": ["va.marketdata.prices.requested", "va.screening.run.requested"],
+    # D2.3: dazu die Tageskurse, D3.3 die Abdeckung von portfolio
+    "market-data": [
+        "va.marketdata.prices.requested",
+        "va.portfolio.coverage.changed",
+        "va.screening.run.requested",
+    ],
     "scoring": ["va.marketdata.snapshot.completed"],
     "notification": ["va.scoring.run.completed", "va.screening.run.failed"],
     "web-api": ["va.>"],

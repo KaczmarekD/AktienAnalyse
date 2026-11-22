@@ -4,18 +4,22 @@
   neue Version (nie ueberschrieben), gueltig ist die juengste. Ohne Nutzer und Mengen.
 - ``fundamental_snapshot.role``: ``universe`` (Standard) oder ``coverage``. Alle bestehenden
   Lesewege sehen nur ``universe``, sonst stuenden Depot-Titel im Ranking.
+- D3.3: ``coverage_as_of`` ist der Zeitpunkt der juengsten Fassung; die Menge von portfolio
+  ueber PostgreSQL.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, text
 
 from va_market_data.adapters.postgres.store import PostgresSnapshotStore
+from va_market_data.application.coverage import PORTFOLIO_SOURCE, follow_portfolio
 from va_market_data.domain.coverage import CoverageItem
 from va_market_data.domain.fundamentals import Fundamentals, Identity, MarketData
+from va_market_data.domain.securities import Listing, SecurityHit
 from va_market_data.domain.universe import Ticker
 
 T0 = datetime(2026, 11, 7, 6, 0, tzinfo=UTC)
@@ -53,6 +57,42 @@ class TestVersions:
         store.write_coverage([APPLE], source="test", at=T0)
         assert store.write_coverage([], source="test", at=T0) is True
         assert store.coverage() == []
+
+    def test_as_of_is_the_newest_version(self, store):
+        assert store.coverage_as_of() is None
+        store.write_coverage([APPLE], source="test", at=T0)
+        store.write_coverage([], source="test", at=T0 - timedelta(hours=1))
+        assert store.coverage_as_of() == T0 - timedelta(hours=1)  # die juengste Zeile zaehlt
+
+
+class TestFromPortfolio:
+    def test_the_set_of_portfolio_on_postgres(self, store, engine):
+        hit = SecurityHit(
+            APPLE.isin,
+            "Apple Inc.",
+            "equity",
+            (Listing("AAPL", exchange="US"), Listing("APC.DE", exchange="GY")),
+            "catalog",
+        )
+
+        def follow(isins: list[str], at: datetime):
+            return follow_portfolio(
+                isins,
+                as_of=at,
+                store=store,
+                known=lambda isin: hit if isin == APPLE.isin else None,
+                resolve=lambda isin: None,
+            )
+
+        assert follow([APPLE.isin], T0).changed
+        assert store.coverage() == [APPLE]
+        assert not follow([], T0 - timedelta(minutes=5)).changed  # aelter: uebergangen
+        assert follow([], T0 + timedelta(minutes=5)).changed
+        with engine.connect() as conn:
+            sources = conn.execute(
+                text("SELECT source FROM market_data.coverage_version ORDER BY id")
+            ).scalars()
+            assert list(sources) == [PORTFOLIO_SOURCE, PORTFOLIO_SOURCE]
 
 
 class TestSnapshots:

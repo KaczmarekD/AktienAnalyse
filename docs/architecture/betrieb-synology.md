@@ -184,9 +184,15 @@ erst, wenn er den Link aus der Bestätigungsmail öffnet (24 Stunden, einmal). D
 aufgerufen wurde; hinter dem DSM-Proxy also `https://<name>`. Kommt keine Mail an: `docker compose
 logs notification` zeigt „Bestaetigungsmail fuer Nutzer … verschickt“ oder den Fehler.
 
-**Abdeckung pflegen (seit D2.2):** Bis Depots im UI angelegt werden (D3), legt ein Kommando
-fest, welche Wertpapiere außerhalb von DAX und MDAX market-data zusätzlich abruft. `set`
-ersetzt die ganze Menge, `ISIN=SYMBOL` wählt das Listing für die Kurse:
+**Abdeckung (seit D2.2, aus den Depots seit D3.3):** Welche Wertpapiere außerhalb von DAX und
+MDAX market-data zusätzlich abruft, meldet portfolio: bei jeder Änderung der Depots, beim Start und
+täglich. Eine ISIN, die sich nicht auflösen lässt, steht im Log von market-data („nicht
+aufgeloest“). Das Kommando bleibt für Tests und Notfälle; die nächste Meldung von portfolio
+ersetzt, was es gesetzt hat. **Beim Update auf D3.3:** Schon der erste Start von portfolio meldet
+die Depots, ohne Depots also eine leere Menge. Wer die Abdeckung bisher per Kommando gepflegt hat,
+legt die Wertpapiere vorher als Beobachtungsliste an (`POST /api/v1/depots`, bis D3.6 ohne
+Oberfläche); die alten Fassungen bleiben in `market_data.coverage_version` erhalten. `set` ersetzt die ganze Menge, `ISIN=SYMBOL` wählt das Listing für
+die Kurse (bleibt erhalten, solange portfolio die ISIN meldet):
 
 ```bash
 docker compose exec market-data python -m va_market_data.coverage set US0378331005 IE00B4L5Y983

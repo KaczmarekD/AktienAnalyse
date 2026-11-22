@@ -84,8 +84,15 @@ class ConsumerSpec:
 
 # Die Tabelle "Consumer" aus events.md
 CONSUMERS = (
-    # D2.3: dazu die Tageskurse
-    ConsumerSpec("market-data", ("va.screening.run.requested", "va.marketdata.prices.requested")),
+    # D2.3: dazu die Tageskurse, D3.3 die Abdeckung von portfolio
+    ConsumerSpec(
+        "market-data",
+        (
+            "va.screening.run.requested",
+            "va.marketdata.prices.requested",
+            "va.portfolio.coverage.changed",
+        ),
+    ),
     ConsumerSpec("scoring", ("va.marketdata.snapshot.completed",)),
     ConsumerSpec("notification", ("va.scoring.run.completed", "va.screening.run.failed")),
     ConsumerSpec("web-api", ("va.>",)),

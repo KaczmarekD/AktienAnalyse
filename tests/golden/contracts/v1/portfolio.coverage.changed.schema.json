@@ -1,0 +1,15 @@
+{
+  "description": "portfolio -> market-data (D3.3, WP-09): die Abdeckung aus den Depots.\n\nImmer die ganze Menge: alle ISINs in den neuesten Depotstaenden aktiver Depots und\nBeobachtungslisten, aller Nutzer zusammen, sortiert. Keine Nutzer, Depots oder Mengen;\nmarket-data erfaehrt nicht, wer was haelt. Listings und Symbole bestimmt market-data.",
+  "properties": {
+    "isins": {
+      "items": {
+        "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+        "type": "string"
+      },
+      "title": "Isins",
+      "type": "array"
+    }
+  },
+  "title": "CoverageChangedV1",
+  "type": "object"
+}

@@ -156,6 +156,10 @@ class PostgresSnapshotStore:
         with session_scope(self._engine) as s:
             return MarketDataRepository(s).get_coverage()
 
+    def coverage_as_of(self) -> datetime | None:
+        with session_scope(self._engine) as s:
+            return MarketDataRepository(s).get_coverage_as_of()
+
     def write_coverage(self, items: Sequence[Coverage], *, source: str, at: datetime) -> bool:
         with session_scope(self._engine) as s:
             return MarketDataRepository(s).write_coverage(items, source=source, at=at)

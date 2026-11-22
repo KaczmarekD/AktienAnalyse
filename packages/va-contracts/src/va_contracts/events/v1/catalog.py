@@ -8,6 +8,7 @@ from typing import Any
 
 from ...base import Contract
 from .payloads import (
+    CoverageChangedV1,
     DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
@@ -83,6 +84,10 @@ SECURITIES_UPDATED = EventSpec(
 )
 # D3.1: Ein Depot hat sich geaendert (nur IDs und Version)
 DEPOT_CHANGED = EventSpec("portfolio.depot.changed", DepotChangedV1, max_age=timedelta(hours=24))
+# D3.3: Die Abdeckung aus den Depots; das juengste gilt, portfolio schickt sie auch beim Start
+COVERAGE_CHANGED = EventSpec(
+    "portfolio.coverage.changed", CoverageChangedV1, max_age=timedelta(days=7)
+)
 
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
@@ -100,6 +105,7 @@ EVENTS: dict[str, EventSpec[Any]] = {
         PRICES_COMPLETED,
         SECURITIES_UPDATED,
         DEPOT_CHANGED,
+        COVERAGE_CHANGED,
     )
 }
 

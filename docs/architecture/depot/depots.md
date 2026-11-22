@@ -5,8 +5,9 @@
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (angenommen am 06.11.2026).
 > Umgesetzt: Dienst portfolio mit Schema `portfolio` (Depots, Depotstände, Kasse, Verlauf),
 > Request/Reply `rpc.va.portfolio.*` und `portfolio.depot.changed` (D3.1), die Endpunkte im
-> web-api aus der Tabelle unten ohne Import und Zielallokation (D3.2). Abdeckung, Bewertung,
-> Import und Oberfläche folgen mit D3.3 bis D3.6.
+> web-api aus der Tabelle unten ohne Import und Zielallokation (D3.2), die Abdeckung aus den
+> Depots (D3.3, `portfolio.coverage.changed`). Bewertung, Import und Oberfläche folgen mit D3.4
+> bis D3.6.
 
 ## Begriffe
 
@@ -60,7 +61,7 @@ web-api ─ rpc.va.portfolio.holdings.save {user_id, depot_id, base_version: 7, 
 portfolio: Besitz prüfen, Version prüfen, Wertpapiere prüfen, Depotstand 8 anlegen,
            Events in die Outbox, Antwort {version: 8}
 portfolio ─ va.portfolio.depot.changed ──────► web-api ─WS depot:<id>─► Browser (alle Tabs)
-portfolio ─ va.portfolio.coverage.changed ───► market-data (nur wenn sich die Menge aller gehaltenen Wertpapiere ändert)
+portfolio ─ va.portfolio.coverage.changed ───► market-data (wenn sich die Menge aller gehaltenen Wertpapiere ändert, dazu beim Start und täglich)
 portfolio: Analyse neu rechnen ─ va.portfolio.analysis.completed ─► web-api ─WS─► Browser
 ```
 

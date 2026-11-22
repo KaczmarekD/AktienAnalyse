@@ -6,7 +6,7 @@
 > Datenquellen: [Recherche 11/2026](../../research/2026-11-depot-datenquellen-und-bankzugang.md).
 > Umgesetzt: Suche und Auflösung (D2.1, `security`, `security_master`, `listing`), Abdeckung im
 > Wochenlauf (D2.2, `coverage_version`, `coverage_item`, `fundamental_snapshot.role`,
-> `covered[]`; bis D3 per Kommando gepflegt), Tageskurse (D2.3, `price_run`, `daily_close`,
+> `covered[]`; seit D3.3 aus den Depots, `portfolio.coverage.changed`), Tageskurse (D2.3, `price_run`, `daily_close`,
 > `fx_daily`, Scheduler im web-api), ETF-Daten und Stammdaten im Wochenlauf (D2.4,
 > `etf_composition`, `marketdata.securities.updated`), Kurse der Bundesanleihen aus der
 > Bundesbank (D2.5, `daily_close` mit Quelle `bundesbank`, in Prozent vom Nennwert).
@@ -95,15 +95,27 @@ market-data: eigene Wertpapiere → OpenFIGI (ISIN/WKN → Listings) → yfinanc
 | Abruf | Wann | Was | Event |
 |---|---|---|---|
 | Wochenlauf (heute) | Samstag, Scheduler | Referenzuniversum wie bisher, dazu Fundamentaldaten aller Aktien der Abdeckung | `marketdata.snapshot.completed` mit neuem optionalen Feld `covered[]` |
-| Neue Abdeckung (WP-13) | sofort nach `coverage.changed` | Stammdaten, letzter Kurs, Fundamentaldaten der neuen Aktien | `marketdata.securities.updated`, `marketdata.coverage.fetched` |
+| Neue Abdeckung (WP-13) | sofort nach `coverage.changed` | Stammdaten, letzter Kurs, Fundamentaldaten der neuen Aktien (seit D3.3 nur die Stammdaten sofort; Kurs am nächsten Handelstag, Fundamentaldaten im nächsten Wochenlauf) | `marketdata.securities.updated`, `marketdata.coverage.fetched` |
 | Stammdaten | bei neuer Abdeckung sofort, sonst im Wochenlauf | Stammdaten, ETF-Struktur und -Bestände | `marketdata.securities.updated` |
 | Tageskurse | Handelstage, 22:30 `Europe/Berlin` (nach Xetra-Schluss), Scheduler | Schlusskurse und Währungskurse für die Abdeckung | `marketdata.prices.completed` |
 | News | siehe [news.md](news.md) | | `marketdata.news.collected` |
 
-- **Abdeckung pflegen:** portfolio schickt bei jeder Änderung die vollständige Menge
-  (`portfolio.coverage.changed`: ISIN, Anlageklasse, Listing für Fundamentaldaten, Listing für
-  Kurse). market-data speichert sie als neue Version. Was nicht mehr gehalten wird, wird nicht mehr
-  abgerufen. Seine Historie bleibt.
+- **Abdeckung pflegen (seit D3.3):** portfolio schickt bei jeder Änderung die vollständige Menge
+  (`portfolio.coverage.changed`), dazu beim Start und täglich. Sie enthält nur die ISINs aller
+  neuesten Depotstände aktiver Depots und Beobachtungslisten, ohne Nutzer und Mengen. Anlageklasse
+  und Listings bestimmt market-data selbst:
+  - Bekannte Einträge übernimmt es unverändert, auch ein Symbol, das das Kommando gewählt hat.
+  - Neue ISINs löst es auf: aus den eigenen Wertpapieren (die Suche hat sie meist gespeichert),
+    sonst über ESMA FIRDS und OpenFIGI. Die Symbole bildet `coverage_symbols`.
+  - Einen Eintrag ohne Kurs-Symbol löst es bei jeder Meldung neu auf.
+  - Eine ISIN, die sich nicht auflösen lässt, fehlt bis zur nächsten Meldung.
+  - Eine Meldung, die älter ist als die jüngste Fassung, ändert nichts.
+
+  market-data speichert die Menge als neue Fassung (Quelle `portfolio`, Zeitpunkt der Meldung) und
+  frischt die Stammdaten der neuen Wertpapiere sofort auf (`marketdata.securities.updated`). Was
+  nicht mehr gehalten wird, wird nicht mehr abgerufen. Seine Historie bleibt. Das Kommando
+  `python -m va_market_data.coverage` bleibt für Tests und Notfälle; die nächste Meldung von
+  portfolio ersetzt, was es gesetzt hat.
 - **Kein Einfluss auf das Ranking:** Die Aktien der Abdeckung stehen in `covered[]`, nicht in
   `fundamentals[]`. scoring rankt wie bisher nur `fundamentals[]` und ordnet `covered[]` ein
   ([analyse.md](analyse.md#aktien-einordnung)). Die Report-CSV bleibt gleich.

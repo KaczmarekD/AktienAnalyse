@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 
 from ...base import Contract, PositiveId
 from ...profile import ProfileParamsV1
-from ...securities import SecurityV1
+from ...securities import IsinStr, SecurityV1
 from .fundamentals import FundamentalsV1
 from .ranking import RankingRowV1
 
@@ -250,6 +250,17 @@ class DepotChangedV1(Contract):
     owner_user_id: PositiveId
     change: DepotChange
     version: int = Field(ge=0)
+
+
+class CoverageChangedV1(Contract):
+    """portfolio -> market-data (D3.3, WP-09): die Abdeckung aus den Depots.
+
+    Immer die ganze Menge: alle ISINs in den neuesten Depotstaenden aktiver Depots und
+    Beobachtungslisten, aller Nutzer zusammen, sortiert. Keine Nutzer, Depots oder Mengen;
+    market-data erfaehrt nicht, wer was haelt. Listings und Symbole bestimmt market-data.
+    """
+
+    isins: list[IsinStr] = Field(default_factory=list)
 
 
 class SecuritiesUpdatedV1(Contract):

@@ -9,9 +9,11 @@ import socket
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine
 
 from src.composition import build_adapters
 from src.regression.case import ReplayCase
+from va_market_data.entrypoints import service as market_data
 
 FIXTURE = Path(__file__).parent / "fixtures" / "replay" / "2026-10-30_scoring-run-1.json"
 
@@ -59,3 +61,12 @@ def test_fetch_returns_the_stored_snapshots_without_pause(replay_settings, no_ne
         expected["market_cap"].tolist(), nan_ok=True
     )
     assert set(sleeps) == {0.0}
+
+
+def test_the_replay_service_has_no_coverage(replay_settings, no_network):
+    """Abdeckung, Kurse, Stammdaten und die Abdeckung von portfolio (D2.2 bis D3.3) nur im echten
+    Abruf: Eine Replay-Datei kennt nur das Universum."""
+    engine = create_engine("postgresql+psycopg://replay@localhost/replay")  # verbindet nie
+    adapters = market_data.build_adapters(replay_settings, engine)
+    assert (adapters.coverage, adapters.prices, adapters.securities) == (None, None, None)
+    assert (adapters.follow_coverage, adapters.refresh_items) == (None, None)

@@ -1,4 +1,8 @@
-"""Die Abdeckung von Hand pflegen (D2.2), bis portfolio sie meldet (D3).
+"""Die Abdeckung von Hand pflegen (D2.2), seit D3.3 nur fuer Tests und Notfaelle.
+
+Seit D3.3 meldet portfolio die Menge (``portfolio.coverage.changed``, taeglich und bei jeder
+Aenderung); die naechste Meldung ersetzt, was das Kommando gesetzt hat. Ein Symbol fuer eine ISIN,
+die auch portfolio meldet, bleibt dabei erhalten.
 
 Im Container von market-data (dort steht ``DATABASE_URL`` mit der Rolle des Dienstes)::
 
@@ -24,8 +28,9 @@ from datetime import UTC, datetime
 from va_platform.db import create_db_engine
 
 from .adapters.postgres.store import PostgresSnapshotStore
+from .application.coverage import coverage_item
 from .application.securities import ResolvedSecurity
-from .domain.coverage import CoverageItem, coverage_symbols
+from .domain.coverage import CoverageItem
 from .entrypoints.service import securities
 
 SOURCE = "command"
@@ -46,13 +51,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def _item(resolved: ResolvedSecurity, symbol: str | None) -> CoverageItem:
     master = resolved.master
-    fundamentals, price = coverage_symbols(master.isin, master.asset_class, resolved.listings)
-    return CoverageItem(
-        isin=master.isin,
-        asset_class=master.asset_class,
-        fundamentals_symbol=fundamentals,
-        price_symbol=symbol or price,
-        name=master.name,
+    return coverage_item(
+        master.isin, master.asset_class, resolved.listings, name=master.name, price_symbol=symbol
     )
 
 

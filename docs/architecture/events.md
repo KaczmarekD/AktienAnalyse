@@ -84,6 +84,7 @@ haben (`EventSpec.max_age`): Der `ReliableBus` überspringt es erst danach, nich
 | `va.marketdata.prices.completed` (D2.3, 24 h) | market-data | portfolio (ab D3), web-api | price_run_id, trade_date, closes[] (isin, symbol, trade_date, close in Hauptwährung, currency, seit D2.5 percent_of_par für Anleihen), fx[] (currency, rate_to_eur), missing[] (ISINs ohne Kurs), seit D2.5 price_run_ids (Yahoo und Bundesbank) |
 | `va.marketdata.securities.updated` (D2.4, 7 Tage) | market-data (Wochenlauf, vor `snapshot.completed`) | portfolio (ab D3), web-api | as_of, securities[] (`SecurityV1`: Stammdaten, Listings, bei Anleihen `bond`, bei ETFs `etf` mit Fondsdaten, Gewichten je Sektor, Land und Anlageklasse, den zehn größten Positionen und ihrer Anzahl), missing[] (ISINs ohne Stammdaten, nur im ersten Event); höchstens 50 Wertpapiere je Event |
 | `va.portfolio.depot.changed` (D3.1, 24 h) | portfolio (Outbox im Schema `portfolio`) | web-api (seit D3.2: an `user:<id>` des Besitzers) | depot_id, owner_user_id, change (`created`, `renamed`, `archived`, `restored`, `holdings`), version; keine Namen, Mengen oder Beträge |
+| `va.portfolio.coverage.changed` (D3.3, 7 Tage) | portfolio (Outbox, bei jeder Änderung der Menge, beim Start und täglich) | market-data | isins[]: alle ISINs der neuesten Depotstände aktiver Depots und Beobachtungslisten, aller Nutzer zusammen, sortiert; keine Nutzer, Depots oder Mengen. market-data übernimmt die Menge als neue Fassung der Abdeckung, eine ältere Meldung als die jüngste Fassung ändert nichts |
 | `priv.va.identity.email_confirmation.requested` (D1.6, privat, 24 h) | web-api (Outbox im Schema `identity`) | notification (`notification-private`) | user_id, email (die neue Adresse), link (mit Token, aus der geprüften Herkunft der Anfrage), expires_at |
 
 Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring
@@ -236,7 +237,7 @@ NATS. Er umhüllt den Bus je Service, mit Inbox und Outbox aus dessen Schema.
 
 | Consumer (durable) | Filter | Besonderheit |
 |---|---|---|
-| `market-data` | `va.screening.run.requested`, seit D2.3 `va.marketdata.prices.requested` | Der Abruf dauert Minuten. Währenddessen In-Progress-Acks senden, sonst stellt JetStream nach `ack_wait` erneut zu. |
+| `market-data` | `va.screening.run.requested`, seit D2.3 `va.marketdata.prices.requested`, seit D3.3 `va.portfolio.coverage.changed` | Der Abruf dauert Minuten. Währenddessen In-Progress-Acks senden, sonst stellt JetStream nach `ack_wait` erneut zu. Eine neue ISIN der Abdeckung löst market-data selbst auf (eigene Wertpapiere, sonst ESMA FIRDS und OpenFIGI) und frischt ihre Stammdaten gleich auf (`va.marketdata.securities.updated`). |
 | `scoring` | `va.marketdata.snapshot.completed` | speichert den Snapshot zusätzlich lokal, für Vorschau und Rescore |
 | `notification` | `va.scoring.run.completed`, `va.screening.run.failed` | ignoriert `trigger=rescore`, bei `dry_run` nur rendern und speichern |
 | `web-api` | `va.>` | Projektionen und WebSocket, siehe [web-api-realtime.md](web-api-realtime.md) |

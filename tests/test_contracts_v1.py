@@ -22,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
+    COVERAGE_CHANGED,
     DEPOT_CHANGED,
     EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
@@ -36,6 +37,7 @@ from va_contracts.events.v1 import (
     SCORING_RUN_COMPLETED,
     SECURITIES_UPDATED,
     SNAPSHOT_COMPLETED,
+    CoverageChangedV1,
     DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
@@ -276,6 +278,7 @@ def _examples() -> dict[str, Contract]:
         DEPOT_CHANGED.type: DepotChangedV1(
             depot_id=3, owner_user_id=1, change="holdings", version=8
         ),
+        COVERAGE_CHANGED.type: CoverageChangedV1(isins=["DE0001102580", "US0378331005"]),
         SECURITIES_UPDATED.type: SecuritiesUpdatedV1(
             as_of=date(2026, 11, 21), securities=[_world_etf()], missing=["DE000A383J95"]
         ),
@@ -379,6 +382,7 @@ class TestEventCatalog:
             "marketdata.prices.completed",
             "marketdata.securities.updated",  # D2.4: Stammdaten und ETF-Daten
             "portfolio.depot.changed",  # D3.1: Depots, nur IDs und Version
+            "portfolio.coverage.changed",  # D3.3: Abdeckung, nur ISINs
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -787,3 +791,22 @@ class TestDepotChanged:
     def test_durable_for_a_day(self):
         assert DEPOT_CHANGED.subject == "va.portfolio.depot.changed"
         assert DEPOT_CHANGED.max_age == timedelta(hours=24)
+
+
+class TestCoverageChanged:
+    """D3.3: die Abdeckung aus den Depots, nur ISINs (WP-09): keine Nutzer, Depots, Mengen."""
+
+    def test_only_isins(self):
+        assert set(CoverageChangedV1.model_fields) == {"isins"}
+
+    def test_isins_are_checked(self):
+        with pytest.raises(ValidationError):
+            CoverageChangedV1(isins=["SAP"])
+
+    def test_empty_is_a_set_too(self):
+        assert CoverageChangedV1().isins == []
+
+    def test_durable_for_a_week(self):
+        assert COVERAGE_CHANGED.subject == "va.portfolio.coverage.changed"
+        assert COVERAGE_CHANGED.max_age == timedelta(days=7)
+        assert not COVERAGE_CHANGED.private

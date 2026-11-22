@@ -3813,6 +3813,34 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   `coverage_version` und frischt die Stammdaten der neuen Wertpapiere sofort auf
   (`securities.updated`); das Kommando bleibt für Tests und Notfälle.
 - **Review:** `/code-review high`.
+- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+  - **Nur ISINs:** Das Event nennt nur die sortierte Menge der ISINs. Anlageklasse und Listings
+    bestimmt market-data (eigene Wertpapiere, sonst FIRDS und OpenFIGI), nicht portfolio.
+  - **Auch ohne Änderung:** portfolio meldet die ganze Menge beim Start und täglich. So kommt eine
+    verlorene Meldung an, und eine ISIN, die market-data einmal nicht auflösen konnte, bekommt
+    einen neuen Versuch. Eine Meldung, die älter ist als die jüngste Fassung, ändert nichts
+    (Zustellung nach einem Fehler in anderer Reihenfolge); gespeichert wird der Zeitpunkt der
+    Meldung.
+  - **Reihenfolge in portfolio:** Die Menge liest und meldet `add_coverage` unter einer
+    Transaktionssperre (`pg_advisory_xact_lock`). Bei gleichzeitigen Änderungen nennt so die
+    jüngste Meldung die jüngste Menge.
+  - **Eigene Transaktion:** Das Event entsteht nach der Änderung, nicht in ihrer Transaktion
+    (sonst bräuchte die Speicherung die Sperre). Geht es dazwischen verloren, holt es die nächste
+    Meldung nach.
+  - **WP-13 teilweise:** Sofort kommen nur die Stammdaten; Kurs und Fundamentaldaten einer neuen
+    Aktie kommen mit dem nächsten Tageskurs bzw. Wochenlauf. Den sofortigen Abruf
+    (`marketdata.coverage.fetched`) gibt es noch nicht.
+  - **Keine Migration**, nichts Neues in der `.env`. Der Consumer `market-data` bekommt den Filter
+    `va.portfolio.coverage.changed` beim Start (das Recht dazu hat der Dienst).
+  - **Review (`/code-review high`):** behoben, dass zwei Testmodule `test_coverage.py` hießen (pytest
+    brach beim Sammeln ab), und dass eine Meldung mit vielen neuen ISINs den Consumer von
+    market-data unbegrenzt belegte (jetzt `RESOLVE_BUDGET`, 5 Minuten, der Rest mit der nächsten
+    Meldung). Das Runbook nennt den Übergang vom Kommando. Offen gelassen, weil die tägliche Meldung
+    es binnen eines Tages behebt:
+    - Worker und Batch über NATS lesen den Consumer `market-data` ohne Handler für die Abdeckung
+      und bestätigen ihre Meldungen ungelesen.
+    - Eine unveränderte Meldung hinterlässt keinen Zeitpunkt. Eine ältere, später erneut
+      zugestellte Meldung kann deshalb noch gelten.
 
 **D3.4 Bewertung der Depots** (DEP-07, 13, WP-11)
 - **Test:** portfolio liest `securities.updated` und `prices.completed` in seine Kopien

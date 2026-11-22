@@ -156,6 +156,7 @@ def test_each_service_starts_its_bus_with_its_own_consumer(service):
         ("market-data", "va.marketdata.prices.completed"),
         ("market-data", "va.marketdata.securities.updated"),  # D2.4: Stammdaten
         ("portfolio", "va.portfolio.depot.changed"),  # D3.1: Depots
+        ("portfolio", "va.portfolio.coverage.changed"),  # D3.3: Abdeckung
     ],
 )
 def test_a_service_publishes_its_own_events(service, subject):
@@ -180,6 +181,8 @@ def test_a_service_publishes_its_own_events(service, subject):
         ("portfolio", "va.marketdata.snapshot.completed"),
         ("web-api", "va.portfolio.depot.changed"),
         ("market-data", "va.portfolio.depot.changed"),
+        ("market-data", "va.portfolio.coverage.changed"),  # D3.3: nur lesen
+        ("web-api", "va.portfolio.coverage.changed"),
     ],
 )
 def test_no_service_publishes_foreign_events(service, subject):

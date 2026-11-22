@@ -3,13 +3,14 @@
 Baut die Adapter aus den eigenen Settings (Datenbank, iShares/Deka/CSV oder Replay, Yahoo) und
 haengt den Handler fuer ``screening.run.requested`` an den ``ReliableBus``. Der Batch und der
 Worker nutzen dieselben Funktionen (``src/composition.py``). Seit D2.1 beantwortet der Dienst
-Suche und Aufloesung von Wertpapieren per Request/Reply (``rpc``).
+Suche und Aufloesung von Wertpapieren per Request/Reply (``rpc``). Seit D3.3 uebernimmt er die
+Abdeckung von portfolio (``portfolio.coverage.changed``), nur im echten Abruf.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import cached_property, partial
 from typing import TYPE_CHECKING, Any
 
@@ -38,6 +39,7 @@ from ..adapters.yahoo import (
     YahooTextSearch,
     provider_version,
 )
+from ..application.coverage import CoverageUpdate, CoverageWriter, follow_portfolio
 from ..application.fetch import fetch_all
 from ..application.prices import (
     PricesResult,
@@ -49,11 +51,11 @@ from ..application.securities import RefreshResult, SecurityService, refresh_sec
 from ..application.universe import load_universe as load_universe_chain
 from ..domain.universe import UniverseConfig
 from . import rpc
-from .handlers import PricesRequestedHandler, RunRequestedHandler
+from .handlers import CoverageChangedHandler, PricesRequestedHandler, RunRequestedHandler
 from .settings import MarketDataSettings
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Mapping, Sequence
     from pathlib import Path
 
     import pandas as pd
@@ -64,6 +66,7 @@ if TYPE_CHECKING:
 
     from ..application.coverage import CoverageStore
     from ..application.ports import Fetch, FundamentalsProvider, SnapshotStore
+    from ..domain.coverage import CoverageItem
     from ..domain.fundamentals import Fundamentals
     from ..domain.history import HistoryState
     from ..domain.universe import Ticker, Universe
@@ -82,6 +85,10 @@ class MarketDataAdapters:
     # D2.4: Stammdaten und ETF-Daten der Abdeckung im Wochenlauf; ohne kein
     # marketdata.securities.updated
     securities: Callable[[], RefreshResult] | None = None
+    # D3.3: Abdeckung von portfolio uebernehmen, Stammdaten neuer Wertpapiere; ohne (Replay,
+    # Batch, Tests) kein Handler fuer portfolio.coverage.changed
+    follow_coverage: Callable[[Sequence[str], datetime], CoverageUpdate] | None = None
+    refresh_items: Callable[[Sequence[CoverageItem]], RefreshResult] | None = None
 
 
 def live_universe(
@@ -162,18 +169,20 @@ def build_adapters(
         coverage=store if live else None,
         prices=daily_prices(store, PostgresPriceStore(engine)) if live else None,
         securities=master_data(store, engine) if live else None,
+        follow_coverage=portfolio_coverage(store, engine) if live else None,
+        refresh_items=refresh_items(engine) if live else None,
     )
 
 
-def master_data(coverage: CoverageStore, engine: Engine) -> Callable[[], RefreshResult]:
-    """Stammdaten und ETF-Daten der Abdeckung (D2.4): ESMA FIRDS, iShares, dann yfinance.
+def refresh_items(engine: Engine) -> Callable[[Sequence[CoverageItem]], RefreshResult]:
+    """Stammdaten und ETF-Daten dieser Wertpapiere (D2.4): ESMA FIRDS, iShares, dann yfinance.
 
-    Je Lauf eine neue Fondsliste von iShares (``IsharesFunds`` liest sie einmal je Instanz).
+    Je Aufruf eine neue Fondsliste von iShares (``IsharesFunds`` liest sie einmal je Instanz).
     """
 
-    def refresh() -> RefreshResult:
+    def refresh(items: Sequence[CoverageItem]) -> RefreshResult:
         return refresh_securities(
-            coverage.coverage(),
+            items,
             catalog=PostgresSecurityCatalog(engine),
             master=FirdsSource(),
             etf_sources=[IsharesFunds(), YahooFunds()],
@@ -181,6 +190,28 @@ def master_data(coverage: CoverageStore, engine: Engine) -> Callable[[], Refresh
         )
 
     return refresh
+
+
+def master_data(coverage: CoverageStore, engine: Engine) -> Callable[[], RefreshResult]:
+    """Stammdaten und ETF-Daten der ganzen Abdeckung im Wochenlauf (D2.4)."""
+    refresh = refresh_items(engine)
+    return lambda: refresh(coverage.coverage())
+
+
+def portfolio_coverage(
+    store: CoverageWriter, engine: Engine
+) -> Callable[[Sequence[str], datetime], CoverageUpdate]:
+    """D3.3: die Menge von portfolio uebernehmen; neue ISINs aus den eigenen Wertpapieren, sonst
+    ueber ESMA FIRDS und OpenFIGI (wie die Aufloesung per Request/Reply)."""
+    catalog = PostgresSecurityCatalog(engine)
+    resolver = securities(engine)
+
+    def follow(isins: Sequence[str], as_of: datetime) -> CoverageUpdate:
+        return follow_portfolio(
+            isins, as_of=as_of, store=store, known=catalog.get, resolve=resolver.resolve
+        )
+
+    return follow
 
 
 def daily_prices(
@@ -221,6 +252,10 @@ def wire(bus: EventBus, adapters: MarketDataAdapters, settings: MarketDataSettin
     ).subscribe()
     if adapters.prices is not None:
         PricesRequestedHandler(bus, collect=adapters.prices).subscribe()
+    if adapters.follow_coverage is not None:
+        CoverageChangedHandler(
+            bus, follow=adapters.follow_coverage, refresh=adapters.refresh_items
+        ).subscribe()
 
 
 def reliable(bus: EventBus, engine: Engine, settings: MarketDataSettings) -> EventBus:

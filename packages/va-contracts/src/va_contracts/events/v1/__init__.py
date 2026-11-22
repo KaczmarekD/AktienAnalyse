@@ -2,6 +2,7 @@
 
 from .catalog import (
     BY_DATASCHEMA,
+    COVERAGE_CHANGED,
     DEPOT_CHANGED,
     EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
@@ -30,6 +31,7 @@ from .fundamentals import (
 )
 from .payloads import (
     REASON_NO_DATA,
+    CoverageChangedV1,
     DailyCloseV1,
     DepotChange,
     DepotChangedV1,
@@ -58,6 +60,7 @@ from .ranking import RankingRowV1
 
 __all__ = [
     "BY_DATASCHEMA",
+    "COVERAGE_CHANGED",
     "DEPOT_CHANGED",
     "EMAIL_CONFIRMATION_REQUESTED",
     "ERRORS_SEPARATOR",
@@ -74,6 +77,7 @@ __all__ = [
     "SCORING_RUN_COMPLETED",
     "SECURITIES_UPDATED",
     "SNAPSHOT_COMPLETED",
+    "CoverageChangedV1",
     "DailyCloseV1",
     "DepotChange",
     "DepotChangedV1",

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from va_contracts import Envelope
     from va_contracts.portfolio import DepotKind, DepotState
 
-    from ..application.depots import EventFactory
+    from ..application.depots import CoverageFactory, EventFactory
 
 
 class MemoryDepotStore:
@@ -85,6 +85,23 @@ class MemoryDepotStore:
     def newest_version(self, depot_id: int) -> int:
         snaps = self.snaps.get(depot_id, [])
         return snaps[-1].version if snaps else 0
+
+    def held_isins(self) -> list[str]:
+        isins = {
+            line.isin
+            for depot_id, snaps in self.snaps.items()
+            if snaps and self.depots_by_id[depot_id].status == "active"
+            for line in snaps[-1].lines
+        }
+        return sorted(isins)
+
+    def add_coverage(self, make: CoverageFactory, *, unless: list[str] | None = None) -> bool:
+        with self._lock:
+            isins = self.held_isins()
+            if unless is not None and isins == unless:
+                return False
+            self.events.append(make(isins))
+            return True
 
     def summary(self, depot_id: int) -> tuple[int, int]:
         snaps = self.snaps.get(depot_id, [])

@@ -4,6 +4,10 @@ Nur ``INSERT`` und ``SELECT``. Jede Aenderung schreibt ihre Zeilen und ``portfol
 in die Outbox in einer Transaktion. Zwei gleichzeitige Speicherungen auf dieselbe Basis scheitern
 an der Eindeutigkeit von (depot_id, version): Die zweite ergibt ``VersionConflict``. ``SELECT …
 FOR UPDATE`` geht nicht, ``va_portfolio`` hat kein UPDATE-Recht.
+
+D3.3: Die Abdeckung liest und meldet ``add_coverage`` unter einer Transaktionssperre
+(``pg_advisory_xact_lock``): Zwei Meldungen laufen nacheinander, die spaetere sieht alle
+Aenderungen der frueheren.
 """
 
 from __future__ import annotations
@@ -43,7 +47,7 @@ if TYPE_CHECKING:
     from va_contracts import Envelope
     from va_contracts.portfolio import DepotKind, DepotState
 
-    from ...application.depots import EventFactory
+    from ...application.depots import CoverageFactory, EventFactory
 
 # Je Depot die juengste Zeile von Name und Status
 _DEPOTS = """
@@ -56,6 +60,23 @@ CROSS JOIN LATERAL (
     SELECT status FROM portfolio.depot_status
     WHERE depot_id = d.id ORDER BY id DESC LIMIT 1) s
 """
+
+# D3.3: alle ISINs der neuesten Depotstaende aktiver Depots, je ISIN einmal
+_HELD = """
+SELECT DISTINCT l.isin
+FROM portfolio.depot d
+CROSS JOIN LATERAL (
+    SELECT status FROM portfolio.depot_status
+    WHERE depot_id = d.id ORDER BY id DESC LIMIT 1) s
+CROSS JOIN LATERAL (
+    SELECT id FROM portfolio.holding_snapshot
+    WHERE depot_id = d.id ORDER BY version DESC LIMIT 1) h
+JOIN portfolio.holding_line l ON l.snapshot_id = h.id
+WHERE s.status = 'active'
+ORDER BY l.isin
+"""
+# Schluessel der Sperre fuer die Abdeckung (beliebig, nur in diesem Schema genutzt)
+_COVERAGE_LOCK = 0x5641_0D33
 
 
 def _depot(row: Any) -> Depot:
@@ -169,6 +190,21 @@ class PostgresDepotStore:
                 {"id": depot_id},
             ).first()
         return (0, 0) if row is None else (int(row.version), int(row.positions))
+
+    # --- Abdeckung (D3.3) ---------------------------------------------------------------
+
+    def held_isins(self) -> list[str]:
+        with self._engine.connect() as conn:
+            return list(conn.execute(text(_HELD)).scalars())
+
+    def add_coverage(self, make: CoverageFactory, *, unless: list[str] | None = None) -> bool:
+        with session_scope(self._engine) as session:
+            session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _COVERAGE_LOCK})
+            isins = list(session.execute(text(_HELD)).scalars())
+            if unless is not None and isins == unless:
+                return False
+            self._outbox.add(session, make(isins))
+            return True
 
     def snapshot(self, depot_id: int, version: int | None = None) -> Snapshot | None:
         query = select(HoldingSnapshot).where(HoldingSnapshot.depot_id == depot_id)
