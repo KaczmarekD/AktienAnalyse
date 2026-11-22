@@ -16,6 +16,7 @@ from va_contracts.portfolio import CashLineV1, HoldingLineV1
 from va_contracts.rpc.v1 import (
     DEPOTS_ARCHIVE,
     DEPOTS_CREATE,
+    DEPOTS_EXPORT,
     DEPOTS_GET,
     DEPOTS_LIST,
     DEPOTS_RESTORE,
@@ -25,6 +26,7 @@ from va_contracts.rpc.v1 import (
     HOLDINGS_SAVE,
     RPCS,
     DepotCreateRequestV1,
+    DepotExportRequestV1,
     DepotListRequestV1,
     DepotRefRequestV1,
     DepotUpdateRequestV1,
@@ -170,3 +172,29 @@ def test_an_unknown_version_is_not_found(call):
     reply = call(HOLDINGS_GET, HoldingsGetRequestV1(user_id=ANNA, depot_id=depot_id, version=3))
     assert reply.error is not None
     assert reply.error.code == "not_found"
+
+
+def test_the_export_has_every_own_depot_with_all_versions(call):
+    """D3.2 (NUT-12): auch archivierte Depots, jeder Depotstand, aelteste zuerst."""
+    first = _create(call)
+    second = _create(call)
+    _create(call, user=BEN)
+    for version in (0, 1):
+        call(
+            HOLDINGS_SAVE,
+            HoldingsSaveRequestV1(
+                user_id=ANNA,
+                depot_id=first,
+                base_version=version,
+                lines=[HoldingLineV1(isin=SAP, quantity=Decimal(version + 1))],
+            ),
+        )
+    call(DEPOTS_ARCHIVE, DepotRefRequestV1(user_id=ANNA, depot_id=second))
+    exported = call(DEPOTS_EXPORT, DepotExportRequestV1(user_id=ANNA)).depots
+    assert [(e.depot.id, e.depot.status) for e in exported] == [
+        (first, "active"),
+        (second, "archived"),
+    ]
+    assert [v.version for v in exported[0].versions] == [1, 2]
+    assert exported[0].versions[1].lines[0].quantity == Decimal(2)
+    assert exported[1].versions == []

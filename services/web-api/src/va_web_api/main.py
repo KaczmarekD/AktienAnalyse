@@ -53,6 +53,7 @@ from .api import (
     account,
     admin,
     auth,
+    depots,
     health,
     instruments,
     ranking,
@@ -68,7 +69,7 @@ from .read_models import ProjectionReadModel, TableReadModel
 from .realtime import endpoint
 from .realtime.hub import HubBroadcaster, WebSocketHub
 from .realtime.replay import NatsReplayer
-from .rpc import RemoteReads, RemoteScoring, RemoteSecurities
+from .rpc import RemoteDepots, RemoteReads, RemoteScoring, RemoteSecurities
 from .runs import PriceScheduler, RunManager
 from .security import JsonOnlyMiddleware, OriginCheckMiddleware
 from .settings import WebApiSettings
@@ -199,6 +200,8 @@ def create_app(
         app.state.securities = (
             RemoteSecurities(lambda: app.state.rpc) if settings.nats_url else None
         )
+        # D3.2: Depots bei portfolio, nur ueber NATS (ohne antworten /depots mit 503)
+        app.state.depots = RemoteDepots(lambda: app.state.rpc) if settings.nats_url else None
         if settings.nats_url:
             # P4.8: Vorschau und Profil-Befehle beantwortet der Worker ueber NATS
             app.state.preview = app.state.commands = RemoteScoring(lambda: app.state.rpc)
@@ -317,6 +320,13 @@ def create_app(
             dependencies=[Depends(auth.current_user)],
             responses=auth.UNAUTHORIZED,
         )
+    # D3.2: Depots gehoeren einer Person: immer eine echte Sitzung, auch im Uebergang
+    app.include_router(
+        depots.router,
+        prefix=API_PREFIX,
+        dependencies=[Depends(auth.depot_owner)],
+        responses=auth.UNAUTHORIZED,
+    )
     # P4.5: WebSocket unter /ws, nginx reicht ihn neben /api/ weiter
     app.include_router(endpoint.router)
 

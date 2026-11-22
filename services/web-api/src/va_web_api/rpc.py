@@ -10,6 +10,7 @@ Richtungen liegen deshalb hier, das Format steht neutral in ``va_contracts.rpc.v
   mit ihren Fakes. Nach Speichern und Aktivieren meldet ``notify`` das Profil-Event.
 - ``RemoteReads`` (P4.9): Profile und Reports fuer das ``ReadModel`` aus den Projektionen. Die
   Gegenseite steht seit P5.1a bei ihren Besitzern (``va_scoring``, ``va_notification``).
+- ``RemoteDepots`` (D3.2): Depots bei portfolio, die Fehlercodes werden Ausnahmen des Ports.
 - Den Server fuer scoring stellt seit P5.1a scoring selbst (``va_scoring.entrypoints.rpc``).
   ``scoring_handlers`` bleibt als Server fuer beliebige Umsetzungen der Ports, etwa die Fakes
   der API-Tests.
@@ -29,6 +30,16 @@ from va_contracts.events.v1 import (
     ProfileSavedV1,
 )
 from va_contracts.rpc.v1 import (
+    DEPOTS_ARCHIVE,
+    DEPOTS_CREATE,
+    DEPOTS_EXPORT,
+    DEPOTS_GET,
+    DEPOTS_LIST,
+    DEPOTS_RESTORE,
+    DEPOTS_UPDATE,
+    HOLDINGS_GET,
+    HOLDINGS_HISTORY,
+    HOLDINGS_SAVE,
     PROFILE_ACTIVATE,
     PROFILE_GET,
     PROFILE_LIST,
@@ -41,9 +52,17 @@ from va_contracts.rpc.v1 import (
     SECURITIES_SEARCH,
     ActivateReplyV1,
     ActivateRequestV1,
+    DepotCreateRequestV1,
+    DepotExportRequestV1,
+    DepotListRequestV1,
+    DepotRefRequestV1,
+    DepotReplyV1,
+    DepotUpdateRequestV1,
     FactorsReplyV1,
     FactorsRequestV1,
     FactorV1,
+    HoldingsGetRequestV1,
+    HoldingsSaveRequestV1,
     PreviewBasisV1,
     PreviewReplyV1,
     PreviewRequestV1,
@@ -61,9 +80,14 @@ from va_platform.nats import RpcUnavailable
 
 from .models import Factor, ProfileDetail, ProfileSummary, Report
 from .ports import (
+    DepotArchived,
+    DepotConflict,
+    DepotInvalid,
+    DepotNotFound,
     MarketDataUnavailable,
     NoPreviewData,
     NotificationUnavailable,
+    PortfolioUnavailable,
     PreviewBasis,
     ProfileConflict,
     RankedTitle,
@@ -77,6 +101,15 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from va_contracts import Contract, Envelope
+    from va_contracts.portfolio import (
+        CashLineV1,
+        DepotExportV1,
+        DepotKind,
+        DepotV1,
+        HistoryEntryV1,
+        HoldingLineV1,
+        HoldingsV1,
+    )
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.rpc.v1 import RpcSpec
     from va_contracts.securities import SecurityHitV1, SecurityV1
@@ -214,6 +247,96 @@ class RemoteSecurities:
         reply = _request(self._bus, SECURITIES_RESOLVE, request, MarketDataUnavailable)
         _raise(reply)
         return reply.security
+
+
+class RemoteDepots:
+    """Depots bei portfolio (D3.2, ``DepotDirectory``). Fehler der Antwort werden Ausnahmen des
+    Ports; jede Anfrage nennt den Nutzer, portfolio prueft den Besitz noch einmal."""
+
+    def __init__(self, bus: Callable[[], RpcCaller | None]) -> None:
+        self._bus = bus
+
+    def _call[Q: Contract, R: RpcReplyV1](self, spec: RpcSpec[Q, R], request: Q) -> R:
+        reply = _request(self._bus, spec, request, PortfolioUnavailable)
+        error = reply.error
+        if error is None:
+            return reply
+        if error.code == "not_found":
+            raise DepotNotFound(error.message)
+        if error.code == "archived":
+            raise DepotArchived(error.message)
+        if error.code == "conflict":
+            raise DepotConflict(error.newest)
+        if error.code == "invalid":
+            raise DepotInvalid(error.message)
+        msg = f"portfolio: {error.code}: {error.message}"
+        raise RuntimeError(msg)
+
+    def _depot(self, spec: RpcSpec[Any, DepotReplyV1], request: Contract) -> DepotV1:
+        depot = self._call(spec, request).depot
+        if depot is None:  # pragma: no cover - portfolio antwortet mit Depot oder Fehler
+            msg = f"{spec.name}: Antwort ohne Depot"
+            raise RuntimeError(msg)
+        return depot
+
+    def list(self, user_id: int, *, include_archived: bool) -> list[DepotV1]:
+        request = DepotListRequestV1(user_id=user_id, include_archived=include_archived)
+        return list(self._call(DEPOTS_LIST, request).depots)
+
+    def create(
+        self, user_id: int, *, kind: DepotKind, name: str, description: str | None
+    ) -> DepotV1:
+        request = DepotCreateRequestV1(
+            user_id=user_id, kind=kind, name=name, description=description
+        )
+        return self._depot(DEPOTS_CREATE, request)
+
+    def get(self, user_id: int, depot_id: int) -> DepotV1:
+        return self._depot(DEPOTS_GET, DepotRefRequestV1(user_id=user_id, depot_id=depot_id))
+
+    def update(self, user_id: int, depot_id: int, *, name: str, description: str | None) -> DepotV1:
+        request = DepotUpdateRequestV1(
+            user_id=user_id, depot_id=depot_id, name=name, description=description
+        )
+        return self._depot(DEPOTS_UPDATE, request)
+
+    def archive(self, user_id: int, depot_id: int) -> DepotV1:
+        return self._depot(DEPOTS_ARCHIVE, DepotRefRequestV1(user_id=user_id, depot_id=depot_id))
+
+    def restore(self, user_id: int, depot_id: int) -> DepotV1:
+        return self._depot(DEPOTS_RESTORE, DepotRefRequestV1(user_id=user_id, depot_id=depot_id))
+
+    def holdings(self, user_id: int, depot_id: int, version: int | None) -> HoldingsV1:
+        request = HoldingsGetRequestV1(user_id=user_id, depot_id=depot_id, version=version)
+        holdings = self._call(HOLDINGS_GET, request).holdings
+        if holdings is None:  # pragma: no cover - portfolio antwortet mit Stand oder Fehler
+            raise DepotNotFound(str(depot_id))
+        return holdings
+
+    def save(
+        self,
+        user_id: int,
+        depot_id: int,
+        *,
+        base_version: int,
+        lines: list[HoldingLineV1],
+        cash: list[CashLineV1],
+    ) -> HoldingsV1:
+        request = HoldingsSaveRequestV1(
+            user_id=user_id, depot_id=depot_id, base_version=base_version, lines=lines, cash=cash
+        )
+        holdings = self._call(HOLDINGS_SAVE, request).holdings
+        if holdings is None:  # pragma: no cover
+            raise DepotNotFound(str(depot_id))
+        return holdings
+
+    def history(self, user_id: int, depot_id: int) -> list[HistoryEntryV1]:
+        request = DepotRefRequestV1(user_id=user_id, depot_id=depot_id)
+        return list(self._call(HOLDINGS_HISTORY, request).entries)
+
+    def export(self, user_id: int) -> list[DepotExportV1]:
+        request = DepotExportRequestV1(user_id=user_id)
+        return list(self._call(DEPOTS_EXPORT, request).depots)
 
 
 def _raise(reply: RpcReplyV1) -> None:

@@ -266,6 +266,13 @@ class DepotService:
             previous = snap.lines
         return entries[::-1]
 
+    def export(self, user_id: int) -> list[tuple[DepotSummary, list[Snapshot]]]:
+        """D3.2 (NUT-12): alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden."""
+        return [
+            (self._summary(depot), self._store.snapshots(depot.id))
+            for depot in self._store.depots(user_id, include_archived=True)
+        ]
+
     # --- intern -----------------------------------------------------------------------
 
     def _owned(self, user_id: int, depot_id: int) -> Depot:

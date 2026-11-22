@@ -109,6 +109,14 @@ def session_admin(user: Annotated[User, Depends(session_user)]) -> User:
     return user
 
 
+def depot_owner(user: Annotated[User, Depends(session_user)]) -> User:
+    """Wer Depots liest oder aendert (D3.2): immer eine echte Sitzung, auch im Uebergang ohne
+    Sitzungspflicht (Depots gehoeren einer Person, nicht ``LAN_USER``), ohne Einmal-Passwort."""
+    if user.must_change_password:
+        raise HTTPException(status_code=403, detail=MUST_CHANGE)
+    return user
+
+
 def disconnect(request: Request, sessions: list[str]) -> None:
     """Trennt die WebSockets dieser Sitzungen (Hashes, D1.3). Die Endpunkte laufen im Threadpool,
     der Hub in der Event-Loop: deshalb ueber den Broadcaster."""
@@ -127,6 +135,7 @@ def session_hash(request: Request, settings: WebApiSettings) -> str | None:
 SessionUser = Annotated[User, Depends(session_user)]
 CurrentUser = Annotated[User, Depends(current_user)]
 Admin = Annotated[User, Depends(require_admin)]
+DepotOwner = Annotated[User, Depends(depot_owner)]
 SessionAdmin = Annotated[User, Depends(session_admin)]
 
 

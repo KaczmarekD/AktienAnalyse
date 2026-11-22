@@ -71,6 +71,7 @@ class TestCatalog:
             "portfolio.holdings.get",
             "portfolio.holdings.save",
             "portfolio.holdings.history",
+            "portfolio.depots.export",  # D3.2: Datenexport
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 

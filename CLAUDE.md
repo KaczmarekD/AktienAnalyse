@@ -84,7 +84,11 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
 - Profile, Vorschau und Reports holt es per Request/Reply bei ihren Besitzern (`va_web_api.rpc`),
   seit D2.1 auch Suche und Auflösung von Wertpapieren bei market-data (`/securities`).
   Die Vorschau rechnet scoring aus seiner Kopie der Eingangsdaten (`scoring.input_snapshot`).
-  Depots liest und ändert es ab D3.2 bei portfolio (`rpc.va.portfolio.*`, seit D3.1).
+  Seit D3.2 Depots bei portfolio (`rpc.va.portfolio.*`, `RemoteDepots`, Router `api/depots.py`):
+  `/depots`, `/depots/{id}`, `…/archive`, `…/restore`, `…/holdings` (`ETag`/`If-Match`, 409, 428),
+  `…/history`; immer mit echter Sitzung (`depot_owner`), ein fremdes Depot ist 404, ohne
+  portfolio 503. `portfolio.depot.changed` geht an das Topic `user:<id>` des Besitzers,
+  `/me/export` enthält die eigenen Depots mit allen Depotständen.
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.
@@ -413,7 +417,7 @@ bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgese
 (D1.1 bis D1.6: Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI,
 HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando), D2
 (Wertpapiere, Abdeckung, Tageskurse, ETF- und Anleihedaten) und von D3 der Dienst portfolio mit
-Depots und Depotständen (D3.1, noch ohne Endpunkte im web-api). Das
+Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2). Das
 Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`

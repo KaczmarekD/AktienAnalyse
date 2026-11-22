@@ -39,7 +39,7 @@ from ..ports import (
     UnknownVersion,
 )
 from .auth import FORBIDDEN, require_admin
-from .deps import NOT_FOUND, Reader, not_found
+from .deps import NOT_FOUND, Reader, etag, if_match_version, not_found
 
 router = APIRouter(tags=["scoring"])
 
@@ -205,16 +205,8 @@ def _row(after: RankedTitle, before: RankedTitle | None) -> PreviewRow:
     )
 
 
-def _etag(version: int) -> str:
-    return f'"{version}"'
+_etag = etag
 
 
 def _based_on(if_match: str | None) -> int:
-    if if_match is None:
-        raise HTTPException(
-            status_code=428, detail="If-Match fehlt: die Version, auf der die Aenderung beruht"
-        )
-    value = if_match.strip().removeprefix("W/").strip('"')
-    if not value.isdigit():
-        raise HTTPException(status_code=400, detail='If-Match muss eine Version sein, z. B. "3"')
-    return int(value)
+    return if_match_version(if_match, missing="die Version, auf der die Aenderung beruht")

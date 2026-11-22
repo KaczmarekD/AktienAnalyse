@@ -4,8 +4,9 @@
 > [Depot-Spezifikation](README.md), Stufe D3. Grundsatzentscheidung:
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (angenommen am 06.11.2026).
 > Umgesetzt: Dienst portfolio mit Schema `portfolio` (Depots, Depotstände, Kasse, Verlauf),
-> Request/Reply `rpc.va.portfolio.*` und `portfolio.depot.changed` (D3.1). Endpunkte im web-api,
-> Abdeckung, Bewertung, Import und Oberfläche folgen mit D3.2 bis D3.6.
+> Request/Reply `rpc.va.portfolio.*` und `portfolio.depot.changed` (D3.1), die Endpunkte im
+> web-api aus der Tabelle unten ohne Import und Zielallokation (D3.2). Abdeckung, Bewertung,
+> Import und Oberfläche folgen mit D3.3 bis D3.6.
 
 ## Begriffe
 

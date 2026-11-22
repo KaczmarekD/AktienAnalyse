@@ -199,6 +199,94 @@
         "title": "BondTerms",
         "type": "object"
       },
+      "CashLine-Input": {
+        "additionalProperties": false,
+        "description": "Guthaben auf dem Verrechnungskonto, in EUR.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "const": "EUR",
+            "default": "EUR",
+            "title": "Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount"
+        ],
+        "title": "CashLine",
+        "type": "object"
+      },
+      "CashLine-Output": {
+        "additionalProperties": false,
+        "description": "Guthaben auf dem Verrechnungskonto, in EUR.",
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "const": "EUR",
+            "default": "EUR",
+            "title": "Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount"
+        ],
+        "title": "CashLine",
+        "type": "object"
+      },
+      "CreateDepot": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "kind": {
+            "default": "depot",
+            "enum": [
+              "depot",
+              "watchlist"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateDepot",
+        "type": "object"
+      },
       "DataExport": {
         "additionalProperties": false,
         "description": "Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.",
@@ -217,6 +305,13 @@
               "type": "object"
             },
             "title": "Credentials",
+            "type": "array"
+          },
+          "depots": {
+            "items": {
+              "$ref": "#/components/schemas/DepotExport"
+            },
+            "title": "Depots",
             "type": "array"
           },
           "email_confirmations": {
@@ -276,6 +371,94 @@
           "email_confirmations"
         ],
         "title": "DataExport",
+        "type": "object"
+      },
+      "Depot": {
+        "additionalProperties": false,
+        "description": "Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "depot",
+              "watchlist"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "description",
+          "status",
+          "created_at",
+          "version",
+          "positions"
+        ],
+        "title": "Depot",
+        "type": "object"
+      },
+      "DepotExport": {
+        "additionalProperties": false,
+        "description": "Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).",
+        "properties": {
+          "depot": {
+            "$ref": "#/components/schemas/Depot"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/Holdings"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "depot",
+          "versions"
+        ],
+        "title": "DepotExport",
         "type": "object"
       },
       "EmailConfirmation": {
@@ -646,6 +829,277 @@
           "auth_required"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HistoryEntry": {
+        "additionalProperties": false,
+        "description": "Ein Depotstand im Verlauf, mit dem Unterschied zum vorherigen.",
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "manual",
+              "import",
+              "bank"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "source",
+          "created_at",
+          "created_by",
+          "positions",
+          "added",
+          "changed",
+          "removed"
+        ],
+        "title": "HistoryEntry",
+        "type": "object"
+      },
+      "HoldingLine-Input": {
+        "additionalProperties": false,
+        "description": "Eine Position; in einer Beobachtungsliste ohne Menge und Einstand.",
+        "properties": {
+          "cost_basis_eur": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Eur"
+          },
+          "isin": {
+            "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+            "title": "Isin",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "unit": {
+            "default": "pieces",
+            "enum": [
+              "pieces",
+              "nominal"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "isin"
+        ],
+        "title": "HoldingLine",
+        "type": "object"
+      },
+      "HoldingLine-Output": {
+        "additionalProperties": false,
+        "description": "Eine Position; in einer Beobachtungsliste ohne Menge und Einstand.",
+        "properties": {
+          "cost_basis_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Eur"
+          },
+          "isin": {
+            "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+            "title": "Isin",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "unit": {
+            "default": "pieces",
+            "enum": [
+              "pieces",
+              "nominal"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "isin"
+        ],
+        "title": "HoldingLine",
+        "type": "object"
+      },
+      "Holdings": {
+        "additionalProperties": false,
+        "description": "Ein Depotstand; ``version`` 0 ist der leere Stand vor der ersten Speicherung.",
+        "properties": {
+          "cash": {
+            "items": {
+              "$ref": "#/components/schemas/CashLine-Output"
+            },
+            "title": "Cash",
+            "type": "array"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "depot_id": {
+            "title": "Depot Id",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingLine-Output"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "manual",
+                  "import",
+                  "bank"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "depot_id",
+          "version",
+          "source",
+          "created_at",
+          "created_by",
+          "lines",
+          "cash"
+        ],
+        "title": "Holdings",
         "type": "object"
       },
       "Instrument": {
@@ -2477,6 +2931,30 @@
         "title": "RunSummary",
         "type": "object"
       },
+      "SaveHoldings": {
+        "additionalProperties": false,
+        "description": "Der ganze neue Depotstand; die Basisversion steht in ``If-Match``.",
+        "properties": {
+          "cash": {
+            "items": {
+              "$ref": "#/components/schemas/CashLine-Input"
+            },
+            "maxItems": 1,
+            "title": "Cash",
+            "type": "array"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingLine-Input"
+            },
+            "maxItems": 1000,
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "title": "SaveHoldings",
+        "type": "object"
+      },
       "SaveProfileVersion": {
         "additionalProperties": false,
         "properties": {
@@ -3125,6 +3603,34 @@
         "title": "Snapshot",
         "type": "object"
       },
+      "UpdateDepot": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "UpdateDepot",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -3554,6 +4060,512 @@
         ]
       }
     },
+    "/api/v1/depots": {
+      "get": {
+        "description": "Die eigenen Depots, archivierte nur auf Wunsch.",
+        "operationId": "list_depots",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Depot"
+                  },
+                  "title": "Response List Depots",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "List Depots",
+        "tags": [
+          "depots"
+        ]
+      },
+      "post": {
+        "description": "Ein neues Depot oder eine Beobachtungsliste, mit dem leeren Depotstand 0.",
+        "operationId": "create_depot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepot"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Depot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "422": {
+            "description": "Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Create Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}": {
+      "get": {
+        "operationId": "get_depot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Depot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Get Depot",
+        "tags": [
+          "depots"
+        ]
+      },
+      "put": {
+        "description": "Name und Beschreibung (neue Zeile, der Verlauf bleibt).",
+        "operationId": "update_depot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDepot"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Depot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "422": {
+            "description": "Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Update Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/archive": {
+      "post": {
+        "description": "Archivieren (DEP-06): schreibgeschuetzt und aus der Liste, geloescht wird nichts.",
+        "operationId": "archive_depot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Depot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Archive Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/history": {
+      "get": {
+        "description": "Alle Depotstaende, neueste zuerst, mit dem Unterschied zum vorherigen.",
+        "operationId": "depot_history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  },
+                  "title": "Response Depot History",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Depot History",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/holdings": {
+      "get": {
+        "description": "Ein Depotstand, ohne ``version`` der neueste. ``ETag``: seine Version.",
+        "operationId": "get_holdings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Holdings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Get Holdings",
+        "tags": [
+          "depots"
+        ]
+      },
+      "put": {
+        "description": "Ein neuer, vollstaendiger Depotstand auf Grundlage des Stands aus ``If-Match``.",
+        "operationId": "save_holdings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveHoldings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Holdings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "422": {
+            "description": "Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)"
+          },
+          "428": {
+            "description": "If-Match fehlt"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Save Holdings",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/restore": {
+      "post": {
+        "operationId": "restore_depot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Depot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Restore Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health",
@@ -3653,7 +4665,7 @@
     },
     "/api/v1/me/export": {
       "get": {
-        "description": "Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens.",
+        "description": "Alle eigenen Daten als JSON-Datei (NUT-12), ohne Hashes und Tokens; seit D3.2 mit den\neigenen Depots aus portfolio (ist portfolio eingerichtet, aber weg: 503, kein halber Export).",
         "operationId": "export_data",
         "responses": {
           "200": {
