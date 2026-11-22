@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "CashLineV1": {
+      "description": "Guthaben auf dem Verrechnungskonto; vorerst nur EUR (DEP-04).",
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            }
+          ],
+          "title": "Amount"
+        },
+        "currency": {
+          "const": "EUR",
+          "default": "EUR",
+          "title": "Currency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount"
+      ],
+      "title": "CashLineV1",
+      "type": "object"
+    },
+    "HoldingLineV1": {
+      "description": "Eine Position. In einer Beobachtungsliste ohne Menge und Einstand.",
+      "properties": {
+        "cost_basis_eur": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Basis Eur"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "unit": {
+          "default": "pieces",
+          "enum": [
+            "pieces",
+            "nominal"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin"
+      ],
+      "title": "HoldingLineV1",
+      "type": "object"
+    }
+  },
+  "description": "Ein neuer Depotstand auf ``base_version``; ist die nicht mehr die neueste: ``conflict``.",
+  "properties": {
+    "base_version": {
+      "minimum": 0,
+      "title": "Base Version",
+      "type": "integer"
+    },
+    "cash": {
+      "items": {
+        "$ref": "#/$defs/CashLineV1"
+      },
+      "maxItems": 1,
+      "title": "Cash",
+      "type": "array"
+    },
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "lines": {
+      "items": {
+        "$ref": "#/$defs/HoldingLineV1"
+      },
+      "maxItems": 1000,
+      "title": "Lines",
+      "type": "array"
+    },
+    "source": {
+      "default": "manual",
+      "enum": [
+        "manual",
+        "import"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id",
+    "base_version"
+  ],
+  "title": "HoldingsSaveRequestV1",
+  "type": "object"
+}

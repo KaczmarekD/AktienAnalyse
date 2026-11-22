@@ -14,20 +14,40 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field
 
 from ..base import Contract, PositiveId
+from ..portfolio import (
+    MAX_LINES,
+    CashLineV1,
+    DepotKind,
+    DepotName,
+    DepotV1,
+    HistoryEntryV1,
+    HoldingLineV1,
+    HoldingsV1,
+)
+from ..portfolio import Text as DepotText
 from ..profile import ProfileParamsV1
 from ..securities import IsinStr, SecurityHitV1, SecurityV1
 
 # no_data: noch kein Bewertungslauf fuer die Vorschau; invalid: Anfrage passt nicht zum Modell;
-# internal: Exception beim Antwortenden (Details nur im Log des Workers)
+# internal: Exception beim Antwortenden (Details nur im Log des Workers). Seit D3.1: not_found
+# (kein Depot dieses Nutzers), archived (archiviertes Depot ist schreibgeschuetzt)
 RpcErrorCode = Literal[
-    "no_data", "unknown_profile", "unknown_version", "conflict", "invalid", "internal"
+    "no_data",
+    "unknown_profile",
+    "unknown_version",
+    "conflict",
+    "invalid",
+    "internal",
+    "not_found",
+    "archived",
 ]
 
 
 class RpcErrorV1(Contract):
     code: RpcErrorCode
     message: str
-    newest: int | None = None  # bei conflict: die neueste Version des Profils
+    # bei conflict: die neueste Version (des Profils, seit D3.1 auch des Depotstands)
+    newest: int | None = None
 
 
 class RpcReplyV1(Contract):
@@ -210,6 +230,71 @@ class SecurityResolveReplyV1(RpcReplyV1):
     security: SecurityV1 | None = None  # leer: unbekannte ISIN
 
 
+# -- portfolio.depots.* / portfolio.holdings.* (D3.1) -----------------------------------
+# Jede Anfrage nennt den Nutzer; ein Depot eines anderen ist ``not_found`` (wie unbekannt).
+
+
+class DepotListRequestV1(Contract):
+    user_id: PositiveId
+    include_archived: bool = False
+
+
+class DepotListReplyV1(RpcReplyV1):
+    depots: list[DepotV1] = Field(default_factory=list)
+
+
+class DepotCreateRequestV1(Contract):
+    user_id: PositiveId
+    kind: DepotKind = "depot"
+    name: DepotName
+    description: DepotText | None = None
+
+
+class DepotRefRequestV1(Contract):
+    """Ein Depot lesen, archivieren oder wiederherstellen."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+
+
+class DepotUpdateRequestV1(Contract):
+    user_id: PositiveId
+    depot_id: PositiveId
+    name: DepotName
+    description: DepotText | None = None
+
+
+class DepotReplyV1(RpcReplyV1):
+    depot: DepotV1 | None = None
+
+
+class HoldingsGetRequestV1(Contract):
+    """``version`` leer: der aktuelle Depotstand."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    version: int | None = Field(default=None, ge=0)
+
+
+class HoldingsSaveRequestV1(Contract):
+    """Ein neuer Depotstand auf ``base_version``; ist die nicht mehr die neueste: ``conflict``."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    base_version: int = Field(ge=0)
+    source: Literal["manual", "import"] = "manual"
+    lines: list[HoldingLineV1] = Field(default_factory=list, max_length=MAX_LINES)
+    cash: list[CashLineV1] = Field(default_factory=list, max_length=1)
+
+
+class HoldingsReplyV1(RpcReplyV1):
+    holdings: HoldingsV1 | None = None
+
+
+class HistoryReplyV1(RpcReplyV1):
+    entries: list[HistoryEntryV1] = Field(default_factory=list)  # neueste zuerst
+
+
 # -- Katalog ------------------------------------------------------------------------------
 
 
@@ -241,6 +326,16 @@ SECURITIES_SEARCH = RpcSpec(
 SECURITIES_RESOLVE = RpcSpec(
     "marketdata.securities.resolve", SecurityResolveRequestV1, SecurityResolveReplyV1
 )
+# D3.1: Depots bei portfolio
+DEPOTS_LIST = RpcSpec("portfolio.depots.list", DepotListRequestV1, DepotListReplyV1)
+DEPOTS_CREATE = RpcSpec("portfolio.depots.create", DepotCreateRequestV1, DepotReplyV1)
+DEPOTS_GET = RpcSpec("portfolio.depots.get", DepotRefRequestV1, DepotReplyV1)
+DEPOTS_UPDATE = RpcSpec("portfolio.depots.update", DepotUpdateRequestV1, DepotReplyV1)
+DEPOTS_ARCHIVE = RpcSpec("portfolio.depots.archive", DepotRefRequestV1, DepotReplyV1)
+DEPOTS_RESTORE = RpcSpec("portfolio.depots.restore", DepotRefRequestV1, DepotReplyV1)
+HOLDINGS_GET = RpcSpec("portfolio.holdings.get", HoldingsGetRequestV1, HoldingsReplyV1)
+HOLDINGS_SAVE = RpcSpec("portfolio.holdings.save", HoldingsSaveRequestV1, HoldingsReplyV1)
+HOLDINGS_HISTORY = RpcSpec("portfolio.holdings.history", DepotRefRequestV1, HistoryReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -255,10 +350,28 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         REPORT_CSV,
         SECURITIES_SEARCH,
         SECURITIES_RESOLVE,
+        DEPOTS_LIST,
+        DEPOTS_CREATE,
+        DEPOTS_GET,
+        DEPOTS_UPDATE,
+        DEPOTS_ARCHIVE,
+        DEPOTS_RESTORE,
+        HOLDINGS_GET,
+        HOLDINGS_SAVE,
+        HOLDINGS_HISTORY,
     )
 }
 
 __all__ = [
+    "DEPOTS_ARCHIVE",
+    "DEPOTS_CREATE",
+    "DEPOTS_GET",
+    "DEPOTS_LIST",
+    "DEPOTS_RESTORE",
+    "DEPOTS_UPDATE",
+    "HOLDINGS_GET",
+    "HOLDINGS_HISTORY",
+    "HOLDINGS_SAVE",
     "PROFILE_ACTIVATE",
     "PROFILE_GET",
     "PROFILE_LIST",
@@ -272,9 +385,19 @@ __all__ = [
     "SECURITIES_SEARCH",
     "ActivateReplyV1",
     "ActivateRequestV1",
+    "DepotCreateRequestV1",
+    "DepotListReplyV1",
+    "DepotListRequestV1",
+    "DepotRefRequestV1",
+    "DepotReplyV1",
+    "DepotUpdateRequestV1",
     "FactorV1",
     "FactorsReplyV1",
     "FactorsRequestV1",
+    "HistoryReplyV1",
+    "HoldingsGetRequestV1",
+    "HoldingsReplyV1",
+    "HoldingsSaveRequestV1",
     "PreviewBasisV1",
     "PreviewReplyV1",
     "PreviewRequestV1",

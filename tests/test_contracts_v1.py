@@ -22,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
+    DEPOT_CHANGED,
     EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
     FETCH_PROGRESSED,
@@ -35,6 +36,7 @@ from va_contracts.events.v1 import (
     SCORING_RUN_COMPLETED,
     SECURITIES_UPDATED,
     SNAPSHOT_COMPLETED,
+    DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
     FundamentalsV1,
@@ -271,6 +273,9 @@ def _examples() -> dict[str, Contract]:
         PRICES_COMPLETED.type: PricesCompletedV1(
             price_run_id=3, trade_date=date(2026, 11, 6), closes=[], fx=[], missing=[]
         ),
+        DEPOT_CHANGED.type: DepotChangedV1(
+            depot_id=3, owner_user_id=1, change="holdings", version=8
+        ),
         SECURITIES_UPDATED.type: SecuritiesUpdatedV1(
             as_of=date(2026, 11, 21), securities=[_world_etf()], missing=["DE000A383J95"]
         ),
@@ -373,6 +378,7 @@ class TestEventCatalog:
             "marketdata.prices.requested",
             "marketdata.prices.completed",
             "marketdata.securities.updated",  # D2.4: Stammdaten und ETF-Daten
+            "portfolio.depot.changed",  # D3.1: Depots, nur IDs und Version
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -765,3 +771,19 @@ class TestSecurities:
 
         with pytest.raises(ValidationError):
             EtfV1(source="yahoo", as_of=date(2026, 11, 21), complete=False, holdings_count=-1)
+
+
+class TestDepotChanged:
+    """D3.1: In VA_EVENTS (30 Tage) nur IDs, Art und Version; keine Namen, Mengen, Betraege."""
+
+    def test_only_ids_kind_and_version(self):
+        assert set(DepotChangedV1.model_fields) == {
+            "depot_id",
+            "owner_user_id",
+            "change",
+            "version",
+        }
+
+    def test_durable_for_a_day(self):
+        assert DEPOT_CHANGED.subject == "va.portfolio.depot.changed"
+        assert DEPOT_CHANGED.max_age == timedelta(hours=24)

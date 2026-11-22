@@ -66,6 +66,7 @@ NATS_PASSWORDS = {
     "market-data": "NATS_MARKET_DATA_PASSWORD",
     "scoring": "NATS_SCORING_PASSWORD",
     "notification": "NATS_NOTIFICATION_PASSWORD",
+    "portfolio": "NATS_PORTFOLIO_PASSWORD",  # D3.1
     "web-api": "NATS_WEB_API_PASSWORD",
     "batch": "NATS_BATCH_PASSWORD",
 }
@@ -354,6 +355,7 @@ class TestNasDefinition:
             "market-data",
             "scoring",
             "notification",
+            "portfolio",  # D3.1
             "web-api",
             "frontend",
         }
@@ -372,9 +374,10 @@ class TestNasDefinition:
             "VA_SCORING_PASSWORD",
             "VA_NOTIFICATION_PASSWORD",
             "VA_IDENTITY_PASSWORD",  # D1.1
+            "VA_PORTFOLIO_PASSWORD",  # D3.1
         ):
             assert variable in env
-        for name in ("market-data", "scoring", "notification", "web-api"):
+        for name in ("market-data", "scoring", "notification", "portfolio", "web-api"):
             assert nas["services"][name]["depends_on"]["migrate"]["condition"] == (
                 "service_completed_successfully"
             )
@@ -395,7 +398,7 @@ class TestNasDefinition:
         conf = _mounts(nats)["/etc/nats/nats.conf"].replace("\\", "/")
         assert conf.endswith("/docker/nats/nats.conf")
         assert set(nats["environment"]) == set(NATS_PASSWORDS.values())
-        for service in ("market-data", "scoring", "notification", "web-api"):
+        for service in ("market-data", "scoring", "notification", "portfolio", "web-api"):
             for variable in NATS_PASSWORDS.values():
                 assert variable not in nas["services"][service]["environment"]
 
@@ -510,6 +513,7 @@ class TestE2eStack:
             "market-data",
             "scoring",
             "notification",
+            "portfolio",  # D3.1
             "migrate",
         }
 
@@ -603,17 +607,18 @@ class TestE2eStack:
             "E2E_MARKET_DATA_IMAGE": "va-market-data:ci",
             "E2E_SCORING_IMAGE": "va-scoring:ci",
             "E2E_NOTIFICATION_IMAGE": "va-notification:ci",
+            "E2E_PORTFOLIO_IMAGE": "va-portfolio:ci",
         }
         ci = _config(tmp_path, NAS, LOCAL, E2E, env_file=E2E_ENV, extra_env=images)
         services = ci["services"]
         assert services["value-analyzer"]["image"] == "value-analyzer:ci"
         assert services["web-api"]["image"] == "va-web-api:ci"
         assert services["frontend"]["image"] == "va-frontend:ci"
-        for name in ("market-data", "scoring", "notification"):
+        for name in ("market-data", "scoring", "notification", "portfolio"):
             assert services[name]["image"] == f"va-{name}:ci"
 
     def test_locally_everything_runs_from_the_app_image(self, e2e):
-        for name in ("web-api", "market-data", "scoring", "notification"):
+        for name in ("web-api", "market-data", "scoring", "notification", "portfolio"):
             assert e2e["services"][name]["image"] == "value-analyzer:local"
 
 
@@ -621,6 +626,7 @@ SERVICES = {
     "market-data": "va_market_data",
     "scoring": "va_scoring",
     "notification": "va_notification",
+    "portfolio": "va_portfolio",  # D3.1
 }
 
 

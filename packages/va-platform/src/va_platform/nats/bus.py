@@ -180,6 +180,11 @@ class NatsBus:
         finally:
             self._stop_loop()
 
+    @property
+    def closing(self) -> bool:
+        """``close`` wurde aufgerufen; Hintergrundaufgaben der Dienste enden dann (D3.1)."""
+        return self._closing
+
     def __enter__(self) -> NatsBus:
         self.start()
         return self

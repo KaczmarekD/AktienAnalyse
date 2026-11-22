@@ -1,0 +1,19 @@
+[project]
+name = "va-portfolio"
+version = "0.3.0"
+description = "Service portfolio: Depots, Depotstaende, spaeter Analyse und Hinweise (ADR-0013)"
+requires-python = ">=3.14"
+dependencies = [
+    "va-contracts",
+    "va-platform",
+    "sqlalchemy>=2.1,<3",  # Adapter postgres
+    "pydantic>=2.13,<3",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+va-contracts = { workspace = true }
+va-platform = { workspace = true }

@@ -83,6 +83,7 @@ haben (`EventSpec.max_age`): Der `ReliableBus` überspringt es erst danach, nich
 | `va.marketdata.prices.requested` (D2.3, 24 h) | web-api (Scheduler, Outbox im Schema `web`) | market-data | slot (Termin), trade_date |
 | `va.marketdata.prices.completed` (D2.3, 24 h) | market-data | portfolio (ab D3), web-api | price_run_id, trade_date, closes[] (isin, symbol, trade_date, close in Hauptwährung, currency, seit D2.5 percent_of_par für Anleihen), fx[] (currency, rate_to_eur), missing[] (ISINs ohne Kurs), seit D2.5 price_run_ids (Yahoo und Bundesbank) |
 | `va.marketdata.securities.updated` (D2.4, 7 Tage) | market-data (Wochenlauf, vor `snapshot.completed`) | portfolio (ab D3), web-api | as_of, securities[] (`SecurityV1`: Stammdaten, Listings, bei Anleihen `bond`, bei ETFs `etf` mit Fondsdaten, Gewichten je Sektor, Land und Anlageklasse, den zehn größten Positionen und ihrer Anzahl), missing[] (ISINs ohne Stammdaten, nur im ersten Event); höchstens 50 Wertpapiere je Event |
+| `va.portfolio.depot.changed` (D3.1, 24 h) | portfolio (Outbox im Schema `portfolio`) | web-api (ab D3.2) | depot_id, owner_user_id, change (`created`, `renamed`, `archived`, `restored`, `holdings`), version; keine Namen, Mengen oder Beträge |
 | `priv.va.identity.email_confirmation.requested` (D1.6, privat, 24 h) | web-api (Outbox im Schema `identity`) | notification (`notification-private`) | user_id, email (die neue Adresse), link (mit Token, aus der geprüften Herkunft der Anfrage), expires_at |
 
 Trigger und Optionen reisen mit jedem Event der Kette mit. So entscheidet jede Stufe allein: scoring
@@ -114,6 +115,8 @@ ein optionales `error` (`no_data`, `unknown_profile`, `unknown_version`, `confli
 | `rpc.va.marketdata.instrument` | Symbol → Stammdaten und Kennzahlen-Verlauf (nicht nötig: die Titelseite kommt seit P4.9 aus den Projektionen) |
 | `rpc.va.marketdata.securities.search` (D2.1) | ISIN, WKN, Name oder Symbol → Treffer (eigene Wertpapiere, OpenFIGI, Yahoo; 24 h im Speicher) |
 | `rpc.va.marketdata.securities.resolve` (D2.1) | ISIN, optional ein Listing → Wertpapier mit Stammdaten (ESMA FIRDS) und Listings; speichert sie (leer: unbekannt, `invalid`: falsche Prüfziffer) |
+| `rpc.va.portfolio.depots.list`, `.create`, `.get`, `.update`, `.archive`, `.restore` (D3.1) | Depots eines Nutzers (`user_id` in jeder Anfrage); ein fremdes ist `not_found`, ein archiviertes `archived` |
+| `rpc.va.portfolio.holdings.get`, `.save`, `.history` (D3.1) | Depotstand (Version, ohne Angabe der neueste), neuer Depotstand auf eine Basisversion (`conflict` mit der neuesten), Verlauf mit Unterschieden |
 
 ## Envelope
 
@@ -272,9 +275,10 @@ Nutzername in der `NATS_URL` des Dienstes.
 | Nutzer | Sendet | Liest | RPC |
 |---|---|---|---|
 | `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | seit D2.1 antwortet auf `rpc.va.marketdata.>` |
+| `portfolio` (D3.1) | `va.portfolio.>`, `va.screening.run.failed` | noch kein Consumer (ab D3.4) | antwortet auf `rpc.va.portfolio.>` |
 | `scoring` | `va.scoring.>`, `va.screening.run.failed` | Consumer `scoring` | antwortet auf `rpc.va.scoring.>` |
 | `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification`, seit D1.6 `notification-private` (`VA_PRIVATE`) | antwortet auf `rpc.va.notification.>` |
-| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>`, seit D2.3 `va.marketdata.prices.requested` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>`, seit D2.1 `rpc.va.marketdata.>` |
+| `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>`, seit D2.3 `va.marketdata.prices.requested` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>`, seit D2.1 `rpc.va.marketdata.>`, seit D3.1 `rpc.va.portfolio.>` |
 | `batch` | alles | alles | alles |
 
 - **Inbox:** Antworten (JetStream-API, RPC) gehen an `_INBOX.<nutzer>`; jeder darf nur seine

@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(
     not BASE, reason="TEST_NATS_AUTH_URL nicht gesetzt (make test-nats-up)"
 )
 
-SERVICES = ("market-data", "scoring", "notification", "web-api")
+SERVICES = ("market-data", "scoring", "notification", "portfolio", "web-api")
 TIMEOUT = 1.0
 
 
@@ -124,6 +124,7 @@ OWN = {
     "market-data": {"consumers": ("market-data",)},
     "scoring": {"consumers": ("scoring",)},
     "notification": {"consumers": ("notification", "notification-private")},
+    "portfolio": {"consumers": ("portfolio",)},  # D3.1: noch ohne Consumer, nur der Stream
     "web-api": {"consumers": ("web-api",), "streams": ("VA_EVENTS", "VA_PRIVATE")},
 }
 
@@ -154,6 +155,7 @@ def test_each_service_starts_its_bus_with_its_own_consumer(service):
         ("web-api", "va.marketdata.prices.requested"),  # D2.3: Scheduler der Tageskurse
         ("market-data", "va.marketdata.prices.completed"),
         ("market-data", "va.marketdata.securities.updated"),  # D2.4: Stammdaten
+        ("portfolio", "va.portfolio.depot.changed"),  # D3.1: Depots
     ],
 )
 def test_a_service_publishes_its_own_events(service, subject):
@@ -175,6 +177,9 @@ def test_a_service_publishes_its_own_events(service, subject):
         ("web-api", "va.marketdata.prices.completed"),
         ("scoring", "va.marketdata.prices.requested"),
         ("web-api", "va.marketdata.securities.updated"),
+        ("portfolio", "va.marketdata.snapshot.completed"),
+        ("web-api", "va.portfolio.depot.changed"),
+        ("market-data", "va.portfolio.depot.changed"),
     ],
 )
 def test_no_service_publishes_foreign_events(service, subject):
@@ -189,7 +194,7 @@ def test_no_service_publishes_foreign_events(service, subject):
     _run(scenario)
 
 
-@pytest.mark.parametrize("service", ["market-data", "scoring", "notification"])
+@pytest.mark.parametrize("service", ["market-data", "scoring", "notification", "portfolio"])
 def test_no_service_listens_to_the_events_directly(service):
     async def scenario() -> None:
         async with Connection(service) as c:
@@ -213,7 +218,7 @@ def test_no_service_reads_a_foreign_consumer(service, consumer):
     _run(scenario)
 
 
-@pytest.mark.parametrize("service", ["market-data", "scoring", "notification"])
+@pytest.mark.parametrize("service", ["market-data", "scoring", "notification", "portfolio"])
 def test_only_the_web_api_reads_messages_from_the_stream(service):
     """Der Replayer des web-api liest einzelne Nachrichten; die Dienste nicht."""
 
@@ -232,7 +237,12 @@ def test_only_the_web_api_reads_messages_from_the_stream(service):
 
 @pytest.mark.parametrize(
     ("service", "inbox"),
-    [("market-data", "_INBOX.web-api.>"), ("scoring", "_INBOX.>"), ("web-api", "_INBOX.scoring.>")],
+    [
+        ("market-data", "_INBOX.web-api.>"),
+        ("scoring", "_INBOX.>"),
+        ("web-api", "_INBOX.scoring.>"),
+        ("portfolio", "_INBOX.web-api.>"),
+    ],
 )
 def test_no_service_reads_a_foreign_inbox(service, inbox):
     async def scenario() -> None:
@@ -372,9 +382,26 @@ class TestRpc:
 
         _run(scenario)
 
+    def test_portfolio_answers_the_depots(self):
+        """D3.1: Depots beantwortet portfolio, gefragt wird nur vom web-api."""
+
+        async def scenario() -> None:
+            async with Connection("portfolio") as portfolio:
+                await self._serve(portfolio, "rpc.va.portfolio.depots.list")
+                async with Connection("web-api") as web:
+                    answer = await web.nc.request(
+                        "rpc.va.portfolio.depots.list", b"ping", timeout=TIMEOUT * 3
+                    )
+                    assert answer.data == b"pong"
+                assert not await portfolio.violations()
+
+        _run(scenario)
+
     @pytest.mark.parametrize(
         ("service", "subject"),
         [
+            ("portfolio", "rpc.va.scoring.>"),
+            ("market-data", "rpc.va.portfolio.>"),
             ("notification", "rpc.va.scoring.>"),
             ("scoring", "rpc.va.notification.>"),
             ("scoring", "rpc.va.marketdata.>"),
@@ -391,7 +418,7 @@ class TestRpc:
 
         _run(scenario)
 
-    @pytest.mark.parametrize("service", ["market-data", "scoring", "notification"])
+    @pytest.mark.parametrize("service", ["market-data", "scoring", "notification", "portfolio"])
     def test_only_the_web_api_asks(self, service):
         async def scenario() -> None:
             async with Connection(service) as c:

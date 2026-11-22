@@ -61,6 +61,16 @@ class TestCatalog:
             # D2.1: Wertpapiere suchen und aufloesen (market-data)
             "marketdata.securities.search",
             "marketdata.securities.resolve",
+            # D3.1: Depots (portfolio)
+            "portfolio.depots.list",
+            "portfolio.depots.create",
+            "portfolio.depots.get",
+            "portfolio.depots.update",
+            "portfolio.depots.archive",
+            "portfolio.depots.restore",
+            "portfolio.holdings.get",
+            "portfolio.holdings.save",
+            "portfolio.holdings.history",
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 
@@ -252,3 +262,45 @@ class TestSecurities:
         assert SecurityResolveRequestV1(isin="US0378331005").isin == "US0378331005"
         with pytest.raises(ValidationError):
             SecurityResolveRequestV1(isin="kein-isin")
+
+
+class TestDepots:
+    """D3.1: Depots per Request/Reply; Mengen als Zahl im String, jede Anfrage nennt den Nutzer."""
+
+    def test_every_request_names_the_user(self):
+        for name, spec in RPCS.items():
+            if name.startswith("portfolio."):
+                assert "user_id" in spec.request.model_fields, name
+
+    def test_quantities_travel_as_strings(self):
+        from decimal import Decimal
+
+        from va_contracts.portfolio import HoldingLineV1
+        from va_contracts.rpc.v1 import HoldingsSaveRequestV1
+
+        request = HoldingsSaveRequestV1(
+            user_id=1,
+            depot_id=2,
+            base_version=0,
+            lines=[HoldingLineV1(isin="DE0007164600", quantity=Decimal("0.12345678"))],
+        )
+        assert '"quantity":"0.12345678"' in request.model_dump_json()
+        restored = HoldingsSaveRequestV1.model_validate_json(request.model_dump_json())
+        assert restored.lines[0].quantity == Decimal("0.12345678")
+
+    @pytest.mark.parametrize("quantity", ["0", "-1", "0.123456789", "NaN"])
+    def test_invalid_quantities(self, quantity):
+        from decimal import Decimal
+
+        from pydantic import ValidationError
+
+        from va_contracts.portfolio import HoldingLineV1
+
+        with pytest.raises(ValidationError):
+            HoldingLineV1(isin="DE0007164600", quantity=Decimal(quantity))
+
+    def test_a_conflict_names_the_newest_holdings_version(self):
+        from va_contracts.rpc.v1 import HoldingsReplyV1, RpcErrorV1
+
+        reply = HoldingsReplyV1(error=RpcErrorV1(code="conflict", message="x", newest=8))
+        assert HoldingsReplyV1.model_validate_json(reply.model_dump_json()).error.newest == 8  # type: ignore[union-attr]

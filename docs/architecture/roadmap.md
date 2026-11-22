@@ -287,6 +287,12 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D2.4 ETF-Daten und Stammdaten im Wochenlauf (`a313371`; Migration 0021, `marketdata.securities.updated`; NAS: nichts Neues in der `.env`)
   - [x] D2.5 Kurse der Bundesanleihen (`f7cf1a3`; keine Migration, Quelle `bundesbank`; NAS: nichts Neues in der `.env`)
 - [ ] D3 Dienst portfolio, Depots und Depotstände
+  - [ ] D3.1 Dienst portfolio: Gerüst, Schema, Depots und Depotstände
+  - [ ] D3.2 Endpunkte im web-api
+  - [ ] D3.3 Abdeckung aus portfolio
+  - [ ] D3.4 Bewertung der Depots
+  - [ ] D3.5 Datei im eigenen Format
+  - [ ] D3.6 Oberfläche „Meine Depots“
 - [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
 - [ ] D5 Hinweise
 - [ ] D6 News

@@ -3698,3 +3698,107 @@ die Kurse der Bundesanleihen kommen als eigenes Paket D2.5)
 
 **Fertig, wenn:** die Suche Aktie, ETF und Anleihe findet und der Wochenlauf mit `covered[]`
 dieselbe Mail liefert.
+
+#### Stufe D3 – Dienst portfolio, Depots, Erfassung, Verlauf
+
+Spezifikation: [depot/depots.md](depot/depots.md), Grundsatz
+[ADR-0013](../adr/0013-depots-im-service-portfolio.md). Geschnitten am 22.11.2026 in sechs
+Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
+
+- **Ausgangslage im Code:** Es gibt drei Fach-Services und das web-api. market-data pflegt die
+  Abdeckung bis jetzt per Kommando (`python -m va_market_data.coverage`), meldet Stammdaten
+  (`securities.updated`) und Tageskurse (`prices.completed`), die noch niemand liest.
+  Migrationen: Track F (F2.1) wartet mit 0022 auf die Abnahme; wer zuerst merged, behält die
+  Nummer.
+- **Persönliche Daten:** Das Schema `portfolio` steht nicht in `SCHEMAS` (`va_read` und `va_app`
+  sehen nichts), Events in `VA_EVENTS` tragen keine Mengen oder Beträge, das web-api liest Depots
+  nur per Request/Reply.
+
+**D3.1 Dienst portfolio: Gerüst, Schema, Depots und Depotstände** (DEP-01, 02 ohne Suche, 03, 04,
+06, 09, 11; ADR-0013)
+- **Test:**
+  - Domain (`va_portfolio.domain`): Depot (`depot`/`watchlist`), Depotstand mit fortlaufender
+    Version, Positionen je ISIN einmal (Menge `Decimal` > 0, Einheit `pieces` oder `nominal` bei
+    Anleihen, Einstand in EUR, Notiz), Kasse in EUR; eine Beobachtungsliste hat keine Mengen und
+    keine Kasse; ungültige ISIN, doppelte ISIN und negative Mengen sind Fehler; Speichern auf eine
+    veraltete Basisversion ist ein Konflikt.
+  - DB: Schema `portfolio` mit `depot`, `depot_version`, `depot_status`, `holding_snapshot`,
+    `holding_line`, `cash_line`, `outbox`, `inbox`; Löschschutz; `va_portfolio` darf nur dort
+    lesen und anfügen; `va_read` und `va_app` sehen nichts; Mengen als `numeric`.
+  - RPC `rpc.va.portfolio.depots.list`, `.create`, `.get`, `.update`, `.archive`, `.restore`,
+    `rpc.va.portfolio.holdings.get` (mit Version), `.save` (Basisversion, Fehler `conflict`),
+    `.history`; jede Anfrage mit `user_id`, ein fremdes Depot ist `not_found`; Golden-Schemas.
+  - Event `va.portfolio.depot.changed` (depot_id, owner_user_id, version, Art der Änderung, keine
+    Inhalte); NATS-Rechte: Nutzer `portfolio` sendet nur `va.portfolio.>`, antwortet auf
+    `rpc.va.portfolio.>`, das web-api fragt.
+  - Löschen auf Wunsch: `erase_user` für alle Tabellen des Schemas mit Outbox und Inbox, wie in
+    `identity` (D1.6).
+- **Implementierung:** neues Workspace-Mitglied `services/portfolio` nach dem Rezept in CLAUDE.md
+  (pyproject, Tests, Coverage, import-linter, Dockerfile-Stufe, Image `va-portfolio` in der CI),
+  Dienst in den Compose-Dateien, Rolle in `src.db.migrate` (`VA_PORTFOLIO_PASSWORD`), NATS-Nutzer
+  (`NATS_PORTFOLIO_PASSWORD`), Runbook.
+- **Review:** `/code-review high`, `/security-review` (neue Rolle, persönliche Daten).
+- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+  - **Migration 0023:** Track F hat 0022 (F2.1) zuerst gemergt; `portfolio` folgt darauf.
+  - **Noch kein Consumer:** portfolio liest in D3.1 keine Events. Der NATS-Nutzer darf nur den
+    Stream anlegen, eigene Events senden und auf `rpc.va.portfolio.>` antworten; einen Consumer
+    bekommt er mit den Kopien von Stammdaten und Kursen (D3.4).
+  - **Konflikte ohne Sperre:** `va_portfolio` hat kein UPDATE-Recht, also kein
+    `SELECT … FOR UPDATE`. Zwei gleichzeitige Speicherungen auf dieselbe Basis scheitern an der
+    Eindeutigkeit von (depot_id, version); die zweite bekommt `conflict` mit der neuesten Version.
+  - **Outbox:** Jede Änderung schreibt Daten und Event in einer Transaktion; der Dienst leert die
+    Outbox gleich danach und im Takt von 30 Sekunden (falls NATS kurz weg war).
+  - **Archiviert heißt schreibgeschützt:** Name und Depotstand ändern sich erst nach dem
+    Wiederherstellen (Fehler `archived`), lesen geht weiter.
+  - **Löschen:** `python -m src.erase_user` löscht Depots und Konto zusammen, die Depots zuerst
+    (dafür braucht es die ID); `identity.erasure_log` nennt die Zeilen beider Schemas.
+    `va_web_api.admin erase-user` bleibt für das Konto allein.
+  - **Fehlercodes:** `RpcErrorV1.code` kennt dazu `not_found` und `archived`; das ändert die
+    Golden-Schemas aller Antworten (additiv).
+  - **E2E:** Der Wegwerf-Stack startet portfolio mit Rolle und NATS-Nutzer; das web-api fragt
+    es erst ab D3.2.
+  - **Worker:** `python -m src.worker` startet portfolio nicht (ADR-0013: nur mit eigener Rolle).
+  - **Review (`/code-review high`, `/security-review`):** behoben, dass der Takt der Outbox nach
+    dem Stopp weiterlief (er endet jetzt mit dem Bus, `NatsBus.closing`) und dass die Depotliste
+    alle Positionen lud, um sie zu zählen (`DepotStore.summary`). Offen gelassen: Der Verlauf lädt
+    alle Depotstände mit ihren Positionen (für den Unterschied je Version); Seiten oder ein
+    Zeitfenster bekommt er mit der Oberfläche (D3.6). Die Sicherheitsprüfung fand nichts.
+
+**D3.2 Endpunkte im web-api** (DEP-01, 03, 06; Tests und Abnahme aus depots.md)
+- **Test:** `GET`/`POST /api/v1/depots`, `GET`/`PUT /depots/{id}`, `…/archive`, `…/restore`,
+  `GET`/`PUT /depots/{id}/holdings` (`ETag` und `If-Match`, 409 bei Konflikt, 428 ohne
+  `If-Match`), `GET /depots/{id}/history`; fremdes Depot 404, ohne portfolio 503; Einträge in
+  `test_authz.py`; WebSocket: `depot.changed` an `user:<id>` des Besitzers; `/me/export` mit den
+  eigenen Depots.
+- **Review:** `/code-review high`, `/security-review`.
+
+**D3.3 Abdeckung aus portfolio** (WP-09, 13 teilweise)
+- **Test:** portfolio meldet die Menge aller Wertpapiere aktiver Depots und Beobachtungslisten
+  (`va.portfolio.coverage.changed`, nur bei Änderung, ohne Nutzer und Mengen, Contract-Test);
+  market-data löst neue ISINs auf, bildet die Symbole (`coverage_symbols`), speichert eine neue
+  `coverage_version` und frischt die Stammdaten der neuen Wertpapiere sofort auf
+  (`securities.updated`); das Kommando bleibt für Tests und Notfälle.
+- **Review:** `/code-review high`.
+
+**D3.4 Bewertung der Depots** (DEP-07, 13, WP-11)
+- **Test:** portfolio liest `securities.updated` und `prices.completed` in seine Kopien
+  (`security_view`, `price_view`, dazu die Währungskurse); Depotwert = Menge × letzter Kurs in EUR,
+  Anleihen Nennwert × Kurs / 100, Kasse dazu; fehlender Kurs sichtbar (kein stilles 0), mit
+  Kursdatum und Quelle; Einstand und Differenz je Position und Depot; „wird geprüft“ ohne
+  Stammdaten. In `GET /depots` und `GET /depots/{id}`.
+- **Review:** `/code-review high`.
+
+**D3.5 Datei im eigenen Format** (DEP-05)
+- **Test:** CSV `isin;menge;einstand;notiz` (`;`, Dezimalkomma, BOM erlaubt, höchstens 1 MB als
+  JSON mit `content_base64`); Abgleich neu, geändert, entfällt, nicht erkannt; Übernehmen mit
+  `If-Match`; Export der Positionen im selben Format.
+- **Review:** `/code-review high`, `/security-review` (Datei-Upload).
+
+**D3.6 Oberfläche „Meine Depots“** (DEP-01 bis 07, 09, 11, 13)
+- **Test:** Startseite nach dem Login mit Kacheln (Name, Wert, Stand); Depot-Detail mit Positionen
+  (Bearbeiten, Wertpapier über die Suche), Verlauf und Import; Konflikt zeigt eine Rückmeldung;
+  Playwright im E2E-Stack: ein Nutzer legt ein Depot an, der Wert stimmt, ein zweiter Nutzer
+  sieht es nicht.
+- **Review:** `/code-review high`.
+
+**Fertig, wenn:** ein Nutzer ein Depot anlegt, der Wert stimmt und fremde Depots unsichtbar sind.

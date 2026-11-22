@@ -23,6 +23,7 @@ OWNERS = {
     "va_notification.adapters.postgres.models": "reporting",
     "va_web_api.adapters.postgres.models": "web",  # P4.4: Projektionen
     "va_web_api.adapters.postgres.identity_models": "identity",  # D1.1: Konten, Sitzungen
+    "va_portfolio.adapters.postgres.models": "portfolio",  # D3.1: Depots
 }
 
 

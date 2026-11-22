@@ -1,0 +1,40 @@
+{
+  "properties": {
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "name": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id",
+    "name"
+  ],
+  "title": "DepotUpdateRequestV1",
+  "type": "object"
+}

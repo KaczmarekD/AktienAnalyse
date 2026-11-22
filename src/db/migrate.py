@@ -28,10 +28,12 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from va_platform.db import normalize_url
 from va_platform.db.ddl import (
     IDENTITY_ROLE,
+    PORTFOLIO_ROLE,
     PROFILES_ROLE,
     SERVICE_ROLES,
     WEB_ROLE,
     identity_grant_statements,
+    portfolio_grant_statements,
     profiles_grant_statements,
     service_grant_statements,
     web_grant_statements,
@@ -127,6 +129,17 @@ def ensure_identity_role(url: str, password: str) -> None:
         engine.dispose()
 
 
+def ensure_portfolio_role(url: str, password: str) -> None:
+    """Die Rolle der Depots (D3.1) samt Rechten im Schema ``portfolio``."""
+    ensure_login_role(url, PORTFOLIO_ROLE, password)
+    engine = create_engine(normalize_url(url))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(portfolio_grant_statements()))
+    finally:
+        engine.dispose()
+
+
 def ensure_service_role(url: str, password: str, *, role: str) -> None:
     """Eine Service-Rolle (P5.3) samt Rechten im eigenen Schema."""
     ensure_login_role(url, role, password)
@@ -156,6 +169,8 @@ def main() -> int:
         (WEB_ROLE, settings.va_web_password, ensure_web_role),
         # D1.1: Konten und Sitzungen des web-api
         (IDENTITY_ROLE, settings.va_identity_password, ensure_identity_role),
+        # D3.1: Depots im Dienst portfolio
+        (PORTFOLIO_ROLE, settings.va_portfolio_password, ensure_portfolio_role),
         # P5.3: eine Rolle je Service
         *(
             (role, getattr(settings, f"{role}_password"), partial(ensure_service_role, role=role))

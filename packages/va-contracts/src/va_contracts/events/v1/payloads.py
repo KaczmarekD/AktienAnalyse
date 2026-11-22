@@ -235,6 +235,23 @@ class PricesCompletedV1(Contract):
     price_run_ids: list[PositiveId] = Field(default_factory=list)
 
 
+DepotChange = Literal["created", "renamed", "archived", "restored", "holdings"]
+
+
+class DepotChangedV1(Contract):
+    """portfolio -> web-api (D3.1): ein Depot hat sich geaendert, ohne Inhalte.
+
+    Keine Namen, Mengen oder Betraege (Stream ``VA_EVENTS``, 30 Tage); das web-api meldet die
+    Aenderung an die Tabs des Besitzers, die den Stand per Request/Reply nachladen.
+    ``version``: der Depotstand danach (0 vor der ersten Speicherung).
+    """
+
+    depot_id: PositiveId
+    owner_user_id: PositiveId
+    change: DepotChange
+    version: int = Field(ge=0)
+
+
 class SecuritiesUpdatedV1(Contract):
     """market-data -> portfolio (ab D3): Stammdaten und ETF-Daten der Abdeckung (D2.4).
 

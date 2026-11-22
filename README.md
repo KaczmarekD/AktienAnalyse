@@ -104,7 +104,7 @@ make up            # db, nats, Migration, die drei Services, web-api und fronten
 docker compose ps
 ```
 
-Die Images (`value-analyzer`, `va-market-data`, `va-scoring`, `va-notification`, `va-web-api`,
+Die Images (`value-analyzer`, `va-market-data`, `va-scoring`, `va-notification`, `va-portfolio`, `va-web-api`,
 `va-frontend` unter `ghcr.io/kaczmarekd`) entstehen in GitHub Actions bei jedem Push auf `main`
 (`latest`, `sha-<commit>`) und bei Tags `vX.Y.Z` passend zur Version in `pyproject.toml`.
 `VERSION` in der `.env` pinnt eine bestimmte Fassung. Der Import-Test prüft das App-Image auf der

@@ -90,6 +90,9 @@ print("App-Importgraph (src.main) geladen")
 web_api = importlib.import_module("va_web_api.main")
 importlib.import_module("uvicorn")
 print(f"web-api geladen ({web_api.__name__})")
+# D3.1: portfolio laeuft aus seinem eigenen Image mit denselben Paketen
+importlib.import_module("va_portfolio.entrypoints.service")
+print("portfolio geladen")
 
 # 3. Rechnen wie im Wochenlauf
 import numpy as np  # noqa: E402

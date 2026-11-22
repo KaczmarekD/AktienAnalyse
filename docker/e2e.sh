@@ -46,7 +46,7 @@ echo "=== E2E: Datenbank, NATS und Mailpit starten"
 
 # Der Dienst migrate laeuft vor den Services (depends_on, P5.4)
 echo "=== E2E: migrate, Services, web-api und frontend starten"
-"${COMPOSE[@]}" up -d --no-build --wait market-data scoring notification web-api frontend
+"${COMPOSE[@]}" up -d --no-build --wait market-data scoring notification portfolio web-api frontend
 "${COMPOSE[@]}" exec -T frontend nginx -t
 
 # D1.4: Der Stack laeuft mit Sitzungspflicht; die Tests melden sich mit diesem Admin an

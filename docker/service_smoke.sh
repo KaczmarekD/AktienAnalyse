@@ -5,11 +5,12 @@
 set -euo pipefail
 
 tag="${1:-ci}"
-modules=(va_market_data va_scoring va_notification va_web_api)
+modules=(va_market_data va_scoring va_notification va_portfolio va_web_api)
 declare -A images=(
   [va_market_data]=va-market-data
   [va_scoring]=va-scoring
   [va_notification]=va-notification
+  [va_portfolio]=va-portfolio
   [va_web_api]=va-web-api
 )
 

@@ -9,10 +9,11 @@ from sqlalchemy import BigInteger, Date, DateTime, Double, MetaData, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase
 
-# web: Projektionen des web-api (P4.4); identity: Konten und Sitzungen des web-api (D1.1). Hier
-# stehen alle Schemas fuer Loeschschutz und Migrationen; welche Rollen was lesen duerfen, regelt
-# va_platform.db.ddl (identity ist dort bewusst nicht in SCHEMAS)
-APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting", "web", "identity")
+# web: Projektionen des web-api (P4.4); identity: Konten und Sitzungen des web-api (D1.1);
+# portfolio: Depots (D3.1). Hier stehen alle Schemas fuer Loeschschutz und Migrationen; welche
+# Rollen was lesen duerfen, regelt va_platform.db.ddl (identity und portfolio sind dort bewusst
+# nicht in SCHEMAS)
+APP_SCHEMAS = ("batch", "market_data", "scoring", "reporting", "web", "identity", "portfolio")
 
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",

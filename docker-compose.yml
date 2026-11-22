@@ -23,6 +23,8 @@ services:
       VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:-}
       # D1.1: Konten und Sitzungen des web-api (Schema identity)
       VA_IDENTITY_PASSWORD: ${VA_IDENTITY_PASSWORD:-}
+      # D3.1: Depots im Dienst portfolio (Schema portfolio)
+      VA_PORTFOLIO_PASSWORD: ${VA_PORTFOLIO_PASSWORD:-}
     volumes:
       # Ab PostgreSQL 18 liegt der Mountpunkt eine Ebene hoeher (nicht mehr .../data).
       # Bind-Mount statt Named Volume: 'docker compose down -v' kann ihn nicht loeschen,
@@ -52,6 +54,7 @@ services:
       NATS_MARKET_DATA_PASSWORD: ${NATS_MARKET_DATA_PASSWORD:?NATS_MARKET_DATA_PASSWORD in .env setzen}
       NATS_SCORING_PASSWORD: ${NATS_SCORING_PASSWORD:?NATS_SCORING_PASSWORD in .env setzen}
       NATS_NOTIFICATION_PASSWORD: ${NATS_NOTIFICATION_PASSWORD:?NATS_NOTIFICATION_PASSWORD in .env setzen}
+      NATS_PORTFOLIO_PASSWORD: ${NATS_PORTFOLIO_PASSWORD:?NATS_PORTFOLIO_PASSWORD in .env setzen}
       NATS_WEB_API_PASSWORD: ${NATS_WEB_API_PASSWORD:?NATS_WEB_API_PASSWORD in .env setzen}
       NATS_BATCH_PASSWORD: ${NATS_BATCH_PASSWORD:?NATS_BATCH_PASSWORD in .env setzen}
     volumes:
@@ -82,6 +85,7 @@ services:
       VA_SCORING_PASSWORD: ${VA_SCORING_PASSWORD:?VA_SCORING_PASSWORD in .env setzen}
       VA_NOTIFICATION_PASSWORD: ${VA_NOTIFICATION_PASSWORD:?VA_NOTIFICATION_PASSWORD in .env setzen}
       VA_IDENTITY_PASSWORD: ${VA_IDENTITY_PASSWORD:?VA_IDENTITY_PASSWORD in .env setzen}
+      VA_PORTFOLIO_PASSWORD: ${VA_PORTFOLIO_PASSWORD:?VA_PORTFOLIO_PASSWORD in .env setzen}
 
   value-analyzer:
     # Fertiges Image aus der CI (P0.6b, ADR-0008) - die NAS baut nicht selbst.
@@ -182,6 +186,20 @@ services:
     volumes:
       # Vorschau eines Dry-Runs (HTML und CSV), wie beim Batch
       - ./data:/app/data
+
+  # D3.1: Depots (ADR-0013); eigene Rolle nur im Schema portfolio, eigener NATS-Nutzer. Nur
+  # Request/Reply fuer das web-api, keine externen Quellen
+  portfolio:
+    image: ${REG:-ghcr.io/kaczmarekd}/va-portfolio:${VERSION:-latest}
+    container_name: value-analyzer-portfolio
+    restart: unless-stopped
+    depends_on: *service-depends-on
+    environment:
+      TZ: Europe/Berlin
+      DATABASE_URL: postgresql+psycopg://va_portfolio:${VA_PORTFOLIO_PASSWORD:?VA_PORTFOLIO_PASSWORD in .env setzen}@db:5432/value_analyzer
+      NATS_URL: nats://portfolio:${NATS_PORTFOLIO_PASSWORD:?NATS_PORTFOLIO_PASSWORD in .env setzen}@nats:4222
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-}
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-}
 
   web-api:
     # REST und WebSocket fuer das UI, ohne Port: Nur das frontend (nginx) erreicht es im internen

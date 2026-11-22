@@ -17,6 +17,7 @@ Nutzer-ID, den Admin und die Zeilenzahlen je Tabelle.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -66,11 +67,29 @@ def user_key(user_id: int) -> str:
     return hashlib.sha256(str(user_id).encode("ascii")).hexdigest()
 
 
-def erase_user(engine: Engine, username: str, *, by: str, at: datetime) -> ErasureReport:
+def user_id_of(engine: Engine, username: str) -> int | None:
+    """Die ID des Kontos ``username`` (D3.1: fuer das Loeschen in den anderen Schemas zuerst)."""
+    with engine.connect() as conn:
+        found = conn.execute(
+            text("SELECT id FROM identity.user_account WHERE username = :name"),
+            {"name": username.strip().lower()},
+        ).scalar()
+    return None if found is None else int(found)
+
+
+def erase_user(
+    engine: Engine,
+    username: str,
+    *,
+    by: str,
+    at: datetime,
+    extra_rows: Mapping[str, int] | None = None,
+) -> ErasureReport:
     """Loescht alle Zeilen des Kontos ``username`` in ``identity``; wirft ``UnknownAccount``.
 
     ``engine`` verbindet sich als Besitzer der Tabellen, mit einer anderen Rolle scheitert schon
-    das Abschalten der Trigger.
+    das Abschalten der Trigger. ``extra_rows``: was davor in anderen Schemas geloescht wurde
+    (``portfolio.…``, seit D3.1), kommt mit ins Protokoll.
     """
     name = username.strip().lower()
     with engine.begin() as conn:
@@ -90,6 +109,7 @@ def erase_user(engine: Engine, username: str, *, by: str, at: datetime) -> Erasu
             rows[table] = result.rowcount
         for table in tables:
             conn.execute(text(f"ALTER TABLE {SCHEMA}.{table} ENABLE TRIGGER {TRIGGER}"))
+        rows = {**dict(extra_rows or {}), **rows}
         key = user_key(user_id)
         conn.execute(insert(ErasureLog).values(user_key=key, by_admin=by, rows=rows, at=at))
     return ErasureReport(user_key=key, rows=rows)

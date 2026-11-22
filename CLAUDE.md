@@ -29,6 +29,7 @@ Container. Betrieb und Updates: [betrieb-synology.md](docs/architecture/betrieb-
 | `market-data` | Universum, yfinance, Kennzahlen | `va-market-data` |
 | `scoring` | Cross-sektionales Ranking, Scoring-Profile, Vorschau | `va-scoring` |
 | `notification` | HTML + CSV, SMTP, Healthcheck | `va-notification` |
+| `portfolio` | Depots und Depotstände (D3.1, ADR-0013), nur Request/Reply und eigene Events | `va-portfolio` |
 | `web-api` | REST, WebSocket, Projektionen, Runs mit Scheduler und Watchdog, Anmeldung (D1.1) | `va-web-api` |
 | `frontend` | Angular hinter nginx, einziger Port (8080 über `UI_LAN_BIND`) | `va-frontend` |
 | `value-analyzer` | Batch und Werkzeuge, nur auf Wunsch (Profil `run`) | App-Image |
@@ -83,6 +84,7 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
 - Profile, Vorschau und Reports holt es per Request/Reply bei ihren Besitzern (`va_web_api.rpc`),
   seit D2.1 auch Suche und Auflösung von Wertpapieren bei market-data (`/securities`).
   Die Vorschau rechnet scoring aus seiner Kopie der Eingangsdaten (`scoring.input_snapshot`).
+  Depots liest und ändert es ab D3.2 bei portfolio (`rpc.va.portfolio.*`, seit D3.1).
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.
@@ -303,15 +305,16 @@ einzige Quelle der Wahrheit (keine Parquet-Caches, kein Housekeeping mehr).
 Warum: Snapshots sind nicht rekonstruierbar – yfinance liefert nur den
 aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
 - Schemas = spätere Services: `batch`, `market_data`, `scoring`, `reporting`, dazu seit P4.4
-  `web` (Projektionen des web-api, seit P4.9 auch die Lesemodelle für REST) und seit D1.1
-  `identity` (Konten und Sitzungen, persönliche Daten). Alle stehen in `APP_SCHEMAS`
+  `web` (Projektionen des web-api, seit P4.9 auch die Lesemodelle für REST), seit D1.1
+  `identity` (Konten und Sitzungen, persönliche Daten) und seit D3.1 `portfolio` (Depots). Alle stehen in `APP_SCHEMAS`
   (Löschschutz, Migrationen). Die Grants für `va_app` und `va_read` gelten nur für `SCHEMAS` in
-  `va_platform.db.ddl`; `identity` steht dort bewusst nicht.
+  `va_platform.db.ddl`; `identity` und `portfolio` stehen dort bewusst nicht.
   Fremdschlüssel nur innerhalb eines Schemas, dazwischen Verweis per ID
   (`tests/db/test_schema_boundaries.py` prüft Modelle und migrierte DB).
 - Jedes Schema gehört einem Modul, Modelle und Repository liegen dort unter
   `adapters/postgres/`: `market_data` → `va_market_data`, `scoring` → `va_scoring`,
-  `reporting` → `va_notification`, `web` und `identity` → `va_web_api`, `batch` → `src/db` (Ablaufsteuerung). Basis,
+  `reporting` → `va_notification`, `web` und `identity` → `va_web_api`, `portfolio` → `va_portfolio`,
+  `batch` → `src/db` (Ablaufsteuerung). Basis,
   Engine/Session und DDL-Helfer stehen in `va_platform.db`. Die Alembic-Historie
   ist eine; `src/db/models/__init__.py` sammelt alle Modelle für sie.
 - Die DB erzwingt „niemals löschen“ selbst (`va_platform.db.ddl`): Trigger gegen
@@ -321,18 +324,20 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   ISIN und das einmalige Setzen von `published_at` in der Outbox (Trigger `va_guard_outbox`,
   `va_app` hat nur dieses Spaltenrecht). Projektionen sind veränderlich, aber nie löschbar
   (`MUTABLE_TABLES`, heute `web.run_status`). Einzige Ausnahme vom Löschverbot (ADR-0012, D1.6):
-  `python -m va_web_api.admin erase-user <name> --by <admin> --yes` löscht auf Wunsch einer
-  Person ihre Zeilen in `identity` (`identity_erasure.erase_user`, Rolle des Besitzers aus
-  `DATABASE_OWNER_URL`, Container `value-analyzer`). Es schaltet `va_no_delete` nur in seiner
-  Transaktion ab und protokolliert ohne Inhalte in `identity.erasure_log`. Ein neuer Besitzer
-  persönlicher Daten bekommt sein eigenes `erase_user`. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
+  `python -m src.erase_user <name> --by <admin> --yes` (seit D3.1) löscht auf Wunsch einer
+  Person ihre Zeilen in `portfolio` und dann in `identity` (`erase_user` je Besitzer, Rolle des
+  Besitzers aus `DATABASE_OWNER_URL`, Container `value-analyzer`). Es schaltet `va_no_delete` nur
+  in seiner Transaktion ab und protokolliert ohne Inhalte in `identity.erasure_log`.
+  `python -m va_web_api.admin erase-user` (D1.6) löscht nur das Konto. Ein neuer Besitzer
+  persönlicher Daten bekommt sein eigenes `erase_user` und einen Platz in `src.erase_user`. Rollen: `va_app` ohne DELETE, `va_read` nur SELECT (LAN-Auswertungen), `va_profiles`
   nur Profile lesen und Versionen/Aktivierungen anfügen (web-api ohne NATS, `make api`), `va_web` nur im Schema
   `web` lesen, anfügen und `run_status` ändern (web-api, P4.4, `VA_WEB_PASSWORD`), seit P4.7 dazu
   Runs in `batch.run` anlegen und einmal abschließen. Seit P5.3 je Service eine Rolle nur fürs
   eigene Schema (`va_market_data`, `va_scoring`, `va_notification`, `SERVICE_ROLES`,
   `VA_<SERVICE>_PASSWORD`); `va_app` bleibt für den Batch im Prozess. Seit D1.1 `va_identity`:
   liest und fügt nur im Schema `identity` an (`identity_grant_statements`, `VA_IDENTITY_PASSWORD`),
-  keine andere Rolle sieht es. Eine Rolle, die nach
+  keine andere Rolle sieht es. Seit D3.1 ebenso `va_portfolio` im Schema `portfolio`
+  (`portfolio_grant_statements`, `VA_PORTFOLIO_PASSWORD`). Eine Rolle, die nach
   dem ersten Start dazukommt, legt `python -m src.db.migrate` an (`db/init` läuft nur einmal).
 - Abdeckung (D2.2): Aktien außerhalb des Referenzuniversums, die in Depots stehen
   (`market_data.coverage_version`/`coverage_item`, bis D3 gepflegt mit
@@ -404,7 +409,9 @@ ADR-0011 ist angenommen und wird in F2/F3 umgesetzt. Track D (Depots, mehrere Nu
 als Spezifikation vor ([docs/architecture/depot/](docs/architecture/depot/README.md)). ADR-0012
 bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgesetzt ist D1
 (D1.1 bis D1.6: Konten, Sitzungspflicht, WebSocket je Nutzer, Anmeldung und Nutzerverwaltung im UI,
-HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando). Das
+HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando), D2
+(Wertpapiere, Abdeckung, Tageskurse, ETF- und Anleihedaten) und von D3 der Dienst portfolio mit
+Depots und Depotständen (D3.1, noch ohne Endpunkte im web-api). Das
 Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`

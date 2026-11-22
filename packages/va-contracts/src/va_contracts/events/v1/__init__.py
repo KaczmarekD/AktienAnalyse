@@ -2,6 +2,7 @@
 
 from .catalog import (
     BY_DATASCHEMA,
+    DEPOT_CHANGED,
     EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
     FETCH_PROGRESSED,
@@ -30,6 +31,8 @@ from .fundamentals import (
 from .payloads import (
     REASON_NO_DATA,
     DailyCloseV1,
+    DepotChange,
+    DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
     FxDailyV1,
@@ -55,6 +58,7 @@ from .ranking import RankingRowV1
 
 __all__ = [
     "BY_DATASCHEMA",
+    "DEPOT_CHANGED",
     "EMAIL_CONFIRMATION_REQUESTED",
     "ERRORS_SEPARATOR",
     "EVENTS",
@@ -71,6 +75,8 @@ __all__ = [
     "SECURITIES_UPDATED",
     "SNAPSHOT_COMPLETED",
     "DailyCloseV1",
+    "DepotChange",
+    "DepotChangedV1",
     "EmailConfirmationRequestedV1",
     "EventSpec",
     "FetchProgressedV1",

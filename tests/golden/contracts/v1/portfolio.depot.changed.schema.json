@@ -1,0 +1,39 @@
+{
+  "description": "portfolio -> web-api (D3.1): ein Depot hat sich geaendert, ohne Inhalte.\n\nKeine Namen, Mengen oder Betraege (Stream ``VA_EVENTS``, 30 Tage); das web-api meldet die\nAenderung an die Tabs des Besitzers, die den Stand per Request/Reply nachladen.\n``version``: der Depotstand danach (0 vor der ersten Speicherung).",
+  "properties": {
+    "change": {
+      "enum": [
+        "created",
+        "renamed",
+        "archived",
+        "restored",
+        "holdings"
+      ],
+      "title": "Change",
+      "type": "string"
+    },
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "owner_user_id": {
+      "minimum": 1,
+      "title": "Owner User Id",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 0,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "depot_id",
+    "owner_user_id",
+    "change",
+    "version"
+  ],
+  "title": "DepotChangedV1",
+  "type": "object"
+}

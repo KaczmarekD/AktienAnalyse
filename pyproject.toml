@@ -28,6 +28,7 @@ dependencies = [
     "va-market-data",
     "va-scoring",
     "va-notification",
+    "va-portfolio",  # D3.1: Depots; src.erase_user und Alembic importieren es
     "va-web-api",  # laeuft aus demselben Image wie der Batch (U4, P3.1)
 ]
 
@@ -64,6 +65,7 @@ va-platform = { workspace = true }
 va-market-data = { workspace = true }
 va-scoring = { workspace = true }
 va-notification = { workspace = true }
+va-portfolio = { workspace = true }
 va-web-api = { workspace = true }
 
 # ----------------------------------------------------------------------------
@@ -77,6 +79,7 @@ root_packages = [
     "va_market_data",
     "va_scoring",
     "va_notification",
+    "va_portfolio",
     "va_web_api",
     "src",  # Batch: Einstieg, Konfiguration, Composition Root, Schema batch
 ]
@@ -86,19 +89,25 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Services importieren einander nicht"
 type = "independence"
-modules = ["va_market_data", "va_scoring", "va_notification", "va_web_api"]
+modules = ["va_market_data", "va_scoring", "va_notification", "va_portfolio", "va_web_api"]
 
 [[tool.importlinter.contracts]]
 name = "Schichten innerhalb jedes Service"
 type = "layers"
 layers = ["entrypoints", "adapters", "application", "domain"]
-containers = ["va_market_data", "va_scoring", "va_notification"]
+containers = ["va_market_data", "va_scoring", "va_notification", "va_portfolio"]
 
 [[tool.importlinter.contracts]]
 name = "Geteilte Pakete kennen keine Services"
 type = "forbidden"
 source_modules = ["va_contracts", "va_platform"]
-forbidden_modules = ["va_market_data", "va_scoring", "va_notification", "va_web_api"]
+forbidden_modules = [
+    "va_market_data",
+    "va_scoring",
+    "va_notification",
+    "va_portfolio",
+    "va_web_api",
+]
 
 [[tool.importlinter.contracts]]
 name = "Contracts sind reine Datenformate"
@@ -115,13 +124,26 @@ forbidden_modules = ["pandas", "numpy", "sqlalchemy", "psycopg", "yfinance"]
 [[tool.importlinter.contracts]]
 name = "Domain ohne Ein-/Ausgabe (Provider, HTTP, Datenbank)"
 type = "forbidden"
-source_modules = ["va_market_data.domain", "va_scoring.domain", "va_notification.domain"]
+source_modules = [
+    "va_market_data.domain",
+    "va_scoring.domain",
+    "va_notification.domain",
+    "va_portfolio.domain",
+]
 forbidden_modules = ["yfinance", "requests", "sqlalchemy", "psycopg", "alembic"]
 
 [[tool.importlinter.contracts]]
 name = "Pakete und Services haengen nicht am Batch src"
 type = "forbidden"
-source_modules = ["va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification", "va_web_api"]
+source_modules = [
+    "va_contracts",
+    "va_platform",
+    "va_market_data",
+    "va_scoring",
+    "va_notification",
+    "va_portfolio",
+    "va_web_api",
+]
 forbidden_modules = ["src"]
 
 # ----------------------------------------------------------------------------
@@ -169,6 +191,7 @@ known-first-party = [
     "va_market_data",
     "va_scoring",
     "va_notification",
+    "va_portfolio",
     "va_web_api",
 ]
 
@@ -206,7 +229,7 @@ indent-style = "space"
 [tool.pytest.ini_options]
 minversion = "7.0"
 # Service-Tests liegen beim Service (code-struktur.md), Rest unter tests/
-testpaths = ["tests", "packages/va-platform/tests", "services/market-data/tests", "services/scoring/tests", "services/notification/tests", "services/web-api/tests"]
+testpaths = ["tests", "packages/va-platform/tests", "services/market-data/tests", "services/scoring/tests", "services/notification/tests", "services/portfolio/tests", "services/web-api/tests"]
 addopts = [
     "-ra",
     "--strict-markers",
@@ -243,7 +266,7 @@ reportOptionalMemberAccess = "warning"
 # Coverage (optional, fuer 'make coverage')
 # ----------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["src", "va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification", "va_web_api"]
+source = ["src", "va_contracts", "va_platform", "va_market_data", "va_scoring", "va_notification", "va_portfolio", "va_web_api"]
 omit = ["src/__init__.py", "tests/*"]
 
 [tool.coverage.report]

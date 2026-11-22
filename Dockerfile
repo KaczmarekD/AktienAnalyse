@@ -4,7 +4,8 @@
 #
 # Stufen: base (alles fuer den Lauf) -> j4125-check (base + QEMU, nur zum Pruefen)
 #         base -> runtime (Standard-Ziel, das App-Image in GHCR)
-#         service-base -> market-data, scoring, notification, web-api (P5.1, je ein Image)
+#         service-base -> market-data, scoring, notification, portfolio (D3.1), web-api
+#         (P5.1, je ein Image)
 FROM python:3.14-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -41,6 +42,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/portfolio/pyproject.toml,target=services/portfolio/pyproject.toml \
     --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --no-install-project --no-install-workspace
@@ -54,7 +56,8 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     uv sync --locked --inexact --no-dev --no-install-project --no-editable \
         --refresh-package va-contracts --refresh-package va-platform \
         --refresh-package va-market-data --refresh-package va-scoring \
-        --refresh-package va-notification --refresh-package va-web-api
+        --refresh-package va-notification --refresh-package va-portfolio \
+        --refresh-package va-web-api
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/
@@ -94,6 +97,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/portfolio/pyproject.toml,target=services/portfolio/pyproject.toml \
     --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --package va-market-data --no-install-workspace
@@ -120,6 +124,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/portfolio/pyproject.toml,target=services/portfolio/pyproject.toml \
     --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --package va-scoring --no-install-workspace
@@ -144,6 +149,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/portfolio/pyproject.toml,target=services/portfolio/pyproject.toml \
     --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --package va-notification --no-install-workspace
@@ -158,6 +164,32 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
         --refresh-package va-contracts --refresh-package va-platform --refresh-package va-notification
 ENTRYPOINT ["python", "-m", "va_notification"]
 
+# D3.1: Depots (ADR-0013); nur Request/Reply und Outbox, keine externen Quellen
+FROM service-base AS portfolio
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages/va-contracts/pyproject.toml,target=packages/va-contracts/pyproject.toml \
+    --mount=type=bind,source=packages/va-platform/pyproject.toml,target=packages/va-platform/pyproject.toml \
+    --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
+    --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
+    --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/portfolio/pyproject.toml,target=services/portfolio/pyproject.toml \
+    --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-portfolio --no-install-workspace
+RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=packages,target=packages \
+    --mount=type=bind,source=services,target=services \
+    UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    uv sync --locked --inexact --no-dev --package va-portfolio --no-editable \
+        --refresh-package va-contracts --refresh-package va-platform --refresh-package va-portfolio
+ENTRYPOINT ["python", "-m", "va_portfolio"]
+
 FROM service-base AS web-api
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
@@ -168,6 +200,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.21,source=/uv,target=/bin/uv \
     --mount=type=bind,source=services/market-data/pyproject.toml,target=services/market-data/pyproject.toml \
     --mount=type=bind,source=services/scoring/pyproject.toml,target=services/scoring/pyproject.toml \
     --mount=type=bind,source=services/notification/pyproject.toml,target=services/notification/pyproject.toml \
+    --mount=type=bind,source=services/portfolio/pyproject.toml,target=services/portfolio/pyproject.toml \
     --mount=type=bind,source=services/web-api/pyproject.toml,target=services/web-api/pyproject.toml \
     UV_PROJECT_ENVIRONMENT=/usr/local UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
     uv sync --locked --inexact --no-dev --package va-web-api --no-install-workspace

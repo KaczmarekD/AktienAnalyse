@@ -70,6 +70,7 @@ jobs:
             -e NATS_MARKET_DATA_PASSWORD=test-market-data \
             -e NATS_SCORING_PASSWORD=test-scoring \
             -e NATS_NOTIFICATION_PASSWORD=test-notification \
+            -e NATS_PORTFOLIO_PASSWORD=test-portfolio \
             -e NATS_WEB_API_PASSWORD=test-web-api \
             -e NATS_BATCH_PASSWORD=test-batch \
             nats:2.15.1-alpine -c /etc/nats/nats.conf
@@ -109,7 +110,7 @@ jobs:
           uv run alembic check
 
       - name: Pytest
-        run: uv run pytest --cov=src --cov=va_contracts --cov=va_platform --cov=va_market_data --cov=va_scoring --cov=va_notification --cov=va_web_api --cov-report=xml --cov-report=term
+        run: uv run pytest --cov=src --cov=va_contracts --cov=va_platform --cov=va_market_data --cov=va_scoring --cov=va_notification --cov=va_portfolio --cov=va_web_api --cov-report=xml --cov-report=term
 
       - name: Upload coverage
         uses: actions/upload-artifact@v7
@@ -238,6 +239,19 @@ jobs:
           cache-from: type=gha,scope=svc-notification
           cache-to: type=gha,scope=svc-notification,mode=max
 
+      - name: Service-Image portfolio bauen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: portfolio
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: va-portfolio:ci
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=svc-portfolio
+          cache-to: type=gha,scope=svc-portfolio,mode=max
+
       - name: Service-Image web-api bauen
         uses: docker/build-push-action@v7
         with:
@@ -293,6 +307,7 @@ jobs:
           E2E_MARKET_DATA_IMAGE: va-market-data:ci
           E2E_SCORING_IMAGE: va-scoring:ci
           E2E_NOTIFICATION_IMAGE: va-notification:ci
+          E2E_PORTFOLIO_IMAGE: va-portfolio:ci
         run: docker/e2e.sh
 
       # P0.6b: Die NAS baut nicht selbst, Compose zieht das Image aus GHCR
@@ -304,7 +319,7 @@ jobs:
           grep -qx "ghcr.io/kaczmarekd/value-analyzer:latest" <<< "$images"
           grep -qx "ghcr.io/kaczmarekd/va-frontend:latest" <<< "$images"
           # P5.1/P5.4: die Services und das web-api mit ihren eigenen Images, ohne Profil
-          for image in va-market-data va-scoring va-notification va-web-api; do
+          for image in va-market-data va-scoring va-notification va-portfolio va-web-api; do
             grep -qx "ghcr.io/kaczmarekd/$image:latest" <<< "$images"
           done
 
@@ -348,7 +363,7 @@ jobs:
           for tag in $tags; do
             # App-Image (Batch, web-api ohne NATS), frontend (P3.6), die Services (P5.1)
             for image in value-analyzer va-frontend va-market-data va-scoring \
-                va-notification va-web-api; do
+                va-notification va-portfolio va-web-api; do
               docker tag "$image:ci" "$registry/$image:$tag"
               docker push "$registry/$image:$tag"
             done

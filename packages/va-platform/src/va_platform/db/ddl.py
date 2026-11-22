@@ -14,6 +14,7 @@ Rollen (legt ``db/init/01_roles.sh`` an, bzw. der DBA bei fremdem Postgres):
   legt seit P4.7 auch Runs in ``batch.run`` an und schliesst sie ab.
 - ``va_identity`` (D1.1): Konten und Sitzungen des web-api im Schema ``identity``. Das Schema
   steht bewusst nicht in ``SCHEMAS``: Persoenliche Daten liest weder ``va_read`` noch ``va_app``.
+- ``va_portfolio`` (D3.1): Depots im Schema ``portfolio``, ebenso nicht in ``SCHEMAS``.
 """
 
 from __future__ import annotations
@@ -257,23 +258,37 @@ $$;
 IDENTITY_ROLE = "va_identity"
 
 
-def identity_grant_statements() -> str:
-    """Rechte im Schema ``identity``: nur ``va_identity`` liest und fuegt an, in der Outbox setzt
-    sie nur ``published_at``. Keine ``DEFAULT PRIVILEGES``: Eine Migration mit neuen Tabellen in
-    ``identity`` ruft diese Funktion erneut auf. Nur, wenn es die Rolle gibt (idempotent).
+def personal_grant_statements(schema: str, role: str) -> str:
+    """Rechte in einem persoenlichen Schema: nur ``role`` liest und fuegt an, in der Outbox setzt
+    sie nur ``published_at``. Keine ``DEFAULT PRIVILEGES``: Eine Migration mit neuen Tabellen im
+    Schema ruft diese Funktion erneut auf. Nur, wenn es die Rolle gibt (idempotent).
     """
     return f"""
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{IDENTITY_ROLE}') THEN
-        GRANT USAGE ON SCHEMA identity TO {IDENTITY_ROLE};
-        GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA identity TO {IDENTITY_ROLE};
-        GRANT USAGE ON ALL SEQUENCES IN SCHEMA identity TO {IDENTITY_ROLE};
-        GRANT UPDATE (published_at) ON identity.outbox TO {IDENTITY_ROLE};
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+        GRANT USAGE ON SCHEMA {schema} TO {role};
+        GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA {schema} TO {role};
+        GRANT USAGE ON ALL SEQUENCES IN SCHEMA {schema} TO {role};
+        GRANT UPDATE (published_at) ON {schema}.outbox TO {role};
     END IF;
 END
 $$;
 """
+
+
+def identity_grant_statements() -> str:
+    """Rechte im Schema ``identity`` fuer ``va_identity`` (D1.1)."""
+    return personal_grant_statements("identity", IDENTITY_ROLE)
+
+
+# D3.1: Depots im Dienst portfolio, persoenliche Daten (ADR-0013)
+PORTFOLIO_ROLE = "va_portfolio"
+
+
+def portfolio_grant_statements() -> str:
+    """Rechte im Schema ``portfolio``: nur ``va_portfolio`` (wie ``identity``)."""
+    return personal_grant_statements("portfolio", PORTFOLIO_ROLE)
 
 
 # P5.3: eine Rolle je Service, nur im eigenen Schema (docs/architecture/datenhaltung.md)

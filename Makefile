@@ -49,7 +49,7 @@ test: ## Tests laufen lassen
 	$(RUN) pytest
 
 test-cov: ## Tests mit Coverage-Report
-	$(RUN) pytest --cov=src --cov=va_contracts --cov=va_platform --cov=va_market_data --cov=va_scoring --cov=va_notification --cov=va_web_api --cov-report=term-missing --cov-report=html
+	$(RUN) pytest --cov=src --cov=va_contracts --cov=va_platform --cov=va_market_data --cov=va_scoring --cov=va_notification --cov=va_portfolio --cov=va_web_api --cov-report=term-missing --cov-report=html
 
 lint: ## Code-Style pruefen (ruff check + Format-Check wie in der CI)
 	$(RUN) ruff check $(PY_PATHS)
@@ -89,7 +89,8 @@ test-nats-up: ## Wegwerf-NATS fuer Tests: JetStream (54222), mit Nutzern je Dien
 	docker run -d --rm --name va-test-nats-auth -p 54223:4222 \
 		-v "$(CURDIR)/docker/nats:/etc/nats:ro" \
 		-e NATS_MARKET_DATA_PASSWORD=test-market-data -e NATS_SCORING_PASSWORD=test-scoring \
-		-e NATS_NOTIFICATION_PASSWORD=test-notification -e NATS_WEB_API_PASSWORD=test-web-api \
+		-e NATS_NOTIFICATION_PASSWORD=test-notification -e NATS_PORTFOLIO_PASSWORD=test-portfolio \
+		-e NATS_WEB_API_PASSWORD=test-web-api \
 		-e NATS_BATCH_PASSWORD=test-batch nats:2.15.1-alpine -c /etc/nats/nats.conf
 
 test-nats: ## Integrationstests gegen NATS (vorher: make test-nats-up)

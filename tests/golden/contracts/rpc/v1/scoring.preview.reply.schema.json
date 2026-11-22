@@ -198,7 +198,9 @@
             "unknown_version",
             "conflict",
             "invalid",
-            "internal"
+            "internal",
+            "not_found",
+            "archived"
           ],
           "title": "Code",
           "type": "string"

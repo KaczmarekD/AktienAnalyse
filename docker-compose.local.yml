@@ -90,6 +90,14 @@ services:
       HEALTHCHECK_URL: ""
       DATA_DIR: /app/data
 
+  # D3.1: Depots, wie die anderen Services aus dem App-Image
+  portfolio:
+    container_name: value-analyzer-local-portfolio
+    image: value-analyzer:local
+    pull_policy: never
+    restart: "no"
+    entrypoint: ["python", "-m", "va_portfolio"]
+
   mailpit:
     # Postfach im Browser; nimmt jede Mail an und verschickt nichts
     image: axllent/mailpit:v1.31.6

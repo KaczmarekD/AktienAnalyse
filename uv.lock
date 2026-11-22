@@ -13,6 +13,7 @@ members = [
     "va-market-data",
     "va-notification",
     "va-platform",
+    "va-portfolio",
     "va-scoring",
     "va-web-api",
     "value-analyzer",
@@ -1347,6 +1348,25 @@ requires-dist = [
 ]
 
 [[package]]
+name = "va-portfolio"
+version = "0.3.0"
+source = { editable = "services/portfolio" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+    { name = "va-contracts" },
+    { name = "va-platform" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.1,<3" },
+    { name = "va-contracts", editable = "packages/va-contracts" },
+    { name = "va-platform", editable = "packages/va-platform" },
+]
+
+[[package]]
 name = "va-scoring"
 version = "0.3.0"
 source = { editable = "services/scoring" }
@@ -1420,6 +1440,7 @@ dependencies = [
     { name = "va-market-data" },
     { name = "va-notification" },
     { name = "va-platform" },
+    { name = "va-portfolio" },
     { name = "va-scoring" },
     { name = "va-web-api" },
     { name = "yfinance" },
@@ -1456,6 +1477,7 @@ requires-dist = [
     { name = "va-market-data", editable = "services/market-data" },
     { name = "va-notification", editable = "services/notification" },
     { name = "va-platform", editable = "packages/va-platform" },
+    { name = "va-portfolio", editable = "services/portfolio" },
     { name = "va-scoring", editable = "services/scoring" },
     { name = "va-web-api", editable = "services/web-api" },
     { name = "yfinance", specifier = ">=1.7,<2" },

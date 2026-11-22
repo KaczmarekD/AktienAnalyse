@@ -20,6 +20,7 @@ SERVICES = {
     "market-data": ("va-market-data", '["python", "-m", "va_market_data"]'),
     "scoring": ("va-scoring", '["python", "-m", "va_scoring"]'),
     "notification": ("va-notification", '["python", "-m", "va_notification"]'),
+    "portfolio": ("va-portfolio", '["python", "-m", "va_portfolio"]'),  # D3.1
     "web-api": (
         "va-web-api",
         '["python", "-m", "uvicorn", "--factory", "va_web_api.main:create_app", '
@@ -92,7 +93,13 @@ class TestSmokeScript:
         script = (ROOT / "docker" / "service_smoke.sh").read_text(encoding="utf-8")
         assert "import" in script
         assert "exit 2" in script or "!= 2" in script or "-ne 2" in script
-        for module in ("va_market_data", "va_scoring", "va_notification", "va_web_api"):
+        for module in (
+            "va_market_data",
+            "va_scoring",
+            "va_notification",
+            "va_portfolio",
+            "va_web_api",
+        ):
             assert module in script
 
 

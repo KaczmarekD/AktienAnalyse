@@ -127,6 +127,7 @@ Docker-Netz des Projekts, nur `frontend` hat einen Port im LAN.
 | `market-data` | `va-market-data` | `db`, `nats`, `migrate` | Universum, Abruf bei Yahoo, Kennzahlen |
 | `scoring` | `va-scoring` | wie oben | Bewertung, Scoring-Profile, Vorschau |
 | `notification` | `va-notification` | wie oben | Mail (SMTP), Healthchecks.io |
+| `portfolio` | `va-portfolio` | wie oben | Depots (seit D3.1), nur für das web-api |
 | `web-api` | `va-web-api` | wie oben | REST, WebSocket, Wochenplan, Watchdog |
 | `frontend` | `va-frontend` | `web-api` | UI (nginx), Port 8080 |
 | `value-analyzer` | `value-analyzer` | `db` | Batch und Werkzeuge, nur mit Profil `run` |
@@ -156,8 +157,8 @@ docker compose ps  # migrate "exited (0)", alle anderen "running" bzw. "healthy"
 
 Pflicht in der `.env` sind `POSTGRES_PASSWORD`, `VA_APP_PASSWORD`, `VA_READ_PASSWORD`,
 `VA_PROFILES_PASSWORD`, `VA_WEB_PASSWORD`, `VA_MARKET_DATA_PASSWORD`, `VA_SCORING_PASSWORD`,
-`VA_NOTIFICATION_PASSWORD`, seit D1.1 `VA_IDENTITY_PASSWORD`, seit D1.5 die fünf
-`NATS_*_PASSWORD` (nur Buchstaben, Ziffern und Bindestrich, sie stehen in URLs), dazu
+`VA_NOTIFICATION_PASSWORD`, seit D1.1 `VA_IDENTITY_PASSWORD`, seit D3.1 `VA_PORTFOLIO_PASSWORD`,
+seit D1.5 die `NATS_*_PASSWORD` (seit D3.1 sechs, mit `NATS_PORTFOLIO_PASSWORD`) (nur Buchstaben, Ziffern und Bindestrich, sie stehen in URLs), dazu
 `SMTP_USER`, `SMTP_PASSWORD` und `MAIL_TO`. Fehlt ein
 Passwort, bricht Compose mit einem Hinweis wie „VA_WEB_PASSWORD in .env setzen“ ab. Fehlen die
 Angaben für die Mail, startet `notification` nicht und nennt das Feld in
@@ -197,13 +198,16 @@ einige Sekunden; bei vielen Titeln `WATCHDOG_FETCH_MINUTES` in der `.env` (Stand
 Seit D2.4 frischt der Wochenlauf danach die Stammdaten und ETF-Daten der Abdeckung auf, höchstens
 10 Minuten lang. Die Grenze muss Abruf und diese 10 Minuten zusammen abdecken; nie unter 30 setzen.
 
-**Daten einer Person löschen (seit D1.6, ADR-0012):** Konten werden sonst nur deaktiviert. Nur auf
-ausdrücklichen Wunsch der Person löscht ein Kommando alle ihre Daten im Schema `identity`, ohne
-Rückweg. Es braucht die Rolle des Besitzers und läuft deshalb im Container `value-analyzer`:
+**Daten einer Person löschen (seit D1.6, ADR-0012):** Konten werden sonst nur deaktiviert, Depots
+nur archiviert. Nur auf ausdrücklichen Wunsch der Person löscht ein Kommando alle ihre Daten, seit
+D3.1 die Depots (Schema `portfolio`) und das Konto (Schema `identity`), ohne Rückweg. Es braucht
+die Rolle des Besitzers und läuft deshalb im Container `value-analyzer`:
 
 ```bash
-docker compose run --rm value-analyzer python -m va_web_api.admin erase-user <name> --by <admin> --yes
+docker compose run --rm value-analyzer python -m src.erase_user <name> --by <admin> --yes
 ```
+
+Das ältere `python -m va_web_api.admin erase-user` löscht nur das Konto und lässt die Depots stehen.
 
 Ohne `--yes` löscht es nichts. Danach steht in `identity.erasure_log`, dass gelöscht wurde, aber
 nicht wen oder was (Hash der Nutzer-ID, Admin, Zeilen je Tabelle). Backups enthalten die Daten, bis
@@ -228,7 +232,8 @@ Housekeeping beim nächsten Lauf Altdateien, die der Import braucht.
 2. `git pull`, dann die `.env` mit `.env.example` vergleichen. Neu sind je nach Stand
    `POSTGRES_PASSWORD`, `VA_APP_PASSWORD` und `VA_READ_PASSWORD` (Phase 2),
    `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4), die drei `VA_<SERVICE>_PASSWORD`
-   (P5.3) und `VA_IDENTITY_PASSWORD` (D1.1). Für das UI im LAN `UI_LAN_BIND` und
+   (P5.3), `VA_IDENTITY_PASSWORD` (D1.1), `VA_PORTFOLIO_PASSWORD` und `NATS_PORTFOLIO_PASSWORD`
+   (D3.1). Für das UI im LAN `UI_LAN_BIND` und
    `UI_SERVER_NAMES` setzen.
 3. `make pull` und der Import-Test aus Regel 2.
 4. Alles stoppen, auch den alten Batch-Container:

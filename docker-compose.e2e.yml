@@ -94,6 +94,12 @@ services:
     # Vorschau eines Dry-Runs bleibt im Container und geht mit ihm
     volumes: !reset []
 
+  # D3.1: Depots; der Stack prueft, dass der Dienst mit seiner Rolle und seinem NATS-Nutzer startet
+  portfolio:
+    container_name: value-analyzer-e2e-portfolio
+    image: ${E2E_PORTFOLIO_IMAGE:-value-analyzer:local}
+    profiles: !reset []
+
   frontend:
     container_name: value-analyzer-e2e-frontend
     # CI: das echte Image (E2E_FRONTEND_IMAGE=va-frontend:ci). Lokal dasselbe nginx mit dem

@@ -8,6 +8,7 @@ from typing import Any
 
 from ...base import Contract
 from .payloads import (
+    DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
     PricesCompletedV1,
@@ -80,6 +81,8 @@ PRICES_COMPLETED = EventSpec(
 SECURITIES_UPDATED = EventSpec(
     "marketdata.securities.updated", SecuritiesUpdatedV1, max_age=timedelta(days=7)
 )
+# D3.1: Ein Depot hat sich geaendert (nur IDs und Version)
+DEPOT_CHANGED = EventSpec("portfolio.depot.changed", DepotChangedV1, max_age=timedelta(hours=24))
 
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
@@ -96,6 +99,7 @@ EVENTS: dict[str, EventSpec[Any]] = {
         PRICES_REQUESTED,
         PRICES_COMPLETED,
         SECURITIES_UPDATED,
+        DEPOT_CHANGED,
     )
 }
 
