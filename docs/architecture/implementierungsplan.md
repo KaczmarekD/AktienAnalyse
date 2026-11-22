@@ -3771,7 +3771,7 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   `test_authz.py`; WebSocket: `depot.changed` an `user:<id>` des Besitzers; `/me/export` mit den
   eigenen Depots.
 - **Review:** `/code-review high`, `/security-review`.
-- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (22.11.2026, auf `main` als `f8f557a`, CI grün):** wie im Entwurf, dazu:
   - **Echte Sitzung:** `depot_owner` verlangt sie auch im Übergang ohne Sitzungspflicht (Depots
     gehören einer Person, nicht `LAN_USER`), mit Einmal-Passwort 403. Die Prüfung hängt am Router,
     läuft also vor Body und Ports (401 vor 422 und 503).
