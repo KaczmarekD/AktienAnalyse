@@ -61,7 +61,7 @@ class ScoreResult(Base):
     composite_score: Mapped[float | None]
     value_trap_flag: Mapped[bool | None]
     rank_overall: Mapped[int | None]
-    # F2.3 (Migration 0025): "quality" oder "momentum", aeltere Laeufe ohne
+    # F2.3 (Migration 0026): "quality" oder "momentum", aeltere Laeufe ohne
     value_trap_reason: Mapped[str | None]
 
 

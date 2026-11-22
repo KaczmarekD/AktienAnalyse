@@ -2873,11 +2873,10 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     `web.ranking_row`, in Ranking, Score-Verlauf und Vorschau. Ältere Läufe haben keinen Grund,
     ihr Flag gilt als „quality“. Der Tooltip des Badges nennt den Grund. Mail und CSV bleiben
     unverändert.
-  - **Durchgehend:** eine Migration für `momentum_12_1` (`market_data.fundamental_snapshot`,
-    `web.snapshot_row`) und `value_trap_reason` (`scoring.score_result`, `web.ranking_row`),
-    Nummer vor dem Merge mit der Depot-Session abstimmen (D3.4 hat `0025`). Das Titel-Detail
-    zeigt das Momentum, der Editor die Regel noch nicht (wie die Branchenregel; F2.5 schaltet sie
-    über das Profil v2 ein).
+  - **Durchgehend:** Migration `0026` (D3.4 hat `0025` zuerst gemergt) für `momentum_12_1`
+    (`market_data.fundamental_snapshot`, `web.snapshot_row`) und `value_trap_reason`
+    (`scoring.score_result`, `web.ranking_row`). Das Titel-Detail zeigt das Momentum, der Editor
+    die Regel noch nicht (wie die Branchenregel; F2.5 schaltet sie über das Profil v2 ein).
 
 #### F2.4 Branchenregeln und Abschnitt „Finanzwerte“
 

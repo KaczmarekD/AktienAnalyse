@@ -64,7 +64,7 @@ class RankingRow(Base):
     value_score: Mapped[float | None]
     quality_score: Mapped[float | None]
     value_trap: Mapped[bool]
-    # F2.3 (Migration 0025): "quality" oder "momentum", aeltere Laeufe ohne
+    # F2.3 (Migration 0026): "quality" oder "momentum", aeltere Laeufe ohne
     value_trap_reason: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -132,7 +132,7 @@ class SnapshotRow(Base):
     currency: Mapped[str | None]
     price: Mapped[float | None]
     market_cap: Mapped[float | None]
-    # F2.3 (Migration 0025): 12-1-Momentum
+    # F2.3 (Migration 0026): 12-1-Momentum
     momentum_12_1: Mapped[float | None]
     ev_ebit: Mapped[float | None]
     pe_ratio: Mapped[float | None]
