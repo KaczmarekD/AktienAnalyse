@@ -17,6 +17,7 @@
  "market": {
   "enterprise_value": 6192849920.0,
   "market_cap": 6244772864.0,
+  "momentum_12_1": null,
   "price": 25.57,
   "shares_outstanding": 244222642.0
  },

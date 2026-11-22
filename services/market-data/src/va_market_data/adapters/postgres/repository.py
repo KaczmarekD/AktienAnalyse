@@ -736,12 +736,19 @@ class MarketDataRepository:
             days.setdefault(symbol, set()).add(day)
         return {symbol: frozenset(found) for symbol, found in days.items()}
 
-    def get_splits_since(
+    def get_price_bars_since(
         self, symbols: Collection[str], since: date
-    ) -> dict[str, dict[date, float]]:
-        """Splits ab ``since`` je Symbol und Tag, aus der aktuellsten Version des Tages (F2.2)."""
-        latest = (
-            select(Instrument.symbol, PriceBarRow.trade_date, PriceBarRow.split)
+    ) -> dict[str, dict[date, PriceBar]]:
+        """Kurse ab ``since`` je Symbol und Tag, aktuellste Version (F2.2, F2.3)."""
+        stmt = (
+            select(
+                Instrument.symbol,
+                PriceBarRow.trade_date,
+                PriceBarRow.close,
+                PriceBarRow.adj_close,
+                PriceBarRow.dividend,
+                PriceBarRow.split,
+            )
             .join(PriceBarRow, PriceBarRow.instrument_id == Instrument.id)
             .where(Instrument.symbol.in_(list(symbols)), PriceBarRow.trade_date >= since)
             .ext(distinct_on(Instrument.symbol, PriceBarRow.trade_date))
@@ -751,15 +758,11 @@ class MarketDataRepository:
                 PriceBarRow.first_seen_at.desc(),
                 PriceBarRow.id.desc(),
             )
-            .subquery()
         )
-        stmt = select(latest.c.symbol, latest.c.trade_date, latest.c.split).where(
-            latest.c.split > 0
-        )
-        splits: dict[str, dict[date, float]] = {}
-        for symbol, day, ratio in self.session.execute(stmt):
-            splits.setdefault(symbol, {})[day] = ratio
-        return splits
+        bars: dict[str, dict[date, PriceBar]] = {}
+        for symbol, day, close, adj_close, dividend, split in self.session.execute(stmt):
+            bars.setdefault(symbol, {})[day] = PriceBar(close, adj_close, dividend, split)
+        return bars
 
     # --- Wechselkurse -----------------------------------------------------------
 

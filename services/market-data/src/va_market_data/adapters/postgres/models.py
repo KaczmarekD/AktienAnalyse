@@ -262,6 +262,8 @@ class FundamentalSnapshot(Base):
     market_cap: Mapped[float | None]
     enterprise_value: Mapped[float | None]
     shares_outstanding: Mapped[float | None]
+    # F2.3 (Migration 0025): 12-1-Momentum, nur fuer die Value-Trap-Regel
+    momentum_12_1: Mapped[float | None]
     # ValueMetrics
     ev_ebit: Mapped[float | None]
     pe_ratio: Mapped[float | None]

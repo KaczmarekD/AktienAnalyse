@@ -236,6 +236,7 @@ def _ranked(snapshots: pd.DataFrame, scored: pd.DataFrame) -> list[RankedTitleV1
             value_score=_number(row.get("value_score")),
             quality_score=_number(row.get("quality_score")),
             value_trap_flag=bool(row["value_trap_flag"]),
+            value_trap_reason=missing_to_none(row.get("value_trap_reason")),
         )
         for row in scored.to_dict("records")
     ]

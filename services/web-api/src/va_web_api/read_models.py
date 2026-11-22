@@ -116,7 +116,7 @@ _ROWS = text("""
            s.index_name AS index, s.sector, r.symbol IS NOT NULL AS passed_filter,
            r.composite_score, r.value_score, r.quality_score,
            CASE WHEN r.symbol IS NULL THEN NULL ELSE r.value_trap END AS value_trap_flag,
-           s.market_cap, s.currency, s.ev_ebit, s.pb_ratio, s.p_fcf, s.shareholder_yield, s.roic,
+           r.value_trap_reason, s.market_cap, s.currency, s.ev_ebit, s.pb_ratio, s.p_fcf, s.shareholder_yield, s.roic,
            s.fcf_margin, s.operating_margin, s.net_debt_ebitda, s.earnings_stability,
            s.f_score, s.operating_accruals, s.cfo_assets, s.net_share_issuance
     FROM (SELECT * FROM web.ranking_row WHERE scoring_run_id = :scoring_run_id) r
@@ -126,7 +126,8 @@ _ROWS = text("""
 """)
 
 _SNAPSHOT = text("""
-    SELECT fetch_run_id, fetched_on, fetch_ok, price, currency, market_cap, ev_ebit, pe_ratio,
+    SELECT fetch_run_id, fetched_on, fetch_ok, price, currency, market_cap, momentum_12_1,
+           ev_ebit, pe_ratio,
            pb_ratio, p_fcf, dividend_yield, shareholder_yield, roic, fcf_margin,
            operating_margin, net_debt_ebitda, earnings_stability, f_score,
            operating_accruals, cfo_assets, net_share_issuance, revenue_growth_5y,
@@ -145,6 +146,7 @@ _HISTORY = text("""
            r.symbol IS NOT NULL AS passed_filter, r.composite_score, r.value_score,
            r.quality_score,
            CASE WHEN r.symbol IS NULL THEN NULL ELSE r.value_trap END AS value_trap_flag,
+           r.value_trap_reason,
            (SELECT count(*) FROM web.ranking_row c
             WHERE c.scoring_run_id = rr.scoring_run_id AND c.rank_overall IS NOT NULL)
                AS ranked_count

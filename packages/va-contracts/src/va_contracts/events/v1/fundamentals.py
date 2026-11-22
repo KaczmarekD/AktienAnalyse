@@ -34,6 +34,8 @@ class MarketDataV1(Contract):
     market_cap: float | None = None
     enterprise_value: float | None = None
     shares_outstanding: float | None = None
+    # F2.3 (additiv): Gesamtrendite ueber zwoelf Monate ohne den letzten, nicht im Score
+    momentum_12_1: float | None = None
 
 
 class ValueMetricsV1(Contract):

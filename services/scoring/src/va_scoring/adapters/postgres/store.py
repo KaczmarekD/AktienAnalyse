@@ -135,6 +135,7 @@ def _score_row(instrument_id: int, row: Mapping[Any, Any]) -> ScoreRow:
         composite_score=to_python(row.get("composite_score")),
         value_trap_flag=None if flag is None else bool(flag),
         rank_overall=None if rank is None else int(rank),
+        value_trap_reason=to_python(row.get("value_trap_reason")),
     )
 
 

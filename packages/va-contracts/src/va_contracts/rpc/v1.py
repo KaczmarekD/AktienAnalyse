@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field
 
 from ..base import Contract, PositiveId
+from ..events.v1.ranking import ValueTrapReason
 from ..portfolio import (
     MAX_LINES,
     CashLineV1,
@@ -96,6 +97,8 @@ class RankedTitleV1(Contract):
     value_score: float | None
     quality_score: float | None
     value_trap_flag: bool | None
+    # F2.3 (additiv): welche Regel das Flag gesetzt hat
+    value_trap_reason: ValueTrapReason | None = None
 
 
 class PreviewBasisV1(Contract):

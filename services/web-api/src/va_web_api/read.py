@@ -40,7 +40,8 @@ RUN_COLUMNS = """
 _RANKING_ROWS = text("""
     SELECT res.rank_overall AS rank, i.symbol, fs.name, fs.index_name AS index, fs.sector,
            res.passed_filter, res.composite_score, res.value_score, res.quality_score,
-           res.value_trap_flag, fs.market_cap, fs.currency, fs.ev_ebit, fs.pb_ratio, fs.p_fcf,
+           res.value_trap_flag, res.value_trap_reason, fs.market_cap, fs.currency, fs.ev_ebit,
+           fs.pb_ratio, fs.p_fcf,
            fs.shareholder_yield, fs.roic, fs.fcf_margin, fs.operating_margin,
            fs.net_debt_ebitda, fs.earnings_stability, fs.f_score, fs.operating_accruals,
            fs.cfo_assets, fs.net_share_issuance
@@ -53,7 +54,8 @@ _RANKING_ROWS = text("""
 """)
 
 _SNAPSHOT_COLUMNS = """
-    fs.fetch_run_id, fs.fetch_ok, fs.price, fs.currency, fs.market_cap, fs.ev_ebit, fs.pe_ratio,
+    fs.fetch_run_id, fs.fetch_ok, fs.price, fs.currency, fs.market_cap, fs.momentum_12_1,
+    fs.ev_ebit, fs.pe_ratio,
     fs.pb_ratio, fs.p_fcf, fs.dividend_yield, fs.shareholder_yield, fs.roic, fs.fcf_margin,
     fs.operating_margin, fs.net_debt_ebitda, fs.earnings_stability, fs.f_score,
     fs.operating_accruals, fs.cfo_assets, fs.net_share_issuance, fs.revenue_growth_5y,
@@ -215,7 +217,7 @@ def get_instrument(conn: Connection, symbol: str) -> Instrument | None:
         text("""
             SELECT sr.id AS scoring_run_id, sr.created_at, sr.origin, res.rank_overall AS rank,
                    res.passed_filter, res.composite_score, res.value_score, res.quality_score,
-                   res.value_trap_flag,
+                   res.value_trap_flag, res.value_trap_reason,
                    (SELECT count(*) FROM scoring.score_result c
                     WHERE c.scoring_run_id = sr.id AND c.rank_overall IS NOT NULL) AS ranked_count
             FROM scoring.score_result res

@@ -51,6 +51,7 @@ class ScoreRow:
     composite_score: float | None
     value_trap_flag: bool | None
     rank_overall: int | None
+    value_trap_reason: str | None = None  # F2.3
 
 
 @dataclass(frozen=True)

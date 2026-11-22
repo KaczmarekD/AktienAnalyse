@@ -25,6 +25,7 @@
           "default": {
             "enterprise_value": null,
             "market_cap": null,
+            "momentum_12_1": null,
             "price": null,
             "shares_outstanding": null
           }
@@ -199,6 +200,18 @@
           ],
           "default": null,
           "title": "Market Cap"
+        },
+        "momentum_12_1": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Momentum 12 1"
         },
         "price": {
           "anyOf": [

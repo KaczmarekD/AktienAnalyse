@@ -112,6 +112,17 @@ class ProfileParamsV1(Contract):
         le=0.1,
         description="Langfristiges Wachstum g fuer das gerechtfertigte KBV",
     )
+    # F2.3 (ADR-0011, Punkt 5): zunaechst abgeschaltet, erst das Profil v2 (F2.5) schaltet sie an
+    trap_momentum_rule: bool = Field(
+        default=False,
+        description="Value-Trap auch bei schwachem Momentum und schwachem F-Score",
+    )
+    trap_momentum_max_rank: float = Field(
+        default=0.30, ge=0, le=1, description="Momentum-Rang, bis zu dem die Regel greift"
+    )
+    trap_fscore_max: int = Field(
+        default=3, ge=0, le=9, description="F-Score, bis zu dem die Regel greift"
+    )
 
     @model_validator(mode="after")
     def _justified_pb_defined(self) -> Self:

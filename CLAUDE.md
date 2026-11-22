@@ -208,6 +208,11 @@ Liquidität für einen Privatanleger ohnehin grenzwertig ist.
 **Value-Trap-Flag** bei oberem Value-Quartil (≥0.70) und unterem
 Quality-Quartil (≤0.30). Die Werte sind bewusst weicher als die exakten
 0.75/0.25-Quartil-Grenzen, damit auch borderline-Fälle gefangen werden.
+Seit F2.3 gibt es eine zweite Regel (`trap_momentum_rule`, im Profil v1 aus): billig,
+Momentum-Rang ≤ 0,30 und F-Score ≤ 3, also ein fallendes Messer ohne fundamentale Stütze.
+`value_trap_reason` hält fest, welche Regel das Flag gesetzt hat („quality“ hat Vorrang vor
+„momentum“). Das 12-1-Momentum (`MarketData.momentum_12_1`) rechnet market-data aus `close`
+und `dividend` der gespeicherten Kurse; es geht nicht in den Composite ein.
 
 ## Konventionen
 

@@ -216,6 +216,8 @@ export class ProfileEditorPage {
   protected readonly trapParams = computed(() => ({
     value_trap_value_threshold: this.model().value_trap_value_threshold,
     value_trap_quality_threshold: this.model().value_trap_quality_threshold,
+    trap_momentum_max_rank: this.model().trap_momentum_max_rank,
+    trap_fscore_max: this.model().trap_fscore_max,
   }));
 
   protected readonly notice = signal<Notice | undefined>(undefined);

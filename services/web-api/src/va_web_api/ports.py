@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from datetime import date
 
     from va_contracts.events.v1 import RunOptionsV1
+    from va_contracts.events.v1.ranking import ValueTrapReason
     from va_contracts.portfolio import (
         CashLineV1,
         DepotExportV1,
@@ -54,6 +55,7 @@ class RankedTitle:
     value_score: float | None
     quality_score: float | None
     value_trap_flag: bool | None
+    value_trap_reason: ValueTrapReason | None = None  # F2.3
 
 
 @dataclass(frozen=True)

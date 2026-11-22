@@ -223,9 +223,11 @@ class TestTotalReturn:
         start, end = min(bars), max(bars)
         assert start < date(2025, 5, 14) < end  # die Dividende liegt im Fenster
         expected = _adj_return(frame, start, end)
-        assert total_return(bars, start, end) == pytest.approx(expected, abs=1e-3)
+        result = total_return(bars, start, end)
+        assert result is not None
+        assert result == pytest.approx(expected, abs=1e-3)
         without = bars[end].close / bars[start].close - 1
-        assert total_return(bars, start, end) > without  # 2,35 EUR Dividende zählen mit
+        assert result > without  # 2,35 EUR Dividende zählen mit
 
     def test_split_is_already_in_close(self):
         # Yahoo bereinigt close um Splits; den Split noch einmal anzuwenden, zählte ihn doppelt

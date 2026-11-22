@@ -47,6 +47,7 @@ log = logging.getLogger(__name__)
 _METRICS = (
     "price",
     "market_cap",
+    "momentum_12_1",
     "ev_ebit",
     "pe_ratio",
     "pb_ratio",
@@ -90,7 +91,7 @@ _RUNS = text("""
 _ROWS = text("""
     SELECT res.scoring_run_id, i.symbol, fs.name, fs.index_name, res.rank_overall,
            res.composite_score, res.value_score, res.quality_score, res.value_trap_flag,
-           fr.started_at, sr.created_at,
+           res.value_trap_reason, fr.started_at, sr.created_at,
            (SELECT max(b.id) FROM batch.run b WHERE b.scoring_run_id = sr.id) AS run_id
     FROM scoring.score_result res
     JOIN scoring.scoring_run sr ON sr.id = res.scoring_run_id
@@ -186,6 +187,7 @@ def _ranking_rows(conn: Connection) -> list[dict[str, Any]]:
                 "value_score": row["value_score"],
                 "quality_score": row["quality_score"],
                 "value_trap": bool(row["value_trap_flag"]),
+                "value_trap_reason": row["value_trap_reason"],
             }
         )
     return rows

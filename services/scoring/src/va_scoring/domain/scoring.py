@@ -129,6 +129,12 @@ class ScoringConfig:
     cost_of_capital: float = 0.08
     terminal_growth: float = 0.02
 
+    # Value-Trap-Regel mit Momentum (F2.3, ADR-0011, Punkt 5): Momentum-Rang und F-Score, bis zu
+    # denen ein billiger Titel als fallendes Messer gilt
+    trap_momentum_rule: bool = False
+    trap_momentum_max_rank: float = 0.30
+    trap_fscore_max: int = 3
+
 
 def _percentile_rank(series: pd.Series, direction: str, drop_non_positive: bool) -> pd.Series:
     """Perzentilrang. NaN bleibt NaN. direction='low' -> niedrig wird zu hohem Score."""
@@ -207,9 +213,22 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
     q = out["quality_score"]
     out["composite_score"] = cfg.value_weight * v + cfg.quality_weight * q
 
-    out["value_trap_flag"] = (out["value_score"].fillna(0) >= cfg.value_trap_value_threshold) & (
+    quality_trap = (out["value_score"].fillna(0) >= cfg.value_trap_value_threshold) & (
         out["quality_score"].fillna(1) <= cfg.value_trap_quality_threshold
     )
+    # Momentum geht nicht in den Composite ein, es prueft nur den Anker (F2.3)
+    momentum_rank = (
+        _percentile_rank(inputs["momentum_12_1"], "high", drop_non_positive=False)
+        if "momentum_12_1" in inputs.columns
+        else pd.Series(np.nan, index=out.index, dtype=float)
+    )
+    momentum_trap = _momentum_trap(out["value_score"], momentum_rank, inputs, ruled, cfg)
+    out["value_trap_flag"] = quality_trap | momentum_trap
+    # Welche Regel das Flag gesetzt hat; die bisherige hat Vorrang
+    reason = pd.Series(None, index=out.index, dtype=object)
+    reason.loc[momentum_trap] = "momentum"
+    reason.loc[quality_trap] = "quality"
+    out["value_trap_reason"] = reason
 
     out["industry_rule"] = ruled
     out = pd.concat([out, value_ranks, quality_ranks], axis=1)
@@ -222,12 +241,36 @@ def score(df: pd.DataFrame, cfg: ScoringConfig | None = None) -> pd.DataFrame:
 
     if cfg.industry_rules:
         log.info("Branchenregel: %d Titel ohne EV-, FCF- und Margen-Kennzahlen", int(ruled.sum()))
+    if cfg.trap_momentum_rule:
+        log.info("Value-Trap-Regel mit Momentum: %d Titel", int(momentum_trap.sum()))
     log.info(
         "Scoring fertig: %d bewertet, %d mit Value-Trap-Flag",
         int(out["composite_score"].notna().sum()),
         int(out["value_trap_flag"].sum()),
     )
     return out
+
+
+def _momentum_trap(
+    value_score: pd.Series,
+    momentum_rank: pd.Series,
+    inputs: pd.DataFrame,
+    ruled: pd.Series,
+    cfg: ScoringConfig,
+) -> pd.Series:
+    """Billig, schwaches Momentum, schwacher F-Score: ein fallendes Messer (ADR-0011, Punkt 5).
+
+    Fehlt Momentum oder F-Score, greift die Regel nicht. Unter der Branchenregel (``ruled``)
+    zaehlt der F-Score nicht, auch wenn er kein aktiver Faktor ist.
+    """
+    if not cfg.trap_momentum_rule or "f_score" not in inputs.columns:
+        return pd.Series(False, index=value_score.index, dtype=bool)
+    f_score = inputs["f_score"].astype(float).mask(ruled)
+    return (
+        (value_score >= cfg.value_trap_value_threshold)
+        & (momentum_rank <= cfg.trap_momentum_max_rank)
+        & (f_score <= cfg.trap_fscore_max)
+    ).astype(bool)
 
 
 def _industry_rule_inputs(out: pd.DataFrame, cfg: ScoringConfig) -> tuple[pd.Series, pd.DataFrame]:

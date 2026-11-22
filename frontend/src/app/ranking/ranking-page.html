@@ -225,7 +225,11 @@
         <th scope="col" mat-header-cell *matHeaderCellDef><app-term key="hint" /></th>
         <td mat-cell *matCellDef="let row">
           <span class="badges">
-            <app-value-trap-badge [flagged]="row.value_trap_flag" [params]="params()" />
+            <app-value-trap-badge
+              [flagged]="row.value_trap_flag"
+              [reason]="row.value_trap_reason"
+              [params]="params()"
+            />
             @if (!row.passed_filter) {
               <span
                 class="badge"

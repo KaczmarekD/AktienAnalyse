@@ -272,7 +272,11 @@
                 <td>{{ row.name ?? row.symbol }}</td>
                 <td class="num">{{ row.composite_score | num }}</td>
                 <td>
-                  <app-value-trap-badge [flagged]="row.value_trap_flag" [params]="trapParams()" />
+                  <app-value-trap-badge
+                    [flagged]="row.value_trap_flag"
+                    [reason]="row.value_trap_reason"
+                    [params]="trapParams()"
+                  />
                 </td>
               </tr>
             }

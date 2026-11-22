@@ -74,6 +74,8 @@ const QUALITY = [
 const MARKET = [
   figure('price', 'price'),
   figure('market_cap', 'mrd'),
+  // F2.3 (ADR-0011): nur für die Value-Trap-Regel
+  figure('momentum_12_1', 'pct'),
   figure('revenue_growth_5y', 'pct'),
   figure('eps_growth_5y', 'pct'),
 ];

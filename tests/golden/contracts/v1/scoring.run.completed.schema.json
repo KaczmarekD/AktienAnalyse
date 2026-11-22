@@ -25,6 +25,7 @@
           "default": {
             "enterprise_value": null,
             "market_cap": null,
+            "momentum_12_1": null,
             "price": null,
             "shares_outstanding": null
           }
@@ -200,6 +201,18 @@
           "default": null,
           "title": "Market Cap"
         },
+        "momentum_12_1": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Momentum 12 1"
+        },
         "price": {
           "anyOf": [
             {
@@ -323,6 +336,28 @@
           "minimum": -0.05,
           "title": "Terminal Growth",
           "type": "number"
+        },
+        "trap_fscore_max": {
+          "default": 3,
+          "description": "F-Score, bis zu dem die Regel greift",
+          "maximum": 9,
+          "minimum": 0,
+          "title": "Trap Fscore Max",
+          "type": "integer"
+        },
+        "trap_momentum_max_rank": {
+          "default": 0.3,
+          "description": "Momentum-Rang, bis zu dem die Regel greift",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Trap Momentum Max Rank",
+          "type": "number"
+        },
+        "trap_momentum_rule": {
+          "default": false,
+          "description": "Value-Trap auch bei schwachem Momentum und schwachem F-Score",
+          "title": "Trap Momentum Rule",
+          "type": "boolean"
         },
         "value_factors": {
           "description": "Aktive Value-Faktoren, mindestens 2",
@@ -660,6 +695,22 @@
           "default": false,
           "title": "Value Trap Flag",
           "type": "boolean"
+        },
+        "value_trap_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "quality",
+                "momentum"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Trap Reason"
         }
       },
       "required": [

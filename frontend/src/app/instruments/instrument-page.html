@@ -3,7 +3,11 @@
 @if (instrument(); as title) {
   <app-page-header>
     {{ title.name ?? title.symbol }}
-    <app-value-trap-badge [flagged]="newest()?.value_trap_flag" [params]="params()" />
+    <app-value-trap-badge
+      [flagged]="newest()?.value_trap_flag"
+      [reason]="newest()?.value_trap_reason"
+      [params]="params()"
+    />
   </app-page-header>
   <p class="meta">
     <app-term key="symbol" /> {{ title.symbol }}
@@ -269,7 +273,11 @@
           <ng-container matColumnDef="value_trap_flag">
             <th scope="col" mat-header-cell *matHeaderCellDef><app-term key="hint" /></th>
             <td mat-cell *matCellDef="let point">
-              <app-value-trap-badge [flagged]="point.value_trap_flag" [params]="params()" />
+              <app-value-trap-badge
+                [flagged]="point.value_trap_flag"
+                [reason]="point.value_trap_reason"
+                [params]="params()"
+              />
             </td>
           </ng-container>
 

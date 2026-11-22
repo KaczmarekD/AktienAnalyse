@@ -514,6 +514,10 @@ def _trap(frame: pd.DataFrame, **values: Any) -> pd.DataFrame:
     return score(frame, _trap_config(**values)).set_index("symbol")
 
 
+def _value_score(out: pd.DataFrame) -> float:
+    return float(out["value_score"].to_dict()["CHEAP.DE"])
+
+
 class TestMomentumTrapRule:
     """Das Flag kommt zusätzlich bei hohem Value-Score, schwachem Momentum und schwachem
     F-Score. Das Ergebnis nennt die Regel; Momentum geht nicht in den Composite ein."""
@@ -531,8 +535,7 @@ class TestMomentumTrapRule:
 
     def test_the_combination_sets_the_flag(self):
         out = _trap(_trap_universe(), trap_momentum_rule=True)
-        assert out.loc["CHEAP.DE", "value_score"] >= 0.70
-        assert out.loc["CHEAP.DE", "momentum_rank"] == pytest.approx(0.2)
+        assert _value_score(out) >= 0.70
         assert out.loc["CHEAP.DE", "value_trap_flag"]
         assert out.loc["CHEAP.DE", "value_trap_reason"] == "momentum"
         others = out.drop(index="CHEAP.DE")
@@ -570,10 +573,11 @@ class TestMomentumTrapRule:
         with_momentum = _trap(_trap_universe(), trap_momentum_rule=True)
         without = _trap(_trap_universe().drop(columns=["momentum_12_1"]))
         pd.testing.assert_series_equal(with_momentum["composite_score"], without["composite_score"])
-        assert not any(c.startswith("rank_momentum") for c in with_momentum.columns)
+        # Kein Faktor-Rang: Der Momentum-Rang bleibt in score(), das Event traegt den Grund
+        assert not any("momentum" in c and "rank" in c for c in with_momentum.columns)
 
     def test_no_f_score_under_the_industry_rule(self):
         frame = _trap_universe(industry="Banks - Regional")
         out = _trap(frame, trap_momentum_rule=True, industry_rules=True)
-        assert out.loc["CHEAP.DE", "value_score"] >= 0.70  # KBV und Shareholder Yield bleiben
+        assert _value_score(out) >= 0.70  # KBV und Shareholder Yield zählen weiter
         assert not out.loc["CHEAP.DE", "value_trap_flag"]

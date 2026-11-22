@@ -1642,6 +1642,21 @@
               }
             ],
             "title": "Value Trap Flag Active"
+          },
+          "value_trap_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "momentum"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Trap Reason"
           }
         },
         "required": [
@@ -1655,6 +1670,7 @@
           "value_score",
           "quality_score",
           "value_trap_flag",
+          "value_trap_reason",
           "value_trap_flag_active"
         ],
         "title": "PreviewRow",
@@ -1813,6 +1829,28 @@
             "title": "Terminal Growth",
             "type": "number"
           },
+          "trap_fscore_max": {
+            "default": 3,
+            "description": "F-Score, bis zu dem die Regel greift",
+            "maximum": 9.0,
+            "minimum": 0.0,
+            "title": "Trap Fscore Max",
+            "type": "integer"
+          },
+          "trap_momentum_max_rank": {
+            "default": 0.3,
+            "description": "Momentum-Rang, bis zu dem die Regel greift",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Trap Momentum Max Rank",
+            "type": "number"
+          },
+          "trap_momentum_rule": {
+            "default": false,
+            "description": "Value-Trap auch bei schwachem Momentum und schwachem F-Score",
+            "title": "Trap Momentum Rule",
+            "type": "boolean"
+          },
           "value_factors": {
             "description": "Aktive Value-Faktoren, mindestens 2",
             "items": {
@@ -1941,6 +1979,28 @@
             "minimum": -0.05,
             "title": "Terminal Growth",
             "type": "number"
+          },
+          "trap_fscore_max": {
+            "default": 3,
+            "description": "F-Score, bis zu dem die Regel greift",
+            "maximum": 9.0,
+            "minimum": 0.0,
+            "title": "Trap Fscore Max",
+            "type": "integer"
+          },
+          "trap_momentum_max_rank": {
+            "default": 0.3,
+            "description": "Momentum-Rang, bis zu dem die Regel greift",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Trap Momentum Max Rank",
+            "type": "number"
+          },
+          "trap_momentum_rule": {
+            "default": false,
+            "description": "Value-Trap auch bei schwachem Momentum und schwachem F-Score",
+            "title": "Trap Momentum Rule",
+            "type": "boolean"
           },
           "value_factors": {
             "description": "Aktive Value-Faktoren, mindestens 2",
@@ -2489,6 +2549,21 @@
               }
             ],
             "title": "Value Trap Flag"
+          },
+          "value_trap_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "momentum"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Trap Reason"
           }
         },
         "required": [
@@ -2502,6 +2577,7 @@
           "value_score",
           "quality_score",
           "value_trap_flag",
+          "value_trap_reason",
           "market_cap",
           "currency",
           "ev_ebit",
@@ -3089,6 +3165,21 @@
               }
             ],
             "title": "Value Trap Flag"
+          },
+          "value_trap_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "momentum"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Trap Reason"
           }
         },
         "required": [
@@ -3100,7 +3191,8 @@
           "composite_score",
           "value_score",
           "quality_score",
-          "value_trap_flag"
+          "value_trap_flag",
+          "value_trap_reason"
         ],
         "title": "ScorePoint",
         "type": "object"
@@ -3452,6 +3544,17 @@
             ],
             "title": "Market Cap"
           },
+          "momentum_12_1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Momentum 12 1"
+          },
           "net_debt_ebitda": {
             "anyOf": [
               {
@@ -3581,6 +3684,7 @@
           "price",
           "currency",
           "market_cap",
+          "momentum_12_1",
           "ev_ebit",
           "pe_ratio",
           "pb_ratio",

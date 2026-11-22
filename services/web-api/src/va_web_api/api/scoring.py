@@ -201,6 +201,7 @@ def _row(after: RankedTitle, before: RankedTitle | None) -> PreviewRow:
         value_score=after.value_score,
         quality_score=after.quality_score,
         value_trap_flag=after.value_trap_flag,
+        value_trap_reason=after.value_trap_reason,
         value_trap_flag_active=None if before is None else before.value_trap_flag,
     )
 

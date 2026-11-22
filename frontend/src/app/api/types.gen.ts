@@ -861,6 +861,10 @@ export type PreviewRow = {
    * Value Trap Flag Active
    */
   value_trap_flag_active: boolean | null;
+  /**
+   * Value Trap Reason
+   */
+  value_trap_reason: 'quality' | 'momentum' | null;
 };
 
 /**
@@ -972,6 +976,24 @@ export type ProfileParamsV1Input = {
    */
   terminal_growth?: number;
   /**
+   * Trap Fscore Max
+   *
+   * F-Score, bis zu dem die Regel greift
+   */
+  trap_fscore_max?: number;
+  /**
+   * Trap Momentum Max Rank
+   *
+   * Momentum-Rang, bis zu dem die Regel greift
+   */
+  trap_momentum_max_rank?: number;
+  /**
+   * Trap Momentum Rule
+   *
+   * Value-Trap auch bei schwachem Momentum und schwachem F-Score
+   */
+  trap_momentum_rule?: boolean;
+  /**
    * Value Factors
    *
    * Aktive Value-Faktoren, mindestens 2
@@ -1066,6 +1088,24 @@ export type ProfileParamsV1Output = {
    * Langfristiges Wachstum g fuer das gerechtfertigte KBV
    */
   terminal_growth?: number;
+  /**
+   * Trap Fscore Max
+   *
+   * F-Score, bis zu dem die Regel greift
+   */
+  trap_fscore_max?: number;
+  /**
+   * Trap Momentum Max Rank
+   *
+   * Momentum-Rang, bis zu dem die Regel greift
+   */
+  trap_momentum_max_rank?: number;
+  /**
+   * Trap Momentum Rule
+   *
+   * Value-Trap auch bei schwachem Momentum und schwachem F-Score
+   */
+  trap_momentum_rule?: boolean;
   /**
    * Value Factors
    *
@@ -1310,6 +1350,10 @@ export type RankingRow = {
    * Value Trap Flag
    */
   value_trap_flag: boolean | null;
+  /**
+   * Value Trap Reason
+   */
+  value_trap_reason: 'quality' | 'momentum' | null;
 };
 
 /**
@@ -1619,6 +1663,10 @@ export type ScorePoint = {
    * Value Trap Flag
    */
   value_trap_flag: boolean | null;
+  /**
+   * Value Trap Reason
+   */
+  value_trap_reason: 'quality' | 'momentum' | null;
 };
 
 /**
@@ -1781,6 +1829,10 @@ export type Snapshot = {
    * Market Cap
    */
   market_cap: number | null;
+  /**
+   * Momentum 12 1
+   */
+  momentum_12_1: number | null;
   /**
    * Net Debt Ebitda
    */

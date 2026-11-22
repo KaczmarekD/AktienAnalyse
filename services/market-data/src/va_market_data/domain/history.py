@@ -1,7 +1,7 @@
 """Zeitreihen je Titel (ADR-0010): Aktienanzahl (F1.3) und Kurshistorie (F1.4).
 
-Nur Parser und der gespeicherte Stand je Titel. Gespeichert wird im Repository,
-ausgewertet wird (noch) nichts - Ranking, Mail und CSV bleiben unveraendert.
+Parser, der gespeicherte Stand je Titel und das 12-1-Momentum (F2.3, ADR-0011). Gespeichert
+wird im Repository.
 Die Parser kennen keine yfinance-Namen: Der Abruf benennt die Spalten vorher um
 (``va_market_data.adapters.yahoo.PRICE_FIELDS``).
 """
@@ -9,7 +9,10 @@ Die Parser kennen keine yfinance-Namen: Der Abruf benennt die Spalten vorher um
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from dataclasses import dataclass, field
+from datetime import timedelta
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -26,9 +29,17 @@ MAX_BIGINT = 2**63 - 1
 # Spalten der Kurshistorie nach dem Abruf
 PRICE_COLUMNS = ("close", "adj_close", "dividend", "split")
 
-# So weit zurueck liest der Abruf die gespeicherte Aktienanzahl und die Splits (F2.2): ein Jahr
-# fuer die Netto-Emission, ihr Fenster und das hoechste Alter des Stichtags, mit Reserve
-ISSUANCE_HISTORY_DAYS = 550
+# So weit zurueck liest der Abruf die gespeicherte Aktienanzahl und die Kurse: ein Jahr fuer
+# Netto-Emission (F2.2) und Momentum (F2.3), ihre Fenster und das Alter des Stichtags, mit Reserve
+RECENT_HISTORY_DAYS = 550
+
+# 12-1-Momentum (F2.3): Rendite von 365 bis 30 Tage vor dem juengsten Handelstag. Ein Zieltag
+# gilt mit dem Handelstag davor, hoechstens so viele Tage frueher; die Kurse duerfen beim Abruf
+# hoechstens so alt sein.
+MOMENTUM_LOOKBACK_DAYS = 365
+MOMENTUM_SKIP_DAYS = 30
+MOMENTUM_MAX_GAP_DAYS = 7
+MOMENTUM_MAX_AGE_DAYS = 14
 
 # Yahoo rechnet Adj Close bei jedem Abruf minimal anders (gemessen: bis 6e-7 relativ).
 # Korrekturen, Splits und Dividendenanpassungen liegen um Groessenordnungen darueber.
@@ -46,10 +57,11 @@ class HistoryState:
     last_price_date: date | None = None
     # Tage mit gespeichertem Split: Ein neuer Split im Abruffenster laedt alle Kurse neu
     price_split_days: frozenset[date] = frozenset()
-    # Gespeicherte Aktienanzahl und Splits der letzten Zeit (``ISSUANCE_HISTORY_DAYS``): Der
-    # Abruf holt nur die neuen Tage, die Netto-Emission braucht das Jahr davor (F2.2)
+    # Gespeicherte Aktienanzahl und Kurse (juengste Version je Tag) der letzten
+    # ``RECENT_HISTORY_DAYS``: Der Abruf holt nur die neuen Tage, Netto-Emission (F2.2) und
+    # Momentum (F2.3) brauchen das Jahr davor
     stored_shares: Mapping[date, int] = field(default_factory=dict)
-    stored_splits: Mapping[date, float] = field(default_factory=dict)
+    stored_prices: Mapping[date, PriceBar] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -168,3 +180,50 @@ def split_ratios(frame: pd.DataFrame | None) -> dict[date, float]:
 def split_days(frame: pd.DataFrame | None) -> set[date]:
     """Tage mit Split in einer Kurshistorie (Spalten ``PRICE_COLUMNS``)."""
     return set(split_ratios(frame))
+
+
+def total_return(bars: Mapping[date, PriceBar], start: date, end: date) -> float | None:
+    """Gesamtrendite mit Dividenden vom Schlusskurs an ``start`` bis zu dem an ``end``.
+
+    Aus ``close`` und ``dividend``: Yahoo bereinigt ``close`` schon um Splits, ein neuer Split
+    laedt die ganze Kurshistorie neu (``price_frames``). ``split`` noch einmal anzuwenden,
+    zaehlte ihn doppelt. ``adj_close`` bleibt aussen vor: Gespeichert mischt es ueber Monate
+    die Bereinigungsstaende verschiedener Abrufe.
+    """
+    if start not in bars or end not in bars or start >= end:
+        return None
+    days = sorted(day for day in bars if start <= day <= end)
+    growth = 1.0
+    for before, day in pairwise(days):
+        if bars[before].close <= 0:
+            return None
+        growth *= (bars[day].close + bars[day].dividend) / bars[before].close
+    return growth - 1
+
+
+def _trading_day(days: list[date], target: date) -> date | None:
+    """Der letzte Handelstag bis ``target``, hoechstens ``MOMENTUM_MAX_GAP_DAYS`` davor."""
+    index = bisect_right(days, target) - 1
+    if index < 0 or (target - days[index]).days > MOMENTUM_MAX_GAP_DAYS:
+        return None
+    return days[index]
+
+
+def momentum_12_1(bars: Mapping[date, PriceBar], *, as_of: date) -> float | None:
+    """12-1-Momentum: Gesamtrendite ueber zwoelf Monate ohne den letzten (JKP ``ret_12_1``,
+    Jegadeesh und Titman 1993).
+
+    Stichtag ist der juengste Handelstag, hoechstens ``MOMENTUM_MAX_AGE_DAYS`` vor ``as_of``.
+    ``None`` ohne genug Historie.
+    """
+    if not bars:
+        return None
+    days = sorted(bars)
+    latest = days[-1]
+    if (as_of - latest).days > MOMENTUM_MAX_AGE_DAYS:
+        return None
+    start = _trading_day(days, latest - timedelta(days=MOMENTUM_LOOKBACK_DAYS))
+    end = _trading_day(days, latest - timedelta(days=MOMENTUM_SKIP_DAYS))
+    if start is None or end is None:
+        return None
+    return total_return(bars, start, end)

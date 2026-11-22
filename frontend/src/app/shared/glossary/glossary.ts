@@ -24,6 +24,9 @@ export interface TipParams {
   value_weight?: number | null;
   value_trap_value_threshold?: number | null;
   value_trap_quality_threshold?: number | null;
+  /** F2.3: Schwellen der Value-Trap-Regel mit Momentum */
+  trap_momentum_max_rank?: number | null;
+  trap_fscore_max?: number | null;
   min_market_cap?: number | null;
   /** Länge der Liste in der Vorschau des Profil-Editors */
   top?: number | null;
@@ -98,6 +101,19 @@ export const GLOSSARY = {
       high != null && low != null
         ? `Verdacht auf eine Value-Falle: günstig (Value ≥ ${score(high)}), aber schwache Qualität (Quality ≤ ${score(low)}). Solche Titel sind oft zu Recht billig.`
         : 'Verdacht auf eine Value-Falle: günstig (hoher Value-Score), aber schwache Qualität (niedriger Quality-Score). Solche Titel sind oft zu Recht billig.',
+  },
+  // F2.3 (ADR-0011): die zweite Regel, im Profil v1 aus
+  value_trap_momentum: {
+    group: 'Scores und Ranking',
+    label: 'Value-Trap? (Momentum)',
+    tip: ({
+      value_trap_value_threshold: high,
+      trap_momentum_max_rank: rank,
+      trap_fscore_max: max,
+    }) =>
+      high != null && rank != null && max != null
+        ? `Verdacht auf ein fallendes Messer: günstig (Value ≥ ${score(high)}), aber schwaches Momentum (Momentum-Rang ≤ ${score(rank)}) und keine fundamentale Stütze (F-Score ≤ ${max}).`
+        : 'Verdacht auf ein fallendes Messer: günstig (hoher Value-Score), aber schwaches Momentum und keine fundamentale Stütze (niedriger F-Score).',
   },
   no_composite: {
     group: 'Scores und Ranking',
@@ -238,6 +254,14 @@ export const GLOSSARY = {
     label: 'Dividendenrendite',
     role: 'info',
     tip: 'Dividende je Aktie im Verhältnis zum Kurs. Im Score steckt sie im Shareholder Yield.',
+  },
+  // F2.3 (ADR-0011): prüft den fundamentalen Anker, zählt nicht im Score
+  momentum_12_1: {
+    group: 'Nur zur Information',
+    label: 'Momentum 12-1',
+    short: 'Momentum',
+    role: 'info',
+    tip: 'Kursrendite mit Dividenden über zwölf Monate, ohne den letzten Monat. Zählt nicht im Score, dient nur der Value-Trap-Regel als Prüfung des fundamentalen Ankers.',
   },
   revenue_growth_5y: {
     group: 'Nur zur Information',

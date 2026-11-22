@@ -173,6 +173,22 @@
             }
           ],
           "title": "Value Trap Flag"
+        },
+        "value_trap_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "quality",
+                "momentum"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Trap Reason"
         }
       },
       "required": [

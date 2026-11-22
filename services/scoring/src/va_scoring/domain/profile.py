@@ -127,6 +127,9 @@ class ScoringProfileParams(ProfileParamsV1):
                 "industry_prefixes": tuple(cfg.industry_prefixes),
                 "cost_of_capital": cfg.cost_of_capital,
                 "terminal_growth": cfg.terminal_growth,
+                "trap_momentum_rule": cfg.trap_momentum_rule,
+                "trap_momentum_max_rank": cfg.trap_momentum_max_rank,
+                "trap_fscore_max": cfg.trap_fscore_max,
             }
         )
 
@@ -156,6 +159,9 @@ class ScoringProfileParams(ProfileParamsV1):
             industry_prefixes=tuple(self.industry_prefixes),
             cost_of_capital=self.cost_of_capital,
             terminal_growth=self.terminal_growth,
+            trap_momentum_rule=self.trap_momentum_rule,
+            trap_momentum_max_rank=self.trap_momentum_max_rank,
+            trap_fscore_max=self.trap_fscore_max,
         )
 
 

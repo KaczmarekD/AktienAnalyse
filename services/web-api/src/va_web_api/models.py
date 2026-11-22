@@ -11,6 +11,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from va_contracts.events.v1.ranking import ValueTrapReason
 from va_contracts.portfolio import MAX_LINES, MAX_NAME, MAX_TEXT, Amount, Quantity
 from va_contracts.profile import ProfileParamsV1
 from va_contracts.securities import IsinStr
@@ -69,6 +70,8 @@ class RankingRow(_Model):
     value_score: float | None
     quality_score: float | None
     value_trap_flag: bool | None
+    # F2.3: welche Regel das Flag gesetzt hat; leer ohne Flag und bei aelteren Laeufen
+    value_trap_reason: ValueTrapReason | None
     market_cap: float | None
     currency: str | None
     ev_ebit: float | None
@@ -118,6 +121,8 @@ class Snapshot(_Model):
     price: float | None
     currency: str | None
     market_cap: float | None
+    # F2.3: 12-1-Momentum, nur fuer die Value-Trap-Regel
+    momentum_12_1: float | None
     ev_ebit: float | None
     pe_ratio: float | None
     pb_ratio: float | None
@@ -150,6 +155,8 @@ class ScorePoint(_Model):
     value_score: float | None
     quality_score: float | None
     value_trap_flag: bool | None
+    # F2.3: welche Regel das Flag gesetzt hat
+    value_trap_reason: ValueTrapReason | None
     # Track G (G3), additiv: Titel mit Rang im selben Lauf, fuer "Rang 1 von N"
     ranked_count: int | None = None
 
@@ -258,6 +265,8 @@ class PreviewRow(_Model):
     value_score: float | None
     quality_score: float | None
     value_trap_flag: bool | None
+    # F2.3: welche Regel das Flag mit den neuen params gesetzt hat
+    value_trap_reason: ValueTrapReason | None
     value_trap_flag_active: bool | None
 
 

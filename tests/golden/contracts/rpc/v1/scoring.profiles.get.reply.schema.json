@@ -153,6 +153,28 @@
           "title": "Terminal Growth",
           "type": "number"
         },
+        "trap_fscore_max": {
+          "default": 3,
+          "description": "F-Score, bis zu dem die Regel greift",
+          "maximum": 9,
+          "minimum": 0,
+          "title": "Trap Fscore Max",
+          "type": "integer"
+        },
+        "trap_momentum_max_rank": {
+          "default": 0.3,
+          "description": "Momentum-Rang, bis zu dem die Regel greift",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Trap Momentum Max Rank",
+          "type": "number"
+        },
+        "trap_momentum_rule": {
+          "default": false,
+          "description": "Value-Trap auch bei schwachem Momentum und schwachem F-Score",
+          "title": "Trap Momentum Rule",
+          "type": "boolean"
+        },
         "value_factors": {
           "description": "Aktive Value-Faktoren, mindestens 2",
           "items": {

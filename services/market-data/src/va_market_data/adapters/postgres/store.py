@@ -18,7 +18,7 @@ from va_platform.db import session_scope
 
 from ...application.fetch import success_share
 from ...domain.history import (
-    ISSUANCE_HISTORY_DAYS,
+    RECENT_HISTORY_DAYS,
     HistoryState,
     daily_price_bars,
     daily_share_counts,
@@ -89,24 +89,24 @@ class PostgresSnapshotStore:
     def history_state(self, symbols: Collection[str]) -> dict[str, HistoryState]:
         """Bis wann die Zeitreihen je Titel gespeichert sind; fehlt ein Titel, gilt alles.
 
-        Dazu die Aktienanzahl und die Splits der letzten ``ISSUANCE_HISTORY_DAYS`` Tage fuer die
-        Netto-Emission (F2.2).
+        Dazu die Aktienanzahl und die Kurse der letzten ``RECENT_HISTORY_DAYS`` Tage fuer
+        Netto-Emission (F2.2) und Momentum (F2.3).
         """
-        since = date.today() - timedelta(days=ISSUANCE_HISTORY_DAYS)
+        since = date.today() - timedelta(days=RECENT_HISTORY_DAYS)
         with session_scope(self._engine) as s:
             repo = MarketDataRepository(s)
             last_share = repo.get_last_share_dates(symbols)
             last_price = repo.get_last_price_dates(symbols)
             splits = repo.get_price_split_days(symbols)
             recent_shares = repo.get_share_counts_since(symbols, since)
-            recent_splits = repo.get_splits_since(symbols, since)
+            recent_prices = repo.get_price_bars_since(symbols, since)
         return {
             symbol: HistoryState(
                 last_share_date=last_share.get(symbol),
                 last_price_date=last_price.get(symbol),
                 price_split_days=splits.get(symbol, frozenset()),
                 stored_shares=recent_shares.get(symbol, {}),
-                stored_splits=recent_splits.get(symbol, {}),
+                stored_prices=recent_prices.get(symbol, {}),
             )
             for symbol in last_share.keys() | last_price.keys()
         }

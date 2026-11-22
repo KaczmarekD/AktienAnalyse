@@ -129,6 +129,7 @@ def ranking(session: Session, env: Envelope[Any]) -> None:
             "value_score": row.value_score,
             "quality_score": row.quality_score,
             "value_trap": row.value_trap_flag,
+            "value_trap_reason": row.value_trap_reason,
         }
         for row in data.ranking
     ]
@@ -173,6 +174,7 @@ def snapshot_values(
         "currency": identity.currency,
         "price": market.price,
         "market_cap": market.market_cap,
+        "momentum_12_1": market.momentum_12_1,
         "ev_ebit": value.ev_ebit,
         "pe_ratio": value.pe_ratio,
         "pb_ratio": value.pb_ratio,

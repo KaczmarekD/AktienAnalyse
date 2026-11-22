@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -12,6 +12,10 @@ from .fundamentals import FundamentalsV1
 
 # Spalten von score(), die keine Faktor-Raenge sind
 _SCORE_COLUMNS = ("value_score", "quality_score", "composite_score")
+
+# Welche Regel das Value-Trap-Flag gesetzt hat (F2.3): die bisherige (hoher Value-, niedriger
+# Quality-Score) oder die mit Momentum und F-Score (ADR-0011, Punkt 5)
+ValueTrapReason = Literal["quality", "momentum"]
 
 
 class RankingRowV1(Contract):
@@ -34,6 +38,9 @@ class RankingRowV1(Contract):
     # F2.4 (additiv): Der Titel faellt unter die Branchenregel und steht im Abschnitt
     # "Finanzwerte" der Mail. Fehlt bei aelteren Events und gilt dann als nicht gesetzt.
     industry_rule: bool = False
+    # F2.3 (additiv): Fehlt bei aelteren Events; ein Flag ohne Grund stammt von der bisherigen
+    # Regel
+    value_trap_reason: ValueTrapReason | None = None
 
     def to_flat(self) -> dict[str, Any]:
         """Eine Zeile wie die Ausgabe von ``score()``: Faktor-Raenge als ``rank_<name>``."""
@@ -43,6 +50,7 @@ class RankingRowV1(Contract):
             quality_score=self.quality_score,
             composite_score=self.composite_score,
             value_trap_flag=self.value_trap_flag,
+            value_trap_reason=self.value_trap_reason,
             rank_overall=self.rank_overall,
             industry_rule=self.industry_rule,
         )
@@ -62,6 +70,7 @@ class RankingRowV1(Contract):
             fundamentals=fundamentals or FundamentalsV1.from_flat(flat),
             rank_overall=int(flat["rank_overall"]),
             value_trap_flag=bool(flat.get("value_trap_flag", False)),
+            value_trap_reason=missing_to_none(flat.get("value_trap_reason")),
             industry_rule=bool(flat.get("industry_rule", False)),
             factor_ranks={
                 key.removeprefix("rank_"): missing_to_none(value)

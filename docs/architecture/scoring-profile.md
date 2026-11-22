@@ -42,6 +42,9 @@ Die Standardwerte entsprechen dem heutigen `ScoringConfig`:
 | `industry_prefixes` | Banks, Insurance, Capital Markets, Real Estate, REIT | Anfänge der Yahoo-`industry`, für die die Branchenregel gilt; keine leeren Einträge |
 | `cost_of_capital` | 0.08 | 0–0,5 (ohne 0): Kapitalkosten r für das gerechtfertigte KBV (ROE − g) / (r − g) |
 | `terminal_growth` | 0.02 | −0,05–0,1: Wachstum g dafür; `cost_of_capital` muss größer sein |
+| `trap_momentum_rule` | aus | Value-Trap-Regel mit Momentum (seit F2.3, ADR-0011): Das Flag kommt auch bei Value ≥ `value_trap_value_threshold`, Momentum-Rang ≤ `trap_momentum_max_rank` und F-Score ≤ `trap_fscore_max`. Erst das Profil v2 (F2.5) schaltet sie an. |
+| `trap_momentum_max_rank` | 0.30 | 0–1: Perzentilrang des 12-1-Momentums, bis zu dem die Regel greift |
+| `trap_fscore_max` | 3 | 0–9: F-Score, bis zu dem die Regel greift |
 
 **Bewusst nicht änderbar** sind der Faktor-Katalog selbst und die Richtung jedes Faktors (ob ein
 hoher oder niedriger Wert besser ist). Neue Faktoren bleiben Code-Änderungen nach dem Ablauf in

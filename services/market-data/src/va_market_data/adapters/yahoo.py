@@ -38,7 +38,13 @@ from ..domain.fundamentals import (
     RawFetch,
     ValueMetrics,
 )
-from ..domain.history import HistoryState, daily_share_counts, split_days, split_ratios
+from ..domain.history import (
+    HistoryState,
+    daily_price_bars,
+    daily_share_counts,
+    momentum_12_1,
+    split_days,
+)
 from ..domain.metrics import (
     FiscalYear,
     MarketFigures,
@@ -799,10 +805,13 @@ def fetch_one(
     )
     fx = _statement_fx(info, fund.errors)
     fund.provenance.statement_fx = fx
-    # Netto-Emission (F2.2): gespeicherte Tage plus die neuen aus diesem Abruf
+    # Netto-Emission (F2.2) und Momentum (F2.3): gespeicherte Tage plus die neuen aus diesem
+    # Abruf; ein Tag, der neu mitkommt, gilt in seinem neuen Stand
+    price_history = {**state.stored_prices, **daily_price_bars(prices, fetched_at=fetched_at)}
+    fund.market.momentum_12_1 = momentum_12_1(price_history, as_of=fetched_at.date())
     share_history = ShareHistory(
         counts={**state.stored_shares, **daily_share_counts(shares)},
-        splits={**state.stored_splits, **split_ratios(prices)},
+        splits={day: bar.split for day, bar in price_history.items() if bar.split > 0},
         as_of=fetched_at.date(),
     )
     metrics = compute_metrics(

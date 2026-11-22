@@ -368,6 +368,7 @@ export const zPreviewRow = z.object({
   value_score: z.number().nullable(),
   value_trap_flag: z.boolean().nullable(),
   value_trap_flag_active: z.boolean().nullable(),
+  value_trap_reason: z.enum(['quality', 'momentum']).nullable(),
 });
 
 /**
@@ -420,6 +421,9 @@ export const zProfileParamsV1Input = z.object({
     )
     .optional(),
   terminal_growth: z.number().gte(-0.05).lte(0.1).optional().default(0.02),
+  trap_fscore_max: z.int().gte(0).lte(9).optional().default(3),
+  trap_momentum_max_rank: z.number().gte(0).lte(1).optional().default(0.3),
+  trap_momentum_rule: z.boolean().optional().default(false),
   value_factors: z
     .array(z.enum(['ev_ebit', 'pb', 'p_fcf', 'shareholder_yield', 'net_share_issuance']))
     .optional(),
@@ -450,6 +454,9 @@ export const zProfileParamsV1Output = z.object({
   min_value_factor_share: z.number().gte(0).lte(1).optional().default(0.5),
   quality_factors: z.array(z.string()).optional(),
   terminal_growth: z.number().gte(-0.05).lte(0.1).optional().default(0.02),
+  trap_fscore_max: z.int().gte(0).lte(9).optional().default(3),
+  trap_momentum_max_rank: z.number().gte(0).lte(1).optional().default(0.3),
+  trap_momentum_rule: z.boolean().optional().default(false),
   value_factors: z.array(z.string()).optional(),
   value_trap_quality_threshold: z.number().gte(0).lte(1).optional().default(0.3),
   value_trap_value_threshold: z.number().gte(0).lte(1).optional().default(0.7),
@@ -531,6 +538,7 @@ export const zRankingRow = z.object({
   symbol: z.string(),
   value_score: z.number().nullable(),
   value_trap_flag: z.boolean().nullable(),
+  value_trap_reason: z.enum(['quality', 'momentum']).nullable(),
 });
 
 /**
@@ -674,6 +682,7 @@ export const zScorePoint = z.object({
   scoring_run_id: z.int(),
   value_score: z.number().nullable(),
   value_trap_flag: z.boolean().nullable(),
+  value_trap_reason: z.enum(['quality', 'momentum']).nullable(),
 });
 
 /**
@@ -746,6 +755,7 @@ export const zSnapshot = z.object({
   fetch_run_id: z.int(),
   fetched_on: z.iso.date(),
   market_cap: z.number().nullable(),
+  momentum_12_1: z.number().nullable(),
   net_debt_ebitda: z.number().nullable(),
   net_share_issuance: z.number().nullable(),
   operating_accruals: z.number().nullable(),
