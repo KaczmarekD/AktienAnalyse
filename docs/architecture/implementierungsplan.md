@@ -2811,6 +2811,26 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
 - **Implementierung:** Die Kennzahl kommt nach `domain.metrics`, dazu der Katalogeintrag. Der
   Katalog bekommt ein Kennzeichen „kein Multiple“, das den Ausschluss negativer Werte je Faktor
   steuert.
+- **Festgelegt vor der Umsetzung (22.11.2026):**
+  - **Rohe Aktienanzahl:** Yahoo liefert `get_shares_full` unbereinigt; bei NVIDIA springt sie am
+    10:1-Split im Juni 2024 von 2,5 auf 24,6 Mrd. (live geprüft). Bereinigt wird mit den
+    Split-Verhältnissen aus den Kursdaten (F1.4).
+  - **Definition:** Stichtag ist der jüngste Tag mit Aktienanzahl, höchstens 120 Tage vor dem
+    Abruf. „Jetzt“ ist der Median der Werte in den 30 Tagen bis dahin, „vor einem Jahr“ der Median
+    in den 30 Tagen bis 365 Tage davor; der Median fängt die doppelten und abweichenden Tage von
+    Yahoo ab. Netto-Emission = jetzt / (vor einem Jahr × Produkt der Splits dazwischen) − 1.
+    Grundlage: JKP `chcsho_12m`, Pontiff und Woodgate (2008).
+  - **Daten:** Der Abruf holt die Aktienanzahl nur ab dem letzten gespeicherten Tag. Deshalb
+    bekommt `HistoryState` die gespeicherte Aktienanzahl und die Splits der letzten 550 Tage
+    (`stored_shares`, `stored_splits`); `fetch_one` ergänzt die neuen Tage und rechnet mit beidem.
+  - **Katalog:** `VALUE_FACTOR_CATALOG` mit `net_share_issuance` (niedrig ist gut), Kennzeichen
+    `NON_MULTIPLE_FACTORS`: Negative Werte (Rückkäufe) bleiben im Ranking. Die Standardauswahl
+    (`DEFAULT_VALUE_FACTORS`, `DEFAULT_VALUE_FACTOR_KEYS`) bleibt bei den vier bisherigen. Die
+    Branchenregel schließt den Faktor nicht aus (ADR-0011, Punkt 3 nennt ihn nicht).
+  - **Durchgehend bis ins UI** wie F2.1: Contract `ValueMetricsV1`, eine Migration für
+    `market_data.fundamental_snapshot` und `web.snapshot_row` (Nummer vor dem Merge mit der
+    Depot-Session abstimmen, Stand: `0024`), Projektion, Backfill, beide Lesewege, OpenAPI,
+    TS-Client, Glossar, Ranking, Titel-Detail und Editor.
 
 #### F2.3 Momentum und Value-Trap-Regel
 

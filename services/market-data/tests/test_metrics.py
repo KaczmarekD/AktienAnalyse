@@ -7,6 +7,7 @@ Titel beim Umbau gleich bleiben, prueft tests/test_metrics_snapshot.py.
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import date, timedelta
 
 import pytest
 
@@ -14,6 +15,7 @@ from va_market_data.domain.metrics import (
     FiscalYear,
     MarketFigures,
     Metrics,
+    ShareHistory,
     StatementFigures,
     cagr,
     cfo_assets,
@@ -21,6 +23,7 @@ from va_market_data.domain.metrics import (
     earnings_stability,
     f_score,
     f_score_signals,
+    net_share_issuance,
     operating_accruals,
     roic,
     safe_div,
@@ -391,3 +394,65 @@ class TestAccruals:
         assert m.operating_accruals == pytest.approx(-0.05)
         assert m.cfo_assets == pytest.approx(0.15)
         assert _metrics(StatementFigures()).f_score is None
+
+
+# --- F2.2 (ADR-0011): Netto-Aktienemission über 12 Monate, um Splits bereinigt -------------------
+
+_DAY = date(2026, 11, 20)
+_YEAR_AGO = _DAY - timedelta(days=365)
+
+
+def _issuance(counts: dict[date, float], splits: dict[date, float] | None = None, as_of=_DAY):
+    return net_share_issuance(ShareHistory(counts=counts, splits=splits or {}, as_of=as_of))
+
+
+class TestNetShareIssuance:
+    def test_buyback_is_negative(self):
+        assert _issuance({_YEAR_AGO: 100.0, _DAY: 95.0}) == pytest.approx(-0.05)
+
+    def test_capital_increase_is_positive(self):
+        assert _issuance({_YEAR_AGO: 100.0, _DAY: 110.0}) == pytest.approx(0.10)
+
+    def test_split_is_no_issuance(self):
+        # Yahoo liefert die Aktienanzahl roh: am 2:1-Split verdoppelt sie sich
+        counts = {_YEAR_AGO: 100.0, _DAY: 200.0}
+        assert _issuance(counts, {_DAY - timedelta(days=100): 2.0}) == pytest.approx(0.0)
+
+    def test_reverse_split_is_no_buyback(self):
+        counts = {_YEAR_AGO: 1_000.0, _DAY: 100.0}
+        assert _issuance(counts, {_DAY - timedelta(days=50): 0.1}) == pytest.approx(0.0)
+
+    def test_split_before_the_year_does_not_count(self):
+        counts = {_YEAR_AGO: 100.0, _DAY: 200.0}
+        assert _issuance(counts, {_YEAR_AGO - timedelta(days=40): 2.0}) == pytest.approx(1.0)
+
+    def test_median_ignores_a_stray_value(self):
+        # Yahoo liefert manche Tage doppelt oder abweichend
+        counts = {
+            _YEAR_AGO: 100.0,
+            _DAY - timedelta(days=2): 300.0,
+            _DAY - timedelta(days=1): 95.0,
+            _DAY: 95.0,
+        }
+        assert _issuance(counts) == pytest.approx(-0.05)
+
+    def test_reference_is_the_newest_count(self):
+        counts = {_YEAR_AGO: 100.0, _DAY: 95.0}
+        assert _issuance(counts, as_of=_DAY + timedelta(days=30)) == pytest.approx(-0.05)
+
+    def test_stale_counts_give_none(self):
+        counts = {_YEAR_AGO: 100.0, _DAY: 95.0}
+        assert _issuance(counts, as_of=_DAY + timedelta(days=121)) is None
+
+    def test_needs_a_count_a_year_earlier(self):
+        assert _issuance({_DAY: 95.0}) is None
+        assert _issuance({_DAY - timedelta(days=200): 100.0, _DAY: 95.0}) is None
+        assert _issuance({}) is None
+
+    def test_wired_into_compute_metrics(self):
+        shares = ShareHistory(counts={_YEAR_AGO: 100.0, _DAY: 95.0}, splits={}, as_of=_DAY)
+        m = compute_metrics(
+            StatementFigures(), MarketFigures(), fx=1.0, default_tax_rate=TAX, shares=shares
+        )
+        assert m.net_share_issuance == pytest.approx(-0.05)
+        assert _metrics(StatementFigures()).net_share_issuance is None

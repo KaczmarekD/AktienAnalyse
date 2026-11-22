@@ -157,6 +157,16 @@ describe('ProfileEditorPage', () => {
     }
   });
 
+  it('offers the net share issuance as a value factor, off in profile v1 (F2.2)', async () => {
+    const fixture = await render();
+    const box = query<HTMLInputElement>(
+      fixture,
+      '[data-factor="net_share_issuance"] input[type="checkbox"]',
+    )[0];
+    expect(box?.checked).toBe(false);
+    expect(text(fixture)).toContain('Netto-Emission');
+  });
+
   it('lists the versions with the active one marked', async () => {
     const fixture = await render();
     const [newest, first] = query(fixture, '[data-version]');

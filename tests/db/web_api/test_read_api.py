@@ -14,7 +14,7 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -261,3 +261,42 @@ class TestBilanzqualitaet:
     def test_off_in_profile_v1(self, api):
         params = api.get("/api/v1/ranking/latest").json()["params"]
         assert not {"f_score", "operating_accruals", "cfo_assets"} & set(params["quality_factors"])
+
+
+def _shares_over_a_year(symbol: str, start: date):
+    """F2.2: ein Jahr Aktienanzahl relativ zu heute, 5 % zurückgekauft; CCC.DE ohne."""
+    import pandas as pd
+
+    if symbol == "CCC.DE":
+        return None
+    today = date.today()
+    days = pd.DatetimeIndex(
+        [pd.Timestamp(today - timedelta(days=370)), pd.Timestamp(today - timedelta(days=5))]
+    ).tz_localize("Europe/Berlin")
+    return pd.Series([1_000_000, 950_000], index=days)
+
+
+@pytest.fixture(params=["tables", "projections"])
+def issuance_api(request, db_settings, db_url, engine):
+    rc, _, _ = _patched_run(db_settings, shares=_shares_over_a_year)
+    assert rc == 0
+    with _client(request, db_settings, db_url, engine) as client:
+        yield client
+
+
+class TestNettoEmission:
+    """F2.2: Die Netto-Emission kommt aus dem Abruf bis in Ranking und Titel-Detail, aus den
+    Tabellen wie aus den Projektionen; im Profil v1 ist sie aus."""
+
+    def test_in_the_ranking(self, issuance_api):
+        rows = issuance_api.get("/api/v1/ranking/latest").json()["rows"]
+        row = next(row for row in rows if row["symbol"] == "AAA.DE")
+        assert row["net_share_issuance"] == pytest.approx(-0.05)
+
+    def test_in_the_instrument_detail(self, issuance_api):
+        latest = issuance_api.get("/api/v1/instruments/AAA.DE").json()["latest"]
+        assert latest["net_share_issuance"] == pytest.approx(-0.05)
+
+    def test_off_in_profile_v1(self, issuance_api):
+        params = issuance_api.get("/api/v1/ranking/latest").json()["params"]
+        assert "net_share_issuance" not in params["value_factors"]

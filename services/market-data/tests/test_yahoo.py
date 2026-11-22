@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from unittest.mock import PropertyMock, patch
 
@@ -983,6 +983,37 @@ class TestFetchOneProvenanceAndRaw:
         self._fetch(side_effect=RuntimeError("down"))
         no_prices_network.assert_not_called()
 
+    def test_net_share_issuance_from_stored_and_new_counts(self, no_shares_network):
+        """F2.2: Der Abruf holt nur die neuen Tage; das Jahr davor kommt aus dem Speicher."""
+        today = date.today()
+        state = HistoryState(
+            last_share_date=today - timedelta(days=40),
+            stored_shares={today - timedelta(days=370): 100_000_000},
+        )
+        no_shares_network.return_value = _share_series({today - timedelta(days=5): 95_000_000})
+        f = self._fetch(history=state)
+        assert f.value.net_share_issuance == pytest.approx(-0.05)
+
+    def test_net_share_issuance_without_the_split(self, no_shares_network, no_prices_network):
+        today = date.today()
+        state = HistoryState(stored_shares={today - timedelta(days=370): 100_000_000})
+        no_shares_network.return_value = _share_series({today - timedelta(days=5): 200_000_000})
+        split_day = pd.Timestamp(today - timedelta(days=100)).tz_localize("Europe/Berlin")
+        no_prices_network.return_value = pd.DataFrame(
+            {"close": [50.0], "adj_close": [49.0], "dividend": [0.0], "split": [2.0]},
+            index=pd.DatetimeIndex([split_day]),
+        )
+        assert self._fetch(history=state).value.net_share_issuance == pytest.approx(0.0)
+
+    def test_stored_split_counts_too(self, no_shares_network):
+        today = date.today()
+        state = HistoryState(
+            stored_shares={today - timedelta(days=370): 100_000_000},
+            stored_splits={today - timedelta(days=100): 2.0},
+        )
+        no_shares_network.return_value = _share_series({today - timedelta(days=5): 200_000_000})
+        assert self._fetch(history=state).value.net_share_issuance == pytest.approx(0.0)
+
 
 class TestRateLimitPerTicker:
     """Review F1.2-F1.4: Nach einem Rate-Limit bleibt der Rest des Titels aus.
@@ -1126,3 +1157,9 @@ class TestFetchOneInvalidPeriods:
         assert f.quality.operating_margin is None
         assert f.provenance.fiscal_period_end is None
         assert any("income" in e and "Periodenende" in e for e in f.errors)
+
+
+def _share_series(counts: dict[date, int]) -> pd.Series:
+    """Antwort von ``get_shares_full`` (F2.2): ein Wert je Tag, Zeitzone der Börse."""
+    index = pd.DatetimeIndex([pd.Timestamp(day) for day in counts]).tz_localize("Europe/Berlin")
+    return pd.Series(list(counts.values()), index=index)

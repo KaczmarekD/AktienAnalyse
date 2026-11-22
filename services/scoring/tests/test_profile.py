@@ -23,6 +23,7 @@ from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
     DEFAULT_VALUE_FACTORS,
     QUALITY_FACTOR_CATALOG,
+    VALUE_FACTOR_CATALOG,
     ScoringConfig,
     score,
 )
@@ -81,7 +82,7 @@ def test_params_are_plain_json():
 
 # --- P2b.2 ScoringProfileParams --------------------------------------------------------------
 
-ALL_VALUE = set(DEFAULT_VALUE_FACTORS)
+ALL_VALUE = set(VALUE_FACTOR_CATALOG)  # F2.2: Katalog, nicht nur die Standardauswahl
 ALL_QUALITY = set(QUALITY_FACTOR_CATALOG)  # F2.1: Katalog, nicht nur die Standardauswahl
 
 
@@ -246,6 +247,7 @@ def test_factor_texts_match_the_ui_glossary():
         "f_score": "F-Score",
         "operating_accruals": "Accruals",
         "cfo_assets": "CFO/Bilanzsumme",
+        "net_share_issuance": "Netto-Emission",
     }
     # Ersatzschreibungen der alten Texte; "Steuern" o. Ä. sind echte Wörter und bleiben erlaubt
     ascii_umlauts = ("verhaeltnis", "beschoen", "rueck", "boerse", "stabilitaet", "ueber", "fuenf")
@@ -302,3 +304,14 @@ class TestBilanzqualitaetInTheProfile:
     def test_can_be_switched_on(self):
         cfg = _params(quality_factors={"roic", "f_score", "cfo_assets"}).to_config()
         assert list(cfg.quality_factors) == ["roic", "f_score", "cfo_assets"]
+
+
+class TestNetShareIssuanceInTheProfile:
+    """F2.2: Netto-Emission lässt sich einschalten, Standard ist aus."""
+
+    def test_default_profile_keeps_the_four_value_factors(self):
+        assert ScoringProfileParams().value_factors == set(DEFAULT_VALUE_FACTORS)
+
+    def test_can_be_switched_on(self):
+        cfg = _params(value_factors={"ev_ebit", "net_share_issuance"}).to_config()
+        assert list(cfg.value_factors) == ["ev_ebit", "net_share_issuance"]

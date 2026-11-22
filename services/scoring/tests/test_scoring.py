@@ -13,7 +13,9 @@ from va_scoring.domain.scoring import (
     DEFAULT_QUALITY_FACTORS,
     DEFAULT_VALUE_FACTORS,
     INDUSTRY_RULE_EXCLUDED,
+    NON_MULTIPLE_FACTORS,
     QUALITY_FACTOR_CATALOG,
+    VALUE_FACTOR_CATALOG,
     ScoringConfig,
     _composite_mean,
     _percentile_rank,
@@ -406,3 +408,40 @@ class TestBilanzqualitaetFactors:
         # Hoher F-Score und niedrige Accruals sind gut
         assert out["rank_f_score"].idxmax() == "Q0.DE"
         assert out["rank_operating_accruals"].idxmax() == "Q0.DE"
+
+
+class TestNetShareIssuanceFactor:
+    """F2.2 (ADR-0011, Punkt 1): Netto-Emission im Katalog, niedrig ist gut. Sie ist kein
+    Multiple: Negative Werte (Rückkäufe) bleiben im Ranking, auch wenn negative Multiples
+    ausgeschlossen werden. Die Standardauswahl bleibt bei den vier bisherigen Value-Faktoren."""
+
+    def test_in_the_catalog_and_not_a_multiple(self):
+        assert VALUE_FACTOR_CATALOG["net_share_issuance"] == ("net_share_issuance", "low")
+        assert "net_share_issuance" in NON_MULTIPLE_FACTORS
+        assert not {"ev_ebit", "pb", "p_fcf"} & NON_MULTIPLE_FACTORS
+
+    def test_catalog_starts_with_the_default_selection(self):
+        assert list(VALUE_FACTOR_CATALOG)[: len(DEFAULT_VALUE_FACTORS)] == list(
+            DEFAULT_VALUE_FACTORS
+        )
+
+    def test_off_by_default(self):
+        assert "net_share_issuance" not in DEFAULT_VALUE_FACTORS
+        assert "net_share_issuance" not in ScoringConfig().value_factors
+
+    def test_buybacks_stay_in_the_ranking(self):
+        frame = _frame(
+            {
+                "BUY.DE": {"net_share_issuance": -0.05, "ev_ebit": 10.0},
+                "SAME.DE": {"net_share_issuance": 0.0, "ev_ebit": 11.0},
+                "ISSUE.DE": {"net_share_issuance": 0.10, "ev_ebit": -3.0},
+            }
+        )
+        factors = {key: VALUE_FACTOR_CATALOG[key] for key in ("ev_ebit", "net_share_issuance")}
+        cfg = ScoringConfig(value_factors=factors, drop_negative_value_metrics=True)
+        out = score(frame, cfg).set_index("symbol")
+        ranks = out["rank_net_share_issuance"]
+        assert ranks.notna().all()
+        assert ranks.idxmax() == "BUY.DE"  # zurückgekauft: am besten
+        # Negative Multiples bleiben ausgeschlossen
+        assert out["rank_ev_ebit"].isna()["ISSUE.DE"]

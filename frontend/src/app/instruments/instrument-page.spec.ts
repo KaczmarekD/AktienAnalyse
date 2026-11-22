@@ -121,6 +121,13 @@ describe('InstrumentPage', () => {
     expect(figure('f_score')).toContain('nicht aktiv');
   });
 
+  it('shows the net share issuance, not active in profile v1 (F2.2)', async () => {
+    const fixture = await loaded();
+    const figure = plain(query(fixture, '[data-figure="net_share_issuance"]')[0]);
+    expect(figure).toContain('Netto-Emission -2,1 %');
+    expect(figure).toContain('nicht aktiv');
+  });
+
   it('warns when the fetch was incomplete and shows its notes', async () => {
     const fixture = await loaded({
       ...INSTRUMENT,

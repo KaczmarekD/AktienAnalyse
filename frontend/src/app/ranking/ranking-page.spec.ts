@@ -225,6 +225,15 @@ describe('RankingPage', () => {
     expect(query(fixture, 'th.mat-column-f_score')).toHaveLength(1);
   });
 
+  it('offers the net share issuance as a column (F2.2)', async () => {
+    const fixture = await loaded();
+    await click(fixture, query(fixture, 'button[data-action="columns"]')[0]);
+    const box = document.querySelector<HTMLElement>('[data-column="net_share_issuance"] input');
+    expect(box).not.toBeNull();
+    await click(fixture, box as HTMLElement);
+    expect(query(fixture, 'th.mat-column-net_share_issuance')).toHaveLength(1);
+  });
+
   it('says when a scoring run is not the current one and links to the current one', async () => {
     const fixture = await render(7);
     await respond(fixture, '/api/v1/ranking/7', {

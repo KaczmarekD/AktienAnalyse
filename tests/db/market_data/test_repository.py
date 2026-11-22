@@ -652,3 +652,44 @@ class TestSnapshots:
     def test_metric_history_rejects_unknown_metric(self, session):
         with pytest.raises(ValueError, match="drop table"):
             MarketDataRepository(session).get_metric_history("SAP.DE", "drop table")
+
+
+class TestIssuanceHistory:
+    """F2.2: Aktienanzahl und Splits der letzten Zeit je Titel, für die Netto-Emission."""
+
+    def _write(self, engine, counts, bars) -> None:
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            fid = _fetch_run(repo)
+            iid = repo.get_or_create_instruments(["SAP.DE"])["SAP.DE"]
+            repo.write_share_counts(fid, iid, counts, fetched_at=T0)
+            repo.write_price_bars(fid, iid, bars, fetched_at=T0)
+
+    def test_share_counts_and_splits_since_a_day(self, engine):
+        old, recent, split_day = date(2024, 1, 2), date(2025, 6, 2), date(2025, 7, 1)
+        self._write(
+            engine,
+            {old: 900, recent: 1_000},
+            {split_day: _bar(50.0, split=2.0), date(2025, 7, 2): _bar(51.0)},
+        )
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            shares = repo.get_share_counts_since(["SAP.DE", "ALV.DE"], date(2025, 1, 1))
+            splits = repo.get_splits_since(["SAP.DE", "ALV.DE"], date(2025, 1, 1))
+        assert shares == {"SAP.DE": {recent: 1_000}}
+        assert splits == {"SAP.DE": {split_day: 2.0}}
+
+    def test_history_state_carries_them(self, engine):
+        from va_market_data.adapters.postgres.store import PostgresSnapshotStore
+
+        today = date.today()
+        year_ago, split_day = today - timedelta(days=370), today - timedelta(days=100)
+        self._write(
+            engine,
+            {year_ago: 1_000, today - timedelta(days=5): 1_900},
+            {split_day: _bar(50.0, split=2.0)},
+        )
+        store = PostgresSnapshotStore(engine, provider="yfinance", provider_version="test")
+        state = store.history_state(["SAP.DE"])["SAP.DE"]
+        assert state.stored_shares[year_ago] == 1_000
+        assert state.stored_splits == {split_day: 2.0}

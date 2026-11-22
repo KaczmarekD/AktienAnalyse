@@ -33,6 +33,7 @@ export function row(values: Partial<RankingRow> & Pick<RankingRow, 'symbol'>): R
     pb_ratio: null,
     p_fcf: null,
     shareholder_yield: null,
+    net_share_issuance: null,
     roic: null,
     fcf_margin: null,
     operating_margin: null,
@@ -162,6 +163,8 @@ function snapshot(values: Partial<Snapshot> = {}): Snapshot {
     p_fcf: 9.5,
     dividend_yield: 0.045,
     shareholder_yield: 0.06,
+    // F2.2: Netto-Emission, im Profil v1 abgeschaltet
+    net_share_issuance: -0.021,
     roic: 0.123,
     fcf_margin: 0.15,
     operating_margin: 0.11,
@@ -296,6 +299,14 @@ export const FACTORS: Factor[] = [
     label: 'Shareholder Yield',
     better: 'high',
     hint: 'Dividenden plus Aktienrückkäufe im Verhältnis zum Börsenwert: Wie viel fließt an die Aktionäre zurück?',
+  },
+  // F2.2 (ADR-0011): im Katalog, im Profil v1 abgeschaltet
+  {
+    key: 'net_share_issuance',
+    group: 'value',
+    label: 'Netto-Emission',
+    better: 'low',
+    hint: 'Veränderung der Aktienanzahl in zwölf Monaten, um Splits bereinigt. Rückkäufe senken sie, Kapitalerhöhungen und Mitarbeiteraktien erhöhen sie.',
   },
   {
     key: 'roic',
