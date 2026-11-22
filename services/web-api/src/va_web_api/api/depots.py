@@ -8,18 +8,33 @@ Depots. Jede Anfrage nennt den angemeldeten Nutzer, portfolio prueft den Besitz 
 - Speichern ist optimistisch wie bei den Profilen: ``If-Match`` nennt den Depotstand, auf dem die
   Aenderung beruht (aus dem ``ETag`` beim Lesen). Ist er nicht mehr der neueste: 409, ohne
   ``If-Match``: 428. Ein archiviertes Depot aendert sich erst nach dem Wiederherstellen (409).
+- Datei im eigenen Format (D3.5): ``import/preview`` gleicht ab, ``import`` uebernimmt (mit
+  ``If-Match``), ``holdings/csv`` liefert die Positionen. Lesen und Schreiben des Formats macht
+  portfolio; das web-api prueft nur Base64 und Groesse (413) und nennt eine sichere Datei.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
+import re
 from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 
-from va_contracts.portfolio import CashLineV1, HoldingLineV1
+from va_contracts.portfolio import MAX_FILE_BYTES, CashLineV1, HoldingLineV1
 
-from ..models import CreateDepot, Depot, HistoryEntry, Holdings, SaveHoldings, UpdateDepot
+from ..models import (
+    CreateDepot,
+    Depot,
+    HistoryEntry,
+    Holdings,
+    ImportFile,
+    ImportPreview,
+    SaveHoldings,
+    UpdateDepot,
+)
 from ..ports import (
     DepotArchived,
     DepotConflict,
@@ -42,6 +57,11 @@ CONFLICT: dict[int | str, dict[str, Any]] = {
     **WRITE,
     428: {"description": "If-Match fehlt"},
 }
+FILE: dict[int | str, dict[str, Any]] = {
+    413: {"description": "Datei groesser als 640 KiB"},
+    422: {"description": "Kein Base64 oder Datei nicht lesbar; beim Uebernehmen: Zeilen abgelehnt"},
+}
+SAFE_FILENAME = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 
 
 def _directory(request: Request) -> DepotDirectory:
@@ -78,6 +98,16 @@ def _guarded[T](work: Callable[[], T]) -> T:
         raise HTTPException(status_code=409, detail=detail) from e
     except DepotInvalid as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _content(body: ImportFile) -> bytes:
+    try:
+        content = base64.b64decode(body.content_base64, validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise HTTPException(status_code=422, detail="Die Datei ist kein gueltiges Base64") from e
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="Die Datei ist groesser als 640 KiB")
+    return content
 
 
 def _depot(value: Any) -> Depot:
@@ -178,4 +208,71 @@ def depot_history(user: DepotOwner, directory: Directory, depot_id: int) -> list
             HistoryEntry.model_validate(e.model_dump())
             for e in directory.history(user.id, depot_id)
         ]
+    )
+
+
+@router.post(
+    "/depots/{depot_id}/import/preview",
+    responses={**NOT_FOUND, **UNAVAILABLE, **WRITE, **FILE},
+)
+def preview_import(
+    user: DepotOwner, directory: Directory, depot_id: int, body: ImportFile
+) -> ImportPreview:
+    """Abgleich einer Datei im eigenen Format mit dem aktuellen Depotstand; speichert nichts."""
+    content = _content(body)
+    return _guarded(
+        lambda: ImportPreview.model_validate(
+            directory.preview_import(user.id, depot_id, content).model_dump()
+        )
+    )
+
+
+@router.post(
+    "/depots/{depot_id}/import",
+    responses={**NOT_FOUND, **UNAVAILABLE, **CONFLICT, **FILE},
+)
+def import_holdings(
+    user: DepotOwner,
+    directory: Directory,
+    depot_id: int,
+    body: ImportFile,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> Holdings:
+    """Die Datei als neuer Depotstand (Herkunft ``import``) auf den Stand aus ``If-Match``; die
+    Kasse bleibt. Mit abgelehnten Zeilen 422."""
+    base = _base_version(if_match)
+    content = _content(body)
+    holdings = _guarded(
+        lambda: _holdings(
+            directory.import_file(user.id, depot_id, base_version=base, content=content)
+        )
+    )
+    response.headers["ETag"] = _etag(holdings.version)
+    return holdings
+
+
+@router.get(
+    "/depots/{depot_id}/holdings/csv",
+    response_class=Response,
+    responses={
+        200: {"content": {"text/csv": {}}, "description": "Die Positionen im eigenen Format"},
+        **NOT_FOUND,
+        **UNAVAILABLE,
+    },
+)
+def holdings_csv(
+    user: DepotOwner,
+    directory: Directory,
+    depot_id: int,
+    version: Annotated[int | None, Query(ge=0)] = None,
+) -> Response:
+    """Die Positionen eines Depotstands (ohne ``version`` des neuesten) als CSV."""
+    filename, content = _guarded(lambda: directory.holdings_file(user.id, depot_id, version))
+    if not SAFE_FILENAME.match(filename):  # portfolio nennt nur Zahlen; sicher ist sicher
+        filename = f"depot-{depot_id}.csv"
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

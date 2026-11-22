@@ -5,7 +5,8 @@ portfolio laeuft wie in seinem Image: eigene Settings, Rolle ``va_portfolio``, E
 per Request/Reply; jede Aenderung kommt als ``portfolio.depot.changed`` in den Stream, ohne Namen
 und Mengen. Seit D3.3 dazu die Abdeckung (``portfolio.coverage.changed``), beim Start und nach
 der Aenderung; market-data uebernimmt sie als neue Fassung. Seit D3.4 liest portfolio Kurse
-ueber seinen Consumer und bewertet das Depot. Ohne ``TEST_DATABASE_URL`` oder ``TEST_NATS_URL``
+ueber seinen Consumer und bewertet das Depot. Seit D3.5 passt die groesste erlaubte Datei samt
+Abgleich durch NATS (max_payload 1 MB). Ohne ``TEST_DATABASE_URL`` oder ``TEST_NATS_URL``
 uebersprungen.
 """
 
@@ -31,10 +32,16 @@ from va_contracts.rpc.v1 import (
     DEPOTS_CREATE,
     DEPOTS_GET,
     DEPOTS_LIST,
+    HOLDINGS_FILE,
+    HOLDINGS_IMPORT,
+    HOLDINGS_IMPORT_PREVIEW,
     HOLDINGS_SAVE,
     DepotCreateRequestV1,
     DepotListRequestV1,
     DepotRefRequestV1,
+    HoldingsFileRequestV1,
+    HoldingsGetRequestV1,
+    HoldingsImportRequestV1,
     HoldingsSaveRequestV1,
 )
 from va_market_data.adapters.postgres.store import PostgresSnapshotStore
@@ -263,6 +270,55 @@ def test_prices_reach_the_valuation(db_url, nats_url):
             time.sleep(0.5)
         assert valuation.value_eur == Decimal("2315.00")
         assert valuation.positions[0].price_source == "yahoo"
+    finally:
+        client.close()
+        stop.set()
+        service.join(timeout=30)
+
+
+def _isin(n: int) -> str:
+    from va_contracts.securities import valid_isin
+
+    body = f"DE000{n:06d}"
+    return next(body + d for d in "0123456789" if valid_isin(body + d))
+
+
+def test_the_largest_file_fits_through_nats(db_url, nats_url):
+    """D3.5: 1000 Positionen mit 500 Zeichen Notiz, knapp unter 640 KiB: Abgleich, Uebernahme
+    und Export ueber echtes NATS."""
+    from va_contracts.portfolio import MAX_FILE_BYTES
+
+    isins = [_isin(n) for n in range(1000)]
+    rows = [f"{i};1234567,12345678;9999999,99;{'n' * 500}\n" for i in isins]
+    content = ("isin;menge;einstand;notiz\n" + "".join(rows)).encode()
+    content = content[: MAX_FILE_BYTES - 1].rsplit(b"\n", 1)[0] + b"\n"  # ganze Zeilen
+    stop = threading.Event()
+    service = _portfolio(db_url, nats_url, stop)
+    service.start()
+    client = NatsBus(nats_url, consumers=())
+    client.start()
+    try:
+        _wait_for_portfolio(client)
+        depot = client.call(DEPOTS_CREATE, DepotCreateRequestV1(user_id=ANNA, name="Gross")).depot
+        assert depot is not None
+        preview = client.call(
+            HOLDINGS_IMPORT_PREVIEW,
+            HoldingsFileRequestV1(user_id=ANNA, depot_id=depot.id, content=content),
+        )
+        assert preview.error is None, preview.error
+        assert preview.preview is not None
+        count = len(preview.preview.entries)
+        assert count > 900
+        imported = client.call(
+            HOLDINGS_IMPORT,
+            HoldingsImportRequestV1(
+                user_id=ANNA, depot_id=depot.id, base_version=0, content=content
+            ),
+        )
+        assert imported.error is None, imported.error
+        exported = client.call(HOLDINGS_FILE, HoldingsGetRequestV1(user_id=ANNA, depot_id=depot.id))
+        assert exported.content is not None
+        assert len(exported.content.decode("utf-8-sig").splitlines()) == count + 1
     finally:
         client.close()
         stop.set()

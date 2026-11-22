@@ -664,6 +664,68 @@ export type Holdings = {
 };
 
 /**
+ * ImportEntry
+ *
+ * Eine ISIN im Abgleich: ``new``, ``changed``, ``unchanged`` oder ``removed``; ``pending``:
+ * noch ohne Stammdaten ("wird geprueft").
+ */
+export type ImportEntry = {
+  after: HoldingLineOutput | null;
+  before: HoldingLineOutput | null;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Pending
+   */
+  pending: boolean;
+  /**
+   * Status
+   */
+  status: 'new' | 'changed' | 'unchanged' | 'removed';
+};
+
+/**
+ * ImportFile
+ *
+ * Eine Datei im eigenen Format (D3.5, DEP-05): ``isin;menge;einstand;notiz`` und optional
+ * ``einheit``, ``;``, Dezimalkomma, UTF-8 (BOM erlaubt) oder Windows-1252, hoechstens 640 KiB.
+ * Als JSON statt multipart, damit schreibende Endpunkte nur JSON annehmen.
+ */
+export type ImportFile = {
+  /**
+   * Content Base64
+   */
+  content_base64: string;
+  /**
+   * Filename
+   */
+  filename?: string | null;
+};
+
+/**
+ * ImportPreview
+ *
+ * Abgleich mit dem Depotstand ``base_version`` (als ``If-Match`` fuers Uebernehmen).
+ * Uebernehmen geht nur ohne ``rejected``.
+ */
+export type ImportPreview = {
+  /**
+   * Base Version
+   */
+  base_version: number;
+  /**
+   * Entries
+   */
+  entries: Array<ImportEntry>;
+  /**
+   * Rejected
+   */
+  rejected: Array<RejectedRow>;
+};
+
+/**
  * Instrument
  */
 export type Instrument = {
@@ -1442,6 +1504,22 @@ export type RankingRow = {
    * Value Trap Flag
    */
   value_trap_flag: boolean | null;
+};
+
+/**
+ * RejectedRow
+ *
+ * Eine Zeile der Datei, die nicht erkannt wurde.
+ */
+export type RejectedRow = {
+  /**
+   * Line
+   */
+  line: number;
+  /**
+   * Reason
+   */
+  reason: string;
 };
 
 /**
@@ -2689,6 +2767,157 @@ export type SaveHoldingsResponses = {
 };
 
 export type SaveHoldingsResponse = SaveHoldingsResponses[keyof SaveHoldingsResponses];
+
+export type HoldingsCsvData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: {
+    /**
+     * Version
+     */
+    version?: number | null;
+  };
+  url: '/api/v1/depots/{depot_id}/holdings/csv';
+};
+
+export type HoldingsCsvErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type HoldingsCsvError = HoldingsCsvErrors[keyof HoldingsCsvErrors];
+
+export type HoldingsCsvResponses = {
+  /**
+   * Die Positionen im eigenen Format
+   */
+  200: unknown;
+};
+
+export type ImportHoldingsData = {
+  body: ImportFile;
+  headers?: {
+    /**
+     * If-Match
+     */
+    'if-match'?: string | null;
+  };
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/import';
+};
+
+export type ImportHoldingsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Datei groesser als 640 KiB
+   */
+  413: unknown;
+  /**
+   * Kein Base64 oder Datei nicht lesbar; beim Uebernehmen: Zeilen abgelehnt
+   */
+  422: unknown;
+  /**
+   * If-Match fehlt
+   */
+  428: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type ImportHoldingsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Holdings;
+};
+
+export type ImportHoldingsResponse = ImportHoldingsResponses[keyof ImportHoldingsResponses];
+
+export type PreviewImportData = {
+  body: ImportFile;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/import/preview';
+};
+
+export type PreviewImportErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Datei groesser als 640 KiB
+   */
+  413: unknown;
+  /**
+   * Kein Base64 oder Datei nicht lesbar; beim Uebernehmen: Zeilen abgelehnt
+   */
+  422: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type PreviewImportResponses = {
+  /**
+   * Successful Response
+   */
+  200: ImportPreview;
+};
+
+export type PreviewImportResponse = PreviewImportResponses[keyof PreviewImportResponses];
 
 export type RestoreDepotData = {
   body?: never;

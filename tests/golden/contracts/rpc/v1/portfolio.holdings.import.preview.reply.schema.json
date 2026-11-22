@@ -1,0 +1,243 @@
+{
+  "$defs": {
+    "HoldingLineV1": {
+      "description": "Eine Position. In einer Beobachtungsliste ohne Menge und Einstand.",
+      "properties": {
+        "cost_basis_eur": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Basis Eur"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,21}0*$)\\d{0,12}\\.\\d{0,8}0*$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "unit": {
+          "default": "pieces",
+          "enum": [
+            "pieces",
+            "nominal"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin"
+      ],
+      "title": "HoldingLineV1",
+      "type": "object"
+    },
+    "ImportEntryV1": {
+      "description": "Eine ISIN im Abgleich (D3.5, DEP-05): vorher und nachher; ``pending``: noch ohne\nStammdaten (\"wird geprueft\").",
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HoldingLineV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HoldingLineV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "pending": {
+          "default": false,
+          "title": "Pending",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "new",
+            "changed",
+            "unchanged",
+            "removed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isin",
+        "status"
+      ],
+      "title": "ImportEntryV1",
+      "type": "object"
+    },
+    "ImportPreviewV1": {
+      "description": "Abgleich einer Datei mit dem Depotstand ``base_version``. Uebernommen wird nur eine Datei\nohne abgelehnte Zeilen, sonst entfielen deren Positionen still.",
+      "properties": {
+        "base_version": {
+          "minimum": 0,
+          "title": "Base Version",
+          "type": "integer"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/ImportEntryV1"
+          },
+          "title": "Entries",
+          "type": "array"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/RejectedRowV1"
+          },
+          "title": "Rejected",
+          "type": "array"
+        }
+      },
+      "required": [
+        "base_version"
+      ],
+      "title": "ImportPreviewV1",
+      "type": "object"
+    },
+    "RejectedRowV1": {
+      "description": "Eine Zeile der Datei, die nicht erkannt wurde, mit Grund.",
+      "properties": {
+        "line": {
+          "minimum": 1,
+          "title": "Line",
+          "type": "integer"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "line",
+        "reason"
+      ],
+      "title": "RejectedRowV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal",
+            "not_found",
+            "archived"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "preview": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImportPreviewV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "ImportPreviewReplyV1",
+  "type": "object"
+}

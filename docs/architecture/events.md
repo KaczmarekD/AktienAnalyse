@@ -118,6 +118,7 @@ ein optionales `error` (`no_data`, `unknown_profile`, `unknown_version`, `confli
 | `rpc.va.marketdata.securities.resolve` (D2.1) | ISIN, optional ein Listing → Wertpapier mit Stammdaten (ESMA FIRDS) und Listings; speichert sie (leer: unbekannt, `invalid`: falsche Prüfziffer) |
 | `rpc.va.portfolio.depots.list`, `.create`, `.get`, `.update`, `.archive`, `.restore` (D3.1) | Depots eines Nutzers (`user_id` in jeder Anfrage); ein fremdes ist `not_found`, ein archiviertes `archived` |
 | `rpc.va.portfolio.depots.export` (D3.2) | alle eigenen Depots, auch archivierte, mit allen Depotständen (Datenexport, NUT-12) |
+| `rpc.va.portfolio.holdings.import.preview`, `.import`, `.file` (D3.5) | Datei im eigenen Format (Bytes, im JSON Base64, höchstens 640 KiB): Abgleich ohne Speichern, Übernahme auf eine Basisversion (`invalid` bei abgelehnten Zeilen, `conflict`), die Positionen als Datei |
 | `rpc.va.portfolio.holdings.get`, `.save`, `.history` (D3.1) | Depotstand (Version, ohne Angabe der neueste), neuer Depotstand auf eine Basisversion (`conflict` mit der neuesten), Verlauf mit Unterschieden |
 
 ## Envelope

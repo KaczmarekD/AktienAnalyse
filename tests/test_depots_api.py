@@ -12,10 +12,14 @@ Speicher im Speicher, wie in ``services/web-api/tests/test_authz.py``.
 - ``portfolio.depot.changed`` geht an das Topic ``user:<id>`` des Besitzers.
 - D3.4: Liste und Depot tragen die Bewertung, das Depot dazu jede Position; Betraege als
   Zahl im String, ein fehlender Kurs sichtbar.
+- D3.5: Datei im eigenen Format als JSON mit Base64: Abgleich, Uebernahme mit ``If-Match``,
+  413 ueber 640 KiB, 422 ohne Base64 oder mit abgelehnten Zeilen; Download als CSV mit
+  sicherem Dateinamen.
 """
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Iterator
 from datetime import date
 from decimal import Decimal
@@ -328,3 +332,114 @@ class TestValuation:
     def test_without_market_data_no_valuation(self, anna):
         depot_id = _create(anna)
         assert anna.get(f"/api/v1/depots/{depot_id}").json()["valuation"] is None
+
+
+def _b64(text: str) -> str:
+    return base64.b64encode(text.encode("utf-8")).decode()
+
+
+class TestFile:
+    """D3.5: Datei im eigenen Format."""
+
+    def _depot(self, client: TestClient) -> int:
+        depot_id = _create(client)
+        response = _write(
+            client,
+            "PUT",
+            f"/api/v1/depots/{depot_id}/holdings",
+            json={"lines": [{"isin": SAP, "quantity": "10"}]},
+            headers={"If-Match": '"0"'},
+        )
+        assert response.status_code == 200
+        return depot_id
+
+    def test_preview_then_import(self, anna):
+        depot_id = self._depot(anna)
+        body = {
+            "filename": "depot.csv",
+            "content_base64": _b64(f"{SAP};12,5\n{BUND};5000;;;nennwert\n"),
+        }
+        preview = _write(anna, "POST", f"/api/v1/depots/{depot_id}/import/preview", json=body)
+        assert preview.status_code == 200, preview.text
+        data = preview.json()
+        assert data["base_version"] == 1
+        assert [(e["isin"], e["status"]) for e in data["entries"]] == [
+            (SAP, "changed"),
+            (BUND, "new"),
+        ]
+        imported = _write(
+            anna,
+            "POST",
+            f"/api/v1/depots/{depot_id}/import",
+            json=body,
+            headers={"If-Match": '"1"'},
+        )
+        assert imported.status_code == 200, imported.text
+        assert (imported.json()["version"], imported.json()["source"]) == (2, "import")
+        assert imported.headers["ETag"] == '"2"'
+
+    def test_import_needs_if_match(self, anna):
+        depot_id = self._depot(anna)
+        body = {"content_base64": _b64(f"{SAP};1\n")}
+        response = _write(anna, "POST", f"/api/v1/depots/{depot_id}/import", json=body)
+        assert response.status_code == 428
+
+    def test_rejected_rows_are_422_on_import(self, anna):
+        depot_id = self._depot(anna)
+        body = {"content_base64": _b64(f"{SAP};zehn\n")}
+        preview = _write(anna, "POST", f"/api/v1/depots/{depot_id}/import/preview", json=body)
+        assert preview.json()["rejected"][0]["line"] == 1
+        response = _write(
+            anna,
+            "POST",
+            f"/api/v1/depots/{depot_id}/import",
+            json=body,
+            headers={"If-Match": '"1"'},
+        )
+        assert response.status_code == 422
+
+    def test_not_base64(self, anna):
+        depot_id = self._depot(anna)
+        body = {"content_base64": "kein base64!"}
+        response = _write(anna, "POST", f"/api/v1/depots/{depot_id}/import/preview", json=body)
+        assert response.status_code == 422
+
+    def test_too_large(self, anna):
+        depot_id = self._depot(anna)
+        content = base64.b64encode(b"x" * (640 * 1024 + 1)).decode()
+        response = _write(
+            anna,
+            "POST",
+            f"/api/v1/depots/{depot_id}/import/preview",
+            json={"content_base64": content},
+        )
+        assert response.status_code in {413, 422}  # 422: schon die Laenge des Base64 ist zu gross
+
+    def test_just_below_the_limit_passes_the_size_check(self, anna):
+        depot_id = self._depot(anna)
+        content = base64.b64encode(b"kaputt;1\n" * (640 * 1024 // 9)).decode()
+        response = _write(
+            anna,
+            "POST",
+            f"/api/v1/depots/{depot_id}/import/preview",
+            json={"content_base64": content},
+        )
+        assert response.status_code == 422  # portfolio liest sie und lehnt sie ab
+        assert "1000 Zeilen" in response.text
+
+    def test_foreign_depot(self, anna, ben):
+        depot_id = self._depot(anna)
+        body = {"content_base64": _b64(f"{SAP};1\n")}
+        response = _write(ben, "POST", f"/api/v1/depots/{depot_id}/import/preview", json=body)
+        assert response.status_code == 404
+        assert ben.get(f"/api/v1/depots/{depot_id}/holdings/csv").status_code == 404
+
+    def test_download_as_csv(self, anna):
+        depot_id = self._depot(anna)
+        response = anna.get(f"/api/v1/depots/{depot_id}/holdings/csv")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+        assert response.headers["content-disposition"] == (
+            f'attachment; filename="depot-{depot_id}-v1.csv"'
+        )
+        assert response.content.decode("utf-8-sig").splitlines()[1] == f"{SAP};10;;;stueck"

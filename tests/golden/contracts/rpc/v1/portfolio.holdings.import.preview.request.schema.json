@@ -1,0 +1,28 @@
+{
+  "description": "D3.5: eine Datei im eigenen Format fuer den Abgleich (nichts wird gespeichert).",
+  "properties": {
+    "content": {
+      "format": "base64url",
+      "maxLength": 655360,
+      "title": "Content",
+      "type": "string"
+    },
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id",
+    "content"
+  ],
+  "title": "HoldingsFileRequestV1",
+  "type": "object"
+}

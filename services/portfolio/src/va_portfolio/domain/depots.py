@@ -40,6 +40,7 @@ __all__ = [
     "check_name",
     "diff",
     "next_version",
+    "same_position",
 ]
 
 
@@ -92,6 +93,7 @@ class Snapshot:
     created_by: int | None = None
     lines: tuple[HoldingLine, ...] = ()
     cash: tuple[CashLine, ...] = ()
+    source_ref: str | None = None  # D3.5: SHA-256 der Datei bei Herkunft ``import``
 
 
 @dataclass(frozen=True)
@@ -183,7 +185,8 @@ def next_version(*, newest: int, base: int) -> int:
     return newest + 1
 
 
-def _same(a: HoldingLine, b: HoldingLine) -> bool:
+def same_position(a: HoldingLine, b: HoldingLine) -> bool:
+    """Gleich bis auf die ISIN; ``Decimal`` vergleicht 10 und 10.000 als gleich."""
     return (a.quantity, a.unit, a.cost_basis_eur, a.note) == (
         b.quantity,
         b.unit,
@@ -199,6 +202,6 @@ def diff(previous: Sequence[HoldingLine], current: Sequence[HoldingLine]) -> Dif
     added = len(after.keys() - before.keys())
     removed = len(before.keys() - after.keys())
     changed = sum(
-        1 for isin in after.keys() & before.keys() if not _same(before[isin], after[isin])
+        1 for isin in after.keys() & before.keys() if not same_position(before[isin], after[isin])
     )
     return Diff(added, changed, removed)

@@ -244,6 +244,32 @@ export const zHoldings = z.object({
 });
 
 /**
+ * ImportEntry
+ *
+ * Eine ISIN im Abgleich: ``new``, ``changed``, ``unchanged`` oder ``removed``; ``pending``:
+ * noch ohne Stammdaten ("wird geprueft").
+ */
+export const zImportEntry = z.object({
+  after: zHoldingLineOutput.nullable(),
+  before: zHoldingLineOutput.nullable(),
+  isin: z.string(),
+  pending: z.boolean(),
+  status: z.enum(['new', 'changed', 'unchanged', 'removed']),
+});
+
+/**
+ * ImportFile
+ *
+ * Eine Datei im eigenen Format (D3.5, DEP-05): ``isin;menge;einstand;notiz`` und optional
+ * ``einheit``, ``;``, Dezimalkomma, UTF-8 (BOM erlaubt) oder Windows-1252, hoechstens 640 KiB.
+ * Als JSON statt multipart, damit schreibende Endpunkte nur JSON annehmen.
+ */
+export const zImportFile = z.object({
+  content_base64: z.string().min(1).max(873816),
+  filename: z.string().max(255).nullish(),
+});
+
+/**
  * Listing
  *
  * Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.
@@ -615,6 +641,28 @@ export const zRankingRow = z.object({
   symbol: z.string(),
   value_score: z.number().nullable(),
   value_trap_flag: z.boolean().nullable(),
+});
+
+/**
+ * RejectedRow
+ *
+ * Eine Zeile der Datei, die nicht erkannt wurde.
+ */
+export const zRejectedRow = z.object({
+  line: z.int(),
+  reason: z.string(),
+});
+
+/**
+ * ImportPreview
+ *
+ * Abgleich mit dem Depotstand ``base_version`` (als ``If-Match`` fuers Uebernehmen).
+ * Uebernehmen geht nur ohne ``rejected``.
+ */
+export const zImportPreview = z.object({
+  base_version: z.int(),
+  entries: z.array(zImportEntry),
+  rejected: z.array(zRejectedRow),
 });
 
 /**
@@ -1036,6 +1084,40 @@ export const zSaveHoldingsPath = z.object({
  * Successful Response
  */
 export const zSaveHoldingsResponse = zHoldings;
+
+export const zHoldingsCsvPath = z.object({
+  depot_id: z.int(),
+});
+
+export const zHoldingsCsvQuery = z.object({
+  version: z.int().gte(0).nullish(),
+});
+
+export const zImportHoldingsBody = zImportFile;
+
+export const zImportHoldingsHeaders = z.object({
+  'if-match': z.string().nullish(),
+});
+
+export const zImportHoldingsPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zImportHoldingsResponse = zHoldings;
+
+export const zPreviewImportBody = zImportFile;
+
+export const zPreviewImportPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zPreviewImportResponse = zImportPreview;
 
 export const zRestoreDepotPath = z.object({
   depot_id: z.int(),

@@ -37,8 +37,11 @@ from va_contracts.rpc.v1 import (
     DEPOTS_LIST,
     DEPOTS_RESTORE,
     DEPOTS_UPDATE,
+    HOLDINGS_FILE,
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
+    HOLDINGS_IMPORT,
+    HOLDINGS_IMPORT_PREVIEW,
     HOLDINGS_SAVE,
     PROFILE_ACTIVATE,
     PROFILE_GET,
@@ -61,7 +64,9 @@ from va_contracts.rpc.v1 import (
     FactorsReplyV1,
     FactorsRequestV1,
     FactorV1,
+    HoldingsFileRequestV1,
     HoldingsGetRequestV1,
+    HoldingsImportRequestV1,
     HoldingsSaveRequestV1,
     PreviewBasisV1,
     PreviewReplyV1,
@@ -109,6 +114,7 @@ if TYPE_CHECKING:
         HistoryEntryV1,
         HoldingLineV1,
         HoldingsV1,
+        ImportPreviewV1,
     )
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.rpc.v1 import RpcSpec
@@ -337,6 +343,31 @@ class RemoteDepots:
     def export(self, user_id: int) -> list[DepotExportV1]:
         request = DepotExportRequestV1(user_id=user_id)
         return list(self._call(DEPOTS_EXPORT, request).depots)
+
+    def preview_import(self, user_id: int, depot_id: int, content: bytes) -> ImportPreviewV1:
+        request = HoldingsFileRequestV1(user_id=user_id, depot_id=depot_id, content=content)
+        preview = self._call(HOLDINGS_IMPORT_PREVIEW, request).preview
+        if preview is None:  # pragma: no cover - portfolio antwortet mit Abgleich oder Fehler
+            raise DepotNotFound(str(depot_id))
+        return preview
+
+    def import_file(
+        self, user_id: int, depot_id: int, *, base_version: int, content: bytes
+    ) -> HoldingsV1:
+        request = HoldingsImportRequestV1(
+            user_id=user_id, depot_id=depot_id, base_version=base_version, content=content
+        )
+        holdings = self._call(HOLDINGS_IMPORT, request).holdings
+        if holdings is None:  # pragma: no cover
+            raise DepotNotFound(str(depot_id))
+        return holdings
+
+    def holdings_file(self, user_id: int, depot_id: int, version: int | None) -> tuple[str, bytes]:
+        request = HoldingsGetRequestV1(user_id=user_id, depot_id=depot_id, version=version)
+        reply = self._call(HOLDINGS_FILE, request)
+        if reply.filename is None or reply.content is None:  # pragma: no cover
+            raise DepotNotFound(str(depot_id))
+        return reply.filename, reply.content
 
 
 def _raise(reply: RpcReplyV1) -> None:

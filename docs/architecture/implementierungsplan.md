@@ -3883,6 +3883,33 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   JSON mit `content_base64`); Abgleich neu, geändert, entfällt, nicht erkannt; Übernehmen mit
   `If-Match`; Export der Positionen im selben Format.
 - **Review:** `/code-review high`, `/security-review` (Datei-Upload).
+- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+  - **640 KiB statt 1 MB:** Base64 im JSON muss unter 1 MB bleiben, der Grenze von nginx
+    (`client_max_body_size`) und NATS (`max_payload`). Die Datei hat höchstens 1000 Datenzeilen,
+    abgelehnte mitgezählt, sonst passte der Abgleich nicht durch NATS. Im Abgleich sind Notizen auf
+    120 Zeichen gekürzt (1000 geänderte Positionen mit langen Notizen vorher und nachher). Ein
+    Test schickt die größte erlaubte Datei über echtes NATS.
+  - **Nachsichtig lesen, nie still:**
+    - Spalte `einheit` optional, Kopfzeile optional (dann in beliebiger Reihenfolge).
+    - Windows-1252, wenn UTF-8 nicht passt (so speichert Excel).
+    - `1.234` ohne Komma ist mehrdeutig und wird abgelehnt.
+    - Übernommen wird nur eine Datei ohne abgelehnte Zeile; Kasse und Einheit bleiben.
+  - **Herkunft:** Depotstand mit `source = import`, `source_ref` = SHA-256 der Datei.
+  - **Endpunkte:** `POST /depots/{id}/import/preview`, `POST /depots/{id}/import` (`If-Match`,
+    428, 409, 422 bei abgelehnten Zeilen), `GET /depots/{id}/holdings/csv?version=`. Das web-api
+    prüft Base64 und Größe (413); das Format kennt nur portfolio (RPC
+    `portfolio.holdings.import.preview`, `.import`, `.file`).
+  - **Sicherheit:**
+    - Der Dateiname der Antwort ist `depot-<id>-v<version>.csv`, nie der Depotname, und das
+      web-api prüft ihn noch einmal.
+    - Notizen, die wie eine Formel beginnen, bekommen im Export ein `'`.
+    - Der hochgeladene Dateiname wird nur angezeigt.
+  - **Review (`/code-review high`, `/security-review`):** Das Sicherheitsreview fand nichts.
+    Behoben: eine Kopfzeile mit unbekannter Spalte ergab eine abgelehnte Datenzeile statt einer
+    klaren Meldung, und abgelehnte Zeilen zählten nicht zur Grenze von 1000 Zeilen. Offen, schon
+    seit D3.2: `/me/export` schickt alle Depotstände in einer Antwort über NATS (1 MB). Viele
+    Importe großer Depots können das sprengen, dann antwortet der Export mit 503. Abhilfe später:
+    den Export je Depot holen oder `max_payload` anheben.
 
 **D3.6 Oberfläche „Meine Depots“** (DEP-01 bis 07, 09, 11, 13)
 - **Test:** Startseite nach dem Login mit Kacheln (Name, Wert, Stand); Depot-Detail mit Positionen

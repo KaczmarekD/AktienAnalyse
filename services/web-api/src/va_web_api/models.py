@@ -12,7 +12,14 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from va_contracts.portfolio import MAX_LINES, MAX_NAME, MAX_TEXT, Amount, Quantity
+from va_contracts.portfolio import (
+    MAX_FILE_BYTES,
+    MAX_LINES,
+    MAX_NAME,
+    MAX_TEXT,
+    Amount,
+    Quantity,
+)
 from va_contracts.profile import ProfileParamsV1
 from va_contracts.securities import IsinStr
 
@@ -557,6 +564,46 @@ class Holdings(_Model):
     created_by: int | None
     lines: list[HoldingLine]
     cash: list[CashLine]
+
+
+# D3.5: Base64 von hoechstens ``MAX_FILE_BYTES`` (4 Zeichen je 3 Bytes, aufgerundet)
+MAX_FILE_BASE64 = -(-MAX_FILE_BYTES // 3) * 4
+
+
+class ImportFile(_Model):
+    """Eine Datei im eigenen Format (D3.5, DEP-05): ``isin;menge;einstand;notiz`` und optional
+    ``einheit``, ``;``, Dezimalkomma, UTF-8 (BOM erlaubt) oder Windows-1252, hoechstens 640 KiB.
+    Als JSON statt multipart, damit schreibende Endpunkte nur JSON annehmen."""
+
+    filename: Annotated[str, Field(max_length=255)] | None = None  # nur zur Anzeige
+    content_base64: Annotated[str, Field(min_length=1, max_length=MAX_FILE_BASE64)]
+
+
+class ImportEntry(_Model):
+    """Eine ISIN im Abgleich: ``new``, ``changed``, ``unchanged`` oder ``removed``; ``pending``:
+    noch ohne Stammdaten ("wird geprueft")."""
+
+    isin: str
+    status: Literal["new", "changed", "unchanged", "removed"]
+    before: HoldingLine | None
+    after: HoldingLine | None
+    pending: bool
+
+
+class RejectedRow(_Model):
+    """Eine Zeile der Datei, die nicht erkannt wurde."""
+
+    line: int
+    reason: str
+
+
+class ImportPreview(_Model):
+    """Abgleich mit dem Depotstand ``base_version`` (als ``If-Match`` fuers Uebernehmen).
+    Uebernehmen geht nur ohne ``rejected``."""
+
+    base_version: int
+    entries: list[ImportEntry]
+    rejected: list[RejectedRow]
 
 
 class HistoryEntry(_Model):
