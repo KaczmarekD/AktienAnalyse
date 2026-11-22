@@ -3738,7 +3738,7 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   Dienst in den Compose-Dateien, Rolle in `src.db.migrate` (`VA_PORTFOLIO_PASSWORD`), NATS-Nutzer
   (`NATS_PORTFOLIO_PASSWORD`), Runbook.
 - **Review:** `/code-review high`, `/security-review` (neue Rolle, persönliche Daten).
-- **Umgesetzt (22.11.2026):** wie im Entwurf, dazu:
+- **Umgesetzt (22.11.2026, auf `main` als `2630999`, CI grün):** wie im Entwurf, dazu:
   - **Migration 0023:** Track F hat 0022 (F2.1) zuerst gemergt; `portfolio` folgt darauf.
   - **Noch kein Consumer:** portfolio liest in D3.1 keine Events. Der NATS-Nutzer darf nur den
     Stream anlegen, eigene Events senden und auf `rpc.va.portfolio.>` antworten; einen Consumer
