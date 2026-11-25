@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         HistoryEntryV1,
         HoldingLineV1,
         HoldingsV1,
+        ImportPreviewV1,
     )
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.securities import SecurityHitV1, SecurityV1
@@ -182,6 +183,17 @@ class DepotDirectory(Protocol):
     def history(self, user_id: int, depot_id: int) -> list[HistoryEntryV1]: ...
 
     def export(self, user_id: int) -> list[DepotExportV1]: ...
+
+    # D3.5: Datei im eigenen Format (portfolio liest und schreibt sie)
+    def preview_import(self, user_id: int, depot_id: int, content: bytes) -> ImportPreviewV1: ...
+
+    def import_file(
+        self, user_id: int, depot_id: int, *, base_version: int, content: bytes
+    ) -> HoldingsV1: ...
+
+    def holdings_file(
+        self, user_id: int, depot_id: int, version: int | None
+    ) -> tuple[str, bytes]: ...
 
 
 class ProfileConflict(Exception):

@@ -1,0 +1,34 @@
+{
+  "description": "``version`` leer: der aktuelle Depotstand.",
+  "properties": {
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    },
+    "version": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Version"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id"
+  ],
+  "title": "HoldingsGetRequestV1",
+  "type": "object"
+}

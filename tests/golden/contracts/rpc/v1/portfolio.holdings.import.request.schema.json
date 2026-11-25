@@ -1,0 +1,34 @@
+{
+  "description": "D3.5: die Datei als neuer Depotstand (Herkunft ``import``) auf ``base_version``; mit einer\nabgelehnten Zeile ``invalid``, auf eine alte Basis ``conflict``.",
+  "properties": {
+    "base_version": {
+      "minimum": 0,
+      "title": "Base Version",
+      "type": "integer"
+    },
+    "content": {
+      "format": "base64url",
+      "maxLength": 655360,
+      "title": "Content",
+      "type": "string"
+    },
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id",
+    "content",
+    "base_version"
+  ],
+  "title": "HoldingsImportRequestV1",
+  "type": "object"
+}

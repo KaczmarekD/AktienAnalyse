@@ -260,6 +260,7 @@ class PostgresDepotStore:
                 created_by=row.created_by,
                 lines=tuple(lines[row.id]),
                 cash=tuple(cash[row.id]),
+                source_ref=row.source_ref,
             )
             for row in rows
         ]
@@ -273,6 +274,7 @@ class PostgresDepotStore:
                         depot_id=snapshot.depot_id,
                         version=snapshot.version,
                         source=snapshot.source,
+                        source_ref=snapshot.source_ref,
                         created_by=snapshot.created_by,
                         created_at=snapshot.created_at,
                     )

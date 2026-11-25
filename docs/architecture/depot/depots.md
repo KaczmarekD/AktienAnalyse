@@ -8,7 +8,8 @@
 > web-api aus der Tabelle unten ohne Import und Zielallokation (D3.2), die Abdeckung aus den
 > Depots (D3.3, `portfolio.coverage.changed`), die Bewertung aus den Kopien der Marktdaten (D3.4,
 > `security_view`, `price_view`, `fx_view`, `valuation` in `GET /depots` und `GET /depots/{id}`).
-> Import und Oberfläche folgen mit D3.5 und D3.6.
+> Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import`, `…/holdings/csv`).
+> Die Oberfläche folgt mit D3.6.
 
 ## Begriffe
 
@@ -51,8 +52,24 @@
 Das eigene Format gehört zu portfolio, wie der Export. Fremde Formate und Banken liegen hinter dem
 Port der Bankanbindung im Dienst `depot-gateway`.
 
-Datei-Uploads gehen als JSON (`{"filename", "content_base64"}`, höchstens 1 MB), nicht als
+Datei-Uploads gehen als JSON (`{"filename", "content_base64"}`), nicht als
 `multipart/form-data`. So bleibt die Regel „schreibende Endpunkte nur mit JSON“ bestehen.
+Seit D3.5 ist eine Datei höchstens 640 KiB groß: Als Base64 bleibt sie unter 1 MB, der Grenze von
+nginx und NATS. Sie hat höchstens 1000 Datenzeilen, gelesene und abgelehnte zusammen.
+
+Das eigene Format (D3.5):
+
+- Spalten `isin;menge;einstand;notiz`, optional `einheit` (`stueck`, `nennwert`); mit
+  Kopfzeile in beliebiger Reihenfolge.
+- Fehlt die Einheit, gilt die bisherige der ISIN, sonst `nennwert` für Anleihen, sonst `stueck`.
+- Dezimalkomma, Tausenderpunkte erlaubt. `1.234` ohne Komma ist mehrdeutig und wird abgelehnt.
+- UTF-8 mit oder ohne BOM, sonst Windows-1252 (Excel).
+- Jede Zeile wird gelesen oder mit Grund abgelehnt. Übernommen wird nur eine Datei ohne
+  abgelehnte Zeilen, sonst entfielen deren Positionen still.
+- Die Kasse bleibt, die Datei kennt keine.
+- Der Depotstand bekommt die Herkunft `import` und als `source_ref` den SHA-256 der Datei.
+- Der Export setzt vor eine Notiz, die wie eine Formel beginnt, ein `'`; das Lesen nimmt es
+  wieder weg.
 
 ## Ablauf: Position ändern
 

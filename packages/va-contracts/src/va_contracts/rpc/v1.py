@@ -16,6 +16,7 @@ from pydantic import ConfigDict, Field
 from ..base import Contract, PositiveId
 from ..events.v1.ranking import ValueTrapReason
 from ..portfolio import (
+    MAX_FILE_BYTES,
     MAX_LINES,
     CashLineV1,
     DepotExportV1,
@@ -25,6 +26,7 @@ from ..portfolio import (
     HistoryEntryV1,
     HoldingLineV1,
     HoldingsV1,
+    ImportPreviewV1,
 )
 from ..portfolio import Text as DepotText
 from ..profile import ProfileParamsV1
@@ -299,6 +301,37 @@ class HistoryReplyV1(RpcReplyV1):
     entries: list[HistoryEntryV1] = Field(default_factory=list)  # neueste zuerst
 
 
+class HoldingsFileRequestV1(Contract):
+    """D3.5: eine Datei im eigenen Format fuer den Abgleich (nichts wird gespeichert)."""
+
+    # Bytes im JSON als Base64, wie ``ReportCsvReplyV1``
+    model_config = ConfigDict(ser_json_bytes="base64", val_json_bytes="base64")
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    content: bytes = Field(max_length=MAX_FILE_BYTES)
+
+
+class HoldingsImportRequestV1(HoldingsFileRequestV1):
+    """D3.5: die Datei als neuer Depotstand (Herkunft ``import``) auf ``base_version``; mit einer
+    abgelehnten Zeile ``invalid``, auf eine alte Basis ``conflict``."""
+
+    base_version: int = Field(ge=0)
+
+
+class ImportPreviewReplyV1(RpcReplyV1):
+    preview: ImportPreviewV1 | None = None
+
+
+class HoldingsFileReplyV1(RpcReplyV1):
+    """D3.5: die Positionen eines Depotstands im eigenen Format."""
+
+    model_config = ConfigDict(ser_json_bytes="base64", val_json_bytes="base64")
+
+    filename: str | None = None
+    content: bytes | None = None  # UTF-8 mit BOM
+
+
 class DepotExportRequestV1(Contract):
     """D3.2: alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden (NUT-12)."""
 
@@ -352,6 +385,12 @@ HOLDINGS_SAVE = RpcSpec("portfolio.holdings.save", HoldingsSaveRequestV1, Holdin
 HOLDINGS_HISTORY = RpcSpec("portfolio.holdings.history", DepotRefRequestV1, HistoryReplyV1)
 # D3.2: Datenexport (NUT-12)
 DEPOTS_EXPORT = RpcSpec("portfolio.depots.export", DepotExportRequestV1, DepotExportReplyV1)
+# D3.5: Datei im eigenen Format
+HOLDINGS_IMPORT_PREVIEW = RpcSpec(
+    "portfolio.holdings.import.preview", HoldingsFileRequestV1, ImportPreviewReplyV1
+)
+HOLDINGS_IMPORT = RpcSpec("portfolio.holdings.import", HoldingsImportRequestV1, HoldingsReplyV1)
+HOLDINGS_FILE = RpcSpec("portfolio.holdings.file", HoldingsGetRequestV1, HoldingsFileReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -376,6 +415,9 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         HOLDINGS_SAVE,
         HOLDINGS_HISTORY,
         DEPOTS_EXPORT,
+        HOLDINGS_IMPORT_PREVIEW,
+        HOLDINGS_IMPORT,
+        HOLDINGS_FILE,
     )
 }
 
@@ -387,8 +429,11 @@ __all__ = [
     "DEPOTS_LIST",
     "DEPOTS_RESTORE",
     "DEPOTS_UPDATE",
+    "HOLDINGS_FILE",
     "HOLDINGS_GET",
     "HOLDINGS_HISTORY",
+    "HOLDINGS_IMPORT",
+    "HOLDINGS_IMPORT_PREVIEW",
     "HOLDINGS_SAVE",
     "PROFILE_ACTIVATE",
     "PROFILE_GET",
@@ -415,9 +460,13 @@ __all__ = [
     "FactorsReplyV1",
     "FactorsRequestV1",
     "HistoryReplyV1",
+    "HoldingsFileReplyV1",
+    "HoldingsFileRequestV1",
     "HoldingsGetRequestV1",
+    "HoldingsImportRequestV1",
     "HoldingsReplyV1",
     "HoldingsSaveRequestV1",
+    "ImportPreviewReplyV1",
     "PreviewBasisV1",
     "PreviewReplyV1",
     "PreviewRequestV1",

@@ -66,6 +66,12 @@ import type {
   GetSecurityResponses,
   HealthData,
   HealthResponses,
+  HoldingsCsvData,
+  HoldingsCsvErrors,
+  HoldingsCsvResponses,
+  ImportHoldingsData,
+  ImportHoldingsErrors,
+  ImportHoldingsResponses,
   LatestRankingData,
   LatestRankingErrors,
   LatestRankingResponses,
@@ -96,6 +102,9 @@ import type {
   MeData,
   MeErrors,
   MeResponses,
+  PreviewImportData,
+  PreviewImportErrors,
+  PreviewImportResponses,
   PreviewProfileData,
   PreviewProfileErrors,
   PreviewProfileResponses,
@@ -169,6 +178,12 @@ import {
   zGetSecurityQuery,
   zGetSecurityResponse,
   zHealthResponse,
+  zHoldingsCsvPath,
+  zHoldingsCsvQuery,
+  zImportHoldingsBody,
+  zImportHoldingsHeaders,
+  zImportHoldingsPath,
+  zImportHoldingsResponse,
   zLatestRankingResponse,
   zListDepotsQuery,
   zListDepotsResponse,
@@ -182,6 +197,9 @@ import {
   zLoginResponse,
   zLogoutResponse,
   zMeResponse,
+  zPreviewImportBody,
+  zPreviewImportPath,
+  zPreviewImportResponse,
   zPreviewProfileBody,
   zPreviewProfileQuery,
   zPreviewProfileResponse,
@@ -624,6 +642,81 @@ export const saveHoldings = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zSaveHoldingsResponse.parseAsync(data),
     url: '/api/v1/depots/{depot_id}/holdings',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Holdings Csv
+ *
+ * Die Positionen eines Depotstands (ohne ``version`` des neuesten) als CSV.
+ */
+export const holdingsCsv = <ThrowOnError extends boolean = false>(
+  options: Options<HoldingsCsvData, ThrowOnError>,
+): RequestResult<HoldingsCsvResponses, HoldingsCsvErrors, ThrowOnError> =>
+  (options.client ?? client).get<HoldingsCsvResponses, HoldingsCsvErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zHoldingsCsvPath,
+          query: zHoldingsCsvQuery.optional(),
+        })
+        .parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/holdings/csv',
+    ...options,
+  });
+
+/**
+ * Import Holdings
+ *
+ * Die Datei als neuer Depotstand (Herkunft ``import``) auf den Stand aus ``If-Match``; die
+ * Kasse bleibt. Mit abgelehnten Zeilen 422.
+ */
+export const importHoldings = <ThrowOnError extends boolean = false>(
+  options: Options<ImportHoldingsData, ThrowOnError>,
+): RequestResult<ImportHoldingsResponses, ImportHoldingsErrors, ThrowOnError> =>
+  (options.client ?? client).post<ImportHoldingsResponses, ImportHoldingsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zImportHoldingsBody,
+          headers: zImportHoldingsHeaders.optional(),
+          path: zImportHoldingsPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zImportHoldingsResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/import',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Preview Import
+ *
+ * Abgleich einer Datei im eigenen Format mit dem aktuellen Depotstand; speichert nichts.
+ */
+export const previewImport = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewImportData, ThrowOnError>,
+): RequestResult<PreviewImportResponses, PreviewImportErrors, ThrowOnError> =>
+  (options.client ?? client).post<PreviewImportResponses, PreviewImportErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zPreviewImportBody,
+          path: zPreviewImportPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zPreviewImportResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/import/preview',
     ...options,
     headers: {
       'Content-Type': 'application/json',

@@ -1,6 +1,11 @@
 """Request/Reply von portfolio (D3.1): Depots lesen und aendern fuer das web-api; seit D3.2
 auch der Datenexport aller eigenen Depots (``portfolio.depots.export``).
 
+Seit D3.5 Datei im eigenen Format: Abgleich (``holdings.import.preview``), Uebernahme
+(``holdings.import``) und die Positionen als Datei (``holdings.file``). Im Abgleich sind Notizen
+auf ``PREVIEW_NOTE`` Zeichen gekuerzt: 1000 geaenderte Positionen mit langen Notizen vorher und
+nachher passten sonst nicht durch NATS (1 MB). Uebernommen wird die volle Notiz.
+
 Seit D3.4 traegt jedes Depot seine Bewertung (``DepotValuationV1``), ``depots.get`` dazu jede
 Position; der Export nicht.
 
@@ -22,7 +27,10 @@ from va_contracts.portfolio import (
     HistoryEntryV1,
     HoldingLineV1,
     HoldingsV1,
+    ImportEntryV1,
+    ImportPreviewV1,
     PositionValueV1,
+    RejectedRowV1,
 )
 from va_contracts.rpc.v1 import (
     DEPOTS_ARCHIVE,
@@ -32,14 +40,19 @@ from va_contracts.rpc.v1 import (
     DEPOTS_LIST,
     DEPOTS_RESTORE,
     DEPOTS_UPDATE,
+    HOLDINGS_FILE,
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
+    HOLDINGS_IMPORT,
+    HOLDINGS_IMPORT_PREVIEW,
     HOLDINGS_SAVE,
     DepotExportReplyV1,
     DepotListReplyV1,
     DepotReplyV1,
     HistoryReplyV1,
+    HoldingsFileReplyV1,
     HoldingsReplyV1,
+    ImportPreviewReplyV1,
     RpcErrorV1,
 )
 
@@ -53,13 +66,15 @@ if TYPE_CHECKING:
         DepotListRequestV1,
         DepotRefRequestV1,
         DepotUpdateRequestV1,
+        HoldingsFileRequestV1,
         HoldingsGetRequestV1,
+        HoldingsImportRequestV1,
         HoldingsSaveRequestV1,
         RpcReplyV1,
         RpcSpec,
     )
 
-    from ..application.depots import DepotService, DepotSummary, HistoryEntry
+    from ..application.depots import DepotService, DepotSummary, HistoryEntry, ImportPreview
     from ..domain.depots import Snapshot
     from ..domain.valuation import DepotValue, PositionValue
 
@@ -117,6 +132,39 @@ def _depot(summary: DepotSummary, *, positions: bool = False) -> DepotV1:
     )
 
 
+PREVIEW_NOTE = 120
+
+
+def _line(line: HoldingLine, *, note_limit: int | None = None) -> HoldingLineV1:
+    note = line.note
+    if note is not None and note_limit is not None and len(note) > note_limit:
+        note = note[: note_limit - 1] + "\u2026"
+    return HoldingLineV1(
+        isin=line.isin,
+        quantity=line.quantity,
+        unit=line.unit,
+        cost_basis_eur=line.cost_basis_eur,
+        note=note,
+    )
+
+
+def _preview(preview: ImportPreview) -> ImportPreviewV1:
+    return ImportPreviewV1(
+        base_version=preview.base_version,
+        entries=[
+            ImportEntryV1(
+                isin=e.isin,
+                status=e.status,
+                before=None if e.before is None else _line(e.before, note_limit=PREVIEW_NOTE),
+                after=None if e.after is None else _line(e.after, note_limit=PREVIEW_NOTE),
+                pending=e.after is not None and e.isin in preview.pending,
+            )
+            for e in preview.entries
+        ],
+        rejected=[RejectedRowV1(line=r.line, reason=r.reason) for r in preview.rejected],
+    )
+
+
 def _holdings(snapshot: Snapshot) -> HoldingsV1:
     return HoldingsV1(
         depot_id=snapshot.depot_id,
@@ -124,16 +172,7 @@ def _holdings(snapshot: Snapshot) -> HoldingsV1:
         source=snapshot.source,
         created_at=snapshot.created_at,
         created_by=snapshot.created_by,
-        lines=[
-            HoldingLineV1(
-                isin=line.isin,
-                quantity=line.quantity,
-                unit=line.unit,
-                cost_basis_eur=line.cost_basis_eur,
-                note=line.note,
-            )
-            for line in snapshot.lines
-        ],
+        lines=[_line(line) for line in snapshot.lines],
         cash=[CashLineV1(currency="EUR", amount=c.amount) for c in snapshot.cash],
     )
 
@@ -252,6 +291,37 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
             ]
         )
 
+    def import_preview(request: HoldingsFileRequestV1) -> ImportPreviewReplyV1:
+        return _guarded(
+            ImportPreviewReplyV1,
+            lambda: ImportPreviewReplyV1(
+                preview=_preview(
+                    service.preview_import(request.user_id, request.depot_id, request.content)
+                )
+            ),
+        )
+
+    def import_file(request: HoldingsImportRequestV1) -> HoldingsReplyV1:
+        return _guarded(
+            HoldingsReplyV1,
+            lambda: HoldingsReplyV1(
+                holdings=_holdings(
+                    service.import_file(
+                        request.user_id, request.depot_id, request.base_version, request.content
+                    )
+                )
+            ),
+        )
+
+    def holdings_file(request: HoldingsGetRequestV1) -> HoldingsFileReplyV1:
+        def work() -> HoldingsFileReplyV1:
+            filename, content = service.export_file(
+                request.user_id, request.depot_id, request.version
+            )
+            return HoldingsFileReplyV1(filename=filename, content=content)
+
+        return _guarded(HoldingsFileReplyV1, work)
+
     def history(request: DepotRefRequestV1) -> HistoryReplyV1:
         return _guarded(
             HistoryReplyV1,
@@ -271,4 +341,7 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         HOLDINGS_SAVE: save,
         HOLDINGS_HISTORY: history,
         DEPOTS_EXPORT: export,
+        HOLDINGS_IMPORT_PREVIEW: import_preview,
+        HOLDINGS_IMPORT: import_file,
+        HOLDINGS_FILE: holdings_file,
     }

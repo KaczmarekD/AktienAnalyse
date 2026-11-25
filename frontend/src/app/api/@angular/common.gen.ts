@@ -46,6 +46,9 @@ import type {
   GetSecurityResponse,
   HealthData,
   HealthResponse,
+  HoldingsCsvData,
+  ImportHoldingsData,
+  ImportHoldingsResponse,
   LatestRankingData,
   LatestRankingResponse,
   ListDepotsData,
@@ -66,6 +69,8 @@ import type {
   LogoutResponse,
   MeData,
   MeResponse,
+  PreviewImportData,
+  PreviewImportResponse,
   PreviewProfileData,
   PreviewProfileResponse,
   ResetPasswordData,
@@ -340,6 +345,52 @@ export const saveHoldingsRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'PUT',
     url: '/api/v1/depots/{depot_id}/holdings',
+    ...options,
+  });
+
+/**
+ * Holdings Csv
+ *
+ * Die Positionen eines Depotstands (ohne ``version`` des neuesten) als CSV.
+ */
+export const holdingsCsvRequest = <ThrowOnError extends boolean = false>(
+  options: Options<HoldingsCsvData, ThrowOnError>,
+): HttpRequest<unknown> =>
+  (options?.client ?? client).requestOptions<unknown, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/holdings/csv',
+    ...options,
+  });
+
+/**
+ * Import Holdings
+ *
+ * Die Datei als neuer Depotstand (Herkunft ``import``) auf den Stand aus ``If-Match``; die
+ * Kasse bleibt. Mit abgelehnten Zeilen 422.
+ */
+export const importHoldingsRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ImportHoldingsData, ThrowOnError>,
+): HttpRequest<ImportHoldingsResponse> =>
+  (options?.client ?? client).requestOptions<ImportHoldingsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/depots/{depot_id}/import',
+    ...options,
+  });
+
+/**
+ * Preview Import
+ *
+ * Abgleich einer Datei im eigenen Format mit dem aktuellen Depotstand; speichert nichts.
+ */
+export const previewImportRequest = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewImportData, ThrowOnError>,
+): HttpRequest<PreviewImportResponse> =>
+  (options?.client ?? client).requestOptions<PreviewImportResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/depots/{depot_id}/import/preview',
     ...options,
   });
 
@@ -910,6 +961,46 @@ export const saveHoldingsResource = <ThrowOnError extends boolean = false>(
   httpResource<SaveHoldingsResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? saveHoldingsRequest(opts) : undefined;
+  });
+
+/**
+ * Holdings Csv
+ *
+ * Die Positionen eines Depotstands (ohne ``version`` des neuesten) als CSV.
+ */
+export const holdingsCsvResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<HoldingsCsvData, ThrowOnError> | undefined,
+) =>
+  httpResource<unknown>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? holdingsCsvRequest(opts) : undefined;
+  });
+
+/**
+ * Import Holdings
+ *
+ * Die Datei als neuer Depotstand (Herkunft ``import``) auf den Stand aus ``If-Match``; die
+ * Kasse bleibt. Mit abgelehnten Zeilen 422.
+ */
+export const importHoldingsResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<ImportHoldingsData, ThrowOnError> | undefined,
+) =>
+  httpResource<ImportHoldingsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? importHoldingsRequest(opts) : undefined;
+  });
+
+/**
+ * Preview Import
+ *
+ * Abgleich einer Datei im eigenen Format mit dem aktuellen Depotstand; speichert nichts.
+ */
+export const previewImportResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<PreviewImportData, ThrowOnError> | undefined,
+) =>
+  httpResource<PreviewImportResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? previewImportRequest(opts) : undefined;
   });
 
 /**

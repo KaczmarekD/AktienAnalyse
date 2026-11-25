@@ -27,10 +27,14 @@ SnapshotSource = Literal["manual", "import", "bank"]
 # D3.4: Warum eine Position mit Menge keinen Wert hat: kein Kurs, kein Waehrungskurs, oder der
 # Kurs passt nicht zur Einheit (Prozent vom Nennwert je Stueck)
 ValueMissing = Literal["price", "fx", "unit"]
+# D3.5: Abgleich einer Datei mit dem aktuellen Depotstand, je ISIN
+ImportStatus = Literal["new", "changed", "unchanged", "removed"]
 
 MAX_NAME = 100
 MAX_TEXT = 500
 MAX_LINES = 1000
+# D3.5: Datei im eigenen Format; Base64 im JSON bleibt unter 1 MB (nginx, NATS max_payload)
+MAX_FILE_BYTES = 640 * 1024
 
 # Bis 10^12 mit hoechstens 8 Nachkommastellen (Bruchstuecke aus Sparplaenen)
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=8)]
@@ -146,6 +150,33 @@ class HistoryEntryV1(Contract):
     removed: int = Field(ge=0)
 
 
+class ImportEntryV1(Contract):
+    """Eine ISIN im Abgleich (D3.5, DEP-05): vorher und nachher; ``pending``: noch ohne
+    Stammdaten ("wird geprueft")."""
+
+    isin: IsinStr
+    status: ImportStatus
+    before: HoldingLineV1 | None = None
+    after: HoldingLineV1 | None = None
+    pending: bool = False
+
+
+class RejectedRowV1(Contract):
+    """Eine Zeile der Datei, die nicht erkannt wurde, mit Grund."""
+
+    line: int = Field(ge=1)
+    reason: str
+
+
+class ImportPreviewV1(Contract):
+    """Abgleich einer Datei mit dem Depotstand ``base_version``. Uebernommen wird nur eine Datei
+    ohne abgelehnte Zeilen, sonst entfielen deren Positionen still."""
+
+    base_version: int = Field(ge=0)
+    entries: list[ImportEntryV1] = Field(default_factory=list)
+    rejected: list[RejectedRowV1] = Field(default_factory=list)
+
+
 class DepotExportV1(Contract):
     """Ein Depot mit allen seinen Depotstaenden, aelteste zuerst (Datenexport, NUT-12, D3.2)."""
 
@@ -154,6 +185,7 @@ class DepotExportV1(Contract):
 
 
 __all__ = [
+    "MAX_FILE_BYTES",
     "MAX_LINES",
     "MAX_NAME",
     "MAX_TEXT",
@@ -169,8 +201,12 @@ __all__ = [
     "HoldingLineV1",
     "HoldingUnit",
     "HoldingsV1",
+    "ImportEntryV1",
+    "ImportPreviewV1",
+    "ImportStatus",
     "PositionValueV1",
     "Quantity",
+    "RejectedRowV1",
     "SnapshotSource",
     "Text",
     "ValueMissing",

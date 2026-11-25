@@ -151,6 +151,21 @@ class TestSnapshots:
         assert _count(engine, "holding_snapshot") == 1
         assert _count(engine, "outbox") == 2  # created und der erste Stand, nicht der zweite
 
+    def test_import_keeps_the_hash_of_the_file(self, store):
+        """D3.5: Herkunft ``import`` mit dem SHA-256 der Datei in ``source_ref``."""
+        depot = _depot(store)
+        snapshot = Snapshot(
+            depot_id=depot.id,
+            version=1,
+            source="import",
+            created_at=T0,
+            created_by=ANNA,
+            lines=(HoldingLine(SAP, Decimal(1)),),
+            source_ref="ab" * 32,
+        )
+        store.save_snapshot(snapshot, event=_event(depot.id))
+        assert store.snapshot(depot.id) == snapshot
+
     def test_without_snapshot_version_0(self, store):
         depot = _depot(store)
         assert (store.newest_version(depot.id), store.snapshot(depot.id)) == (0, None)

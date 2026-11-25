@@ -14,10 +14,16 @@
 - Bewertung (D3.4, DEP-07, DEP-13): Mit ``market`` (Kopien der Marktdaten) tragen Liste und
   Depot ihren Wert aus dem neuesten Depotstand (``value_depot``). Sind die Kopien nicht lesbar,
   fehlt nur die Bewertung, nicht das Depot.
+- Datei im eigenen Format (D3.5, DEP-05): ``preview_import`` gleicht ab und speichert nichts;
+  ``import_file`` uebernimmt nur eine Datei ohne abgelehnte Zeilen (sonst entfielen deren
+  Positionen still), als Depotstand mit Herkunft ``import`` und dem SHA-256 der Datei. Die
+  Kasse bleibt, die Datei kennt keine. Fehlt die Einheit, gilt die bisherige der ISIN, sonst
+  ``nominal`` fuer Anleihen (Stammdaten), sonst ``pieces``. ``export_file``: dasselbe Format.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -36,6 +42,7 @@ from va_contracts.events.v1 import (
 from ..domain.depots import (
     CashLine,
     Depot,
+    DepotError,
     Diff,
     HoldingLine,
     Snapshot,
@@ -44,11 +51,19 @@ from ..domain.depots import (
     diff,
     next_version,
 )
+from ..domain.holdings_file import (
+    FileLine,
+    ImportEntry,
+    RejectedRow,
+    compare,
+    parse_holdings,
+    write_holdings,
+)
 from ..domain.valuation import DepotValue, value_depot
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
-    from va_contracts.portfolio import DepotKind, DepotState, SnapshotSource
+    from va_contracts.portfolio import DepotKind, DepotState, HoldingUnit, SnapshotSource
 
     from .market import MarketReader
 
@@ -137,6 +152,14 @@ class DepotSummary:
     version: int  # 0: noch kein Depotstand
     positions: int
     valuation: DepotValue | None = None  # D3.4: ohne Marktdaten keine
+
+
+@dataclass(frozen=True)
+class ImportPreview:
+    base_version: int
+    entries: list[ImportEntry]
+    rejected: tuple[RejectedRow, ...]
+    pending: frozenset[str]  # ISINs ohne Stammdaten; leer ohne Marktdaten
 
 
 @dataclass(frozen=True)
@@ -260,6 +283,7 @@ class DepotService:
         cash: Sequence[CashLine],
         *,
         source: SnapshotSource = "manual",
+        source_ref: str | None = None,
     ) -> Snapshot:
         """Ein neuer Depotstand; wirft ``VersionConflict`` auf eine veraltete Basis."""
         depot = self._writable(user_id, depot_id)
@@ -273,6 +297,7 @@ class DepotService:
             created_by=user_id,
             lines=checked,
             cash=cash_lines,
+            source_ref=source_ref,
         )
         before = self._held()
         self._store.save_snapshot(snapshot, event=_changed(depot.id, user_id, "holdings", version))
@@ -308,6 +333,81 @@ class DepotService:
             (self._summary(depot), self._store.snapshots(depot.id))
             for depot in self._store.depots(user_id, include_archived=True)
         ]
+
+    # --- Datei im eigenen Format (D3.5) ------------------------------------------------
+
+    def preview_import(self, user_id: int, depot_id: int, content: bytes) -> ImportPreview:
+        """Abgleich der Datei mit dem aktuellen Depotstand; speichert nichts."""
+        depot = self._writable(user_id, depot_id)
+        parsed = parse_holdings(content, depot.kind)
+        current = self._store.snapshot(depot.id) or Snapshot(depot.id, 0)
+        lines, securities = self._with_units(parsed.lines, current.lines)
+        pending = (
+            frozenset()
+            if securities is None
+            else frozenset(line.isin for line in lines if line.isin not in securities)
+        )
+        return ImportPreview(
+            current.version, compare(current.lines, lines), parsed.rejected, pending
+        )
+
+    def import_file(
+        self, user_id: int, depot_id: int, base_version: int, content: bytes
+    ) -> Snapshot:
+        """Die Datei als neuer Depotstand; ``DepotError``, wenn eine Zeile nicht erkannt ist."""
+        depot = self._writable(user_id, depot_id)
+        parsed = parse_holdings(content, depot.kind)
+        if parsed.rejected:
+            first = parsed.rejected[0]
+            msg = (
+                f"{len(parsed.rejected)} Zeilen der Datei sind nicht erkannt"
+                f" (Zeile {first.line}: {first.reason})"
+            )
+            raise DepotError(msg)
+        current = self._store.snapshot(depot.id) or Snapshot(depot.id, 0)
+        lines, _ = self._with_units(parsed.lines, current.lines)
+        return self.save(
+            user_id,
+            depot_id,
+            base_version,
+            lines,
+            current.cash,
+            source="import",
+            source_ref=hashlib.sha256(content).hexdigest(),
+        )
+
+    def export_file(
+        self, user_id: int, depot_id: int, version: int | None = None
+    ) -> tuple[str, bytes]:
+        """Die Positionen eines Depotstands im eigenen Format; der Name enthaelt nur Zahlen."""
+        snapshot = self.holdings(user_id, depot_id, version)
+        return f"depot-{depot_id}-v{snapshot.version}.csv", write_holdings(snapshot.lines)
+
+    def _with_units(
+        self, lines: Sequence[FileLine], current: Sequence[HoldingLine]
+    ) -> tuple[list[HoldingLine], set[str] | None]:
+        """Die Einheit fuer Zeilen ohne: bisherige der ISIN, sonst nach den Stammdaten."""
+        known: dict[str, HoldingUnit] = {line.isin: line.unit for line in current}
+        securities: dict[str, str] | None = None
+        if self._market is not None:
+            try:
+                copies = self._market.market({line.isin for line in lines}).securities
+                securities = {isin: info.asset_class for isin, info in copies.items()}
+            except Exception:
+                log.warning("Stammdaten nicht lesbar - Einheit ohne sie", exc_info=True)
+        bonds = {isin for isin, kind in (securities or {}).items() if kind == "bond"}
+
+        def unit(line: FileLine) -> HoldingUnit:
+            if line.unit is not None:
+                return line.unit
+            fallback: HoldingUnit = "nominal" if line.isin in bonds else "pieces"
+            return known.get(line.isin) or fallback
+
+        resolved = [
+            HoldingLine(line.isin, line.quantity, unit(line), line.cost_basis_eur, line.note)
+            for line in lines
+        ]
+        return resolved, None if securities is None else set(securities)
 
     # --- Abdeckung (D3.3) ---------------------------------------------------------------
 

@@ -1217,6 +1217,119 @@
         "title": "Holdings",
         "type": "object"
       },
+      "ImportEntry": {
+        "additionalProperties": false,
+        "description": "Eine ISIN im Abgleich: ``new``, ``changed``, ``unchanged`` oder ``removed``; ``pending``:\nnoch ohne Stammdaten (\"wird geprueft\").",
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingLine-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingLine-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "changed",
+              "unchanged",
+              "removed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "isin",
+          "status",
+          "before",
+          "after",
+          "pending"
+        ],
+        "title": "ImportEntry",
+        "type": "object"
+      },
+      "ImportFile": {
+        "additionalProperties": false,
+        "description": "Eine Datei im eigenen Format (D3.5, DEP-05): ``isin;menge;einstand;notiz`` und optional\n``einheit``, ``;``, Dezimalkomma, UTF-8 (BOM erlaubt) oder Windows-1252, hoechstens 640 KiB.\nAls JSON statt multipart, damit schreibende Endpunkte nur JSON annehmen.",
+        "properties": {
+          "content_base64": {
+            "maxLength": 873816,
+            "minLength": 1,
+            "title": "Content Base64",
+            "type": "string"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          }
+        },
+        "required": [
+          "content_base64"
+        ],
+        "title": "ImportFile",
+        "type": "object"
+      },
+      "ImportPreview": {
+        "additionalProperties": false,
+        "description": "Abgleich mit dem Depotstand ``base_version`` (als ``If-Match`` fuers Uebernehmen).\nUebernehmen geht nur ohne ``rejected``.",
+        "properties": {
+          "base_version": {
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ImportEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/RejectedRow"
+            },
+            "title": "Rejected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_version",
+          "entries",
+          "rejected"
+        ],
+        "title": "ImportPreview",
+        "type": "object"
+      },
       "Instrument": {
         "additionalProperties": false,
         "properties": {
@@ -2906,6 +3019,26 @@
           "cfo_assets"
         ],
         "title": "RankingRow",
+        "type": "object"
+      },
+      "RejectedRow": {
+        "additionalProperties": false,
+        "description": "Eine Zeile der Datei, die nicht erkannt wurde.",
+        "properties": {
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "reason"
+        ],
+        "title": "RejectedRow",
         "type": "object"
       },
       "Report": {
@@ -4925,6 +5058,212 @@
           }
         },
         "summary": "Save Holdings",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/holdings/csv": {
+      "get": {
+        "description": "Die Positionen eines Depotstands (ohne ``version`` des neuesten) als CSV.",
+        "operationId": "holdings_csv",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {}
+            },
+            "description": "Die Positionen im eigenen Format"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Holdings Csv",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/import": {
+      "post": {
+        "description": "Die Datei als neuer Depotstand (Herkunft ``import``) auf den Stand aus ``If-Match``; die\nKasse bleibt. Mit abgelehnten Zeilen 422.",
+        "operationId": "import_holdings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Holdings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "413": {
+            "description": "Datei groesser als 640 KiB"
+          },
+          "422": {
+            "description": "Kein Base64 oder Datei nicht lesbar; beim Uebernehmen: Zeilen abgelehnt"
+          },
+          "428": {
+            "description": "If-Match fehlt"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Import Holdings",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/import/preview": {
+      "post": {
+        "description": "Abgleich einer Datei im eigenen Format mit dem aktuellen Depotstand; speichert nichts.",
+        "operationId": "preview_import",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "413": {
+            "description": "Datei groesser als 640 KiB"
+          },
+          "422": {
+            "description": "Kein Base64 oder Datei nicht lesbar; beim Uebernehmen: Zeilen abgelehnt"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Preview Import",
         "tags": [
           "depots"
         ]

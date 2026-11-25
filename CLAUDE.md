@@ -93,6 +93,9 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   seinen Kopien (Consumer `portfolio`: `securities.updated`, `prices.completed` →
   `security_view`, `price_view`, `fx_view`). Wert = Menge × letzter Kurs × Währungskurs,
   Anleihen Nennwert × Kurs / 100. Ein fehlender Kurs fehlt sichtbar (`missing`, `complete`).
+  Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import` mit `If-Match`,
+  `…/holdings/csv`): JSON mit Base64, höchstens 640 KiB und 1000 Zeilen. Lesen, Abgleich und
+  Schreiben macht portfolio (`va_portfolio.domain.holdings_file`).
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.
@@ -431,7 +434,7 @@ bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgese
 HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando), D2
 (Wertpapiere, Abdeckung, Tageskurse, ETF- und Anleihedaten) und von D3 der Dienst portfolio mit
 Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2), der Abdeckung aus den
-Depots (D3.3) und der Bewertung (D3.4). Das
+Depots (D3.3), der Bewertung (D3.4) und der Datei im eigenen Format (D3.5). Das
 Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`
