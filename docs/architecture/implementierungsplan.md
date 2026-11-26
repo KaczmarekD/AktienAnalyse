@@ -2917,7 +2917,11 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
 
 #### F2.5 Standardprofil v2 aktivieren
 
-- **Voraussetzung:** F2.1 bis F2.4.
+- **Voraussetzung:** F2.1 bis F2.4. Dazu ein echter Abruf mit dem Code ab F2.3 von der NAS
+  (entschieden am 26.11.2026): Die gespeicherten Wochen haben weder F-Score, Accruals,
+  Netto-Emission noch Momentum. Nach der Umstellung exportiert `make regression-export` den
+  ersten Lauf ([Runbook, Schritt 10](betrieb-synology.md#umstellung-vom-batch-mit-cron-einmalig)),
+  die Datei kommt unter `tests/fixtures/replay/`.
 - **Test:**
   - Die Version 2 des Profils „Standard“ enthält die Werte aus ADR-0011.
   - Ein Rescore mit v1 reproduziert das alte Ranking.

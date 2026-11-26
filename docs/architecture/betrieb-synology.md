@@ -148,7 +148,7 @@ cd /volume1/docker/
 git clone https://github.com/KaczmarekD/AktienAnalyse.git value-analyzer
 cd value-analyzer
 cp .env.example .env
-nano .env          # Passwörter, SMTP_*, MAIL_TO, UI_LAN_BIND, UI_SERVER_NAMES
+nano .env          # Passwörter, SMTP_*, MAIL_TO, UI_SERVER_NAMES, UI_ORIGINS
 make pull          # alle Images aus GHCR, die NAS baut nichts
 docker compose run --rm --no-deps --entrypoint python value-analyzer -c "import src.main"
 make up            # db, nats, migrate, Services, web-api, frontend
@@ -238,9 +238,11 @@ Housekeeping beim nächsten Lauf Altdateien, die der Import braucht.
 2. `git pull`, dann die `.env` mit `.env.example` vergleichen. Neu sind je nach Stand
    `POSTGRES_PASSWORD`, `VA_APP_PASSWORD` und `VA_READ_PASSWORD` (Phase 2),
    `VA_PROFILES_PASSWORD` (P3.3), `VA_WEB_PASSWORD` (P4.4), die drei `VA_<SERVICE>_PASSWORD`
-   (P5.3), `VA_IDENTITY_PASSWORD` (D1.1), `VA_PORTFOLIO_PASSWORD` und `NATS_PORTFOLIO_PASSWORD`
-   (D3.1). Für das UI im LAN `UI_LAN_BIND` und
-   `UI_SERVER_NAMES` setzen.
+   (P5.3), `VA_IDENTITY_PASSWORD` (D1.1), die `NATS_*_PASSWORD` (D1.5, seit D3.1 sechs) und
+   `VA_PORTFOLIO_PASSWORD` (D3.1). Seit D1.5 gibt es das UI nur über HTTPS mit Anmeldung:
+   `UI_SERVER_NAMES` und `UI_ORIGINS` setzen wie unter
+   [HTTPS über den Reverse-Proxy von DSM](#https-über-den-reverse-proxy-von-dsm),
+   `UI_LAN_BIND` nicht setzen bzw. entfernen.
 3. `make pull` und der Import-Test aus Regel 2.
 4. Alles stoppen, auch den alten Batch-Container:
    ```bash
@@ -261,15 +263,23 @@ Housekeeping beim nächsten Lauf Altdateien, die der Import braucht.
    jetzt der Composite. Exit 2 mit „nichts zu vergleichen“ heißt: Es gibt noch keine Wochen.
 7. `make up`. Der Dienst `migrate` legt die neuen Rollen an und füllt die Projektionen des
    web-api mit allen Läufen nach, auch mit den importierten. Deshalb kommt der Import vorher.
+   Danach den [Reverse-Proxy von DSM](#https-über-den-reverse-proxy-von-dsm) einrichten und das
+   erste Admin-Konto anlegen (`create-user --admin`, siehe [Erstinstallation](#erstinstallation)).
 8. Prüfen:
    - `docker compose ps`: kein Container `value-analyzer` mehr.
-   - Das UI unter `http://<nas>:8080` zeigt die alten Läufe.
+   - `https://<name>` zeigt nach der Anmeldung die alten Läufe, `http://<nas-ip>:8080` aus dem
+     LAN antwortet nicht.
    - Auf der Seite „Runs“ einen Dry-Run starten. Er läuft durch die drei Services und speichert
      die Mail, ohne sie zu senden.
 9. Aufräumen und sichern:
    - `RETENTION_DAYS` aus der `.env` entfernen. Das neue Image kennt die Variable nicht mehr und
      löscht nie etwas.
    - Die Sicherung einrichten wie unter [Backup](#backup) beschrieben.
+10. **Daten für F2.5 (ADR-0011):** Nach dem ersten Lauf mit dem neuen Code (der Dry-Run aus
+    Schritt 8 reicht, er speichert den Abruf) `make regression-export`. Die neueste Datei in
+    `data/replay/` ist die Grundlage für den Vergleich der Profile v1 und v2 und kommt ins Repo
+    (`tests/fixtures/replay/`). Der erste Abruf holt die ganze Kurs- und Aktienhistorie, F-Score,
+    Netto-Emission und Momentum sind damit sofort da.
 
 Zurück geht es mit `VERSION` auf dem alten Stand und der alten Compose-Datei
 (`git checkout <commit> -- docker-compose.yml`). Die Datenbank bleibt gültig, denn Migrationen
