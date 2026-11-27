@@ -132,6 +132,22 @@ def test_scores_stores_and_publishes_the_ranking(bus, mock_universe_df):
     assert list(call["scored"]["symbol"]) == list(expected["symbol"])
 
 
+def test_anchors_are_stored_and_published(bus, mock_universe_df):
+    """F3.1: Anker nach score(), im Speicher und im Event; der Composite bleibt gleich."""
+    store = FakeStore()
+    _subscribe(bus, store)
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df)
+    scored = store.calls[0]["scored"]
+    assert "implied_fcf_growth" in scored.columns
+    expected = score(mock_universe_df, ScoringConfig())
+    assert list(scored["composite_score"]) == pytest.approx(
+        list(expected["composite_score"]), nan_ok=True
+    )
+    with_growth = [r for r in seen[0].data.ranking if r.anchors.get("implied_fcf_growth")]
+    assert with_growth  # die Mock-Titel haben Börsenwert und Kurs/FCF
+
+
 def test_weights_come_from_the_config(bus, mock_universe_df):
     _subscribe(bus, FakeStore(), ScoringConfig(value_weight=0.5, quality_weight=0.5))
     seen = _probe(bus)

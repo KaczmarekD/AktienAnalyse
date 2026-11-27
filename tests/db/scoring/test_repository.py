@@ -68,6 +68,26 @@ class TestScoring:
         ).all()
         assert dict(rows) == {ids["BAD.DE"]: "momentum", ids["OK.DE"]: None}
 
+    def test_anchor_values_roundtrip(self, session):
+        """F3.1: Anker im Long-Format, nur Werte, die es gibt."""
+        from va_scoring.adapters.postgres import AnchorRow
+
+        ids = MarketDataRepository(session).get_or_create_instruments(["SAP.DE"])
+        repo = ScoringRepository(session)
+        sid = repo.write_scoring_run(fetch_run_id=7, config={}, app_version="x", origin="live")
+        repo.write_anchor_values(
+            sid,
+            [
+                AnchorRow(ids["SAP.DE"], "price_to_epv", 1.25),
+                AnchorRow(ids["SAP.DE"], "implied_fcf_growth", 0.07),
+            ],
+        )
+        session.commit()
+        assert repo.get_anchor_values_df(sid).to_dict("records") == [
+            {"symbol": "SAP.DE", "anchor": "implied_fcf_growth", "value": 0.07},
+            {"symbol": "SAP.DE", "anchor": "price_to_epv", "value": 1.25},
+        ]
+
     def test_same_config_same_hash(self, session):
         repo = ScoringRepository(session)
         a = repo.write_scoring_run(fetch_run_id=1, config={"b": 1, "a": 2}, app_version="x")

@@ -103,6 +103,18 @@ class TestBuildReportIntegration:
         assert '<td class="text">-</td>' in report.html
 
 
+class TestAnchorsInTheCsv:
+    """F3.1: Preis/EPV und implizites FCF-Wachstum stehen in der CSV vor den Fehlern."""
+
+    def test_columns(self, mock_universe_df):
+        from va_scoring.domain.anchors import add_anchors
+
+        scored = add_anchors(score(mock_universe_df, ScoringConfig()), ScoringConfig())
+        report = build_report(scored, universe_size=8)
+        header = report.csv_bytes.decode("utf-8-sig").splitlines()[0].split(";")
+        assert header[-3:] == ["price_to_epv", "implied_fcf_growth", "errors"]
+
+
 class TestUnscoredTitles:
     """M1: Ein Titel ohne Composite steht nur in der CSV, hinter den bewerteten Titeln."""
 

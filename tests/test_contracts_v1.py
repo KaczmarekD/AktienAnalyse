@@ -853,3 +853,35 @@ def test_ranked_title_of_the_preview_carries_the_reason():
     }
     assert RankedTitleV1.model_validate(title).value_trap_reason is None
     assert RankedTitleV1(**title, value_trap_reason="momentum").value_trap_reason == "momentum"
+
+
+def test_ranking_row_carries_the_anchors():
+    """F3.1: Die Anker reisen zu notification (CSV), Schlüssel aus ``ANCHOR_KEYS``."""
+    from pydantic import ValidationError
+
+    from va_contracts.events.v1.ranking import ANCHOR_KEYS, RankingRowV1
+
+    flat = {
+        "symbol": "SAP.DE",
+        "name": "SAP",
+        "index": "DAX",
+        "rank_overall": 3,
+        "price_to_epv": 1.25,
+        "implied_fcf_growth": 0.07,
+        "epv_per_share": float("nan"),
+        "nopat_normalized": 80.0,
+    }
+    row = RankingRowV1.from_flat(flat)
+    assert row.anchors == {"price_to_epv": 1.25, "implied_fcf_growth": 0.07, "epv_per_share": None}
+    assert row.fundamentals.value.nopat_normalized == 80.0
+    assert row.to_flat()["price_to_epv"] == 1.25
+    assert set(row.anchors) <= set(ANCHOR_KEYS)
+    # Ältere Events haben keine Anker
+    assert (
+        RankingRowV1.from_flat(
+            {k: v for k, v in flat.items() if k in ("symbol", "name", "index", "rank_overall")}
+        ).anchors
+        == {}
+    )
+    with pytest.raises(ValidationError):
+        RankingRowV1(**{**row.model_dump(), "anchors": {"kurs_ziel": 1.0}})

@@ -2953,6 +2953,31 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     bewusst aktualisiert.
   - Für Finanzwerte gibt es keine EPV-Anker, dort gilt das gerechtfertigte P/B aus F2.4.
 - **Review:** Die Werte von drei bekannten Titeln sind plausibilisiert.
+- **Festgelegt vor der Umsetzung (27.11.2026):**
+  - **Datenfluss:** scoring liest nicht aus `market_data` (ADR-0003). market-data schickt deshalb
+    `nopat_normalized` im Snapshot mit (`ValueMetrics`, `ValueMetricsV1`, Handelswährung): den
+    Mittelwert der jüngsten EBIT-Jahre (dieselbe Regel wie die Gewinnstabilität: bis zu fünf, davon
+    mindestens vier) mal (1 − effektive Steuerquote des jüngsten Jahres, wie beim ROIC), mal dem
+    Wechselkurs. Alles andere steht schon im Snapshot: Nettoverschuldung = `enterprise_value` −
+    `market_cap`, FCF = `market_cap` / `p_fcf`, `shares_outstanding`.
+  - **EPV:** EPV (Eigenkapital) = `nopat_normalized` / r − Nettoverschuldung, `epv_per_share` =
+    EPV / `shares_outstanding`, `price_to_epv` = `market_cap` / EPV, nur bei positivem EPV.
+  - **Reverse DCF auf den Börsenwert:** Gesucht ist g, bei dem der heutige FCF mit g über
+    `dcf_years` Jahre und danach mit `terminal_growth` wächst und, mit r abgezinst, den Börsenwert
+    ergibt (Gordon-Endwert). Bisektion zwischen −20 % und +40 %; ohne positiven FCF, ohne Lösung im
+    Intervall oder bei r ≤ g gibt es kein Ergebnis.
+  - **Sensitivität:** dieselben Anker bei r − 1 und r + 1 Prozentpunkt (`*_r_low`, `*_r_high`).
+  - **Finanzwerte:** Titel, deren Branche unter `industry_prefixes` fällt, bekommen keine Anker,
+    auch wenn `industry_rules` aus ist. Die Einstufung hängt nicht am Ranking.
+  - **Wo:** `va_scoring.domain.anchors` (reine Funktionen und `add_anchors`). Der Handler rechnet
+    die Anker nach `score()`, sie gehen nicht in den Composite ein. `RankingRowV1.anchors`
+    (additiv, Schlüssel aus `ANCHOR_KEYS`) trägt sie zu notification. Die CSV bekommt
+    `price_to_epv` und `implied_fcf_growth` vor `errors`; die Mail bleibt gleich. Golden-CSV und
+    Replay-Fixtures werden bewusst erneuert.
+  - **Speicher:** `scoring.anchor_value` (nur Werte, die es gibt), dazu die Spalte
+    `nopat_normalized` in `market_data.fundamental_snapshot`, eine Migration (`0027`).
+  - **Profil:** neuer Parameter `dcf_years` (10, 1 bis 30). Titel-Detail und Projektion kommen
+    mit F3.2.
 
 #### F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung
 

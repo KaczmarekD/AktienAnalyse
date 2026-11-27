@@ -24,6 +24,7 @@ from va_market_data.domain.metrics import (
     f_score,
     f_score_signals,
     net_share_issuance,
+    nopat_normalized,
     operating_accruals,
     roic,
     safe_div,
@@ -456,3 +457,37 @@ class TestNetShareIssuance:
         )
         assert m.net_share_issuance == pytest.approx(-0.05)
         assert _metrics(StatementFigures()).net_share_issuance is None
+
+
+# --- F3.1 (ADR-0011, Punkt 6): Grundlage des Ertragskraftwerts ----------------------------------
+
+
+class TestNopatNormalized:
+    """Mittelwert der jüngsten EBIT-Jahre nach Steuern, in Handelswährung."""
+
+    def _nopat(self, ebit=(100.0, 120.0, 80.0, 100.0), *, pretax=100.0, tax=30.0, fx=1.0):
+        return nopat_normalized(list(ebit), pretax=pretax, tax=tax, fx=fx, default_tax_rate=TAX)
+
+    def test_mean_ebit_after_the_effective_tax(self):
+        assert self._nopat() == pytest.approx(70.0)
+
+    def test_in_trading_currency(self):
+        assert self._nopat(fx=0.9) == pytest.approx(63.0)
+        assert self._nopat(fx=None) is None
+
+    def test_default_tax_rate_without_pretax_income(self):
+        assert self._nopat(pretax=None, tax=None) == pytest.approx(100.0 * (1 - TAX))
+
+    def test_needs_four_years_like_the_earnings_stability(self):
+        assert self._nopat(ebit=(100.0, 120.0, 80.0)) is None
+        assert self._nopat(ebit=(100.0, None, 120.0, 80.0, 100.0)) == pytest.approx(70.0)
+
+    def test_losses_stay_negative(self):
+        assert self._nopat(ebit=(-100.0, -100.0, -100.0, -100.0)) == pytest.approx(-70.0)
+
+    def test_wired_into_compute_metrics(self):
+        s = StatementFigures(
+            ebit_history=[100.0, 120.0, 80.0, 100.0], pretax_income=100.0, tax_expense=30.0
+        )
+        assert _metrics(s).nopat_normalized == pytest.approx(70.0)
+        assert _metrics(StatementFigures()).nopat_normalized is None

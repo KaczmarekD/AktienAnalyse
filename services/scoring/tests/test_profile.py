@@ -63,6 +63,8 @@ def test_params_of_todays_defaults():
         "trap_momentum_rule": False,
         "trap_momentum_max_rank": 0.30,
         "trap_fscore_max": 3,
+        # F3.1 (ADR-0011, Punkt 6): Jahre des Reverse DCF
+        "dcf_years": 10,
     }
 
 
@@ -160,6 +162,8 @@ class TestRules:
             ("trap_momentum_max_rank", 1.1),
             ("trap_fscore_max", -1),
             ("trap_fscore_max", 10),
+            ("dcf_years", 0),
+            ("dcf_years", 31),
         ],
     )
     def test_bounds(self, field: str, value: Any):
@@ -347,4 +351,19 @@ class TestMomentumTrapParams:
 
     def test_round_trip_from_config(self):
         cfg = ScoringConfig(trap_momentum_rule=True, trap_momentum_max_rank=0.25, trap_fscore_max=4)
+        assert ScoringProfileParams.model_validate(profile_params(cfg)).to_config() == cfg
+
+
+class TestAnchorParams:
+    """F3.1: Jahre des Reverse DCF; Kapitalkosten und Endwachstum gibt es seit F2.4."""
+
+    def test_stored_params_without_it_get_the_default(self):
+        params = ScoringProfileParams.model_validate({"value_weight": 0.6})
+        assert params.dcf_years == 10
+
+    def test_is_passed_to_score(self):
+        assert _params(dcf_years=5).to_config().dcf_years == 5
+
+    def test_round_trip_from_config(self):
+        cfg = ScoringConfig(dcf_years=7)
         assert ScoringProfileParams.model_validate(profile_params(cfg)).to_config() == cfg
