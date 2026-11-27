@@ -373,6 +373,25 @@ export const zImportFile = z.object({
 });
 
 /**
+ * InstrumentAnchors
+ *
+ * Fundamentale Anker eines Titels im juengsten Bewertungslauf (F3.1, F3.2a).
+ *
+ * Nicht im Composite. ``_r_low`` und ``_r_high``: bei Kapitalkosten 1 Prozentpunkt darunter
+ * und darueber. Kapitalkosten, Endwachstum und Jahre stehen in den Parametern des Laufs.
+ */
+export const zInstrumentAnchors = z.object({
+  epv_per_share: z.number().nullable(),
+  implied_fcf_growth: z.number().nullable(),
+  implied_fcf_growth_r_high: z.number().nullable(),
+  implied_fcf_growth_r_low: z.number().nullable(),
+  price_to_epv: z.number().nullable(),
+  price_to_epv_r_high: z.number().nullable(),
+  price_to_epv_r_low: z.number().nullable(),
+  scoring_run_id: z.int(),
+});
+
+/**
  * Listing
  *
  * Handel an einem Boersenplatz; ``symbol`` ist das Yahoo-Symbol, falls es eines gibt.
@@ -1101,6 +1120,7 @@ export const zSnapshot = z.object({
  * Instrument
  */
 export const zInstrument = z.object({
+  anchors: zInstrumentAnchors.nullish(),
   factor_ranks: zFactorRanks.nullish(),
   index: z.string().nullable(),
   industry: z.string().nullable(),

@@ -209,6 +209,19 @@ class RankingFactor(Base):
     created_at: Mapped[datetime]
 
 
+class RankingAnchor(Base):
+    """Fundamentale Anker eines Titels in einem Bewertungslauf (F3.2a, Migration 0030). Nur zum
+    Anfuegen; nur Titel mit mindestens einem Anker, fehlende Anker als ``null``."""
+
+    __tablename__ = "ranking_anchor"
+    __table_args__ = {"schema": "web"}  # noqa: RUF012
+
+    scoring_run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    symbol: Mapped[str] = mapped_column(primary_key=True, index=True)
+    anchors: Mapped[dict[str, Any]]
+    created_at: Mapped[datetime]
+
+
 class WebInbox(InboxMixin, Base):
     """Events, die der Eventmanager verarbeitet hat (Consumer ``web-api``)."""
 

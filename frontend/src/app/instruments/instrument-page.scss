@@ -39,6 +39,16 @@
 }
 
 // Abgesetzte Zeile vor den Kennzahlen, die nicht in den Score eingehen
+// F3.2a: Sensitivität der Anker, schmal unter den Kennzahlen
+.sensitivity {
+  margin-top: var(--va-space-sm);
+
+  caption {
+    caption-side: bottom;
+    text-align: left;
+  }
+}
+
 .separator {
   margin: var(--va-space-md) 0 0;
   padding: var(--va-space-sm) 0 var(--va-space-xs);

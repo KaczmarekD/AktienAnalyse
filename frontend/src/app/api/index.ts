@@ -199,6 +199,7 @@ export type {
   ImportHoldingsResponses,
   ImportPreview,
   Instrument,
+  InstrumentAnchors,
   LatestRankingData,
   LatestRankingErrors,
   LatestRankingResponse,

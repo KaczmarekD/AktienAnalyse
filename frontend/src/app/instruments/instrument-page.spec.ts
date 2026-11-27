@@ -86,10 +86,16 @@ describe('InstrumentPage', () => {
     expect(card('quality')).toContain('0,90');
   });
 
-  it('groups the figures into valuation, quality, and market and growth', async () => {
+  it('groups the figures into valuation, quality, market and growth, and anchors', async () => {
     const fixture = await loaded();
     const headings = query(fixture, 'app-section h3').map((h) => plain(h));
-    expect(headings).toEqual(['Bewertung (Value)', 'Qualität (Quality)', 'Markt und Wachstum']);
+    // F3.2a: die fundamentalen Anker als vierter Abschnitt
+    expect(headings).toEqual([
+      'Bewertung (Value)',
+      'Qualität (Quality)',
+      'Markt und Wachstum',
+      'Fundamentale Anker',
+    ]);
     const valuation = plain(query(fixture, 'app-section')[0]);
     expect(valuation).toContain('Nur zur Information');
     expect(valuation).toContain('KGV 14,4');

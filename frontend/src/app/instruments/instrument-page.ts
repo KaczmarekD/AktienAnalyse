@@ -150,6 +150,30 @@ export class InstrumentPage {
       min_market_cap: ranking?.params?.min_market_cap,
     };
   });
+  /** F3.2a: die fundamentalen Anker des jüngsten Bewertungslaufs */
+  protected readonly anchors = computed(() => this.instrument()?.anchors ?? undefined);
+  /** Kapitalkosten, Endwachstum und Jahre des jüngsten Laufs für die Sensitivität */
+  protected readonly anchorParams = computed(() => {
+    const params = loaded(this.ranking)?.params;
+    const r = params?.cost_of_capital;
+    if (params == null || r == null) {
+      return undefined;
+    }
+    // Spalten der Sensitivität: ein Prozentpunkt darunter und darüber, wie in scoring (F3.1)
+    return {
+      low: r - 0.01,
+      r,
+      high: r + 0.01,
+      g: params.terminal_growth ?? null,
+      years: params.dcf_years ?? null,
+    };
+  });
+  /** Finanzwert: Branche unter den Präfixen der Branchenregel, dafür gibt es keine Anker */
+  protected readonly financial = computed(() => {
+    const industry = this.instrument()?.industry;
+    const prefixes = loaded(this.ranking)?.params?.industry_prefixes ?? [];
+    return industry != null && prefixes.some((prefix) => industry.startsWith(prefix));
+  });
   /** Gewichte des jüngsten Bewertungslaufs als Nebenzeile der Karte Composite */
   protected readonly weightText = computed(() => {
     const ranking = loaded(this.ranking);

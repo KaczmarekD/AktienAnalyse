@@ -110,6 +110,12 @@ _FACTORS = text("""
     WHERE scoring_run_id = :scoring_run_id AND symbol = :symbol
 """)
 
+# F3.2a: fundamentale Anker eines Titels in einem Bewertungslauf
+_ANCHORS = text("""
+    SELECT anchors FROM web.ranking_anchor
+    WHERE scoring_run_id = :scoring_run_id AND symbol = :symbol
+""")
+
 # Wie _RANKING_ROWS in read.py: erst die bewerteten Titel, dann die gefilterten des Abrufs
 _ROWS = text("""
     SELECT r.rank_overall AS rank, COALESCE(r.symbol, s.symbol) AS symbol, s.name,
@@ -228,6 +234,11 @@ class ProjectionReadModel:
                 if latest is None
                 else conn.execute(_FACTORS, {"scoring_run_id": latest, "symbol": symbol}).scalar()
             )
+            anchors = (
+                None
+                if latest is None
+                else conn.execute(_ANCHORS, {"scoring_run_id": latest, "symbol": symbol}).scalar()
+            )
         values: dict[str, Any] = dict(snapshot)
         identity = {
             "name": values.pop("name"),
@@ -245,6 +256,7 @@ class ProjectionReadModel:
             factor_ranks=None
             if latest is None or ranks is None
             else FactorRanks(scoring_run_id=int(latest), ranks=ranks),
+            anchors=None if latest is None else read.instrument_anchors(int(latest), anchors),
         )
 
     def get_report(self, report_id: int) -> Report | None:

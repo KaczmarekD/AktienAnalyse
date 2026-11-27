@@ -178,6 +178,23 @@ class FactorRanks(_Model):
     ranks: dict[str, float | None]
 
 
+class InstrumentAnchors(_Model):
+    """Fundamentale Anker eines Titels im juengsten Bewertungslauf (F3.1, F3.2a).
+
+    Nicht im Composite. ``_r_low`` und ``_r_high``: bei Kapitalkosten 1 Prozentpunkt darunter
+    und darueber. Kapitalkosten, Endwachstum und Jahre stehen in den Parametern des Laufs.
+    """
+
+    scoring_run_id: int
+    epv_per_share: float | None  # Handelswaehrung
+    price_to_epv: float | None
+    implied_fcf_growth: float | None
+    price_to_epv_r_low: float | None
+    price_to_epv_r_high: float | None
+    implied_fcf_growth_r_low: float | None
+    implied_fcf_growth_r_high: float | None
+
+
 class Instrument(_Model):
     symbol: str
     isin: str | None
@@ -188,6 +205,8 @@ class Instrument(_Model):
     latest: Snapshot | None  # neuester gueltiger Abruf
     score_history: list[ScorePoint]  # aeltester zuerst
     factor_ranks: FactorRanks | None = None  # G3; leer ohne Bewertung im juengsten Lauf
+    # F3.2a: leer ohne Anker im juengsten Lauf (Finanzwerte, fehlende Daten)
+    anchors: InstrumentAnchors | None = None
 
 
 class Report(_Model):

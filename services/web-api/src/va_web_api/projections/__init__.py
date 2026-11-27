@@ -39,6 +39,7 @@ from va_contracts.events.v1 import (
 
 from ..adapters.postgres.batch_run import BATCH_RUN
 from ..adapters.postgres.models import (
+    RankingAnchor,
     RankingFactor,
     RankingProfile,
     RankingRow,
@@ -74,6 +75,7 @@ def register(manager: EventManager) -> None:
     manager.projection(SCORING_RUN_COMPLETED)(ranking_run)
     manager.projection(SCORING_RUN_COMPLETED)(ranking_profile)
     manager.projection(SCORING_RUN_COMPLETED)(ranking_factor)
+    manager.projection(SCORING_RUN_COMPLETED)(ranking_anchor)
     manager.projection(REPORT_SENT)(reported)
     manager.projection(RUN_FAILED)(failed)
     # Nach run_status: close_run liest die Zaehler, die die Projektionen davor gesetzt haben
@@ -251,6 +253,23 @@ def ranking_factor(session: Session, env: Envelope[Any]) -> None:
     ]
     if rows:
         session.execute(insert(RankingFactor).values(rows).on_conflict_do_nothing())
+
+
+def ranking_anchor(session: Session, env: Envelope[Any]) -> None:
+    """Je Titel die fundamentalen Anker (F3.2a), nur fuer Titel mit mindestens einem Anker."""
+    data = env.data
+    rows = [
+        {
+            "scoring_run_id": data.scoring_run_id,
+            "symbol": row.fundamentals.identity.symbol,
+            "anchors": dict(row.anchors),
+            "created_at": env.time,
+        }
+        for row in data.ranking
+        if any(value is not None for value in row.anchors.values())
+    ]
+    if rows:
+        session.execute(insert(RankingAnchor).values(rows).on_conflict_do_nothing())
 
 
 def reported(session: Session, env: Envelope[Any]) -> None:

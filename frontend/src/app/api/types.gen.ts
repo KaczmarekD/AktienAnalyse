@@ -1023,6 +1023,7 @@ export type ImportPreview = {
  * Instrument
  */
 export type Instrument = {
+  anchors?: InstrumentAnchors | null;
   factor_ranks?: FactorRanks | null;
   /**
    * Index
@@ -1053,6 +1054,49 @@ export type Instrument = {
    * Symbol
    */
   symbol: string;
+};
+
+/**
+ * InstrumentAnchors
+ *
+ * Fundamentale Anker eines Titels im juengsten Bewertungslauf (F3.1, F3.2a).
+ *
+ * Nicht im Composite. ``_r_low`` und ``_r_high``: bei Kapitalkosten 1 Prozentpunkt darunter
+ * und darueber. Kapitalkosten, Endwachstum und Jahre stehen in den Parametern des Laufs.
+ */
+export type InstrumentAnchors = {
+  /**
+   * Epv Per Share
+   */
+  epv_per_share: number | null;
+  /**
+   * Implied Fcf Growth
+   */
+  implied_fcf_growth: number | null;
+  /**
+   * Implied Fcf Growth R High
+   */
+  implied_fcf_growth_r_high: number | null;
+  /**
+   * Implied Fcf Growth R Low
+   */
+  implied_fcf_growth_r_low: number | null;
+  /**
+   * Price To Epv
+   */
+  price_to_epv: number | null;
+  /**
+   * Price To Epv R High
+   */
+  price_to_epv_r_high: number | null;
+  /**
+   * Price To Epv R Low
+   */
+  price_to_epv_r_low: number | null;
+  /**
+   * Scoring Run Id
+   */
+  scoring_run_id: number;
 };
 
 /**

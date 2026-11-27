@@ -29,6 +29,7 @@ from va_platform.db import normalize_url
 from va_scoring.adapters.postgres.models import InputSnapshot
 from va_scoring.adapters.postgres.store import input_rows
 from va_web_api.adapters.postgres.models import (
+    RankingAnchor,
     RankingFactor,
     RankingProfile,
     RankingRow,
@@ -123,6 +124,17 @@ _FACTORS = text("""
     WHERE NOT EXISTS (SELECT 1 FROM web.ranking_factor x
                       WHERE x.scoring_run_id = fs.scoring_run_id AND x.symbol = i.symbol)
     ORDER BY fs.scoring_run_id, i.symbol
+""")
+
+# F3.2a: fundamentale Anker je Titel und Bewertungslauf
+_ANCHORS = text("""
+    SELECT av.scoring_run_id, i.symbol, av.anchor, av.value, sr.created_at
+    FROM scoring.anchor_value av
+    JOIN scoring.scoring_run sr ON sr.id = av.scoring_run_id
+    JOIN market_data.instrument i ON i.id = av.instrument_id
+    WHERE NOT EXISTS (SELECT 1 FROM web.ranking_anchor x
+                      WHERE x.scoring_run_id = av.scoring_run_id AND x.symbol = i.symbol)
+    ORDER BY av.scoring_run_id, i.symbol, av.anchor
 """)
 
 # P5.1a: Abrufe mit Bewertungslauf, deren Eingangsdaten scoring noch nicht hat
@@ -233,6 +245,26 @@ def _ranking_factors(conn: Connection) -> list[dict[str, Any]]:
     ]
 
 
+def _ranking_anchors(conn: Connection) -> list[dict[str, Any]]:
+    """Je Bewertungslauf und Titel die Anker aus ``scoring.anchor_value`` (F3.2a)."""
+    grouped: dict[tuple[int, str], dict[str, Any]] = {}
+    for row in conn.execute(_ANCHORS).mappings():
+        entry = grouped.setdefault(
+            (row["scoring_run_id"], row["symbol"]),
+            {"created_at": row["created_at"], "anchors": {}},
+        )
+        entry["anchors"][row["anchor"]] = row["value"]
+    return [
+        {
+            "scoring_run_id": scoring_run_id,
+            "symbol": symbol,
+            "anchors": entry["anchors"],
+            "created_at": entry["created_at"],
+        }
+        for (scoring_run_id, symbol), entry in grouped.items()
+    ]
+
+
 def _input_snapshots(conn: Connection) -> list[dict[str, Any]]:
     """Die flachen Zeilen alter Abrufe, wie scoring sie seit P5.1a selbst speichert."""
     rows: list[dict[str, Any]] = []
@@ -274,6 +306,7 @@ def backfill_projections(engine: Engine) -> dict[str, int]:
             # Track G (G3)
             "ranking_profile": _insert(conn, RankingProfile, _ranking_profiles(conn)),
             "ranking_factor": _insert(conn, RankingFactor, _ranking_factors(conn)),
+            "ranking_anchor": _insert(conn, RankingAnchor, _ranking_anchors(conn)),
             # P5.1a: Eingangsdaten fuer die Vorschau von scoring
             "input_snapshot": _insert(conn, InputSnapshot, _input_snapshots(conn)),
         }

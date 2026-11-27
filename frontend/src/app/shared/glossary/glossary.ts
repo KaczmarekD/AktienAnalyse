@@ -270,6 +270,29 @@ export const GLOSSARY = {
     role: 'info',
     tip: 'Kursrendite mit Dividenden über zwölf Monate, ohne den letzten Monat. Zählt nicht im Score, dient nur der Value-Trap-Regel als Prüfung des fundamentalen Ankers.',
   },
+  // F3.1 (ADR-0011): fundamentale Anker im Titel-Detail (F3.2a), nicht im Score
+  epv_per_share: {
+    group: 'Nur zur Information',
+    label: 'Ertragskraftwert je Aktie',
+    short: 'EPV je Aktie',
+    role: 'info',
+    tip: 'Earnings Power Value: mittlerer operativer Gewinn nach Steuern geteilt durch die Kapitalkosten, minus Nettoschulden, je Aktie. Der Wert ohne Wachstum. Nicht im Score.',
+  },
+  price_to_epv: {
+    group: 'Nur zur Information',
+    label: 'Preis/EPV',
+    role: 'info',
+    abbr: true,
+    tip: 'Börsenwert geteilt durch den Ertragskraftwert (Earnings Power Value). Über 1 heißt: Der Kurs setzt Wachstum voraus. Nicht im Score.',
+  },
+  implied_fcf_growth: {
+    group: 'Nur zur Information',
+    label: 'Implizites FCF-Wachstum',
+    short: 'Impl. Wachstum',
+    role: 'info',
+    abbr: true,
+    tip: 'Jährliches Wachstum des Free Cashflow, das der heutige Börsenwert unterstellt (Reverse DCF). Nicht im Score.',
+  },
   revenue_growth_5y: {
     group: 'Nur zur Information',
     label: 'Umsatzwachstum 5 J.',

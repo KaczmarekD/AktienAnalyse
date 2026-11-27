@@ -206,6 +206,75 @@
           <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: item }" />
         }
       </app-section>
+      <app-section heading="Fundamentale Anker" [level]="3" data-section="anchors">
+        <app-info-tip
+          sectionInfo
+          label="Was zeigen die Anker?"
+          text="Was der Kurs gemessen an Ertragskraft und Free Cashflow unterstellt. Keiner der Anker geht in den Score ein."
+        />
+        @if (anchors(); as anchor) {
+          <div class="fig" data-figure="epv_per_share">
+            <app-term key="epv_per_share" />
+            <span class="value">{{ anchor.epv_per_share | num }} {{ figures.currency ?? '' }}</span>
+            <span class="rank">Kurs {{ figures.price | num }} {{ figures.currency ?? '' }}</span>
+          </div>
+          <div class="fig" data-figure="price_to_epv">
+            <app-term key="price_to_epv" />
+            <span class="value">{{ anchor.price_to_epv | num }}</span>
+          </div>
+          <div class="fig" data-figure="implied_fcf_growth">
+            <app-term key="implied_fcf_growth" />
+            <span class="value">{{ anchor.implied_fcf_growth | pct }}</span>
+          </div>
+          @if (anchorParams(); as p) {
+            <table class="data-table sensitivity">
+              <caption class="hint">
+                Bei Kapitalkosten einen Punkt darunter und darüber;
+                {{
+                  p.years
+                }}
+                Jahre eigenes Wachstum, danach
+                {{
+                  p.g | pct
+                }}.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Kapitalkosten</th>
+                  <th scope="col" class="num">{{ p.low | pct: '1.0-0' }}</th>
+                  <th scope="col" class="num">{{ p.r | pct: '1.0-0' }}</th>
+                  <th scope="col" class="num">{{ p.high | pct: '1.0-0' }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row"><app-term key="price_to_epv" /></th>
+                  <td class="num">{{ anchor.price_to_epv_r_low | num }}</td>
+                  <td class="num">{{ anchor.price_to_epv | num }}</td>
+                  <td class="num">{{ anchor.price_to_epv_r_high | num }}</td>
+                </tr>
+                <tr>
+                  <th scope="row"><app-term key="implied_fcf_growth" /></th>
+                  <td class="num">{{ anchor.implied_fcf_growth_r_low | pct }}</td>
+                  <td class="num">{{ anchor.implied_fcf_growth | pct }}</td>
+                  <td class="num">{{ anchor.implied_fcf_growth_r_high | pct }}</td>
+                </tr>
+              </tbody>
+            </table>
+          }
+        } @else if (financial()) {
+          <p class="message">
+            Für Finanzwerte gibt es keine Anker aus Ertragskraft und Cashflow: Ihr operativer Gewinn
+            sagt wenig über den Wert. Die Mail nennt für sie das gerechtfertigte
+            Kurs-Buchwert-Verhältnis.
+          </p>
+        } @else {
+          <p class="message">
+            Keine Anker im jüngsten Bewertungslauf: Es fehlen Daten, etwa vier Geschäftsjahre mit
+            EBIT oder ein positiver Free Cashflow.
+          </p>
+        }
+      </app-section>
     </div>
   } @else {
     <p class="message">Für diesen Titel gibt es noch keinen gültigen Abruf.</p>

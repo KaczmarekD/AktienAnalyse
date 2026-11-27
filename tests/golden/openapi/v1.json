@@ -1922,6 +1922,16 @@
       "Instrument": {
         "additionalProperties": false,
         "properties": {
+          "anchors": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstrumentAnchors"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "factor_ranks": {
             "anyOf": [
               {
@@ -2020,6 +2030,105 @@
           "score_history"
         ],
         "title": "Instrument",
+        "type": "object"
+      },
+      "InstrumentAnchors": {
+        "additionalProperties": false,
+        "description": "Fundamentale Anker eines Titels im juengsten Bewertungslauf (F3.1, F3.2a).\n\nNicht im Composite. ``_r_low`` und ``_r_high``: bei Kapitalkosten 1 Prozentpunkt darunter\nund darueber. Kapitalkosten, Endwachstum und Jahre stehen in den Parametern des Laufs.",
+        "properties": {
+          "epv_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Epv Per Share"
+          },
+          "implied_fcf_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Fcf Growth"
+          },
+          "implied_fcf_growth_r_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Fcf Growth R High"
+          },
+          "implied_fcf_growth_r_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Fcf Growth R Low"
+          },
+          "price_to_epv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price To Epv"
+          },
+          "price_to_epv_r_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price To Epv R High"
+          },
+          "price_to_epv_r_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price To Epv R Low"
+          },
+          "scoring_run_id": {
+            "title": "Scoring Run Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scoring_run_id",
+          "epv_per_share",
+          "price_to_epv",
+          "implied_fcf_growth",
+          "price_to_epv_r_low",
+          "price_to_epv_r_high",
+          "implied_fcf_growth_r_low",
+          "implied_fcf_growth_r_high"
+        ],
+        "title": "InstrumentAnchors",
         "type": "object"
       },
       "Listing": {

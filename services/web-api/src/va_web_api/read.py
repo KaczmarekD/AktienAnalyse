@@ -12,11 +12,13 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
+from va_contracts.events.v1.ranking import ANCHOR_KEYS
 from va_contracts.profile import params_from_config
 
 from .models import (
     FactorRanks,
     Instrument,
+    InstrumentAnchors,
     ProfileDetail,
     ProfileSummary,
     Ranking,
@@ -175,6 +177,33 @@ def _factor_ranks(conn: Connection, instrument_id: int) -> FactorRanks | None:
     )
 
 
+def _anchors(conn: Connection, instrument_id: int) -> InstrumentAnchors | None:
+    """Die fundamentalen Anker im juengsten Bewertungslauf (F3.2a)."""
+    scoring_run_id = latest_scoring_run_id(conn)
+    if scoring_run_id is None:
+        return None
+    rows = conn.execute(
+        text("""
+            SELECT anchor, value FROM scoring.anchor_value
+            WHERE scoring_run_id = :scoring_run_id AND instrument_id = :instrument_id
+        """),
+        {"scoring_run_id": scoring_run_id, "instrument_id": instrument_id},
+    ).all()
+    return instrument_anchors(scoring_run_id, {str(anchor): value for anchor, value in rows})
+
+
+def instrument_anchors(
+    scoring_run_id: int, values: dict[str, float | None] | None
+) -> InstrumentAnchors | None:
+    """Die Anker eines Laufs, fehlende als ``None``; ohne einen Wert gar keine."""
+    if not values or all(value is None for value in values.values()):
+        return None
+    return InstrumentAnchors(
+        scoring_run_id=scoring_run_id,
+        **{key: values.get(key) for key in ANCHOR_KEYS},
+    )
+
+
 def factor_ranks(config: dict[str, Any] | None, found: dict[str, float | None]) -> dict[str, Any]:
     """Die Faktoren des Profils eines Laufs mit ihren Perzentilen, fehlende als ``None``.
 
@@ -247,6 +276,7 @@ def get_instrument(conn: Connection, symbol: str) -> Instrument | None:
         latest=latest,
         score_history=[ScorePoint.model_validate(dict(row)) for row in history],
         factor_ranks=_factor_ranks(conn, instrument["id"]),
+        anchors=_anchors(conn, instrument["id"]),
     )
 
 
