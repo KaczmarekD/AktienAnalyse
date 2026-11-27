@@ -4,7 +4,8 @@
 > [Depot-Spezifikation](README.md), Stufen D4 (Analyse) und D5 (Hinweise). Grundsatzentscheidung:
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (vorgeschlagen).
 > Umgesetzt: die Einordnung im Bewertungslauf (D4.1, `place()`, `placements[]`,
-> `scoring.placement`), die Scores je Aktie im Depot (D4.2, `score_view` in portfolio).
+> `scoring.placement`), die Scores je Aktie im Depot (D4.2, `score_view` in portfolio), die
+> Rechnungen für ETFs und Anleihen (D4.3, `va_portfolio.domain.funds` und `bonds`).
 
 ## Grundsatz: bewertet wird gegen ein Referenzuniversum
 
@@ -131,6 +132,14 @@ Grenzen, die das UI offen zeigt:
   (Schwelle einstellbar). Bei einem Welt-ETF ist das mit DAX/MDAX als Referenz selten der Fall.
 - Die Währung eines ETF ist seine Fondswährung, nicht das Währungsrisiko seiner Bestände.
 
+**Umgesetzt (27.11.2026, D4.3):** reine Funktionen in `va_portfolio.domain.funds`
+(`running_costs`, `look_through`, `overlap`, `look_through_score` mit `min_covered`). Gezählt
+werden Positionen mit ISIN und positivem Gewicht, dieselbe ISIN in mehreren Zeilen zusammen.
+portfolio kennt aus `marketdata.securities.updated` nur die zehn größten Positionen eines ETF;
+Durchschau und Überschneidung sind damit bis auf Weiteres meist Untergrenzen. Die Struktur nach
+Sektor, Land und Anlageklasse steht schon in den Stammdaten (`EtfV1`), zusammengeführt wird sie
+in der Depot-Analyse (D4.4).
+
 ## Anleihen
 
 - **Rendite bis Fälligkeit:** interner Zinsfuß der Zahlungen aus Kupon und Rückzahlung, gemessen
@@ -142,6 +151,20 @@ Grenzen, die das UI offen zeigt:
 - Nicht berechnet: Floater, inflationsindexierte und ewige Anleihen, Wandelanleihen. Sie stehen
   im Bestand mit Hinweis „Sonderform, keine Rendite“.
 - Ein Rating gibt es frei nicht. Es ist kein Teil der ersten Stufe.
+
+**Umgesetzt (27.11.2026, D4.3):** `va_portfolio.domain.bonds` (`coupon_dates`,
+`accrued_interest`, `bond_figures`, `special_form`). Abweichungen und Annahmen:
+- ESMA FIRDS liefert weder Kupontermine noch Zinsmethode. Ohne Angabe gilt, was für
+  Bundesanleihen stimmt: jährlich, ACT/ACT ICMA, Kupon am Jahrestag der Fälligkeit. 30E/360 und
+  2, 4 oder 12 Kupons im Jahr sind möglich, sobald eine Quelle sie liefert.
+- Stichtag ist das Kursdatum, ohne Valuta (T+2). Eine unregelmäßige erste Periode kennen die
+  Stammdaten nicht.
+- Sonderformen erkennt `special_form` an `floating` und am CFI-Code (Wandelanleihe `DC…`,
+  variabel `D?V…`, ohne Fälligkeit 5. Zeichen `P`, `Q`, `R`). Inflationsindexierte erkennt FIRDS
+  nicht; sie rechnen wie feste Anleihen auf den Nominalkurs.
+- Ohne Rendite nennt `special` den Grund, auch `matured` und `out_of_range` (Kurs außerhalb von
+  −50 % bis 100 % Rendite, meist ein Datenfehler).
+- Das Fälligkeitsprofil (Wert je Fälligkeitsjahr) gehört zur Depot-Analyse (D4.4).
 
 ## Depot
 
