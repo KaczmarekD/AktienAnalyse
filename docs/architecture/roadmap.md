@@ -304,7 +304,7 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D4.6 Neue Aktie sofort einordnen (`85bb1bf`; `marketdata.coverage.fetched`, `scoring.placements.updated`, Migration 0031 `market_data.coverage_fetch`; NAS: nichts Neues in der `.env`, die Consumer gleichen sich beim Start an)
 - [ ] D5 Hinweise (mit `analysis_run` und `portfolio.analysis.completed`, aus D4.4 verschoben)
   - [x] D5.1 Regeln und Katalog (`12ad024`; `va_portfolio.domain.hints`, `HintParamsV1`, 19 von 25 Regeln gerechnet; keine Migration; NAS: nichts Neues)
-  - [ ] D5.2 Lebenszyklus und Speicher
+  - [x] D5.2 Lebenszyklus und Speicher (`5e24faa`; `analysis_run`, `hint` (Migration 0032), Status neu/besteht/erledigt, `portfolio.analysis.completed` an `user:<id>`, `GET /depots/{id}/hints`; NAS: nichts Neues in der `.env`, die Läufe entstehen mit dem nächsten Depotstand oder Kurs)
   - [ ] D5.3 Schwellen, Zielallokation, Kenntnisnahme
   - [ ] D5.4 Ansicht „Hinweise“
   - [ ] D5.5 Prüfkandidaten
