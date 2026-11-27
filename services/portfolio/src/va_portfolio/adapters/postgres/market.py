@@ -1,20 +1,21 @@
 """Kopien der Marktdaten im Schema ``portfolio`` (D3.4, Port ``MarketStore``).
 
 Nur ``INSERT`` und ``SELECT``. Gelesen wird je ISIN bzw. Waehrung die juengste Zeile
-(``DISTINCT ON``): Stammdaten nach ``as_of``, Kurse und Waehrungskurse nach Handelstag, bei
-Gleichstand die zuletzt empfangene.
+(``DISTINCT ON``): Stammdaten nach ``as_of``, Kurse und Waehrungskurse nach Handelstag, Scores
+(D4.2) nach Bewertungslauf, bei Gleichstand die zuletzt empfangene.
 """
 
 from __future__ import annotations
 
+from dataclasses import asdict, fields
 from typing import TYPE_CHECKING
 
 from sqlalchemy import insert, text
 
 from va_platform.db import session_scope
 
-from ...domain.valuation import Market, Quote, SecurityInfo
-from .models import FxView, PriceView, SecurityView
+from ...domain.valuation import Market, Quote, Score, SecurityInfo
+from .models import FxView, PriceView, ScoreView, SecurityView
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Sequence
@@ -34,6 +35,14 @@ SELECT DISTINCT ON (isin) isin, trade_date, close, currency, percent_of_par, sou
 FROM portfolio.price_view WHERE isin = ANY(:isins)
 ORDER BY isin, trade_date DESC, id DESC
 """
+_SCORES = """
+SELECT DISTINCT ON (isin) isin, scoring_run_id, as_of, payload
+FROM portfolio.score_view WHERE isin = ANY(:isins)
+ORDER BY isin, scoring_run_id DESC, id DESC
+"""
+# Spalten statt payload; payload enthaelt die uebrigen Felder von Score
+_SCORE_COLUMNS = ("isin", "scoring_run_id", "as_of")
+_SCORE_FIELDS = {f.name for f in fields(Score)}
 _FX = """
 SELECT DISTINCT ON (currency) currency, rate_to_eur
 FROM portfolio.fx_view
@@ -102,11 +111,34 @@ class PostgresMarketStore:
                     ],
                 )
 
+    def record_scores(self, scores: Sequence[Score], *, at: datetime) -> None:
+        if not scores:
+            return
+        with session_scope(self._engine) as session:
+            session.execute(
+                insert(ScoreView),
+                [
+                    {
+                        "isin": score.isin,
+                        "scoring_run_id": score.scoring_run_id,
+                        "as_of": score.as_of,
+                        "payload": {
+                            key: value
+                            for key, value in asdict(score).items()
+                            if key not in _SCORE_COLUMNS
+                        },
+                        "received_at": at,
+                    }
+                    for score in scores
+                ],
+            )
+
     def market(self, isins: Collection[str]) -> Market:
         wanted = sorted(set(isins))
         with self._engine.connect() as conn:
             securities = conn.execute(text(_SECURITIES), {"isins": wanted}).all() if wanted else []
             quotes = conn.execute(text(_QUOTES), {"isins": wanted}).all() if wanted else []
+            scores = conn.execute(text(_SCORES), {"isins": wanted}).all() if wanted else []
             fx = conn.execute(text(_FX)).all()
         return Market(
             securities={
@@ -125,4 +157,11 @@ class PostgresMarketStore:
                 for r in quotes
             },
             fx={r.currency: r.rate_to_eur for r in fx},
+            scores={r.isin: _score(r.isin, r.scoring_run_id, r.as_of, r.payload) for r in scores},
         )
+
+
+def _score(isin: str, scoring_run_id: int, as_of: date, payload: dict[str, object]) -> Score:
+    """Eine Zeile aus ``score_view``; Felder, die ``Score`` (nicht mehr) kennt, fallen weg."""
+    known = {k: v for k, v in payload.items() if k in _SCORE_FIELDS and k not in _SCORE_COLUMNS}
+    return Score(isin=isin, scoring_run_id=scoring_run_id, as_of=as_of, **known)  # type: ignore[arg-type]

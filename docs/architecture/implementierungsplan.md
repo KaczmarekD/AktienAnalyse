@@ -2975,8 +2975,8 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     `price_to_epv` und `implied_fcf_growth` vor `errors`; die Mail bleibt gleich. Golden-CSV und
     Replay-Fixtures werden bewusst erneuert.
   - **Speicher:** `scoring.anchor_value` (nur Werte, die es gibt), dazu die Spalte
-    `nopat_normalized` in `market_data.fundamental_snapshot`, eine Migration (`0028`; D4.1 hat
-    `0027` zuerst gemergt).
+    `nopat_normalized` in `market_data.fundamental_snapshot`, eine Migration (`0029`; D4.1 und D4.2
+    haben `0027` und `0028` zuerst gemergt).
   - **Profil:** neuer Parameter `dcf_years` (10, 1 bis 30). Titel-Detail und Projektion kommen
     mit F3.2.
   - **Replay-Regression:** Neue Spalten in der CSV zählen nicht als Abweichung, solange die alten
@@ -4098,6 +4098,28 @@ und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
   - UI: Spalten im Depot, Link ins Titel-Detail für Universumstitel.
   - Abnahme von D4: Eine Aktie aus DAX/MDAX zeigt im Depot dieselben Scores wie im Ranking.
 - **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - Consumer `portfolio` mit `va.scoring.run.completed` (`ScoringRunCompletedHandler`), der
+    bestehende durable Consumer wird beim Start angeglichen; `nats.conf` braucht nichts Neues.
+  - `score_view` (Migration 0028, nur anfügen): alle Ranking-Zeilen und Einordnungen mit ISIN, je
+    ISIN gilt der jüngste Bewertungslauf (`DISTINCT ON`, nach `scoring_run_id`). Ohne ISIN lässt
+    sich eine Zeile keiner Position zuordnen und fällt weg.
+  - `Score` in `va_portfolio.domain.valuation`, `Market.scores`, `PositionValue.score`; auch eine
+    Beobachtungsliste trägt Scores. Contract `PositionScoreV1` (additiv in `PositionValueV1`),
+    web-api `PositionScore`, OpenAPI-Snapshot und TS-Client neu (nur hinzugefügt).
+  - `reference`: `universe` (mit Rang), `below_size_filter`, `outside`. Bei Ranking-Zeilen ohne
+    Composite rechnet portfolio den Grund wie scoring (`score_reason`).
+  - UI: Spalten Composite (mit Perzentil und Value-Trap), Value, Quality; Universumstitel führen
+    ins Titel-Detail, sonst ein Hinweis „außerhalb DAX/MDAX“ oder „unter dem Größenfilter“;
+    ohne Scores ein Strich mit Tooltip. Glossar: „Perzentil“ (`composite_percentile`).
+  - Tests: `services/portfolio/tests/test_depot_scores.py` (Kopie, jüngster Lauf, Abnahme gegen
+    die Ranking-Zeile), Domain, DB (`tests/db/portfolio/test_market.py`), API, UI, E2E
+    (`tests/e2e/test_chain.py`: SAP im Depot mit den Werten des Rankings, durch den ganzen Stack).
+  - Nach dem Update: Der angeglichene Consumer liest nur Events, die danach kommen. Scores im
+    Depot gibt es also erst mit dem nächsten Bewertungslauf, sofort mit einem Lauf aus dem UI.
+  - **Review (`/code-review high`):** behoben, dass der Tooltip das Datum von Hand formatierte
+    (jetzt `formatDate` mit `DAY`). Offen gelassen, nur dokumentiert: Scores erst nach dem
+    nächsten Bewertungslauf (oben).
 
 **D4.3 ETF und Anleihen rechnen** (ANA-05 bis 07)
 - **Test:** reine Funktionen in `va_portfolio.domain`:

@@ -9,7 +9,17 @@ import { MatDialog } from '@angular/material/dialog';
 import type { HistoryEntry, ImportPreview } from '../api/types.gen';
 import { apiTestingProviders, query, respond, text } from '../testing/api';
 import { me, provideAuthTesting } from '../testing/auth';
-import { APPLE, depot, DETAIL, HOLDINGS, SAP, valuation } from '../testing/depots';
+import {
+  APPLE,
+  BUND,
+  depot,
+  DETAIL,
+  HOLDINGS,
+  position,
+  SAP,
+  score,
+  valuation,
+} from '../testing/depots';
 import {
   abbreviationsWithoutExplanation,
   controlsWithoutTooltip,
@@ -132,6 +142,54 @@ describe('DepotPage', () => {
     const row = query(fixture, `tr[data-position="${APPLE}"]`)[0];
     expect(row.querySelector('[data-missing]')?.textContent).toContain('Kurs fehlt');
     expect(row.querySelector('[data-pending]')?.textContent).toContain('wird geprüft');
+  });
+
+  describe('scores (D4.2)', () => {
+    it('shows composite, percentile, value and quality like the ranking', async () => {
+      const fixture = await render();
+      const row = query(fixture, `tr[data-position="${SAP}"]`)[0];
+      const cell = (name: string) => (row.querySelector(name)?.textContent ?? '').trim();
+      expect(cell('[data-composite]')).toContain('0,58');
+      expect(cell('[data-composite]')).toContain('Perzentil 71');
+      expect(cell('[data-value-score]')).toContain('0,41');
+      expect(cell('[data-quality-score]')).toContain('0,83');
+    });
+
+    it('links a DAX/MDAX stock to its detail page', async () => {
+      const fixture = await render();
+      const link = query(fixture, `tr[data-position="${SAP}"] a[data-instrument]`)[0];
+      expect(link.getAttribute('href')).toBe('/instruments/SAP.DE');
+    });
+
+    it('names a stock placed from outside and its value trap', async () => {
+      const fixture = await render();
+      const row = query(fixture, `tr[data-position="${APPLE}"]`)[0];
+      expect(row.querySelector('[data-reference]')?.textContent).toContain('außerhalb DAX/MDAX');
+      expect(row.querySelector('a[data-instrument]')).toBeNull();
+      expect(row.querySelector('[data-composite]')?.textContent).toContain('Value-Trap?');
+    });
+
+    it('says why there is no composite, and that a bond has no scores', async () => {
+      const bank = position({
+        isin: 'DE000CBK1001',
+        name: 'Commerzbank',
+        score: score({
+          symbol: 'CBK.DE',
+          value_score: 0.9,
+          quality_score: null,
+          composite_score: null,
+          composite_percentile: null,
+          reason: 'no_quality',
+        }),
+      });
+      const bond = position({ isin: BUND, name: 'Bund 2033', unit: 'nominal' });
+      const fixture = await render(
+        depot({ id: 3, name: 'DKB', valuation: valuation({ positions: [bank, bond] }) }),
+      );
+      const reason = query(fixture, 'tr[data-position="DE000CBK1001"] [data-reason]')[0];
+      expect(reason.textContent).toContain('ohne Quality');
+      expect(query(fixture, `tr[data-position="${BUND}"] [data-no-score]`)).toHaveLength(1);
+    });
   });
 
   it('shows a watchlist with prices only', async () => {

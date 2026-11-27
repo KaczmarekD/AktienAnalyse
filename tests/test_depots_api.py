@@ -33,7 +33,7 @@ from va_contracts.events.v1 import DEPOT_CHANGED, DepotChangedV1
 from va_platform.service import LocalCaller
 from va_portfolio.adapters.memory import MemoryDepotStore, MemoryMarketStore
 from va_portfolio.application.depots import DepotService
-from va_portfolio.domain.valuation import Quote
+from va_portfolio.domain.valuation import Quote, Score
 from va_portfolio.entrypoints.rpc import handlers
 from va_web_api.events import topics_for
 from va_web_api.identity.domain import PasswordHasher
@@ -286,6 +286,20 @@ class TestValuation:
         market = MemoryMarketStore()
         quote = Quote(SAP, date(2026, 11, 20), Decimal("231.5"), "EUR", source="yahoo")
         market.record_prices([quote], [], at=None)  # type: ignore[arg-type]
+        # D4.2: Scores aus einem Bewertungslauf
+        score = Score(
+            isin=SAP,
+            scoring_run_id=8,
+            as_of=date(2026, 11, 20),
+            symbol="SAP.DE",
+            reference="universe",
+            rank=12,
+            value_score=0.41,
+            quality_score=0.83,
+            composite_score=0.578,
+            composite_percentile=0.71,
+        )
+        market.record_scores([score], at=None)  # type: ignore[arg-type]
         client = _client(identity, store, "anna", market)
         yield client
         client.__exit__(None, None, None)
@@ -328,6 +342,27 @@ class TestValuation:
         assert (sap["value_eur"], sap["difference_eur"]) == ("2315.00", "315.00")
         assert (bund["value_eur"], bund["missing"], bund["pending"]) == (None, "price", True)
         assert (valuation["cost_basis_eur"], valuation["difference_eur"]) == ("2000.00", "315.00")
+
+    def test_a_stock_carries_its_scores(self, valued):
+        """D4.2: Scores aus dem juengsten Bewertungslauf; die Anleihe hat keine."""
+        depot_id = self._depot(valued)
+        sap, bund = valued.get(f"/api/v1/depots/{depot_id}").json()["valuation"]["positions"]
+        assert sap["score"] == {
+            "scoring_run_id": 8,
+            "as_of": "2026-11-20",
+            "symbol": "SAP.DE",
+            "reference": "universe",
+            "rank": 12,
+            "value_score": 0.41,
+            "quality_score": 0.83,
+            "composite_score": 0.578,
+            "composite_percentile": 0.71,
+            "value_trap_flag": False,
+            "value_trap_reason": None,
+            "industry_rule": False,
+            "reason": None,
+        }
+        assert bund["score"] is None
 
     def test_without_market_data_no_valuation(self, anna):
         depot_id = _create(anna)

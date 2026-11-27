@@ -124,14 +124,38 @@
                   <th scope="col" class="num"><app-term key="cost_basis" /></th>
                   <th scope="col" class="num"><app-term key="difference" /></th>
                 }
+                <th scope="col" class="num"><app-term key="composite" /></th>
+                <th scope="col" class="num"><app-term key="value_score" /></th>
+                <th scope="col" class="num"><app-term key="quality_score" /></th>
               </tr>
             </thead>
             <tbody>
               @for (position of positions(); track position.isin) {
                 <tr [attr.data-position]="position.isin">
                   <td>
-                    <span class="name">{{ position.name ?? position.isin }}</span>
+                    @if (position.score?.reference === 'universe') {
+                      <a
+                        class="name"
+                        data-instrument
+                        [routerLink]="['/instruments', position.score?.symbol]"
+                        [matTooltip]="references.universe.tip"
+                        >{{ position.name ?? position.isin }}</a
+                      >
+                    } @else {
+                      <span class="name">{{ position.name ?? position.isin }}</span>
+                    }
                     <span class="hint">{{ position.isin }}</span>
+                    @if (position.score; as score) {
+                      @if (score.reference !== 'universe') {
+                        <span
+                          class="badge badge--muted"
+                          data-reference
+                          tabindex="0"
+                          [matTooltip]="references[score.reference].tip"
+                          >{{ references[score.reference].label }}</span
+                        >
+                      }
+                    }
                     @if (position.pending) {
                       <span
                         class="badge badge--muted"
@@ -173,6 +197,36 @@
                     </td>
                     <td class="num">{{ position.cost_basis_eur | eur }}</td>
                     <td class="num">{{ position.difference_eur | eur }}</td>
+                  }
+                  @if (position.score; as score) {
+                    <td class="num" data-composite>
+                      @if (reasonOf(position); as reason) {
+                        <span
+                          class="badge badge--muted"
+                          data-reason
+                          tabindex="0"
+                          [matTooltip]="reason.tip"
+                          >{{ reason.label }}</span
+                        >
+                      } @else {
+                        <app-score [value]="score.composite_score" bar />
+                        <span class="hint" tabindex="0" [matTooltip]="scoreTip(position)"
+                          >Perzentil {{ score.composite_percentile | pct: '1.0-0' }}</span
+                        >
+                      }
+                      <app-value-trap-badge
+                        [flagged]="score.value_trap_flag"
+                        [reason]="score.value_trap_reason"
+                      />
+                    </td>
+                    <td class="num" data-value-score><app-score [value]="score.value_score" /></td>
+                    <td class="num" data-quality-score>
+                      <app-score [value]="score.quality_score" />
+                    </td>
+                  } @else {
+                    <td class="num" data-no-score colspan="3">
+                      <span tabindex="0" [matTooltip]="noScore">–</span>
+                    </td>
                   }
                 </tr>
               }

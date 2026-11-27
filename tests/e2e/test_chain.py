@@ -6,6 +6,7 @@ Frontend-Smoke der CI (P3.6) und prueft dazu, dass Mail, API und UI dasselbe zei
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -159,3 +160,43 @@ class TestScoringProfiles:
         assert saved.json()["version"] == newest + 1
         stale = ui.put(url, json=body, headers={"If-Match": f'"{newest}"'})
         assert stale.status_code == 409
+
+
+class TestDepotScores:
+    """D4.2, Abnahme von D4: Eine Aktie aus DAX/MDAX zeigt im Depot dieselben Scores wie im
+    Ranking. Der Weg: scoring -> ``scoring.run.completed`` -> portfolio (``score_view``) -> web-api.
+    """
+
+    SAP = "DE0007164600"
+
+    def _score(self, ui: httpx.Client, depot_id: int) -> dict[str, Any] | None:
+        """portfolio liest das Event nebenher: bis zu 30 Sekunden auf die Scores warten."""
+        for _ in range(30):
+            [position] = get_json(ui, f"/api/v1/depots/{depot_id}")["valuation"]["positions"]
+            if position["score"] is not None:
+                return position["score"]
+            time.sleep(1)
+        return None
+
+    @pytest.mark.usefixtures("expected")  # nur im Wegwerf-Stack: legt ein Depot an
+    def test_a_dax_stock_has_the_scores_of_the_ranking(self, ui, run):
+        rows = get_json(ui, f"/api/v1/ranking/{run['scoring_run_id']}")["rows"]
+        [sap] = [r for r in rows if r["symbol"] == "SAP.DE"]
+        created = ui.post("/api/v1/depots", json={"kind": "depot", "name": "E2E Scores"})
+        assert created.status_code == 201, created.text
+        depot_id = created.json()["id"]
+        saved = ui.put(
+            f"/api/v1/depots/{depot_id}/holdings",
+            json={"lines": [{"isin": self.SAP, "quantity": "1"}], "cash": []},
+            headers={"If-Match": '"0"'},
+        )
+        assert saved.status_code == 200, saved.text
+        score = self._score(ui, depot_id)
+        assert score is not None, "portfolio hat keine Scores fuer SAP"
+        assert score["reference"] == "universe"
+        assert score["scoring_run_id"] == run["scoring_run_id"]
+        assert (score["rank"], score["composite_score"]) == (sap["rank"], sap["composite_score"])
+        assert (score["value_score"], score["quality_score"]) == (
+            sap["value_score"],
+            sap["quality_score"],
+        )

@@ -397,6 +397,153 @@
       "title": "HoldingsV1",
       "type": "object"
     },
+    "PositionScoreV1": {
+      "description": "Scores einer Aktie im Depot (D4.2, ANA-01): aus dem juengsten Bewertungslauf, der sie kennt.\n\n``reference``: ``universe`` heisst Titel des Rankings, mit denselben Werten wie dort und dem\nRang (``rank``). Sonst ist sie eingeordnet ins Referenzuniversum (D4.1): als Universumstitel\nunter dem Groessenfilter oder von ausserhalb. Ohne Composite nennt ``reason`` den Grund.\n``as_of``: Stand des Abrufs, auf dem der Bewertungslauf beruht.",
+      "properties": {
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "composite_percentile": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Percentile"
+        },
+        "composite_score": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Score"
+        },
+        "industry_rule": {
+          "default": false,
+          "title": "Industry Rule",
+          "type": "boolean"
+        },
+        "quality_score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quality Score"
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rank"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "no_value",
+                "no_quality",
+                "no_data"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "reference": {
+          "enum": [
+            "universe",
+            "below_size_filter",
+            "outside"
+          ],
+          "title": "Reference",
+          "type": "string"
+        },
+        "scoring_run_id": {
+          "minimum": 1,
+          "title": "Scoring Run Id",
+          "type": "integer"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "value_score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Score"
+        },
+        "value_trap_flag": {
+          "default": false,
+          "title": "Value Trap Flag",
+          "type": "boolean"
+        },
+        "value_trap_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "quality",
+                "momentum"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Trap Reason"
+        }
+      },
+      "required": [
+        "scoring_run_id",
+        "as_of",
+        "symbol",
+        "reference"
+      ],
+      "title": "PositionScoreV1",
+      "type": "object"
+    },
     "PositionValueV1": {
       "description": "Eine bewertete Position (D3.4, DEP-07): Kurs mit Datum und Quelle, Wert in EUR.\n\n``price`` in ``price_currency`` (Hauptwaehrung), bei ``percent_of_par`` in Prozent vom\nNennwert. ``fx_rate``: 1 Einheit ``price_currency`` in EUR. ``value_eur`` fehlt mit Grund\n(``missing``), nie als 0; in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch\nohne Stammdaten (\"wird geprueft\", WP-13).",
       "properties": {
@@ -579,6 +726,17 @@
           ],
           "default": null,
           "title": "Quantity"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PositionScoreV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "unit": {
           "default": "pieces",

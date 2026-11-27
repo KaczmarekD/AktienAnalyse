@@ -4,7 +4,7 @@
 > [Depot-Spezifikation](README.md), Stufen D4 (Analyse) und D5 (Hinweise). Grundsatzentscheidung:
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (vorgeschlagen).
 > Umgesetzt: die Einordnung im Bewertungslauf (D4.1, `place()`, `placements[]`,
-> `scoring.placement`).
+> `scoring.placement`), die Scores je Aktie im Depot (D4.2, `score_view` in portfolio).
 
 ## Grundsatz: bewertet wird gegen ein Referenzuniversum
 
@@ -107,6 +107,11 @@ scoring. Abweichungen und Ergänzungen:
 - Einen Rescore nach einer Profil-Aktivierung gibt es in scoring noch nicht (nur den Trigger im
   Contract). Kommt er, braucht er die Kandidaten getrennt in `scoring.input_snapshot`.
 - Die Einordnung gegen den letzten Bewertungslauf bei neuer Abdeckung kommt mit D4.6.
+
+**Umgesetzt (27.11.2026, D4.2):** portfolio übernimmt `scoring.run.completed` in `score_view`:
+alle Ranking-Zeilen und Einordnungen mit ISIN, nicht nur die Titel in Depots. So hat eine neu
+aufgenommene DAX/MDAX-Aktie sofort Scores. Je ISIN gilt der jüngste Bewertungslauf, der sie kennt;
+sein Datum steht an der Position (ANA-09). Der Score-Verlauf je Position (ANA-04) kommt mit D4.5.
 
 ## ETFs
 

@@ -88,7 +88,7 @@ class FactorScore(Base):
 
 
 class AnchorValue(Base):
-    """Fundamentale Anker je Lauf und Titel im Long-Format (F3.1, Migration 0028).
+    """Fundamentale Anker je Lauf und Titel im Long-Format (F3.1, Migration 0029).
 
     Nur Werte, die es gibt; ``anchor`` ist ein Schluessel aus ``ANCHOR_KEYS``.
     """

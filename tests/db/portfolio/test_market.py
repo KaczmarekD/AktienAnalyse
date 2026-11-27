@@ -22,7 +22,7 @@ from va_portfolio.adapters.postgres.store import PostgresDepotStore
 from va_portfolio.application.depots import DepotService
 from va_portfolio.application.market import FxRate, SecurityCopy
 from va_portfolio.domain.depots import HoldingLine
-from va_portfolio.domain.valuation import Quote, SecurityInfo
+from va_portfolio.domain.valuation import Quote, Score, SecurityInfo
 
 T0 = datetime(2026, 11, 20, 22, 45, tzinfo=UTC)
 SAP = "DE0007164600"
@@ -96,3 +96,51 @@ def test_the_depot_is_valued_on_postgres(market, portfolio_engine):
     assert summary.valuation is not None
     assert summary.valuation.value_eur == Decimal("2315.00")
     assert summary.valuation.pending == 0
+
+
+def _score(isin: str, scoring_run_id: int, **values: object) -> Score:
+    return Score(
+        isin=isin,
+        scoring_run_id=scoring_run_id,
+        as_of=FRIDAY,
+        symbol="SAP.DE",
+        **{"reference": "universe", **values},  # type: ignore[arg-type]
+    )
+
+
+def test_newest_score_per_isin(market):
+    """D4.2: je ISIN der juengste Bewertungslauf, auch wenn er spaet zugestellt wird."""
+    market.record_scores([_score(SAP, 9, rank=3, composite_score=0.9)], at=T0)
+    market.record_scores([_score(SAP, 8, rank=12), _score(APPLE, 8, reference="outside")], at=T0)
+    scores = market.market([SAP, APPLE]).scores
+    assert scores[SAP] == _score(SAP, 9, rank=3, composite_score=0.9)
+    assert (scores[APPLE].scoring_run_id, scores[APPLE].reference) == (8, "outside")
+    assert market.market([]).scores == {}
+
+
+def test_the_score_role_never_changes_or_deletes(market, portfolio_engine):
+    market.record_scores([_score(SAP, 8)], at=T0)
+    for statement in (
+        "UPDATE portfolio.score_view SET scoring_run_id = 1",
+        "DELETE FROM portfolio.score_view",
+    ):
+        with pytest.raises(DBAPIError), portfolio_engine.begin() as conn:
+            conn.execute(text(statement))
+
+
+def test_unknown_payload_fields_are_ignored(market, engine):
+    """Ein Feld, das ``Score`` spaeter nicht mehr kennt, bricht das Lesen nicht."""
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO portfolio.score_view (isin, scoring_run_id, as_of, payload, received_at) "
+                "VALUES (:isin, 8, :day, CAST(:payload AS jsonb), :at)"
+            ),
+            {
+                "isin": SAP,
+                "day": FRIDAY,
+                "payload": '{"symbol": "SAP.DE", "reference": "universe", "gone": 1}',
+                "at": T0,
+            },
+        )
+    assert market.market([SAP]).scores[SAP] == _score(SAP, 8)

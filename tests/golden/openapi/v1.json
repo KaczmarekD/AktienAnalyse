@@ -1680,6 +1680,145 @@
         "title": "PasswordReset",
         "type": "object"
       },
+      "PositionScore": {
+        "additionalProperties": false,
+        "description": "Scores einer Aktie im Depot (D4.2) aus dem juengsten Bewertungslauf, der sie kennt.\n\n``reference``: ``universe`` = Titel des Rankings, mit denselben Werten wie dort und seinem\nRang; ``below_size_filter`` = Universumstitel unter dem Groessenfilter, ``outside`` = Aktie\nausserhalb von DAX/MDAX, beide ins Referenzuniversum eingeordnet. Ohne Composite nennt\n``reason`` den Grund. ``as_of``: Stand des Abrufs dieses Bewertungslaufs.",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "composite_percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Percentile"
+          },
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
+          },
+          "industry_rule": {
+            "title": "Industry Rule",
+            "type": "boolean"
+          },
+          "quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Score"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_value",
+                  "no_quality",
+                  "no_data"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reference": {
+            "enum": [
+              "universe",
+              "below_size_filter",
+              "outside"
+            ],
+            "title": "Reference",
+            "type": "string"
+          },
+          "scoring_run_id": {
+            "title": "Scoring Run Id",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "value_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Score"
+          },
+          "value_trap_flag": {
+            "title": "Value Trap Flag",
+            "type": "boolean"
+          },
+          "value_trap_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "momentum"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Trap Reason"
+          }
+        },
+        "required": [
+          "scoring_run_id",
+          "as_of",
+          "symbol",
+          "reference",
+          "rank",
+          "value_score",
+          "quality_score",
+          "composite_score",
+          "composite_percentile",
+          "value_trap_flag",
+          "value_trap_reason",
+          "industry_rule",
+          "reason"
+        ],
+        "title": "PositionScore",
+        "type": "object"
+      },
       "PositionValue": {
         "additionalProperties": false,
         "description": "Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.\n\n``price`` in ``price_currency``, bei ``percent_of_par`` in Prozent vom Nennwert; ``fx_rate``\nist 1 Einheit dieser Waehrung in EUR. Ohne Wert nennt ``missing`` den Grund (``price``,\n``fx``, ``unit``), in einer Beobachtungsliste fehlt er ohne Grund. ``pending``: noch ohne\nStammdaten (\"wird geprueft\").",
@@ -1834,6 +1973,16 @@
             ],
             "title": "Quantity"
           },
+          "score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositionScore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unit": {
             "enum": [
               "pieces",
@@ -1871,7 +2020,8 @@
           "value_eur",
           "cost_basis_eur",
           "difference_eur",
-          "missing"
+          "missing",
+          "score"
         ],
         "title": "PositionValue",
         "type": "object"

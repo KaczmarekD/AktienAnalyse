@@ -94,9 +94,14 @@ CONSUMERS = (
         ),
     ),
     ConsumerSpec("scoring", ("va.marketdata.snapshot.completed",)),
-    # D3.4: Kopien von Stammdaten und Kursen fuer die Bewertung der Depots
+    # D3.4: Kopien von Stammdaten und Kursen fuer die Bewertung der Depots, D4.2 der Scores
     ConsumerSpec(
-        "portfolio", ("va.marketdata.securities.updated", "va.marketdata.prices.completed")
+        "portfolio",
+        (
+            "va.marketdata.securities.updated",
+            "va.marketdata.prices.completed",
+            "va.scoring.run.completed",
+        ),
     ),
     ConsumerSpec("notification", ("va.scoring.run.completed", "va.screening.run.failed")),
     ConsumerSpec("web-api", ("va.>",)),

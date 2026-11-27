@@ -6,7 +6,8 @@ und stehen im JSON als Zahl im String, nie als ``float``. Diese Modelle reisen n
 Request/Reply (``rpc.va.portfolio.*``), nicht in ``VA_EVENTS``: Dort stehen keine Mengen.
 
 Seit D3.4 traegt ``DepotV1`` seine Bewertung (``DepotValuationV1``): Wert in EUR aus den
-letzten Kursen, Einstand und Differenz, bei ``depots.get`` dazu jede Position.
+letzten Kursen, Einstand und Differenz, bei ``depots.get`` dazu jede Position. Seit D4.2 traegt
+jede Aktie ihre Scores aus dem juengsten Bewertungslauf (``PositionScoreV1``).
 """
 
 from __future__ import annotations
@@ -29,6 +30,12 @@ SnapshotSource = Literal["manual", "import", "bank"]
 ValueMissing = Literal["price", "fx", "unit"]
 # D3.5: Abgleich einer Datei mit dem aktuellen Depotstand, je ISIN
 ImportStatus = Literal["new", "changed", "unchanged", "removed"]
+# D4.2: Woher die Scores einer Aktie kommen: aus dem Ranking (DAX/MDAX), eingeordnet als
+# Universumstitel unter dem Groessenfilter oder eingeordnet von ausserhalb (D4.1)
+ScoreReference = Literal["universe", "below_size_filter", "outside"]
+# Wie ``PlacementReason`` und ``ValueTrapReason`` der Events (ein Test haelt sie gleich)
+ScoreReason = Literal["no_value", "no_quality", "no_data"]
+TrapReason = Literal["quality", "momentum"]
 
 MAX_NAME = 100
 MAX_TEXT = 500
@@ -41,6 +48,30 @@ Quantity = Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=8)]
 Amount = Annotated[Decimal, Field(max_digits=20, decimal_places=8)]
 DepotName = Annotated[str, Field(min_length=1, max_length=MAX_NAME)]
 Text = Annotated[str, Field(max_length=MAX_TEXT)]
+
+
+class PositionScoreV1(Contract):
+    """Scores einer Aktie im Depot (D4.2, ANA-01): aus dem juengsten Bewertungslauf, der sie kennt.
+
+    ``reference``: ``universe`` heisst Titel des Rankings, mit denselben Werten wie dort und dem
+    Rang (``rank``). Sonst ist sie eingeordnet ins Referenzuniversum (D4.1): als Universumstitel
+    unter dem Groessenfilter oder von ausserhalb. Ohne Composite nennt ``reason`` den Grund.
+    ``as_of``: Stand des Abrufs, auf dem der Bewertungslauf beruht.
+    """
+
+    scoring_run_id: PositiveId
+    as_of: date
+    symbol: str
+    reference: ScoreReference
+    rank: PositiveId | None = None
+    value_score: float | None = Field(default=None, ge=0, le=1)
+    quality_score: float | None = Field(default=None, ge=0, le=1)
+    composite_score: float | None = Field(default=None, ge=0)
+    composite_percentile: float | None = Field(default=None, ge=0, le=1)
+    value_trap_flag: bool = False
+    value_trap_reason: TrapReason | None = None
+    industry_rule: bool = False
+    reason: ScoreReason | None = None
 
 
 class PositionValueV1(Contract):
@@ -68,6 +99,8 @@ class PositionValueV1(Contract):
     cost_basis_eur: Decimal | None = None
     difference_eur: Decimal | None = None
     missing: ValueMissing | None = None
+    # D4.2 (additiv): nur bei Aktien, die ein Bewertungslauf kennt
+    score: PositionScoreV1 | None = None
 
 
 class DepotValuationV1(Contract):

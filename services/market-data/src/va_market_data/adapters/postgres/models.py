@@ -274,7 +274,7 @@ class FundamentalSnapshot(Base):
     shareholder_yield: Mapped[float | None]
     # F2.2 (Migration 0024): Netto-Emission
     net_share_issuance: Mapped[float | None]
-    # F3.1 (Migration 0028): Grundlage des Ertragskraftwerts
+    # F3.1 (Migration 0029): Grundlage des Ertragskraftwerts
     nopat_normalized: Mapped[float | None]
     # QualityMetrics
     roic: Mapped[float | None]
