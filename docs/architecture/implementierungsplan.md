@@ -3000,6 +3000,27 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
   - Komponententest der Ansicht mit Chart und Sensitivität der Anker.
 - **Implementierung:** Endpunkt `GET /api/v1/instruments/{id}/anchors` und Chart im Titel-Detail.
 - **Review:** Das UI zeigt an, wie viele Jahre die Wertlinie abdeckt.
+- **Zuschnitt (27.11.2026):** F3.2 kommt in zwei Teilen.
+  - **F3.2a Anker im Titel-Detail (jetzt):** Die Anker aus F3.1 samt Sensitivität. Sie liegen schon
+    in `scoring.anchor_value` und im Event. Es fehlen eine Projektion und die Anzeige.
+  - **F3.2b Wertlinie und Renditezerlegung (später):** Sie brauchen je Geschäftsjahr Gewinn, FCF,
+    Buchwert und Aktienanzahl sowie den Kurs zum Stichtag. Das web-api darf diese Daten nur aus
+    Projektionen lesen, das Snapshot-Event trägt sie heute nicht. Yahoo liefert vier Jahre, eine
+    Linie mit vier Punkten trägt wenig. Sinnvoll wird sie mit der Historie, die auf der NAS
+    entsteht. Der Endpunkt `/anchors` kommt mit F3.2b.
+- **Festgelegt für F3.2a (27.11.2026):**
+  - **Projektion** `web.ranking_anchor` (je Bewertungslauf und Titel die Anker als JSON, wie
+    `web.ranking_factor`, nur Titel mit mindestens einem Anker), aus `RankingRowV1.anchors`;
+    der Backfill füllt sie aus `scoring.anchor_value`. Eine Migration (Nummer mit der
+    Depot-Session abstimmen, Stand `0030`).
+  - **API:** `Instrument.anchors` (additiv, wie `factor_ranks`): die sieben Anker des jüngsten
+    Bewertungslaufs, leer ohne Anker. Beide Lesewege.
+  - **UI:** ein Abschnitt „Fundamentale Anker“ im Titel-Detail: Ertragskraftwert je Aktie neben
+    dem Kurs, Preis/EPV und implizites FCF-Wachstum, dazu eine kleine Tabelle mit r − 1, r und
+    r + 1 Prozentpunkt. Kapitalkosten, Endwachstum und Jahre kommen aus den Parametern des
+    jüngsten Laufs. Ohne Anker nennt der Abschnitt den Grund: Finanzwert (Branche unter
+    `industry_prefixes`) oder fehlende Daten. Die Seite wird nachgeladen, das Start-Bundle
+    wächst nicht.
 
 ### Track G – Gestaltung des UI
 

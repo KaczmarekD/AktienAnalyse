@@ -152,3 +152,20 @@ def test_value_trap_reason_comes_along(db_settings, engine):
         )
         == 0
     )
+
+
+def test_anchors_come_along(db_settings, engine):
+    """F3.2a: Die Anker kommen aus ``scoring.anchor_value`` in ``web.ranking_anchor``."""
+    from tests.db.web_api.test_read_api import ANCHORS, _write_anchors
+
+    _patched_run(db_settings)
+    scoring_run_id = _write_anchors(engine, "AAA.DE", ANCHORS)
+    added = backfill_projections(engine)
+    assert added["ranking_anchor"] == 1
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT scoring_run_id, symbol, anchors FROM web.ranking_anchor")
+        ).one()
+    assert (row.scoring_run_id, row.symbol) == (scoring_run_id, "AAA.DE")
+    assert row.anchors == ANCHORS
+    assert backfill_projections(engine)["ranking_anchor"] == 0

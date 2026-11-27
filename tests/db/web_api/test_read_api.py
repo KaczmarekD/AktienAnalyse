@@ -348,3 +348,55 @@ class TestMomentumAndTrapReason:
     def test_rule_off_in_profile_v1(self, momentum_api):
         params = momentum_api.get("/api/v1/ranking/latest").json()["params"]
         assert params["trap_momentum_rule"] is False
+
+
+ANCHORS = {
+    "epv_per_share": 52.3,
+    "price_to_epv": 3.8,
+    "implied_fcf_growth": 0.081,
+    "price_to_epv_r_low": 3.3,
+    "price_to_epv_r_high": 4.3,
+    "implied_fcf_growth_r_low": 0.056,
+    "implied_fcf_growth_r_high": 0.104,
+}
+
+
+def _write_anchors(engine, symbol: str, values: dict[str, float]) -> int:
+    """F3.2a: Anker fuer einen Titel im juengsten Bewertungslauf, wie scoring sie speichert."""
+    from sqlalchemy import text
+
+    from va_platform.db import session_scope
+    from va_scoring.adapters.postgres import AnchorRow, ScoringRepository
+
+    with session_scope(engine) as s:
+        scoring_run_id = s.execute(text("SELECT max(id) FROM scoring.scoring_run")).scalar_one()
+        instrument_id = s.execute(
+            text("SELECT id FROM market_data.instrument WHERE symbol = :symbol"),
+            {"symbol": symbol},
+        ).scalar_one()
+        ScoringRepository(s).write_anchor_values(
+            scoring_run_id, [AnchorRow(instrument_id, key, value) for key, value in values.items()]
+        )
+    return int(scoring_run_id)
+
+
+@pytest.fixture(params=["tables", "projections"])
+def anchor_api(request, db_settings, db_url, engine):
+    rc, _, _ = _patched_run(db_settings)
+    assert rc == 0
+    request.node.scoring_run_id = _write_anchors(engine, "AAA.DE", ANCHORS)
+    with _client(request, db_settings, db_url, engine) as client:
+        yield client
+
+
+class TestAnchorsInTheInstrumentDetail:
+    """F3.2a: die Anker des juengsten Bewertungslaufs, aus den Tabellen wie aus der Projektion
+    (der Backfill fuellt ``web.ranking_anchor`` aus ``scoring.anchor_value``)."""
+
+    def test_all_seven_with_the_scoring_run(self, anchor_api, request):
+        anchors = anchor_api.get("/api/v1/instruments/AAA.DE").json()["anchors"]
+        assert anchors["scoring_run_id"] == request.node.scoring_run_id
+        assert {key: anchors[key] for key in ANCHORS} == pytest.approx(ANCHORS)
+
+    def test_without_anchors_none(self, anchor_api):
+        assert anchor_api.get("/api/v1/instruments/BBB.DE").json()["anchors"] is None

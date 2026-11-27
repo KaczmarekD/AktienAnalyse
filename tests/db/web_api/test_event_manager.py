@@ -97,6 +97,8 @@ def _completed(
                 quality_score=0.8,
                 composite_score=0.86,
                 factor_ranks={"ev_ebit": 0.9, "roic": None},
+                # F3.1: fundamentale Anker, B und C haben keine
+                anchors={"price_to_epv": 3.8, "implied_fcf_growth": 0.08, "epv_per_share": None},
             ),
             RankingRowV1(
                 fundamentals=_fund("B"),
@@ -264,6 +266,14 @@ class TestRanking:
         _manager(engine, Recorder(engine)).dispatch(_completed())
         rows = _rows(engine, "SELECT symbol, value_trap_reason FROM web.ranking_row")
         assert dict(tuple(r) for r in rows) == {"A": None, "B": "momentum", "C": None}
+
+    def test_anchors_come_along(self, engine):
+        """F3.2a: die Anker je Titel, nur fuer Titel mit Ankern."""
+        _manager(engine, Recorder(engine)).dispatch(_completed())
+        rows = _rows(engine, "SELECT symbol, anchors FROM web.ranking_anchor")
+        assert [tuple(r) for r in rows] == [
+            ("A", {"price_to_epv": 3.8, "implied_fcf_growth": 0.08, "epv_per_share": None})
+        ]
 
     def test_rescore_has_a_ranking_but_no_run(self, engine):
         recorder = Recorder(engine)

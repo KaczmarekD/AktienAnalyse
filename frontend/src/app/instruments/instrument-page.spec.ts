@@ -136,6 +136,49 @@ describe('InstrumentPage', () => {
     expect(figure).not.toContain('besser als');
   });
 
+  describe('fundamental anchors (F3.2a)', () => {
+    const anchors = {
+      scoring_run_id: 2,
+      epv_per_share: 100.4,
+      price_to_epv: 3.8,
+      implied_fcf_growth: 0.081,
+      price_to_epv_r_low: 3.3,
+      price_to_epv_r_high: 4.3,
+      implied_fcf_growth_r_low: 0.056,
+      implied_fcf_growth_r_high: 0.104,
+    };
+    const section = (fixture: Fixture) => plain(query(fixture, '[data-section="anchors"]')[0]);
+
+    it('shows earnings power, price ratio and implied growth with the sensitivity', async () => {
+      const fixture = await loaded({
+        ...INSTRUMENT,
+        industry: 'Software - Application',
+        anchors,
+      });
+      const content = section(fixture);
+      expect(content).toContain('100,40 EUR');
+      expect(content).toContain('381,50 EUR');
+      expect(content).toContain('3,80');
+      expect(content).toContain('8,1 %');
+      // Spalten der Sensitivität: Kapitalkosten des Laufs und je ein Punkt darunter und darüber
+      expect(content).toContain('7 %');
+      expect(content).toContain('9 %');
+      expect(content).toContain('10,4 %');
+      expect(content).toContain('10 Jahre');
+    });
+
+    it('names financials as the reason for missing anchors', async () => {
+      const fixture = await loaded();
+      expect(section(fixture)).toContain('Finanzwert');
+    });
+
+    it('names missing data otherwise', async () => {
+      const fixture = await loaded({ ...INSTRUMENT, industry: 'Airlines' });
+      expect(section(fixture)).toContain('fehlen');
+      expect(section(fixture)).not.toContain('Finanzwert');
+    });
+  });
+
   it('warns when the fetch was incomplete and shows its notes', async () => {
     const fixture = await loaded({
       ...INSTRUMENT,
