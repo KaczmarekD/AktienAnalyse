@@ -195,6 +195,24 @@ class TestCompareCsv:
             )
         ]
 
+    def test_added_columns_are_no_difference(self):
+        """F3.1: Neue Spalten (Anker) aendern keinen gespeicherten Wert. Die alten Spalten
+        bleiben in ihrer Reihenfolge und werden verglichen."""
+        rows = [{**r, "price_to_epv": 1.2} for r in CSV_ROWS]
+        assert compare_csv(_csv(CSV_ROWS), _csv(rows)) == []
+        changed = [{**r, "price_to_epv": 1.2} for r in CSV_ROWS]
+        changed[0]["composite_score"] = 0.1
+        assert [d.field for d in compare_csv(_csv(CSV_ROWS), _csv(changed))] == [
+            "composite_score"
+        ]
+
+    def test_reordered_columns_are_one_difference(self):
+        rows = [
+            {"symbol": r["symbol"], **{k: v for k, v in r.items() if k != "symbol"}}
+            for r in CSV_ROWS
+        ]
+        assert [d.field for d in compare_csv(_csv(CSV_ROWS), _csv(rows))] == ["spalten"]
+
     def test_extra_row_is_reported(self):
         rows = [*CSV_ROWS, {"rank_overall": 3, "symbol": "CCC.DE", "name": "Gamma"}]
         assert compare_csv(_csv(CSV_ROWS), _csv(rows)) == [

@@ -2978,6 +2978,9 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     `nopat_normalized` in `market_data.fundamental_snapshot`, eine Migration (`0027`).
   - **Profil:** neuer Parameter `dcf_years` (10, 1 bis 30). Titel-Detail und Projektion kommen
     mit F3.2.
+  - **Replay-Regression:** Neue Spalten in der CSV zählen nicht als Abweichung, solange die alten
+    Spalten in ihrer Reihenfolge bleiben und gleiche Werte haben. Sonst meldete `make regression`
+    auf der NAS jede gespeicherte Woche, und das Runbook verlangt Exit 0 vor `make up`.
 
 #### F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung
 
