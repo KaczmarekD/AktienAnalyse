@@ -4309,6 +4309,28 @@ zeigen den Disclaimer.
   `hint_ack` mit Wiederkehr, wenn der Hinweis schwerer wird oder sich der Messwert um die
   Spanne der Regel verschlechtert; HIN-A01 aus der Zielallokation. Endpunkte nach analyse.md.
 - **Review:** `/code-review high`, `/security-review`.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - Contracts `TargetAllocationV1` (Anteile je Anlageklasse, zusammen 1 oder leer),
+    `DepotSettingsV1`, `HintV1.acknowledged`; RPCs `portfolio.depots.settings`,
+    `.hint_params.save`, `.target.save`, `.hints.ack`.
+  - Migration 0033: `hint_params`, `target_allocation`, `hint_ack`, Auslöser `settings` in
+    `analysis_run`; `src.erase_user` löscht die drei Tabellen mit dem Depot.
+  - `ACK_SPANS` und `still_acknowledged` in `va_portfolio.domain.hints`; der Hinweis bleibt in
+    der Antwort und trägt `acknowledged`, ausblenden ist Sache des UI (D5.4).
+  - Gespeicherte Schwellen ohne ein später neues Feld bekommen beim Lesen den Standardwert
+    (`HintParamsV1.model_validate`).
+  - Tests: `test_hint_settings.py` (Standardwerte, neue Schwellen, Konflikt, archiviert, A01,
+    Kenntnisnahme bis zur Verschlechterung, RPC), A01 und Spannen in `test_hints.py`, DB
+    (Versionen, Konflikt, jüngste Kenntnisnahme, Löschen), API, Contracts.
+  - **Review (`/code-review high`):** behoben, dass eine Kenntnisnahme über das Erledigen hinaus
+    galt (jetzt mit dem Lauf in `hint_ack.analysis_run_id`; erscheint der Hinweis danach neu,
+    ist er wieder sichtbar), dass `/me/export` Schwellen, Ziele und Kenntnisnahmen nicht
+    enthielt (`DepotExportV1.hint_params`, `targets`, `acks`), dass ein Konflikt beim
+    gleichzeitigen Speichern eine zu alte Version meldete, dass ein überlanger Schlüssel 500
+    statt 422 ergab und dass ein archiviertes Depot Kenntnisnahmen annahm.
+    `/security-review` ohne Befund: Nutzer nur aus der Sitzung, Besitz in jeder neuen Methode
+    (`_owned`/`_writable`), gebundene Werte in SQL, ein Schlüssel nur, wenn der jüngste Lauf ihn
+    hat, Export nur der eigenen Depots ohne `user_id`, Tabellen nur für `va_portfolio`.
 
 **D5.4 Ansicht „Hinweise“** (HIN-01 bis 05)
 - **Test:** Hinweise im Depot nach Schwere, mit Messwert, Schwelle, Datenstand und Ansatzpunkt,

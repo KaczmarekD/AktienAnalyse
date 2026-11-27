@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "TargetAllocationV1": {
+      "description": "Zielallokation je Anlageklasse (DEP-10, HIN-A01), zusammen 100 %; leer heisst ohne Ziel.\nEine Region je Klasse sieht die Spezifikation als Kann vor; sie fehlt vorerst.",
+      "properties": {
+        "shares": {
+          "additionalProperties": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "enum": [
+              "equity",
+              "etf",
+              "bond",
+              "other",
+              "cash"
+            ]
+          },
+          "title": "Shares",
+          "type": "object"
+        }
+      },
+      "title": "TargetAllocationV1",
+      "type": "object"
+    }
+  },
+  "description": "D5.3: neue Zielallokation auf ``base_version`` (leer: ohne Ziel).",
+  "properties": {
+    "base_version": {
+      "minimum": 0,
+      "title": "Base Version",
+      "type": "integer"
+    },
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "target": {
+      "$ref": "#/$defs/TargetAllocationV1"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id",
+    "base_version",
+    "target"
+  ],
+  "title": "TargetSaveRequestV1",
+  "type": "object"
+}

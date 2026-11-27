@@ -15,21 +15,32 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import insert, select, text
+from sqlalchemy import func, insert, select, text
 from sqlalchemy.exc import IntegrityError
 
 from va_platform.db import session_scope
 from va_platform.messaging import Outbox
 
 from ...domain.depots import CashLine, Depot, HoldingLine, Snapshot, VersionConflict
-from ...domain.hints import Hint, StoredRun, TrackedHint
+from ...domain.hints import (
+    Ack,
+    Hint,
+    SettingsHistory,
+    SettingsVersion,
+    StoredRun,
+    StoredSettings,
+    TrackedHint,
+)
 from .models import (
     AnalysisRun,
     DepotStatus,
     DepotVersion,
+    HintAck,
+    HintParams,
     HintRow,
     HoldingSnapshot,
     PortfolioOutbox,
+    TargetAllocation,
 )
 from .models import (
     CashLine as CashLineRow,
@@ -276,6 +287,121 @@ class PostgresDepotStore:
                 )
             self._outbox.add(session, event(run_id))
         return run_id
+
+    # --- D5.3: Einstellungen und Kenntnisnahme ---
+
+    def settings(self, depot_id: int) -> StoredSettings:
+        with self._engine.connect() as conn:
+            params = conn.execute(
+                select(HintParams.version, HintParams.params)
+                .where(HintParams.depot_id == depot_id)
+                .order_by(HintParams.version.desc())
+                .limit(1)
+            ).first()
+            target = conn.execute(
+                select(TargetAllocation.version, TargetAllocation.shares)
+                .where(TargetAllocation.depot_id == depot_id)
+                .order_by(TargetAllocation.version.desc())
+                .limit(1)
+            ).first()
+        return StoredSettings(
+            hint_params=params.params if params else {},
+            hint_params_version=params.version if params else 0,
+            target=target.shares if target else {},
+            target_version=target.version if target else 0,
+        )
+
+    def _save_version(self, model: type[Any], depot_id: int, version: int, **values: Any) -> None:
+        try:
+            with session_scope(self._engine) as session:
+                session.execute(insert(model).values(depot_id=depot_id, version=version, **values))
+        except IntegrityError as e:
+            if f"uq_{model.__tablename__}_depot_id_version" not in str(e.orig):
+                raise
+            # jemand war schneller: die neueste Version ist mindestens die eigene
+            with self._engine.connect() as conn:
+                newest = conn.execute(
+                    select(func.max(model.version)).where(model.depot_id == depot_id)
+                ).scalar_one()
+            raise VersionConflict(int(newest or version)) from e
+
+    def save_hint_params(
+        self, depot_id: int, *, version: int, params: dict[str, Any], by: int, at: datetime
+    ) -> None:
+        self._save_version(
+            HintParams, depot_id, version, params=params, created_by=by, created_at=at
+        )
+
+    def save_target(
+        self, depot_id: int, *, version: int, shares: dict[str, float], by: int, at: datetime
+    ) -> None:
+        self._save_version(
+            TargetAllocation, depot_id, version, shares=shares, created_by=by, created_at=at
+        )
+
+    def _acks(self, depot_id: int) -> list[Ack]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(HintAck).where(HintAck.depot_id == depot_id).order_by(HintAck.id)
+            ).all()
+        return [Ack(r.key, r.measured, r.severity, r.at, r.analysis_run_id) for r in rows]
+
+    def acks(self, depot_id: int) -> dict[str, Ack]:
+        return {ack.key: ack for ack in self._acks(depot_id)}
+
+    def since_new(self, depot_id: int) -> dict[str, int]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(HintRow.key, func.max(HintRow.analysis_run_id))
+                .join(AnalysisRun, AnalysisRun.id == HintRow.analysis_run_id)
+                .where(AnalysisRun.depot_id == depot_id, HintRow.status == "new")
+                .group_by(HintRow.key)
+            ).all()
+        return {key: int(run_id) for key, run_id in rows}
+
+    def settings_history(self, depot_id: int) -> SettingsHistory:
+        with self._engine.connect() as conn:
+            params = conn.execute(
+                select(HintParams.version, HintParams.params, HintParams.created_at)
+                .where(HintParams.depot_id == depot_id)
+                .order_by(HintParams.version)
+            ).all()
+            targets = conn.execute(
+                select(
+                    TargetAllocation.version, TargetAllocation.shares, TargetAllocation.created_at
+                )
+                .where(TargetAllocation.depot_id == depot_id)
+                .order_by(TargetAllocation.version)
+            ).all()
+        return SettingsHistory(
+            hint_params=[SettingsVersion(r.version, r.params, r.created_at) for r in params],
+            targets=[SettingsVersion(r.version, r.shares, r.created_at) for r in targets],
+            acks=self._acks(depot_id),
+        )
+
+    def save_ack(
+        self,
+        depot_id: int,
+        *,
+        key: str,
+        user_id: int,
+        run_id: int,
+        measured: float | None,
+        severity: str,
+        at: datetime,
+    ) -> None:
+        with session_scope(self._engine) as session:
+            session.execute(
+                insert(HintAck).values(
+                    depot_id=depot_id,
+                    key=key,
+                    user_id=user_id,
+                    analysis_run_id=run_id,
+                    measured=measured,
+                    severity=severity,
+                    at=at,
+                )
+            )
 
     def held_isins(self) -> list[str]:
         with self._engine.connect() as conn:

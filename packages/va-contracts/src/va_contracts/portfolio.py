@@ -215,6 +215,10 @@ class DepotExportV1(Contract):
 
     depot: DepotV1
     versions: list[HoldingsV1] = Field(default_factory=list)
+    # D5.3 (additiv): alle Versionen der Schwellen und der Zielallokation, alle Kenntnisnahmen
+    hint_params: list[HintParamsVersionV1] = Field(default_factory=list)
+    targets: list[TargetVersionV1] = Field(default_factory=list)
+    acks: list[HintAckV1] = Field(default_factory=list)
 
 
 # --- D4.4: Analyse eines Depots (docs/architecture/depot/analyse.md, Abschnitt Depot) ---------
@@ -337,6 +341,7 @@ class DepotAnalysisV1(Contract):
 # --- D5: Hinweise (docs/architecture/depot/analyse.md, Abschnitt Hinweise) ---------------------
 # Schwere eines Hinweises (HIN-02)
 HintSeverity = Literal["info", "warning", "critical"]
+MAX_HINT_KEY = 200  # Schluessel eines Hinweises: Regel und Gegenstand (D5.3)
 # Die Regeln des Katalogs; ein Test haelt sie gleich mit va_portfolio.domain.hints.HINT_CATALOG
 HintRuleId = Literal[
     "HIN-K01",
@@ -430,6 +435,9 @@ class HintV1(Contract):
     title: str
     reason: str
     approach: str
+    # D5.3 (additiv): zur Kenntnis genommen; gilt nicht mehr, sobald der Hinweis schwerer wird
+    # oder sich der Messwert um die Spanne der Regel verschlechtert
+    acknowledged: bool = False
 
 
 class DepotHintsV1(Contract):
@@ -441,11 +449,71 @@ class DepotHintsV1(Contract):
     hints: list[HintV1] = Field(default_factory=list)
 
 
+# --- D5.3: Einstellungen je Depot (Schwellen, Zielallokation) ----------------------------------
+# Anlageklassen der Zielallokation (DEP-10), wie in der Allokation der Analyse
+TargetClass = Literal["equity", "etf", "bond", "other", "cash"]
+TARGET_TOLERANCE = 0.001  # Rundung: Anteile muessen zusammen 100 % ergeben
+
+
+class TargetAllocationV1(Contract):
+    """Zielallokation je Anlageklasse (DEP-10, HIN-A01), zusammen 100 %; leer heisst ohne Ziel.
+    Eine Region je Klasse sieht die Spezifikation als Kann vor; sie fehlt vorerst."""
+
+    shares: dict[TargetClass, Annotated[float, Field(ge=0, le=1)]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _all_of_it(self) -> TargetAllocationV1:
+        if self.shares and abs(sum(self.shares.values()) - 1) > TARGET_TOLERANCE:
+            msg = "Die Anteile der Zielallokation muessen zusammen 100 % ergeben"
+            raise ValueError(msg)
+        return self
+
+
+class DepotSettingsV1(Contract):
+    """Schwellen der Hinweise und Zielallokation eines Depots, je mit Version (0: Standard bzw.
+    ohne Ziel). Jede Aenderung legt eine neue Version an, die alten bleiben."""
+
+    hint_params: HintParamsV1 = Field(default_factory=HintParamsV1)
+    hint_params_version: int = Field(default=0, ge=0)
+    target: TargetAllocationV1 = Field(default_factory=TargetAllocationV1)
+    target_version: int = Field(default=0, ge=0)
+
+
+class HintParamsVersionV1(Contract):
+    """D5.3: eine gespeicherte Version der Schwellen eines Depots (Datenexport, NUT-12)."""
+
+    version: int = Field(ge=1)
+    params: HintParamsV1
+    created_at: datetime
+
+
+class TargetVersionV1(Contract):
+    """D5.3: eine gespeicherte Version der Zielallokation eines Depots (Datenexport, NUT-12)."""
+
+    version: int = Field(ge=1)
+    target: TargetAllocationV1
+    created_at: datetime
+
+
+class HintAckV1(Contract):
+    """D5.3: ein Hinweis zur Kenntnis genommen, mit Messwert und Schwere in diesem Moment."""
+
+    key: str = Field(max_length=MAX_HINT_KEY)
+    measured: float | None = None
+    severity: HintSeverity
+    at: datetime
+
+
+DepotExportV1.model_rebuild()
+
+
 __all__ = [
     "MAX_FILE_BYTES",
+    "MAX_HINT_KEY",
     "MAX_LINES",
     "MAX_NAME",
     "MAX_TEXT",
+    "TARGET_TOLERANCE",
     "AllocationV1",
     "Amount",
     "BondPositionV1",
@@ -459,11 +527,14 @@ __all__ = [
     "DepotHintsV1",
     "DepotKind",
     "DepotName",
+    "DepotSettingsV1",
     "DepotState",
     "DepotV1",
     "DepotValuationV1",
     "FundQualityV1",
+    "HintAckV1",
     "HintParamsV1",
+    "HintParamsVersionV1",
     "HintRuleId",
     "HintSeverity",
     "HintStatus",
@@ -486,6 +557,9 @@ __all__ = [
     "ScoreReference",
     "SliceV1",
     "SnapshotSource",
+    "TargetAllocationV1",
+    "TargetClass",
+    "TargetVersionV1",
     "Text",
     "TitleV1",
     "ValueMissing",

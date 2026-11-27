@@ -25,8 +25,12 @@ from va_contracts.portfolio import (
     DepotAnalysisV1,
     DepotExportV1,
     DepotHintsV1,
+    DepotSettingsV1,
     DepotV1,
     DepotValuationV1,
+    HintAckV1,
+    HintParamsV1,
+    HintParamsVersionV1,
     HintV1,
     HistoryEntryV1,
     HoldingLineV1,
@@ -36,6 +40,8 @@ from va_contracts.portfolio import (
     PositionScoreV1,
     PositionValueV1,
     RejectedRowV1,
+    TargetAllocationV1,
+    TargetVersionV1,
 )
 from va_contracts.rpc.v1 import (
     DEPOTS_ANALYSIS,
@@ -46,18 +52,23 @@ from va_contracts.rpc.v1 import (
     DEPOTS_HINTS,
     DEPOTS_LIST,
     DEPOTS_RESTORE,
+    DEPOTS_SETTINGS,
     DEPOTS_UPDATE,
+    HINT_ACK,
+    HINT_PARAMS_SAVE,
     HOLDINGS_FILE,
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
     HOLDINGS_IMPORT,
     HOLDINGS_IMPORT_PREVIEW,
     HOLDINGS_SAVE,
+    TARGET_SAVE,
     DepotAnalysisReplyV1,
     DepotExportReplyV1,
     DepotHintsReplyV1,
     DepotListReplyV1,
     DepotReplyV1,
+    DepotSettingsReplyV1,
     HistoryReplyV1,
     HoldingsFileReplyV1,
     HoldingsReplyV1,
@@ -76,17 +87,20 @@ if TYPE_CHECKING:
         DepotListRequestV1,
         DepotRefRequestV1,
         DepotUpdateRequestV1,
+        HintAckRequestV1,
+        HintParamsSaveRequestV1,
         HoldingsFileRequestV1,
         HoldingsGetRequestV1,
         HoldingsImportRequestV1,
         HoldingsSaveRequestV1,
         RpcReplyV1,
         RpcSpec,
+        TargetSaveRequestV1,
     )
 
     from ..application.depots import DepotService, DepotSummary, HistoryEntry, ImportPreview
     from ..domain.depots import Snapshot
-    from ..domain.hints import StoredRun
+    from ..domain.hints import SettingsHistory, StoredRun, StoredSettings
     from ..domain.valuation import DepotValue, PositionValue, Score
 
 
@@ -134,8 +148,10 @@ def _score(score: Score | None) -> PositionScoreV1 | None:
     )
 
 
-def _hints(run: StoredRun | None) -> DepotHintsV1:
-    """D5.2: ein Lauf mit seinen Hinweisen, die Texte aus dem Katalog."""
+def _hints(run: StoredRun | None, acknowledged: set[str] | None = None) -> DepotHintsV1:
+    """D5.2: ein Lauf mit seinen Hinweisen, die Texte aus dem Katalog; seit D5.3 mit den noch
+    zur Kenntnis genommenen."""
+    acknowledged = acknowledged or set()
     if run is None:
         return DepotHintsV1()
     hints = []
@@ -155,10 +171,51 @@ def _hints(run: StoredRun | None) -> DepotHintsV1:
                 title=entry.title,
                 reason=entry.reason,
                 approach=entry.approach,
+                acknowledged=hint.key in acknowledged,
             )
         )
     return DepotHintsV1(
         analysis_run_id=run.id, computed_at=run.computed_at, version=run.version, hints=hints
+    )
+
+
+def _settings(settings: StoredSettings) -> DepotSettingsV1:
+    """D5.3: gespeicherte Schwellen und Ziele; ein spaeter neues Feld bekommt den Standardwert."""
+    return DepotSettingsV1(
+        hint_params=HintParamsV1.model_validate(settings.hint_params),
+        hint_params_version=settings.hint_params_version,
+        target=TargetAllocationV1.model_validate({"shares": dict(settings.target)}),
+        target_version=settings.target_version,
+    )
+
+
+def _export(
+    summary: DepotSummary, snapshots: list[Snapshot], history: SettingsHistory
+) -> DepotExportV1:
+    """Ein Depot im Datenexport: Depotstaende, seit D5.3 Schwellen, Ziele und Kenntnisnahmen."""
+    return DepotExportV1(
+        depot=_depot(summary),
+        versions=[_holdings(s) for s in snapshots],
+        hint_params=[
+            HintParamsVersionV1(
+                version=v.version,
+                params=HintParamsV1.model_validate(v.values),
+                created_at=v.created_at,
+            )
+            for v in history.hint_params
+        ],
+        targets=[
+            TargetVersionV1(
+                version=v.version,
+                target=TargetAllocationV1.model_validate({"shares": dict(v.values)}),
+                created_at=v.created_at,
+            )
+            for v in history.targets
+        ],
+        acks=[
+            HintAckV1(key=a.key, measured=a.measured, severity=a.severity, at=a.at)
+            for a in history.acks
+        ],
     )
 
 
@@ -289,11 +346,54 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
 
         return _guarded(DepotAnalysisReplyV1, work)
 
+    def with_acks(depot_id: int, run: StoredRun | None) -> DepotHintsReplyV1:
+        acknowledged = service.acknowledged(depot_id, run) if run is not None else set()
+        return DepotHintsReplyV1(hints=_hints(run, acknowledged))
+
     def hints(request: DepotRefRequestV1) -> DepotHintsReplyV1:
         return _guarded(
             DepotHintsReplyV1,
-            lambda: DepotHintsReplyV1(
-                hints=_hints(service.hints(request.user_id, request.depot_id))
+            lambda: with_acks(request.depot_id, service.hints(request.user_id, request.depot_id)),
+        )
+
+    def acknowledge(request: HintAckRequestV1) -> DepotHintsReplyV1:
+        return _guarded(
+            DepotHintsReplyV1,
+            lambda: with_acks(
+                request.depot_id,
+                service.acknowledge(request.user_id, request.depot_id, request.key),
+            ),
+        )
+
+    def settings(request: DepotRefRequestV1) -> DepotSettingsReplyV1:
+        return _guarded(
+            DepotSettingsReplyV1,
+            lambda: DepotSettingsReplyV1(
+                settings=_settings(service.settings(request.user_id, request.depot_id))
+            ),
+        )
+
+    def save_params(request: HintParamsSaveRequestV1) -> DepotSettingsReplyV1:
+        return _guarded(
+            DepotSettingsReplyV1,
+            lambda: DepotSettingsReplyV1(
+                settings=_settings(
+                    service.save_hint_params(
+                        request.user_id, request.depot_id, request.base_version, request.params
+                    )
+                )
+            ),
+        )
+
+    def save_target(request: TargetSaveRequestV1) -> DepotSettingsReplyV1:
+        return _guarded(
+            DepotSettingsReplyV1,
+            lambda: DepotSettingsReplyV1(
+                settings=_settings(
+                    service.save_target(
+                        request.user_id, request.depot_id, request.base_version, request.target
+                    )
+                )
             ),
         )
 
@@ -364,8 +464,8 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
     def export(request: DepotExportRequestV1) -> DepotExportReplyV1:
         return DepotExportReplyV1(
             depots=[
-                DepotExportV1(depot=_depot(summary), versions=[_holdings(s) for s in snapshots])
-                for summary, snapshots in service.export(request.user_id)
+                _export(summary, snapshots, history)
+                for summary, snapshots, history in service.export(request.user_id)
             ]
         )
 
@@ -424,4 +524,8 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         HOLDINGS_FILE: holdings_file,
         DEPOTS_ANALYSIS: analysis,
         DEPOTS_HINTS: hints,
+        DEPOTS_SETTINGS: settings,
+        HINT_PARAMS_SAVE: save_params,
+        TARGET_SAVE: save_target,
+        HINT_ACK: acknowledge,
     }

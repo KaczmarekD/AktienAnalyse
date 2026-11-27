@@ -1,0 +1,250 @@
+{
+  "$defs": {
+    "DepotHintsV1": {
+      "description": "Die Hinweise des juengsten Laufs; ``analysis_run_id`` leer ohne Lauf (ohne Marktdaten).",
+      "properties": {
+        "analysis_run_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Analysis Run Id"
+        },
+        "computed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Computed At"
+        },
+        "hints": {
+          "items": {
+            "$ref": "#/$defs/HintV1"
+          },
+          "title": "Hints",
+          "type": "array"
+        },
+        "version": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "title": "DepotHintsV1",
+      "type": "object"
+    },
+    "HintV1": {
+      "description": "Ein Hinweis (D5.2) mit den Texten seines Katalogeintrags, damit das web-api den Katalog\nnicht kennen muss. ``measured``/``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent,\nTage und Handelstage als Zahl; ``as_of``: Datenstand.",
+      "properties": {
+        "acknowledged": {
+          "default": false,
+          "title": "Acknowledged",
+          "type": "boolean"
+        },
+        "approach": {
+          "title": "Approach",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "group": {
+          "title": "Group",
+          "type": "string"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "measured": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "HIN-K01",
+            "HIN-K02",
+            "HIN-K03",
+            "HIN-K04",
+            "HIN-K05",
+            "HIN-K06",
+            "HIN-A01",
+            "HIN-A02",
+            "HIN-Q01",
+            "HIN-Q02",
+            "HIN-Q03",
+            "HIN-Q04",
+            "HIN-Q05",
+            "HIN-Q06",
+            "HIN-E01",
+            "HIN-E02",
+            "HIN-E03",
+            "HIN-B01",
+            "HIN-B02",
+            "HIN-B03",
+            "HIN-N01",
+            "HIN-N02",
+            "HIN-D01",
+            "HIN-D02",
+            "HIN-D03"
+          ],
+          "title": "Rule",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "new",
+            "existing",
+            "resolved"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "rule",
+        "subject",
+        "severity",
+        "status",
+        "group",
+        "title",
+        "reason",
+        "approach"
+      ],
+      "title": "HintV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal",
+            "not_found",
+            "archived"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "description": "D5.2: die Hinweise des juengsten Laufs; ein fehlender Lauf wird vorher gerechnet.",
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "hints": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DepotHintsV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "DepotHintsReplyV1",
+  "type": "object"
+}

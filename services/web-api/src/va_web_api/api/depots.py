@@ -21,15 +21,25 @@ import re
 from collections.abc import Callable
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response
 
-from va_contracts.portfolio import MAX_FILE_BYTES, CashLineV1, HoldingLineV1
+from va_contracts.portfolio import (
+    MAX_FILE_BYTES,
+    MAX_HINT_KEY,
+    CashLineV1,
+    DepotSettingsV1,
+    HintParamsV1,
+    HoldingLineV1,
+    TargetAllocationV1,
+)
 
 from ..models import (
     CreateDepot,
     Depot,
     DepotAnalysis,
+    DepotHintParams,
     DepotHints,
+    DepotTarget,
     HistoryEntry,
     Holdings,
     ImportFile,
@@ -160,6 +170,82 @@ def depot_hints(user: DepotOwner, directory: Directory, depot_id: int) -> DepotH
     """D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
     portfolio zuerst einen. Beobachtungen, keine Anlageempfehlung."""
     hints = _guarded(lambda: directory.hints(user.id, depot_id))
+    if hints is None:  # pragma: no cover - portfolio antwortet mit Hinweisen oder Fehler
+        raise HTTPException(status_code=503, detail="Hinweise nicht verfuegbar")
+    return DepotHints.model_validate(hints.model_dump())
+
+
+def _params(settings: DepotSettingsV1, response: Response) -> DepotHintParams:
+    response.headers["ETag"] = _etag(settings.hint_params_version)
+    return DepotHintParams(version=settings.hint_params_version, params=settings.hint_params)
+
+
+def _target(settings: DepotSettingsV1, response: Response) -> DepotTarget:
+    response.headers["ETag"] = _etag(settings.target_version)
+    return DepotTarget(version=settings.target_version, shares=dict(settings.target.shares))
+
+
+@router.get("/depots/{depot_id}/hint-params", responses={**NOT_FOUND, **UNAVAILABLE})
+def get_hint_params(
+    user: DepotOwner, directory: Directory, depot_id: int, response: Response
+) -> DepotHintParams:
+    """D5.3: Schwellen der Hinweise (HIN-04), ohne gespeicherte die Standardwerte (Version 0)."""
+    return _params(_guarded(lambda: directory.settings(user.id, depot_id)), response)
+
+
+@router.put("/depots/{depot_id}/hint-params", responses={**NOT_FOUND, **UNAVAILABLE, **CONFLICT})
+def save_hint_params(
+    user: DepotOwner,
+    directory: Directory,
+    depot_id: int,
+    body: HintParamsV1,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> DepotHintParams:
+    """Neue Schwellen auf die Version aus ``If-Match``; danach rechnet das Depot neu."""
+    base = if_match_version(if_match, missing="die Version der Schwellen, auf der sie beruhen")
+    settings = _guarded(
+        lambda: directory.save_hint_params(user.id, depot_id, base_version=base, params=body)
+    )
+    return _params(settings, response)
+
+
+@router.get("/depots/{depot_id}/target-allocation", responses={**NOT_FOUND, **UNAVAILABLE})
+def get_target_allocation(
+    user: DepotOwner, directory: Directory, depot_id: int, response: Response
+) -> DepotTarget:
+    """D5.3: Zielallokation je Anlageklasse (DEP-10); ohne Ziel leer (Version 0)."""
+    return _target(_guarded(lambda: directory.settings(user.id, depot_id)), response)
+
+
+@router.put(
+    "/depots/{depot_id}/target-allocation", responses={**NOT_FOUND, **UNAVAILABLE, **CONFLICT}
+)
+def save_target_allocation(
+    user: DepotOwner,
+    directory: Directory,
+    depot_id: int,
+    body: TargetAllocationV1,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> DepotTarget:
+    """Neue Zielallokation auf die Version aus ``If-Match`` (leer: ohne Ziel)."""
+    base = if_match_version(if_match, missing="die Version der Zielallokation, auf der sie beruht")
+    settings = _guarded(
+        lambda: directory.save_target(user.id, depot_id, base_version=base, target=body)
+    )
+    return _target(settings, response)
+
+
+@router.post("/depots/{depot_id}/hints/{key}/ack", responses={**NOT_FOUND, **UNAVAILABLE})
+def acknowledge_hint(
+    user: DepotOwner,
+    directory: Directory,
+    depot_id: int,
+    key: Annotated[str, Path(max_length=MAX_HINT_KEY)],
+) -> DepotHints:
+    """D5.3, HIN-05: einen Hinweis des juengsten Laufs zur Kenntnis nehmen; 404 ohne ihn."""
+    hints = _guarded(lambda: directory.acknowledge(user.id, depot_id, key))
     if hints is None:  # pragma: no cover - portfolio antwortet mit Hinweisen oder Fehler
         raise HTTPException(status_code=503, detail="Hinweise nicht verfuegbar")
     return DepotHints.model_validate(hints.model_dump())

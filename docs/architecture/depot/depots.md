@@ -11,7 +11,8 @@
 > Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import`, `…/holdings/csv`),
 > seit D3.6 die Oberfläche: „Meine Depots“ (`/depots`, Startseite nach der Anmeldung) und das
 > Depot (`/depots/:id`) mit Positionen, Bearbeiten, Datei und Verlauf. Seit D4.2 trägt jede
-> Aktie ihre Scores (`score_view`, `PositionValueV1.score`, Spalten im Depot). Die Reiter
+> Aktie ihre Scores (`score_view`, `PositionValueV1.score`, Spalten im Depot). Seit D5.3 die
+> Zielallokation (`target_allocation`, `…/target-allocation`, Grundlage von HIN-A01). Die Reiter
 > Analyse, Hinweise, News und Einstellungen folgen mit D4 und später.
 
 ## Begriffe
@@ -103,7 +104,7 @@ wird nur angefügt.
 | `holding_snapshot` | id, depot_id, version (fortlaufend je Depot), source (`manual`/`import`/`bank`), source_ref (Datei-Hash oder Sync-ID), as_of (Stand laut Herkunft, z. B. der Bank), created_by, created_at | anfügen, eindeutig (depot_id, version) |
 | `holding_line` | snapshot_id, isin, quantity (numeric), unit (`pieces`/`nominal`), cost_basis_eur, bank_price, bank_price_currency, bank_price_date, note | anfügen |
 | `cash_line` | snapshot_id, currency, amount | anfügen |
-| `target_allocation` | depot_id, version, params (JSONB), created_at | anfügen, gültig ist die jüngste Zeile |
+| `target_allocation` | depot_id, version, shares (JSONB: Anteil je Anlageklasse `equity`, `etf`, `bond`, `other`, `cash`, zusammen 1 oder leer), created_by, created_at | anfügen, eindeutig (depot_id, version), gültig ist die jüngste Zeile (seit D5.3, Migration 0033); je Region noch nicht |
 | `security_view` | isin, payload (JSONB), received_at | lokale Kopie der Stammdaten aus market-data, anfügen |
 | `price_view` | isin, trade_date, close, currency, percent_of_par, source, symbol, received_at | lokale Kopie der Kurse, anfügen |
 | `fx_view` | currency, trade_date, rate_to_eur, received_at | lokale Kopie der Währungskurse (1 Einheit in EUR), anfügen (D3.4) |
@@ -136,7 +137,7 @@ Alle Endpunkte verlangen eine Sitzung. Fremde Depots ergeben 404.
 | `GET /api/v1/depots/{id}/history` | Liste der Depotstände mit Herkunft und Änderungen |
 | `POST /api/v1/depots/{id}/import/preview` | Datei prüfen, Abgleich zurückgeben, nichts speichern |
 | `POST /api/v1/depots/{id}/import` | Abgleich übernehmen (mit `If-Match`) |
-| `GET`/`PUT /api/v1/depots/{id}/target-allocation` | Zielallokation |
+| `GET`/`PUT /api/v1/depots/{id}/target-allocation` | Zielallokation mit Version und `ETag`, Speichern mit `If-Match` (seit D5.3; Version 0: kein Ziel) |
 
 Das web-api liest Depots per Request/Reply bei portfolio (`rpc.va.portfolio.*`), nicht aus
 Projektionen im Schema `web`. So liegen persönliche Daten nur in einem Schema.

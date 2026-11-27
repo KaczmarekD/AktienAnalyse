@@ -423,6 +423,60 @@ class TestValuation:
         finally:
             other.__exit__(None, None, None)
 
+    def test_thresholds_with_if_match(self, valued):
+        """D5.3: Version 0 sind die Standardwerte; Speichern nur auf die neueste Version."""
+        depot_id = self._depot(valued)
+        url = f"/api/v1/depots/{depot_id}/hint-params"
+        got = valued.get(url)
+        assert (got.status_code, got.headers["ETag"]) == (200, '"0"')
+        assert got.json()["params"]["k01_warning"] == 0.1
+        body = {**got.json()["params"], "k01_warning": 0.97, "k01_critical": 0.99}
+        assert _write(valued, "PUT", url, json=body).status_code == 428
+        saved = _write(valued, "PUT", url, json=body, headers={"If-Match": '"0"'})
+        assert (saved.status_code, saved.headers["ETag"]) == (200, '"1"')
+        stale = _write(valued, "PUT", url, json=body, headers={"If-Match": '"0"'})
+        assert stale.status_code == 409
+        hints = valued.get(f"/api/v1/depots/{depot_id}/hints").json()["hints"]
+        assert {h["status"] for h in hints if h["rule"] == "HIN-K01"} == {"resolved"}
+
+    def test_target_allocation_brings_a01(self, valued):
+        depot_id = self._depot(valued)
+        url = f"/api/v1/depots/{depot_id}/target-allocation"
+        assert valued.get(url).json() == {"version": 0, "shares": {}}
+        bad = _write(
+            valued, "PUT", url, json={"shares": {"equity": 0.5}}, headers={"If-Match": '"0"'}
+        )
+        assert bad.status_code == 422
+        body = {"shares": {"equity": 0.5, "cash": 0.5}}
+        saved = _write(valued, "PUT", url, json=body, headers={"If-Match": '"0"'})
+        assert saved.json()["version"] == 1
+        hints = valued.get(f"/api/v1/depots/{depot_id}/hints").json()["hints"]
+        assert "HIN-A01:equity" in {h["key"] for h in hints}
+
+    def test_acknowledge_a_hint(self, valued):
+        depot_id = self._depot(valued)
+        key = f"HIN-K01:{SAP}"
+        acked = _write(valued, "POST", f"/api/v1/depots/{depot_id}/hints/{key}/ack", json={})
+        assert acked.status_code == 200, acked.text
+        [k01] = [h for h in acked.json()["hints"] if h["key"] == key]
+        assert k01["acknowledged"] is True
+        unknown = _write(valued, "POST", f"/api/v1/depots/{depot_id}/hints/HIN-K01:X/ack", json={})
+        assert unknown.status_code == 404
+        long = _write(valued, "POST", f"/api/v1/depots/{depot_id}/hints/{'x' * 201}/ack", json={})
+        assert long.status_code == 422
+        [depot] = valued.get("/api/v1/me/export").json()["depots"]
+        assert [a["key"] for a in depot["acks"]] == [key]
+        assert (depot["hint_params"], depot["targets"]) == ([], [])
+
+    def test_settings_of_a_foreign_depot_are_404(self, valued, identity, store):
+        depot_id = self._depot(valued)
+        other = _client(identity, store, "ben", MemoryMarketStore())
+        try:
+            assert other.get(f"/api/v1/depots/{depot_id}/hint-params").status_code == 404
+            assert other.get(f"/api/v1/depots/{depot_id}/target-allocation").status_code == 404
+        finally:
+            other.__exit__(None, None, None)
+
     def test_without_market_data_no_analysis(self, anna):
         depot_id = _create(anna)
         assert anna.get(f"/api/v1/depots/{depot_id}/analysis").status_code == 503

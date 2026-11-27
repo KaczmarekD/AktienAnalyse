@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
+from va_contracts.portfolio import HintParamsV1, TargetAllocationV1
 from va_portfolio.adapters.postgres.erasure import erase_user
 from va_portfolio.adapters.postgres.market import PostgresMarketStore
 from va_portfolio.adapters.postgres.store import PostgresDepotStore
@@ -40,6 +41,10 @@ def _rows(engine: Engine, owner: int) -> dict[str, int]:
         # D5.2: Laeufe der Analyse und ihre Hinweise
         "analysis_run": f"depot_id IN ({depots})",
         "hint": f"analysis_run_id IN (SELECT id FROM portfolio.analysis_run WHERE depot_id IN ({depots}))",
+        # D5.3: Schwellen, Zielallokation, Kenntnisnahmen
+        "hint_params": f"depot_id IN ({depots})",
+        "target_allocation": f"depot_id IN ({depots})",
+        "hint_ack": f"depot_id IN ({depots})",
     }
     with engine.connect() as conn:
         return {
@@ -55,9 +60,16 @@ def _rows(engine: Engine, owner: int) -> dict[str, int]:
 def _fill(portfolio_engine: Engine, owner: int) -> None:
     market = PostgresMarketStore(portfolio_engine)
     market.record_prices([Quote(SAP, T0.date(), Decimal(100), "EUR")], [], at=T0)
-    service = DepotService(PostgresDepotStore(portfolio_engine), clock=lambda: T0, market=market)
+    store = PostgresDepotStore(portfolio_engine)
+    service = DepotService(store, clock=lambda: T0, market=market)
     depot = service.create(owner, "depot", "DKB", None).depot
     service.save(owner, depot.id, 0, [HoldingLine(SAP, Decimal("3"))], [CashLine(Decimal("5"))])
+    # D5.3: eigene Schwellen und Ziele, ein Hinweis zur Kenntnis genommen
+    service.save_hint_params(owner, depot.id, 0, HintParamsV1(k01_warning=0.5, k01_critical=0.9))
+    service.save_target(owner, depot.id, 0, TargetAllocationV1(shares={"equity": 1.0}))
+    run = store.latest_run(depot.id)
+    assert run is not None
+    service.acknowledge(owner, depot.id, run.hints[0].hint.key)
     service.update(owner, depot.id, "Neu", None)
     service.archive(owner, depot.id)
 
@@ -70,10 +82,13 @@ def test_all_rows_of_the_person_and_only_them(engine, portfolio_engine):
     rows = erase_user(engine, ANNA)
     assert rows["portfolio.depot"] == 1
     assert rows["portfolio.holding_line"] == 1
-    assert rows["portfolio.analysis_run"] == 1  # D5.2: der neue Depotstand bekam seine Analyse
+    # D5.2: der neue Depotstand bekam seine Analyse, D5.3: die neuen Schwellen eine zweite
+    assert rows["portfolio.analysis_run"] == 2
     assert rows["portfolio.hint"] >= 1
-    # created, holdings, analysis.completed, renamed, archived
-    assert rows["portfolio.outbox"] == 5
+    assert (rows["portfolio.hint_params"], rows["portfolio.target_allocation"]) == (1, 1)
+    assert rows["portfolio.hint_ack"] == 1
+    # created, holdings, analysis.completed (Depotstand, Schwellen), renamed, archived
+    assert rows["portfolio.outbox"] == 6
     assert set(_rows(engine, ANNA).values()) == {0}
     assert _rows(engine, BEN) == ben
 

@@ -501,7 +501,19 @@ export type DepotCosts = {
  * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
  */
 export type DepotExport = {
+  /**
+   * Acks
+   */
+  acks: Array<HintAckV1>;
   depot: Depot;
+  /**
+   * Hint Params
+   */
+  hint_params: Array<HintParamsVersionV1>;
+  /**
+   * Targets
+   */
+  targets: Array<TargetVersionV1>;
   /**
    * Versions
    */
@@ -516,6 +528,10 @@ export type DepotExport = {
  * ``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl.
  */
 export type DepotHint = {
+  /**
+   * Acknowledged
+   */
+  acknowledged: boolean;
   /**
    * Approach
    */
@@ -564,6 +580,19 @@ export type DepotHint = {
    * Title
    */
   title: string;
+};
+
+/**
+ * DepotHintParams
+ *
+ * D5.3: Schwellen der Hinweise eines Depots; Version 0 heisst Standardwerte.
+ */
+export type DepotHintParams = {
+  params: HintParamsV1;
+  /**
+   * Version
+   */
+  version: number;
 };
 
 /**
@@ -628,6 +657,24 @@ export type DepotQuality = {
    * Value Traps
    */
   value_traps: number;
+};
+
+/**
+ * DepotTarget
+ *
+ * D5.3: Zielallokation je Anlageklasse (DEP-10), zusammen 100 %; leer ohne Ziel.
+ */
+export type DepotTarget = {
+  /**
+   * Shares
+   */
+  shares: {
+    [key: string]: number;
+  };
+  /**
+   * Version
+   */
+  version: number;
 };
 
 /**
@@ -905,6 +952,181 @@ export type Health = {
    * Version
    */
   version: string;
+};
+
+/**
+ * HintAckV1
+ *
+ * D5.3: ein Hinweis zur Kenntnis genommen, mit Messwert und Schwere in diesem Moment.
+ */
+export type HintAckV1 = {
+  /**
+   * At
+   */
+  at: string;
+  /**
+   * Key
+   */
+  key: string;
+  /**
+   * Measured
+   */
+  measured?: number | null;
+  /**
+   * Severity
+   */
+  severity: 'info' | 'warning' | 'critical';
+};
+
+/**
+ * HintParamsV1
+ *
+ * Schwellen der Hinweise je Depot (HIN-04), mit Standardwerten aus dem Katalog.
+ *
+ * Anteile als Bruchteil (0,1 = 10 %), TER und Kurs in Prozent, Fondsvolumen in Millionen EUR.
+ * ``disabled``: abgeschaltete Regeln. Ein gespeicherter Stand ohne ein spaeter neues Feld bekommt
+ * beim Lesen den Standardwert, wie bei den Scoring-Profilen.
+ */
+export type HintParamsV1 = {
+  /**
+   * A01 Deviation
+   */
+  a01_deviation?: number;
+  /**
+   * A02 Cash
+   */
+  a02_cash?: number;
+  /**
+   * B01 Days
+   */
+  b01_days?: number;
+  /**
+   * B02 Price
+   */
+  b02_price?: number;
+  /**
+   * B03 Maturity Year
+   */
+  b03_maturity_year?: number;
+  /**
+   * Candidates
+   */
+  candidates?: boolean;
+  /**
+   * D01 Trading Days
+   */
+  d01_trading_days?: number;
+  /**
+   * D02 Bank Days
+   */
+  d02_bank_days?: number;
+  /**
+   * Disabled
+   */
+  disabled?: Array<
+    | 'HIN-K01'
+    | 'HIN-K02'
+    | 'HIN-K03'
+    | 'HIN-K04'
+    | 'HIN-K05'
+    | 'HIN-K06'
+    | 'HIN-A01'
+    | 'HIN-A02'
+    | 'HIN-Q01'
+    | 'HIN-Q02'
+    | 'HIN-Q03'
+    | 'HIN-Q04'
+    | 'HIN-Q05'
+    | 'HIN-Q06'
+    | 'HIN-E01'
+    | 'HIN-E02'
+    | 'HIN-E03'
+    | 'HIN-B01'
+    | 'HIN-B02'
+    | 'HIN-B03'
+    | 'HIN-N01'
+    | 'HIN-N02'
+    | 'HIN-D01'
+    | 'HIN-D02'
+    | 'HIN-D03'
+  >;
+  /**
+   * E01 Ter
+   */
+  e01_ter?: number;
+  /**
+   * E02 Overlap
+   */
+  e02_overlap?: number;
+  /**
+   * E03 Fund Size
+   */
+  e03_fund_size?: number;
+  /**
+   * K01 Critical
+   */
+  k01_critical?: number;
+  /**
+   * K01 Warning
+   */
+  k01_warning?: number;
+  /**
+   * K02 Top5
+   */
+  k02_top5?: number;
+  /**
+   * K03 Sector
+   */
+  k03_sector?: number;
+  /**
+   * K04 Country
+   */
+  k04_country?: number;
+  /**
+   * K05 Foreign Currency
+   */
+  k05_foreign_currency?: number;
+  /**
+   * K06 Issuer
+   */
+  k06_issuer?: number;
+  /**
+   * N01 Days
+   */
+  n01_days?: number;
+  /**
+   * N02 Days
+   */
+  n02_days?: number;
+  /**
+   * Q02 Percentile
+   */
+  q02_percentile?: number;
+  /**
+   * Q03 Drop
+   */
+  q03_drop?: number;
+  /**
+   * Q04 Quality
+   */
+  q04_quality?: number;
+};
+
+/**
+ * HintParamsVersionV1
+ *
+ * D5.3: eine gespeicherte Version der Schwellen eines Depots (Datenexport, NUT-12).
+ */
+export type HintParamsVersionV1 = {
+  /**
+   * Created At
+   */
+  created_at: string;
+  params: HintParamsV1;
+  /**
+   * Version
+   */
+  version: number;
 };
 
 /**
@@ -2620,6 +2842,38 @@ export type Snapshot = {
 };
 
 /**
+ * TargetAllocationV1
+ *
+ * Zielallokation je Anlageklasse (DEP-10, HIN-A01), zusammen 100 %; leer heisst ohne Ziel.
+ * Eine Region je Klasse sieht die Spezifikation als Kann vor; sie fehlt vorerst.
+ */
+export type TargetAllocationV1 = {
+  /**
+   * Shares
+   */
+  shares?: {
+    [key: string]: number;
+  };
+};
+
+/**
+ * TargetVersionV1
+ *
+ * D5.3: eine gespeicherte Version der Zielallokation eines Depots (Datenexport, NUT-12).
+ */
+export type TargetVersionV1 = {
+  /**
+   * Created At
+   */
+  created_at: string;
+  target: TargetAllocationV1;
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
  * UpdateDepot
  */
 export type UpdateDepot = {
@@ -3247,6 +3501,102 @@ export type ArchiveDepotResponses = {
 
 export type ArchiveDepotResponse = ArchiveDepotResponses[keyof ArchiveDepotResponses];
 
+export type GetHintParamsData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/hint-params';
+};
+
+export type GetHintParamsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type GetHintParamsError = GetHintParamsErrors[keyof GetHintParamsErrors];
+
+export type GetHintParamsResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotHintParams;
+};
+
+export type GetHintParamsResponse = GetHintParamsResponses[keyof GetHintParamsResponses];
+
+export type SaveHintParamsData = {
+  body: HintParamsV1;
+  headers?: {
+    /**
+     * If-Match
+     */
+    'if-match'?: string | null;
+  };
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/hint-params';
+};
+
+export type SaveHintParamsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)
+   */
+  422: unknown;
+  /**
+   * If-Match fehlt
+   */
+  428: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type SaveHintParamsResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotHintParams;
+};
+
+export type SaveHintParamsResponse = SaveHintParamsResponses[keyof SaveHintParamsResponses];
+
 export type DepotHintsData = {
   body?: never;
   path: {
@@ -3288,6 +3638,52 @@ export type DepotHintsResponses = {
 };
 
 export type DepotHintsResponse = DepotHintsResponses[keyof DepotHintsResponses];
+
+export type AcknowledgeHintData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+    /**
+     * Key
+     */
+    key: string;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/hints/{key}/ack';
+};
+
+export type AcknowledgeHintErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type AcknowledgeHintError = AcknowledgeHintErrors[keyof AcknowledgeHintErrors];
+
+export type AcknowledgeHintResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotHints;
+};
+
+export type AcknowledgeHintResponse = AcknowledgeHintResponses[keyof AcknowledgeHintResponses];
 
 export type DepotHistoryData = {
   body?: never;
@@ -3626,6 +4022,104 @@ export type RestoreDepotResponses = {
 };
 
 export type RestoreDepotResponse = RestoreDepotResponses[keyof RestoreDepotResponses];
+
+export type GetTargetAllocationData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/target-allocation';
+};
+
+export type GetTargetAllocationErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type GetTargetAllocationError = GetTargetAllocationErrors[keyof GetTargetAllocationErrors];
+
+export type GetTargetAllocationResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotTarget;
+};
+
+export type GetTargetAllocationResponse =
+  GetTargetAllocationResponses[keyof GetTargetAllocationResponses];
+
+export type SaveTargetAllocationData = {
+  body: TargetAllocationV1;
+  headers?: {
+    /**
+     * If-Match
+     */
+    'if-match'?: string | null;
+  };
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/target-allocation';
+};
+
+export type SaveTargetAllocationErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Depot archiviert oder Depotstand nicht mehr der neueste
+   */
+  409: unknown;
+  /**
+   * Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)
+   */
+  422: unknown;
+  /**
+   * If-Match fehlt
+   */
+  428: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type SaveTargetAllocationResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotTarget;
+};
+
+export type SaveTargetAllocationResponse =
+  SaveTargetAllocationResponses[keyof SaveTargetAllocationResponses];
 
 export type HealthData = {
   body?: never;

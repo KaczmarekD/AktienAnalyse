@@ -17,6 +17,7 @@ from ..base import Contract, PositiveId
 from ..events.v1.ranking import ValueTrapReason
 from ..portfolio import (
     MAX_FILE_BYTES,
+    MAX_HINT_KEY,
     MAX_LINES,
     CashLineV1,
     DepotAnalysisV1,
@@ -24,11 +25,14 @@ from ..portfolio import (
     DepotHintsV1,
     DepotKind,
     DepotName,
+    DepotSettingsV1,
     DepotV1,
+    HintParamsV1,
     HistoryEntryV1,
     HoldingLineV1,
     HoldingsV1,
     ImportPreviewV1,
+    TargetAllocationV1,
 )
 from ..portfolio import Text as DepotText
 from ..profile import ProfileParamsV1
@@ -282,6 +286,38 @@ class DepotHintsReplyV1(RpcReplyV1):
     hints: DepotHintsV1 | None = None
 
 
+class DepotSettingsReplyV1(RpcReplyV1):
+    """D5.3: Schwellen und Zielallokation; ``conflict`` nennt die neueste Version."""
+
+    settings: DepotSettingsV1 | None = None
+
+
+class HintParamsSaveRequestV1(Contract):
+    """D5.3: neue Schwellen auf ``base_version``; ist die nicht mehr die neueste: ``conflict``."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    base_version: int = Field(ge=0)
+    params: HintParamsV1
+
+
+class TargetSaveRequestV1(Contract):
+    """D5.3: neue Zielallokation auf ``base_version`` (leer: ohne Ziel)."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    base_version: int = Field(ge=0)
+    target: TargetAllocationV1
+
+
+class HintAckRequestV1(Contract):
+    """D5.3: einen Hinweis des juengsten Laufs zur Kenntnis nehmen (HIN-05)."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    key: str = Field(min_length=1, max_length=MAX_HINT_KEY)
+
+
 class DepotAnalysisReplyV1(RpcReplyV1):
     """D4.4: ``analysis`` leer, wenn portfolio keine Marktdaten lesen kann."""
 
@@ -409,6 +445,13 @@ HOLDINGS_FILE = RpcSpec("portfolio.holdings.file", HoldingsGetRequestV1, Holding
 DEPOTS_ANALYSIS = RpcSpec("portfolio.depots.analysis", DepotRefRequestV1, DepotAnalysisReplyV1)
 # D5.2: Hinweise des juengsten Laufs
 DEPOTS_HINTS = RpcSpec("portfolio.depots.hints", DepotRefRequestV1, DepotHintsReplyV1)
+# D5.3: Einstellungen und Kenntnisnahme
+DEPOTS_SETTINGS = RpcSpec("portfolio.depots.settings", DepotRefRequestV1, DepotSettingsReplyV1)
+HINT_PARAMS_SAVE = RpcSpec(
+    "portfolio.depots.hint_params.save", HintParamsSaveRequestV1, DepotSettingsReplyV1
+)
+TARGET_SAVE = RpcSpec("portfolio.depots.target.save", TargetSaveRequestV1, DepotSettingsReplyV1)
+HINT_ACK = RpcSpec("portfolio.depots.hints.ack", HintAckRequestV1, DepotHintsReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -438,6 +481,10 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         HOLDINGS_FILE,
         DEPOTS_ANALYSIS,
         DEPOTS_HINTS,
+        DEPOTS_SETTINGS,
+        HINT_PARAMS_SAVE,
+        TARGET_SAVE,
+        HINT_ACK,
     )
 }
 
@@ -450,7 +497,10 @@ __all__ = [
     "DEPOTS_HINTS",
     "DEPOTS_LIST",
     "DEPOTS_RESTORE",
+    "DEPOTS_SETTINGS",
     "DEPOTS_UPDATE",
+    "HINT_ACK",
+    "HINT_PARAMS_SAVE",
     "HOLDINGS_FILE",
     "HOLDINGS_GET",
     "HOLDINGS_HISTORY",
@@ -468,6 +518,7 @@ __all__ = [
     "SCORING_PREVIEW",
     "SECURITIES_RESOLVE",
     "SECURITIES_SEARCH",
+    "TARGET_SAVE",
     "ActivateReplyV1",
     "ActivateRequestV1",
     "DepotCreateRequestV1",

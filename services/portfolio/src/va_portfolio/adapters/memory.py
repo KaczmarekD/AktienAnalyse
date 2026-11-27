@@ -11,7 +11,14 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from ..domain.depots import Depot, Snapshot, VersionConflict
-from ..domain.hints import StoredRun, TrackedHint
+from ..domain.hints import (
+    Ack,
+    SettingsHistory,
+    SettingsVersion,
+    StoredRun,
+    StoredSettings,
+    TrackedHint,
+)
 from ..domain.valuation import Market, Quote, Score, SecurityInfo
 
 if TYPE_CHECKING:
@@ -36,6 +43,10 @@ class MemoryDepotStore:
         self._lock = threading.Lock()
         self.runs: list[StoredRun] = []  # D5.2
         self.results: dict[int, dict[str, Any]] = {}
+        # D5.3: je Depot die Versionen der Schwellen und Ziele, die Kenntnisnahmen
+        self.params: dict[int, list[SettingsVersion]] = {}
+        self.targets: dict[int, list[SettingsVersion]] = {}
+        self.ack_rows: list[tuple[int, Ack]] = []
 
     def create_depot(
         self,
@@ -161,6 +172,75 @@ class MemoryDepotStore:
             self.results[run.id] = result
             self.events.append(event(run.id))
             return run.id
+
+    # --- D5.3: Einstellungen und Kenntnisnahme ---
+
+    def settings(self, depot_id: int) -> StoredSettings:
+        params = self.params.get(depot_id, [])
+        targets = self.targets.get(depot_id, [])
+        return StoredSettings(
+            hint_params=params[-1].values if params else {},
+            hint_params_version=len(params),
+            target=targets[-1].values if targets else {},  # type: ignore[arg-type]
+            target_version=len(targets),
+        )
+
+    @staticmethod
+    def _append(
+        versions: list[SettingsVersion], version: int, values: dict[str, Any], at: datetime
+    ) -> None:
+        if version != len(versions) + 1:
+            raise VersionConflict(len(versions))
+        versions.append(SettingsVersion(version, values, at))
+
+    def save_hint_params(
+        self, depot_id: int, *, version: int, params: dict[str, Any], by: int, at: datetime
+    ) -> None:
+        del by
+        with self._lock:
+            self._append(self.params.setdefault(depot_id, []), version, params, at)
+
+    def save_target(
+        self, depot_id: int, *, version: int, shares: dict[str, float], by: int, at: datetime
+    ) -> None:
+        del by
+        with self._lock:
+            self._append(self.targets.setdefault(depot_id, []), version, dict(shares), at)
+
+    def acks(self, depot_id: int) -> dict[str, Ack]:
+        return {ack.key: ack for d, ack in self.ack_rows if d == depot_id}
+
+    def save_ack(
+        self,
+        depot_id: int,
+        *,
+        key: str,
+        user_id: int,
+        run_id: int,
+        measured: float | None,
+        severity: str,
+        at: datetime,
+    ) -> None:
+        del user_id
+        ack = Ack(key, measured, severity, at, run_id)  # type: ignore[arg-type]
+        self.ack_rows.append((depot_id, ack))
+
+    def since_new(self, depot_id: int) -> dict[str, int]:
+        since: dict[str, int] = {}
+        for run in self.runs:
+            if run.depot_id != depot_id:
+                continue
+            for tracked in run.hints:
+                if tracked.status == "new":
+                    since[tracked.hint.key] = max(since.get(tracked.hint.key, 0), run.id)
+        return since
+
+    def settings_history(self, depot_id: int) -> SettingsHistory:
+        return SettingsHistory(
+            hint_params=list(self.params.get(depot_id, [])),
+            targets=list(self.targets.get(depot_id, [])),
+            acks=[ack for d, ack in self.ack_rows if d == depot_id],
+        )
 
 
 class MemoryMarketStore:

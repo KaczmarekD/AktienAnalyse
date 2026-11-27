@@ -5,6 +5,8 @@ import { type HttpRequest, httpResource } from '@angular/common/http';
 import { client } from '../client.gen';
 import type { Options } from '../sdk.gen';
 import type {
+  AcknowledgeHintData,
+  AcknowledgeHintResponse,
   ActivateProfileVersionData,
   ActivateProfileVersionResponse,
   ArchiveDepotData,
@@ -33,6 +35,8 @@ import type {
   ExportDataResponse,
   GetDepotData,
   GetDepotResponse,
+  GetHintParamsData,
+  GetHintParamsResponse,
   GetHoldingsData,
   GetHoldingsResponse,
   GetInstrumentData,
@@ -48,6 +52,8 @@ import type {
   GetRunResponse,
   GetSecurityData,
   GetSecurityResponse,
+  GetTargetAllocationData,
+  GetTargetAllocationResponse,
   HealthData,
   HealthResponse,
   HoldingsCsvData,
@@ -83,10 +89,14 @@ import type {
   RestoreDepotResponse,
   RevokeAllSessionsData,
   RevokeAllSessionsResponse,
+  SaveHintParamsData,
+  SaveHintParamsResponse,
   SaveHoldingsData,
   SaveHoldingsResponse,
   SaveProfileVersionData,
   SaveProfileVersionResponse,
+  SaveTargetAllocationData,
+  SaveTargetAllocationResponse,
   SearchSecuritiesData,
   SearchSecuritiesResponse,
   StartRunData,
@@ -324,6 +334,36 @@ export const archiveDepotRequest = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Get Hint Params
+ *
+ * D5.3: Schwellen der Hinweise (HIN-04), ohne gespeicherte die Standardwerte (Version 0).
+ */
+export const getHintParamsRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetHintParamsData, ThrowOnError>,
+): HttpRequest<GetHintParamsResponse> =>
+  (options?.client ?? client).requestOptions<GetHintParamsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/hint-params',
+    ...options,
+  });
+
+/**
+ * Save Hint Params
+ *
+ * Neue Schwellen auf die Version aus ``If-Match``; danach rechnet das Depot neu.
+ */
+export const saveHintParamsRequest = <ThrowOnError extends boolean = false>(
+  options: Options<SaveHintParamsData, ThrowOnError>,
+): HttpRequest<SaveHintParamsResponse> =>
+  (options?.client ?? client).requestOptions<SaveHintParamsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/depots/{depot_id}/hint-params',
+    ...options,
+  });
+
+/**
  * Depot Hints
  *
  * D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
@@ -336,6 +376,21 @@ export const depotHintsRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'GET',
     url: '/api/v1/depots/{depot_id}/hints',
+    ...options,
+  });
+
+/**
+ * Acknowledge Hint
+ *
+ * D5.3, HIN-05: einen Hinweis des juengsten Laufs zur Kenntnis nehmen; 404 ohne ihn.
+ */
+export const acknowledgeHintRequest = <ThrowOnError extends boolean = false>(
+  options: Options<AcknowledgeHintData, ThrowOnError>,
+): HttpRequest<AcknowledgeHintResponse> =>
+  (options?.client ?? client).requestOptions<AcknowledgeHintResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'POST',
+    url: '/api/v1/depots/{depot_id}/hints/{key}/ack',
     ...options,
   });
 
@@ -440,6 +495,36 @@ export const restoreDepotRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'POST',
     url: '/api/v1/depots/{depot_id}/restore',
+    ...options,
+  });
+
+/**
+ * Get Target Allocation
+ *
+ * D5.3: Zielallokation je Anlageklasse (DEP-10); ohne Ziel leer (Version 0).
+ */
+export const getTargetAllocationRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetTargetAllocationData, ThrowOnError>,
+): HttpRequest<GetTargetAllocationResponse> =>
+  (options?.client ?? client).requestOptions<GetTargetAllocationResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/target-allocation',
+    ...options,
+  });
+
+/**
+ * Save Target Allocation
+ *
+ * Neue Zielallokation auf die Version aus ``If-Match`` (leer: ohne Ziel).
+ */
+export const saveTargetAllocationRequest = <ThrowOnError extends boolean = false>(
+  options: Options<SaveTargetAllocationData, ThrowOnError>,
+): HttpRequest<SaveTargetAllocationResponse> =>
+  (options?.client ?? client).requestOptions<SaveTargetAllocationResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'PUT',
+    url: '/api/v1/depots/{depot_id}/target-allocation',
     ...options,
   });
 
@@ -975,6 +1060,32 @@ export const archiveDepotResource = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Get Hint Params
+ *
+ * D5.3: Schwellen der Hinweise (HIN-04), ohne gespeicherte die Standardwerte (Version 0).
+ */
+export const getHintParamsResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<GetHintParamsData, ThrowOnError> | undefined,
+) =>
+  httpResource<GetHintParamsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? getHintParamsRequest(opts) : undefined;
+  });
+
+/**
+ * Save Hint Params
+ *
+ * Neue Schwellen auf die Version aus ``If-Match``; danach rechnet das Depot neu.
+ */
+export const saveHintParamsResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<SaveHintParamsData, ThrowOnError> | undefined,
+) =>
+  httpResource<SaveHintParamsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? saveHintParamsRequest(opts) : undefined;
+  });
+
+/**
  * Depot Hints
  *
  * D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
@@ -986,6 +1097,19 @@ export const depotHintsResource = <ThrowOnError extends boolean = false>(
   httpResource<DepotHintsResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? depotHintsRequest(opts) : undefined;
+  });
+
+/**
+ * Acknowledge Hint
+ *
+ * D5.3, HIN-05: einen Hinweis des juengsten Laufs zur Kenntnis nehmen; 404 ohne ihn.
+ */
+export const acknowledgeHintResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<AcknowledgeHintData, ThrowOnError> | undefined,
+) =>
+  httpResource<AcknowledgeHintResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? acknowledgeHintRequest(opts) : undefined;
   });
 
 /**
@@ -1076,6 +1200,32 @@ export const restoreDepotResource = <ThrowOnError extends boolean = false>(
   httpResource<RestoreDepotResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? restoreDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Get Target Allocation
+ *
+ * D5.3: Zielallokation je Anlageklasse (DEP-10); ohne Ziel leer (Version 0).
+ */
+export const getTargetAllocationResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<GetTargetAllocationData, ThrowOnError> | undefined,
+) =>
+  httpResource<GetTargetAllocationResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? getTargetAllocationRequest(opts) : undefined;
+  });
+
+/**
+ * Save Target Allocation
+ *
+ * Neue Zielallokation auf die Version aus ``If-Match`` (leer: ohne Ziel).
+ */
+export const saveTargetAllocationResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<SaveTargetAllocationData, ThrowOnError> | undefined,
+) =>
+  httpResource<SaveTargetAllocationResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? saveTargetAllocationRequest(opts) : undefined;
   });
 
 /**

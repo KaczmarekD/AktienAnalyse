@@ -23,11 +23,14 @@ if TYPE_CHECKING:
         DepotExportV1,
         DepotHintsV1,
         DepotKind,
+        DepotSettingsV1,
         DepotV1,
+        HintParamsV1,
         HistoryEntryV1,
         HoldingLineV1,
         HoldingsV1,
         ImportPreviewV1,
+        TargetAllocationV1,
     )
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.securities import SecurityHitV1, SecurityV1
@@ -202,6 +205,20 @@ class DepotDirectory(Protocol):
 
     # D5.2: Hinweise des juengsten Laufs; ``None``, wenn portfolio nicht antwortet wie erwartet
     def hints(self, user_id: int, depot_id: int) -> DepotHintsV1 | None: ...
+
+    # D5.3: Schwellen, Zielallokation (je auf eine Basisversion, sonst ``DepotConflict``),
+    # Kenntnisnahme eines Hinweises
+    def settings(self, user_id: int, depot_id: int) -> DepotSettingsV1: ...
+
+    def save_hint_params(
+        self, user_id: int, depot_id: int, *, base_version: int, params: HintParamsV1
+    ) -> DepotSettingsV1: ...
+
+    def save_target(
+        self, user_id: int, depot_id: int, *, base_version: int, target: TargetAllocationV1
+    ) -> DepotSettingsV1: ...
+
+    def acknowledge(self, user_id: int, depot_id: int, key: str) -> DepotHintsV1 | None: ...
 
 
 class ProfileConflict(Exception):

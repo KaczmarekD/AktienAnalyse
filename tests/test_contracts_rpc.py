@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from va_contracts.profile import ProfileParamsV1
 from va_contracts.rpc.v1 import (
@@ -78,6 +79,11 @@ class TestCatalog:
             "portfolio.holdings.file",
             "portfolio.depots.analysis",  # D4.4: Analyse eines Depots
             "portfolio.depots.hints",  # D5.2: Hinweise
+            # D5.3: Einstellungen und Kenntnisnahme
+            "portfolio.depots.settings",
+            "portfolio.depots.hint_params.save",
+            "portfolio.depots.target.save",
+            "portfolio.depots.hints.ack",
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 
@@ -311,3 +317,21 @@ class TestDepots:
 
         reply = HoldingsReplyV1(error=RpcErrorV1(code="conflict", message="x", newest=8))
         assert HoldingsReplyV1.model_validate_json(reply.model_dump_json()).error.newest == 8  # type: ignore[union-attr]
+
+
+class TestTargetAllocation:
+    """D5.3: Zielallokation zusammen 100 %, leer heisst ohne Ziel."""
+
+    def test_together_all_of_it(self):
+        from va_contracts.portfolio import TargetAllocationV1
+
+        assert TargetAllocationV1(shares={"equity": 0.6, "bond": 0.3, "cash": 0.1}).shares
+        assert TargetAllocationV1().shares == {}
+        with pytest.raises(ValidationError):
+            TargetAllocationV1(shares={"equity": 0.6, "bond": 0.3})
+
+    def test_only_known_classes(self):
+        from va_contracts.portfolio import TargetAllocationV1
+
+        with pytest.raises(ValidationError):
+            TargetAllocationV1(shares={"crypto": 1.0})  # type: ignore[dict-item]

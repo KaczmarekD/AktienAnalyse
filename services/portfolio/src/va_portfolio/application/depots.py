@@ -41,7 +41,7 @@ from va_contracts.events.v1 import (
     DepotChange,
     DepotChangedV1,
 )
-from va_contracts.portfolio import DepotAnalysisV1, HintParamsV1
+from va_contracts.portfolio import DepotAnalysisV1, HintParamsV1, TargetAllocationV1
 
 from ..domain.analysis import DepotAnalysis, analyze
 from ..domain.depots import (
@@ -56,7 +56,14 @@ from ..domain.depots import (
     diff,
     next_version,
 )
-from ..domain.hints import Hint, HintInput, TrackedHint, evaluate, track
+from ..domain.hints import (
+    Hint,
+    HintInput,
+    TrackedHint,
+    evaluate,
+    still_acknowledged,
+    track,
+)
 from ..domain.holdings_file import (
     FileLine,
     ImportEntry,
@@ -72,7 +79,7 @@ if TYPE_CHECKING:
     from va_contracts import Envelope
     from va_contracts.portfolio import DepotKind, DepotState, HoldingUnit, SnapshotSource
 
-    from ..domain.hints import StoredRun
+    from ..domain.hints import Ack, SettingsHistory, StoredRun, StoredSettings
     from .market import MarketReader
 
 log = logging.getLogger(__name__)
@@ -160,6 +167,46 @@ class DepotStore(Protocol):
         ...
 
     def latest_run(self, depot_id: int) -> StoredRun | None: ...
+
+    # --- D5.3: Einstellungen und Kenntnisnahme ---
+
+    def settings(self, depot_id: int) -> StoredSettings: ...
+
+    def save_hint_params(
+        self, depot_id: int, *, version: int, params: dict[str, Any], by: int, at: datetime
+    ) -> None:
+        """Wirft ``VersionConflict``, wenn die Version schon vergeben ist."""
+        ...
+
+    def save_target(
+        self, depot_id: int, *, version: int, shares: dict[str, float], by: int, at: datetime
+    ) -> None:
+        """Wirft ``VersionConflict``, wenn die Version schon vergeben ist."""
+        ...
+
+    def acks(self, depot_id: int) -> dict[str, Ack]:
+        """Je Schluessel die juengste Kenntnisnahme."""
+        ...
+
+    def save_ack(
+        self,
+        depot_id: int,
+        *,
+        key: str,
+        user_id: int,
+        run_id: int,
+        measured: float | None,
+        severity: str,
+        at: datetime,
+    ) -> None: ...
+
+    def since_new(self, depot_id: int) -> dict[str, int]:
+        """Je Schluessel der juengste Lauf, in dem der Hinweis neu war."""
+        ...
+
+    def settings_history(self, depot_id: int) -> SettingsHistory:
+        """Alle Versionen der Schwellen und Ziele, alle Kenntnisnahmen (Datenexport)."""
+        ...
 
     def save_run(
         self,
@@ -402,10 +449,15 @@ class DepotService:
             previous = snap.lines
         return entries[::-1]
 
-    def export(self, user_id: int) -> list[tuple[DepotSummary, list[Snapshot]]]:
-        """D3.2 (NUT-12): alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden."""
+    def export(self, user_id: int) -> list[tuple[DepotSummary, list[Snapshot], SettingsHistory]]:
+        """D3.2 (NUT-12): alle Depots des Nutzers, auch archivierte, mit allen Depotstaenden;
+        seit D5.3 mit Schwellen, Zielallokationen und Kenntnisnahmen."""
         return [  # ohne Bewertung: der Export enthaelt nur, was der Nutzer erfasst hat
-            (self._summary(depot), self._store.snapshots(depot.id))
+            (
+                self._summary(depot),
+                self._store.snapshots(depot.id),
+                self._store.settings_history(depot.id),
+            )
             for depot in self._store.depots(user_id, include_archived=True)
         ]
 
@@ -537,6 +589,90 @@ class DepotService:
             self._refresh(depot, "request")
         return self._store.latest_run(depot.id)
 
+    def settings(self, user_id: int, depot_id: int) -> StoredSettings:
+        """D5.3: Schwellen und Zielallokation, ohne gespeicherte die Standardwerte."""
+        return self._store.settings(self._owned(user_id, depot_id).id)
+
+    def save_hint_params(
+        self, user_id: int, depot_id: int, base_version: int, params: HintParamsV1
+    ) -> StoredSettings:
+        """Neue Schwellen auf ``base_version``; danach rechnet das Depot neu."""
+        depot = self._writable(user_id, depot_id)
+        current = self._store.settings(depot.id)
+        version = next_version(newest=current.hint_params_version, base=base_version)
+        self._store.save_hint_params(
+            depot.id,
+            version=version,
+            params=params.model_dump(mode="json"),
+            by=user_id,
+            at=self._clock(),
+        )
+        return self._after_settings(depot)
+
+    def save_target(
+        self, user_id: int, depot_id: int, base_version: int, target: TargetAllocationV1
+    ) -> StoredSettings:
+        """Neue Zielallokation auf ``base_version`` (leer: ohne Ziel); danach rechnet das Depot neu."""
+        depot = self._writable(user_id, depot_id)
+        current = self._store.settings(depot.id)
+        version = next_version(newest=current.target_version, base=base_version)
+        self._store.save_target(
+            depot.id,
+            version=version,
+            shares={str(k): v for k, v in target.shares.items()},
+            by=user_id,
+            at=self._clock(),
+        )
+        return self._after_settings(depot)
+
+    def acknowledge(self, user_id: int, depot_id: int, key: str) -> StoredRun | None:
+        """D5.3, HIN-05: einen Hinweis des juengsten Laufs zur Kenntnis nehmen; ein archiviertes
+        Depot ist schreibgeschuetzt."""
+        depot = self._writable(user_id, depot_id)
+        run = self._store.latest_run(depot.id)
+        tracked = next(
+            (t for t in (run.hints if run else []) if t.hint.key == key and t.status != "resolved"),
+            None,
+        )
+        if tracked is None:
+            msg = f"Kein Hinweis {key}"
+            raise DepotNotFound(msg)
+        assert run is not None  # sonst gaebe es keinen Hinweis
+        self._store.save_ack(
+            depot.id,
+            key=key,
+            user_id=user_id,
+            run_id=run.id,
+            measured=tracked.hint.measured,
+            severity=tracked.hint.severity,
+            at=self._clock(),
+        )
+        return run
+
+    def acknowledged(self, depot_id: int, run: StoredRun) -> set[str]:
+        """Die Schluessel der Hinweise des Laufs, die noch als zur Kenntnis genommen gelten:
+        nicht erledigt, seit der Kenntnisnahme nicht neu erschienen, nicht verschlechtert."""
+        acks = self._store.acks(depot_id)
+        if not acks:
+            return set()
+        since = self._store.since_new(depot_id)
+        return {
+            t.hint.key
+            for t in run.hints
+            if t.status != "resolved"
+            and (ack := acks.get(t.hint.key)) is not None
+            and ack.run_id >= since.get(t.hint.key, 0)
+            and still_acknowledged(t.hint, ack)
+        }
+
+    def _after_settings(self, depot: Depot) -> StoredSettings:
+        try:
+            self._refresh(depot, "settings")
+        except Exception:
+            log.warning("Analyse von Depot %s nicht gespeichert", depot.id, exc_info=True)
+        self._after_write()
+        return self._store.settings(depot.id)
+
     def refresh_all(self, trigger: str) -> int:
         """D5.2: alle aktiven Depots neu rechnen (neue Kurse, Scores, Stammdaten); wirft nicht."""
         runs = 0
@@ -591,6 +727,7 @@ class DepotService:
         except Exception:
             log.warning("Marktdaten nicht lesbar - Depot ohne Analyse", exc_info=True)
             return None
+        settings = self._store.settings(depot.id)
         value = value_depot(depot.kind, snapshot.lines, snapshot.cash, market)
         data = analysis_input(value, found, scores)
         analysis = analyze(data)
@@ -601,8 +738,10 @@ class DepotService:
             leis={i: s.lei for i, s in found.items() if s.lei},
             fund_sizes=fund_sizes(found, market.fx),
             previous_scores=previous,
+            target=settings.target,
         )
-        return Evaluated(snapshot.version, analysis, evaluate(source, HintParamsV1()))
+        params = HintParamsV1.model_validate(settings.hint_params)
+        return Evaluated(snapshot.version, analysis, evaluate(source, params))
 
     def _summary(self, depot: Depot) -> DepotSummary:
         version, positions = self._store.summary(depot.id)

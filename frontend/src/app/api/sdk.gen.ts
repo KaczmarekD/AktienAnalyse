@@ -5,6 +5,9 @@ import * as z from 'zod';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
 import type {
+  AcknowledgeHintData,
+  AcknowledgeHintErrors,
+  AcknowledgeHintResponses,
   ActivateProfileVersionData,
   ActivateProfileVersionErrors,
   ActivateProfileVersionResponses,
@@ -46,6 +49,9 @@ import type {
   GetDepotData,
   GetDepotErrors,
   GetDepotResponses,
+  GetHintParamsData,
+  GetHintParamsErrors,
+  GetHintParamsResponses,
   GetHoldingsData,
   GetHoldingsErrors,
   GetHoldingsResponses,
@@ -70,6 +76,9 @@ import type {
   GetSecurityData,
   GetSecurityErrors,
   GetSecurityResponses,
+  GetTargetAllocationData,
+  GetTargetAllocationErrors,
+  GetTargetAllocationResponses,
   HealthData,
   HealthResponses,
   HoldingsCsvData,
@@ -123,12 +132,18 @@ import type {
   RevokeAllSessionsData,
   RevokeAllSessionsErrors,
   RevokeAllSessionsResponses,
+  SaveHintParamsData,
+  SaveHintParamsErrors,
+  SaveHintParamsResponses,
   SaveHoldingsData,
   SaveHoldingsErrors,
   SaveHoldingsResponses,
   SaveProfileVersionData,
   SaveProfileVersionErrors,
   SaveProfileVersionResponses,
+  SaveTargetAllocationData,
+  SaveTargetAllocationErrors,
+  SaveTargetAllocationResponses,
   SearchSecuritiesData,
   SearchSecuritiesErrors,
   SearchSecuritiesResponses,
@@ -143,6 +158,8 @@ import type {
   UpdateProfileResponses,
 } from './types.gen';
 import {
+  zAcknowledgeHintPath,
+  zAcknowledgeHintResponse,
   zActivateProfileVersionBody,
   zActivateProfileVersionPath,
   zActivateProfileVersionResponse,
@@ -170,6 +187,8 @@ import {
   zExportDataResponse,
   zGetDepotPath,
   zGetDepotResponse,
+  zGetHintParamsPath,
+  zGetHintParamsResponse,
   zGetHoldingsPath,
   zGetHoldingsQuery,
   zGetHoldingsResponse,
@@ -187,6 +206,8 @@ import {
   zGetSecurityPath,
   zGetSecurityQuery,
   zGetSecurityResponse,
+  zGetTargetAllocationPath,
+  zGetTargetAllocationResponse,
   zHealthResponse,
   zHoldingsCsvPath,
   zHoldingsCsvQuery,
@@ -219,6 +240,10 @@ import {
   zRestoreDepotPath,
   zRestoreDepotResponse,
   zRevokeAllSessionsResponse,
+  zSaveHintParamsBody,
+  zSaveHintParamsHeaders,
+  zSaveHintParamsPath,
+  zSaveHintParamsResponse,
   zSaveHoldingsBody,
   zSaveHoldingsHeaders,
   zSaveHoldingsPath,
@@ -227,6 +252,10 @@ import {
   zSaveProfileVersionHeaders,
   zSaveProfileVersionPath,
   zSaveProfileVersionResponse,
+  zSaveTargetAllocationBody,
+  zSaveTargetAllocationHeaders,
+  zSaveTargetAllocationPath,
+  zSaveTargetAllocationResponse,
   zSearchSecuritiesQuery,
   zSearchSecuritiesResponse,
   zStartRunBody,
@@ -612,6 +641,55 @@ export const archiveDepot = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Get Hint Params
+ *
+ * D5.3: Schwellen der Hinweise (HIN-04), ohne gespeicherte die Standardwerte (Version 0).
+ */
+export const getHintParams = <ThrowOnError extends boolean = false>(
+  options: Options<GetHintParamsData, ThrowOnError>,
+): RequestResult<GetHintParamsResponses, GetHintParamsErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetHintParamsResponses, GetHintParamsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zGetHintParamsPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zGetHintParamsResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/hint-params',
+    ...options,
+  });
+
+/**
+ * Save Hint Params
+ *
+ * Neue Schwellen auf die Version aus ``If-Match``; danach rechnet das Depot neu.
+ */
+export const saveHintParams = <ThrowOnError extends boolean = false>(
+  options: Options<SaveHintParamsData, ThrowOnError>,
+): RequestResult<SaveHintParamsResponses, SaveHintParamsErrors, ThrowOnError> =>
+  (options.client ?? client).put<SaveHintParamsResponses, SaveHintParamsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zSaveHintParamsBody,
+          headers: zSaveHintParamsHeaders.optional(),
+          path: zSaveHintParamsPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zSaveHintParamsResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/hint-params',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
  * Depot Hints
  *
  * D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
@@ -631,6 +709,28 @@ export const depotHints = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zDepotHintsResponse.parseAsync(data),
     url: '/api/v1/depots/{depot_id}/hints',
+    ...options,
+  });
+
+/**
+ * Acknowledge Hint
+ *
+ * D5.3, HIN-05: einen Hinweis des juengsten Laufs zur Kenntnis nehmen; 404 ohne ihn.
+ */
+export const acknowledgeHint = <ThrowOnError extends boolean = false>(
+  options: Options<AcknowledgeHintData, ThrowOnError>,
+): RequestResult<AcknowledgeHintResponses, AcknowledgeHintErrors, ThrowOnError> =>
+  (options.client ?? client).post<AcknowledgeHintResponses, AcknowledgeHintErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zAcknowledgeHintPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zAcknowledgeHintResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/hints/{key}/ack',
     ...options,
   });
 
@@ -798,6 +898,63 @@ export const restoreDepot = <ThrowOnError extends boolean = false>(
     responseValidator: async (data) => await zRestoreDepotResponse.parseAsync(data),
     url: '/api/v1/depots/{depot_id}/restore',
     ...options,
+  });
+
+/**
+ * Get Target Allocation
+ *
+ * D5.3: Zielallokation je Anlageklasse (DEP-10); ohne Ziel leer (Version 0).
+ */
+export const getTargetAllocation = <ThrowOnError extends boolean = false>(
+  options: Options<GetTargetAllocationData, ThrowOnError>,
+): RequestResult<GetTargetAllocationResponses, GetTargetAllocationErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetTargetAllocationResponses,
+    GetTargetAllocationErrors,
+    ThrowOnError
+  >({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zGetTargetAllocationPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zGetTargetAllocationResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/target-allocation',
+    ...options,
+  });
+
+/**
+ * Save Target Allocation
+ *
+ * Neue Zielallokation auf die Version aus ``If-Match`` (leer: ohne Ziel).
+ */
+export const saveTargetAllocation = <ThrowOnError extends boolean = false>(
+  options: Options<SaveTargetAllocationData, ThrowOnError>,
+): RequestResult<SaveTargetAllocationResponses, SaveTargetAllocationErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    SaveTargetAllocationResponses,
+    SaveTargetAllocationErrors,
+    ThrowOnError
+  >({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: zSaveTargetAllocationBody,
+          headers: zSaveTargetAllocationHeaders.optional(),
+          path: zSaveTargetAllocationPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zSaveTargetAllocationResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/target-allocation',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

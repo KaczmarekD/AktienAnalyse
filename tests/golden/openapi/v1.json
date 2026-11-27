@@ -928,8 +928,29 @@
         "additionalProperties": false,
         "description": "Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).",
         "properties": {
+          "acks": {
+            "items": {
+              "$ref": "#/components/schemas/HintAckV1"
+            },
+            "title": "Acks",
+            "type": "array"
+          },
           "depot": {
             "$ref": "#/components/schemas/Depot"
+          },
+          "hint_params": {
+            "items": {
+              "$ref": "#/components/schemas/HintParamsVersionV1"
+            },
+            "title": "Hint Params",
+            "type": "array"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetVersionV1"
+            },
+            "title": "Targets",
+            "type": "array"
           },
           "versions": {
             "items": {
@@ -941,7 +962,10 @@
         },
         "required": [
           "depot",
-          "versions"
+          "versions",
+          "hint_params",
+          "targets",
+          "acks"
         ],
         "title": "DepotExport",
         "type": "object"
@@ -950,6 +974,10 @@
         "additionalProperties": false,
         "description": "Ein Hinweis: Beobachtung, keine Empfehlung. ``key`` = Regel und Gegenstand (ISIN,\n``depot``, Sektor, Land, LEI, Jahr); ``status`` gegen den vorherigen Lauf. ``measured`` und\n``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl.",
         "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "boolean"
+          },
           "approach": {
             "title": "Approach",
             "type": "string"
@@ -1043,9 +1071,29 @@
           "group",
           "title",
           "reason",
-          "approach"
+          "approach",
+          "acknowledged"
         ],
         "title": "DepotHint",
+        "type": "object"
+      },
+      "DepotHintParams": {
+        "additionalProperties": false,
+        "description": "D5.3: Schwellen der Hinweise eines Depots; Version 0 heisst Standardwerte.",
+        "properties": {
+          "params": {
+            "$ref": "#/components/schemas/HintParamsV1"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "params"
+        ],
+        "title": "DepotHintParams",
         "type": "object"
       },
       "DepotHints": {
@@ -1172,6 +1220,38 @@
           "funds"
         ],
         "title": "DepotQuality",
+        "type": "object"
+      },
+      "DepotTarget": {
+        "additionalProperties": false,
+        "description": "D5.3: Zielallokation je Anlageklasse (DEP-10), zusammen 100 %; leer ohne Ziel.",
+        "properties": {
+          "shares": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "equity",
+                "etf",
+                "bond",
+                "other",
+                "cash"
+              ]
+            },
+            "title": "Shares",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "shares"
+        ],
+        "title": "DepotTarget",
         "type": "object"
       },
       "DepotValuation": {
@@ -1683,6 +1763,273 @@
           "auth_required"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HintAckV1": {
+        "description": "D5.3: ein Hinweis zur Kenntnis genommen, mit Messwert und Schwere in diesem Moment.",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 200,
+            "title": "Key",
+            "type": "string"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "severity",
+          "at"
+        ],
+        "title": "HintAckV1",
+        "type": "object"
+      },
+      "HintParamsV1": {
+        "description": "Schwellen der Hinweise je Depot (HIN-04), mit Standardwerten aus dem Katalog.\n\nAnteile als Bruchteil (0,1 = 10 %), TER und Kurs in Prozent, Fondsvolumen in Millionen EUR.\n``disabled``: abgeschaltete Regeln. Ein gespeicherter Stand ohne ein spaeter neues Feld bekommt\nbeim Lesen den Standardwert, wie bei den Scoring-Profilen.",
+        "properties": {
+          "a01_deviation": {
+            "default": 0.05,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "A01 Deviation",
+            "type": "number"
+          },
+          "a02_cash": {
+            "default": 0.1,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "A02 Cash",
+            "type": "number"
+          },
+          "b01_days": {
+            "default": 90,
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "B01 Days",
+            "type": "integer"
+          },
+          "b02_price": {
+            "default": 80.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 200.0,
+            "title": "B02 Price",
+            "type": "number"
+          },
+          "b03_maturity_year": {
+            "default": 0.5,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "B03 Maturity Year",
+            "type": "number"
+          },
+          "candidates": {
+            "default": false,
+            "title": "Candidates",
+            "type": "boolean"
+          },
+          "d01_trading_days": {
+            "default": 5,
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "D01 Trading Days",
+            "type": "integer"
+          },
+          "d02_bank_days": {
+            "default": 30,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "D02 Bank Days",
+            "type": "integer"
+          },
+          "disabled": {
+            "items": {
+              "enum": [
+                "HIN-K01",
+                "HIN-K02",
+                "HIN-K03",
+                "HIN-K04",
+                "HIN-K05",
+                "HIN-K06",
+                "HIN-A01",
+                "HIN-A02",
+                "HIN-Q01",
+                "HIN-Q02",
+                "HIN-Q03",
+                "HIN-Q04",
+                "HIN-Q05",
+                "HIN-Q06",
+                "HIN-E01",
+                "HIN-E02",
+                "HIN-E03",
+                "HIN-B01",
+                "HIN-B02",
+                "HIN-B03",
+                "HIN-N01",
+                "HIN-N02",
+                "HIN-D01",
+                "HIN-D02",
+                "HIN-D03"
+              ],
+              "type": "string"
+            },
+            "title": "Disabled",
+            "type": "array"
+          },
+          "e01_ter": {
+            "default": 0.5,
+            "exclusiveMinimum": 0.0,
+            "maximum": 5.0,
+            "title": "E01 Ter",
+            "type": "number"
+          },
+          "e02_overlap": {
+            "default": 0.5,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "E02 Overlap",
+            "type": "number"
+          },
+          "e03_fund_size": {
+            "default": 100.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000.0,
+            "title": "E03 Fund Size",
+            "type": "number"
+          },
+          "k01_critical": {
+            "default": 0.2,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K01 Critical",
+            "type": "number"
+          },
+          "k01_warning": {
+            "default": 0.1,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K01 Warning",
+            "type": "number"
+          },
+          "k02_top5": {
+            "default": 0.5,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K02 Top5",
+            "type": "number"
+          },
+          "k03_sector": {
+            "default": 0.3,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K03 Sector",
+            "type": "number"
+          },
+          "k04_country": {
+            "default": 0.5,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K04 Country",
+            "type": "number"
+          },
+          "k05_foreign_currency": {
+            "default": 0.5,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K05 Foreign Currency",
+            "type": "number"
+          },
+          "k06_issuer": {
+            "default": 0.1,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "K06 Issuer",
+            "type": "number"
+          },
+          "n01_days": {
+            "default": 7,
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "N01 Days",
+            "type": "integer"
+          },
+          "n02_days": {
+            "default": 30,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "N02 Days",
+            "type": "integer"
+          },
+          "q02_percentile": {
+            "default": 0.2,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Q02 Percentile",
+            "type": "number"
+          },
+          "q03_drop": {
+            "default": 0.2,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Q03 Drop",
+            "type": "number"
+          },
+          "q04_quality": {
+            "default": 0.3,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Q04 Quality",
+            "type": "number"
+          }
+        },
+        "title": "HintParamsV1",
+        "type": "object"
+      },
+      "HintParamsVersionV1": {
+        "description": "D5.3: eine gespeicherte Version der Schwellen eines Depots (Datenexport, NUT-12).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/HintParamsV1"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "params",
+          "created_at"
+        ],
+        "title": "HintParamsVersionV1",
         "type": "object"
       },
       "HistoryEntry": {
@@ -5209,6 +5556,56 @@
         "title": "Snapshot",
         "type": "object"
       },
+      "TargetAllocationV1": {
+        "description": "Zielallokation je Anlageklasse (DEP-10, HIN-A01), zusammen 100 %; leer heisst ohne Ziel.\nEine Region je Klasse sieht die Spezifikation als Kann vor; sie fehlt vorerst.",
+        "properties": {
+          "shares": {
+            "additionalProperties": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "equity",
+                "etf",
+                "bond",
+                "other",
+                "cash"
+              ]
+            },
+            "title": "Shares",
+            "type": "object"
+          }
+        },
+        "title": "TargetAllocationV1",
+        "type": "object"
+      },
+      "TargetVersionV1": {
+        "description": "D5.3: eine gespeicherte Version der Zielallokation eines Depots (Datenexport, NUT-12).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TargetAllocationV1"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "target",
+          "created_at"
+        ],
+        "title": "TargetVersionV1",
+        "type": "object"
+      },
       "UpdateDepot": {
         "additionalProperties": false,
         "properties": {
@@ -5973,6 +6370,133 @@
         ]
       }
     },
+    "/api/v1/depots/{depot_id}/hint-params": {
+      "get": {
+        "description": "D5.3: Schwellen der Hinweise (HIN-04), ohne gespeicherte die Standardwerte (Version 0).",
+        "operationId": "get_hint_params",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotHintParams"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Get Hint Params",
+        "tags": [
+          "depots"
+        ]
+      },
+      "put": {
+        "description": "Neue Schwellen auf die Version aus ``If-Match``; danach rechnet das Depot neu.",
+        "operationId": "save_hint_params",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HintParamsV1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotHintParams"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "422": {
+            "description": "Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)"
+          },
+          "428": {
+            "description": "If-Match fehlt"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Save Hint Params",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
     "/api/v1/depots/{depot_id}/hints": {
       "get": {
         "description": "D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet\nportfolio zuerst einen. Beobachtungen, keine Anlageempfehlung.",
@@ -6020,6 +6544,68 @@
           }
         },
         "summary": "Depot Hints",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/hints/{key}/ack": {
+      "post": {
+        "description": "D5.3, HIN-05: einen Hinweis des juengsten Laufs zur Kenntnis nehmen; 404 ohne ihn.",
+        "operationId": "acknowledge_hint",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotHints"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Acknowledge Hint",
         "tags": [
           "depots"
         ]
@@ -6477,6 +7063,133 @@
           }
         },
         "summary": "Restore Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/target-allocation": {
+      "get": {
+        "description": "D5.3: Zielallokation je Anlageklasse (DEP-10); ohne Ziel leer (Version 0).",
+        "operationId": "get_target_allocation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotTarget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Get Target Allocation",
+        "tags": [
+          "depots"
+        ]
+      },
+      "put": {
+        "description": "Neue Zielallokation auf die Version aus ``If-Match`` (leer: ohne Ziel).",
+        "operationId": "save_target_allocation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetAllocationV1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotTarget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "409": {
+            "description": "Depot archiviert oder Depotstand nicht mehr der neueste"
+          },
+          "422": {
+            "description": "Eingabe passt nicht (z. B. ISIN doppelt, Menge fehlt)"
+          },
+          "428": {
+            "description": "If-Match fehlt"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Save Target Allocation",
         "tags": [
           "depots"
         ]

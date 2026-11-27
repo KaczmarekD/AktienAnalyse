@@ -1,0 +1,28 @@
+{
+  "description": "D5.3: einen Hinweis des juengsten Laufs zur Kenntnis nehmen (HIN-05).",
+  "properties": {
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "key": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "user_id": {
+      "minimum": 1,
+      "title": "User Id",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "user_id",
+    "depot_id",
+    "key"
+  ],
+  "title": "HintAckRequestV1",
+  "type": "object"
+}

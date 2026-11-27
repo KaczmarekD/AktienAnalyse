@@ -38,7 +38,10 @@ from va_contracts.rpc.v1 import (
     DEPOTS_HINTS,
     DEPOTS_LIST,
     DEPOTS_RESTORE,
+    DEPOTS_SETTINGS,
     DEPOTS_UPDATE,
+    HINT_ACK,
+    HINT_PARAMS_SAVE,
     HOLDINGS_FILE,
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
@@ -55,6 +58,7 @@ from va_contracts.rpc.v1 import (
     SCORING_PREVIEW,
     SECURITIES_RESOLVE,
     SECURITIES_SEARCH,
+    TARGET_SAVE,
     ActivateReplyV1,
     ActivateRequestV1,
     DepotCreateRequestV1,
@@ -66,6 +70,8 @@ from va_contracts.rpc.v1 import (
     FactorsReplyV1,
     FactorsRequestV1,
     FactorV1,
+    HintAckRequestV1,
+    HintParamsSaveRequestV1,
     HoldingsFileRequestV1,
     HoldingsGetRequestV1,
     HoldingsImportRequestV1,
@@ -82,6 +88,7 @@ from va_contracts.rpc.v1 import (
     SaveVersionRequestV1,
     SecurityResolveRequestV1,
     SecuritySearchRequestV1,
+    TargetSaveRequestV1,
 )
 from va_platform.nats import RpcUnavailable
 
@@ -114,11 +121,14 @@ if TYPE_CHECKING:
         DepotExportV1,
         DepotHintsV1,
         DepotKind,
+        DepotSettingsV1,
         DepotV1,
+        HintParamsV1,
         HistoryEntryV1,
         HoldingLineV1,
         HoldingsV1,
         ImportPreviewV1,
+        TargetAllocationV1,
     )
     from va_contracts.profile import ProfileParamsV1
     from va_contracts.rpc.v1 import RpcSpec
@@ -380,6 +390,37 @@ class RemoteDepots:
     def hints(self, user_id: int, depot_id: int) -> DepotHintsV1 | None:
         request = DepotRefRequestV1(user_id=user_id, depot_id=depot_id)
         return self._call(DEPOTS_HINTS, request).hints
+
+    def _settings(self, spec: RpcSpec[Any, Any], request: Contract) -> DepotSettingsV1:
+        settings = self._call(spec, request).settings
+        if settings is None:  # pragma: no cover - portfolio antwortet mit Einstellungen oder Fehler
+            msg = f"{spec.name}: Antwort ohne Einstellungen"
+            raise RuntimeError(msg)
+        return settings
+
+    def settings(self, user_id: int, depot_id: int) -> DepotSettingsV1:
+        request = DepotRefRequestV1(user_id=user_id, depot_id=depot_id)
+        return self._settings(DEPOTS_SETTINGS, request)
+
+    def save_hint_params(
+        self, user_id: int, depot_id: int, *, base_version: int, params: HintParamsV1
+    ) -> DepotSettingsV1:
+        request = HintParamsSaveRequestV1(
+            user_id=user_id, depot_id=depot_id, base_version=base_version, params=params
+        )
+        return self._settings(HINT_PARAMS_SAVE, request)
+
+    def save_target(
+        self, user_id: int, depot_id: int, *, base_version: int, target: TargetAllocationV1
+    ) -> DepotSettingsV1:
+        request = TargetSaveRequestV1(
+            user_id=user_id, depot_id=depot_id, base_version=base_version, target=target
+        )
+        return self._settings(TARGET_SAVE, request)
+
+    def acknowledge(self, user_id: int, depot_id: int, key: str) -> DepotHintsV1 | None:
+        request = HintAckRequestV1(user_id=user_id, depot_id=depot_id, key=key)
+        return self._call(HINT_ACK, request).hints
 
 
 def _raise(reply: RpcReplyV1) -> None:

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, get_args
 
@@ -21,10 +21,12 @@ from va_portfolio.domain.depots import CashLine, HoldingLine
 from va_portfolio.domain.funds import Fund, FundHolding
 from va_portfolio.domain.hints import (
     HINT_CATALOG,
+    Ack,
     Hint,
     HintInput,
     TrackedHint,
     evaluate,
+    still_acknowledged,
     track,
 )
 from va_portfolio.domain.valuation import Market, Quote, Score, SecurityInfo, value_depot
@@ -73,6 +75,7 @@ def _hints(
     leis: dict[str, str] | None = None,
     fund_sizes: dict[str, float] | None = None,
     previous: dict[str, Score] | None = None,
+    target: dict[str, float] | None = None,
     params: HintParamsV1 = DEFAULT,
 ) -> list[Hint]:
     """``values``: Wert je ISIN in EUR (Kurs 1 bzw. 100 % bei Anleihen); Kasse bis 10 000."""
@@ -110,6 +113,7 @@ def _hints(
         leis=leis or {},
         fund_sizes=fund_sizes or {},
         previous_scores=previous or {},
+        target=target or {},
     )
     return evaluate(source, params)
 
@@ -405,3 +409,48 @@ class TestLifecycle:
         previous = [TrackedHint(self.A02, "resolved")]
         assert track(previous, []) == []
         assert [t.status for t in track(previous, [self.A02])] == ["new"]
+
+
+class TestTargetAllocation:
+    """D5.3, HIN-A01: Abweichung einer Anlageklasse von der Zielallokation."""
+
+    def test_a01_deviation(self):
+        # Aktien 6000 von 10 000 = 60 %, Kasse 40 %
+        close = {"equity": 0.56, "cash": 0.44}  # je 4 Prozentpunkte daneben
+        far = {"equity": 0.54, "cash": 0.46}  # je 6 Prozentpunkte daneben
+        assert _rule(_hints({SAP: 6000}, target=close), "HIN-A01") == []
+        hints = _rule(_hints({SAP: 6000}, target=far), "HIN-A01")
+        assert [(h.subject, h.measured) for h in hints] == [("cash", 0.06), ("equity", 0.06)]
+
+    def test_a_class_without_target_counts_as_zero(self):
+        hints = _rule(
+            _hints({SAP: 6000, BUND: 1000}, target={"equity": 0.6, "cash": 0.4}), "HIN-A01"
+        )
+        assert [h.subject for h in hints] == ["bond", "cash"]  # Anleihen 10 % statt 0, Kasse 30 %
+
+    def test_without_target_nothing(self):
+        assert _rule(_hints({SAP: 6000}), "HIN-A01") == []
+
+
+class TestAcknowledged:
+    """D5.3, HIN-05: bis er schwerer wird oder sich der Messwert um die Spanne verschlechtert."""
+
+    AT = datetime(2026, 11, 27, 12, tzinfo=UTC)
+
+    def test_stays_while_not_worse(self):
+        ack = Ack(f"HIN-K01:{SAP}", 0.12, "warning", self.AT)
+        assert still_acknowledged(Hint("HIN-K01", SAP, "warning", 0.16, 0.10), ack)
+        assert not still_acknowledged(Hint("HIN-K01", SAP, "warning", 0.18, 0.10), ack)
+
+    def test_back_when_more_severe(self):
+        ack = Ack(f"HIN-K01:{SAP}", 0.19, "warning", self.AT)
+        assert not still_acknowledged(Hint("HIN-K01", SAP, "critical", 0.21, 0.20), ack)
+
+    def test_lower_is_worse_for_the_percentile(self):
+        ack = Ack(f"HIN-Q02:{SAP}", 0.18, "info", self.AT)
+        assert still_acknowledged(Hint("HIN-Q02", SAP, "info", 0.10, 0.2), ack)
+        assert not still_acknowledged(Hint("HIN-Q02", SAP, "info", 0.07, 0.2), ack)
+
+    def test_without_measured_value_while_it_exists(self):
+        ack = Ack(f"HIN-Q01:{SAP}", None, "warning", self.AT)
+        assert still_acknowledged(Hint("HIN-Q01", SAP, "warning"), ack)

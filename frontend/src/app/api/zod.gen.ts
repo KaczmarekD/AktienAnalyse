@@ -188,6 +188,7 @@ export const zDepotCosts = z.object({
  * ``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl.
  */
 export const zDepotHint = z.object({
+  acknowledged: z.boolean(),
   approach: z.string(),
   as_of: z.iso.date().nullable(),
   group: z.string(),
@@ -211,6 +212,16 @@ export const zDepotHints = z.object({
   analysis_run_id: z.int().nullable(),
   computed_at: z.iso.datetime().nullable(),
   hints: z.array(zDepotHint),
+  version: z.int(),
+});
+
+/**
+ * DepotTarget
+ *
+ * D5.3: Zielallokation je Anlageklasse (DEP-10), zusammen 100 %; leer ohne Ziel.
+ */
+export const zDepotTarget = z.object({
+  shares: z.record(z.string(), z.number()),
   version: z.int(),
 });
 
@@ -305,6 +316,105 @@ export const zHealth = z.object({
   auth_required: z.boolean(),
   status: z.literal('ok'),
   version: z.string(),
+});
+
+/**
+ * HintAckV1
+ *
+ * D5.3: ein Hinweis zur Kenntnis genommen, mit Messwert und Schwere in diesem Moment.
+ */
+export const zHintAckV1 = z.object({
+  at: z.iso.datetime(),
+  key: z.string().max(200),
+  measured: z.number().nullish(),
+  severity: z.enum(['info', 'warning', 'critical']),
+});
+
+/**
+ * HintParamsV1
+ *
+ * Schwellen der Hinweise je Depot (HIN-04), mit Standardwerten aus dem Katalog.
+ *
+ * Anteile als Bruchteil (0,1 = 10 %), TER und Kurs in Prozent, Fondsvolumen in Millionen EUR.
+ * ``disabled``: abgeschaltete Regeln. Ein gespeicherter Stand ohne ein spaeter neues Feld bekommt
+ * beim Lesen den Standardwert, wie bei den Scoring-Profilen.
+ */
+export const zHintParamsV1 = z.object({
+  a01_deviation: z.number().gt(0).lte(1).optional().default(0.05),
+  a02_cash: z.number().gt(0).lte(1).optional().default(0.1),
+  b01_days: z.int().gte(1).lte(3650).optional().default(90),
+  b02_price: z.number().gt(0).lte(200).optional().default(80),
+  b03_maturity_year: z.number().gt(0).lte(1).optional().default(0.5),
+  candidates: z.boolean().optional().default(false),
+  d01_trading_days: z.int().gte(1).lte(60).optional().default(5),
+  d02_bank_days: z.int().gte(1).lte(365).optional().default(30),
+  disabled: z
+    .array(
+      z.enum([
+        'HIN-K01',
+        'HIN-K02',
+        'HIN-K03',
+        'HIN-K04',
+        'HIN-K05',
+        'HIN-K06',
+        'HIN-A01',
+        'HIN-A02',
+        'HIN-Q01',
+        'HIN-Q02',
+        'HIN-Q03',
+        'HIN-Q04',
+        'HIN-Q05',
+        'HIN-Q06',
+        'HIN-E01',
+        'HIN-E02',
+        'HIN-E03',
+        'HIN-B01',
+        'HIN-B02',
+        'HIN-B03',
+        'HIN-N01',
+        'HIN-N02',
+        'HIN-D01',
+        'HIN-D02',
+        'HIN-D03',
+      ]),
+    )
+    .optional(),
+  e01_ter: z.number().gt(0).lte(5).optional().default(0.5),
+  e02_overlap: z.number().gt(0).lte(1).optional().default(0.5),
+  e03_fund_size: z.number().gt(0).lte(100000).optional().default(100),
+  k01_critical: z.number().gt(0).lte(1).optional().default(0.2),
+  k01_warning: z.number().gt(0).lte(1).optional().default(0.1),
+  k02_top5: z.number().gt(0).lte(1).optional().default(0.5),
+  k03_sector: z.number().gt(0).lte(1).optional().default(0.3),
+  k04_country: z.number().gt(0).lte(1).optional().default(0.5),
+  k05_foreign_currency: z.number().gt(0).lte(1).optional().default(0.5),
+  k06_issuer: z.number().gt(0).lte(1).optional().default(0.1),
+  n01_days: z.int().gte(1).lte(90).optional().default(7),
+  n02_days: z.int().gte(1).lte(365).optional().default(30),
+  q02_percentile: z.number().gt(0).lte(1).optional().default(0.2),
+  q03_drop: z.number().gt(0).lte(1).optional().default(0.2),
+  q04_quality: z.number().gt(0).lte(1).optional().default(0.3),
+});
+
+/**
+ * DepotHintParams
+ *
+ * D5.3: Schwellen der Hinweise eines Depots; Version 0 heisst Standardwerte.
+ */
+export const zDepotHintParams = z.object({
+  params: zHintParamsV1,
+  version: z.int(),
+});
+
+/**
+ * HintParamsVersionV1
+ *
+ * D5.3: eine gespeicherte Version der Schwellen eines Depots (Datenexport, NUT-12).
+ */
+export const zHintParamsVersionV1 = z.object({
+  created_at: z.iso.datetime(),
+  params: zHintParamsV1,
+  version: z.int().gte(1),
 });
 
 /**
@@ -635,33 +745,6 @@ export const zDepot = z.object({
   status: z.enum(['active', 'archived']),
   valuation: zDepotValuation.nullable(),
   version: z.int(),
-});
-
-/**
- * DepotExport
- *
- * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
- */
-export const zDepotExport = z.object({
-  depot: zDepot,
-  versions: z.array(zHoldings),
-});
-
-/**
- * DataExport
- *
- * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
- */
-export const zDataExport = z.object({
-  account: z.array(z.record(z.string(), z.unknown())),
-  credentials: z.array(z.record(z.string(), z.unknown())),
-  depots: z.array(zDepotExport).optional(),
-  email_confirmations: z.array(z.record(z.string(), z.unknown())),
-  exported_at: z.iso.datetime(),
-  logins: z.array(z.record(z.string(), z.unknown())),
-  profiles: z.array(z.record(z.string(), z.unknown())),
-  sessions: z.array(z.record(z.string(), z.unknown())),
-  statuses: z.array(z.record(z.string(), z.unknown())),
 });
 
 /**
@@ -1167,6 +1250,57 @@ export const zInstrument = z.object({
 });
 
 /**
+ * TargetAllocationV1
+ *
+ * Zielallokation je Anlageklasse (DEP-10, HIN-A01), zusammen 100 %; leer heisst ohne Ziel.
+ * Eine Region je Klasse sieht die Spezifikation als Kann vor; sie fehlt vorerst.
+ */
+export const zTargetAllocationV1 = z.object({
+  shares: z.record(z.string(), z.number().gte(0).lte(1)).optional(),
+});
+
+/**
+ * TargetVersionV1
+ *
+ * D5.3: eine gespeicherte Version der Zielallokation eines Depots (Datenexport, NUT-12).
+ */
+export const zTargetVersionV1 = z.object({
+  created_at: z.iso.datetime(),
+  target: zTargetAllocationV1,
+  version: z.int().gte(1),
+});
+
+/**
+ * DepotExport
+ *
+ * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
+ */
+export const zDepotExport = z.object({
+  acks: z.array(zHintAckV1),
+  depot: zDepot,
+  hint_params: z.array(zHintParamsVersionV1),
+  targets: z.array(zTargetVersionV1),
+  versions: z.array(zHoldings),
+});
+
+/**
+ * DataExport
+ *
+ * Alle eigenen Daten (D1.6, NUT-12), je Tabelle eine Liste, ohne Hashes und Tokens.
+ */
+export const zDataExport = z.object({
+  account: z.array(z.record(z.string(), z.unknown())),
+  credentials: z.array(z.record(z.string(), z.unknown())),
+  depots: z.array(zDepotExport).optional(),
+  email_confirmations: z.array(z.record(z.string(), z.unknown())),
+  exported_at: z.iso.datetime(),
+  logins: z.array(z.record(z.string(), z.unknown())),
+  profiles: z.array(z.record(z.string(), z.unknown())),
+  sessions: z.array(z.record(z.string(), z.unknown())),
+  statuses: z.array(z.record(z.string(), z.unknown())),
+});
+
+/**
  * UpdateDepot
  */
 export const zUpdateDepot = z.object({
@@ -1315,6 +1449,30 @@ export const zArchiveDepotPath = z.object({
  */
 export const zArchiveDepotResponse = zDepot;
 
+export const zGetHintParamsPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zGetHintParamsResponse = zDepotHintParams;
+
+export const zSaveHintParamsBody = zHintParamsV1;
+
+export const zSaveHintParamsHeaders = z.object({
+  'if-match': z.string().nullish(),
+});
+
+export const zSaveHintParamsPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zSaveHintParamsResponse = zDepotHintParams;
+
 export const zDepotHintsPath = z.object({
   depot_id: z.int(),
 });
@@ -1323,6 +1481,16 @@ export const zDepotHintsPath = z.object({
  * Successful Response
  */
 export const zDepotHintsResponse = zDepotHints;
+
+export const zAcknowledgeHintPath = z.object({
+  depot_id: z.int(),
+  key: z.string().max(200),
+});
+
+/**
+ * Successful Response
+ */
+export const zAcknowledgeHintResponse = zDepotHints;
 
 export const zDepotHistoryPath = z.object({
   depot_id: z.int(),
@@ -1405,6 +1573,30 @@ export const zRestoreDepotPath = z.object({
  * Successful Response
  */
 export const zRestoreDepotResponse = zDepot;
+
+export const zGetTargetAllocationPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zGetTargetAllocationResponse = zDepotTarget;
+
+export const zSaveTargetAllocationBody = zTargetAllocationV1;
+
+export const zSaveTargetAllocationHeaders = z.object({
+  'if-match': z.string().nullish(),
+});
+
+export const zSaveTargetAllocationPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zSaveTargetAllocationResponse = zDepotTarget;
 
 /**
  * Successful Response

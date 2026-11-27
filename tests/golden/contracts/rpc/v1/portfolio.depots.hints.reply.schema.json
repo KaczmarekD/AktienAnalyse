@@ -49,6 +49,11 @@
     "HintV1": {
       "description": "Ein Hinweis (D5.2) mit den Texten seines Katalogeintrags, damit das web-api den Katalog\nnicht kennen muss. ``measured``/``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent,\nTage und Handelstage als Zahl; ``as_of``: Datenstand.",
       "properties": {
+        "acknowledged": {
+          "default": false,
+          "title": "Acknowledged",
+          "type": "boolean"
+        },
         "approach": {
           "title": "Approach",
           "type": "string"

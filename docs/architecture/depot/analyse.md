@@ -348,14 +348,32 @@ neueste ist also auch nach Tagen ohne Änderung der gültige. Ein erledigter Hin
 einem Lauf. HIN-Q03 vergleicht mit dem zweitjüngsten Bewertungslauf in `score_view`. Bis D5.3
 gelten die Standardschwellen.
 
+**Umgesetzt (27.11.2026, D5.3):** Schwellen und Zielallokation je Depot (`hint_params`,
+`target_allocation`, Migration 0033), versioniert wie die Depotstände: Speichern nur auf die
+neueste Version (`If-Match`, sonst 409 mit der neuesten), Version 0 heißt Standardwerte bzw. kein
+Ziel, ein archiviertes Depot ist schreibgeschützt. Nach dem Speichern rechnet das Depot neu
+(Auslöser `settings`). Die Zielallokation (`TargetAllocationV1`) hat Anteile je Anlageklasse
+(`equity`, `etf`, `bond`, `other`, `cash`), zusammen 100 % (±0,1 Prozentpunkte) oder leer.
+HIN-A01 vergleicht jede Klasse aus Ziel oder Depot (ohne „unbekannt“) mit ihrem Ziel, eine Klasse
+ohne Ziel mit 0 %. Zur Kenntnis genommen (`hint_ack`) wird ein Hinweis des jüngsten Laufs, der
+nicht erledigt ist; gespeichert werden Messwert, Schwere und Lauf in diesem Moment. Er gilt als
+zur Kenntnis genommen, bis er schwerer wird, nach dem Erledigen neu erscheint oder sich der
+Messwert in Richtung der Regel um ihre Spanne verschlechtert (`ACK_SPANS` in `va_portfolio.domain.hints`: Anteile 5 Prozentpunkte,
+Überschneidung und Fälligkeitsjahr 10, Perzentile 10, Quality 0,05, TER 0,1 Prozentpunkte,
+Fondsvolumen 20 Mio. EUR, Anleihekurs 5, Kursalter 5 Handelstage). Regeln ohne Messwert bleiben zur Kenntnis genommen, bis sie schwerer
+werden. Der Hinweis verschwindet nicht aus der Antwort, er trägt `acknowledged`; das UI blendet
+ihn aus (D5.4). `/me/export` enthält alle Versionen der Schwellen und Ziele und alle
+Kenntnisnahmen (`DepotExportV1.hint_params`, `targets`, `acks`).
+
 ## Datenmodell (Schema `portfolio`)
 
 | Tabelle | Inhalt | Schreibweise |
 |---|---|---|
 | `analysis_run` | id, depot_id, snapshot_version, trigger, fingerprint, result (JSONB, `DepotAnalysisV1`), computed_at | anfügen, nur bei geändertem Ergebnis (seit D5.2) |
 | `hint` | analysis_run_id, key, rule, subject, severity, status, measured, threshold, as_of | anfügen (seit D5.2) |
-| `hint_params` | depot_id, version, params (JSONB), created_at | anfügen, gültig ist die jüngste Zeile |
-| `hint_ack` | depot_id, key, user_id, measured_at_ack, severity_at_ack, at | anfügen |
+| `hint_params` | depot_id, version, params (JSONB, `HintParamsV1`), created_by, created_at | anfügen, eindeutig (depot_id, version), gültig ist die jüngste Zeile (seit D5.3) |
+| `target_allocation` | depot_id, version, shares (JSONB, Anteil je Anlageklasse), created_by, created_at | wie `hint_params` (seit D5.3, [depots.md](depots.md#datenmodell)) |
+| `hint_ack` | depot_id, key, user_id, analysis_run_id (jüngster Lauf in diesem Moment), measured, severity, at | anfügen, je Schlüssel gilt die jüngste Zeile (seit D5.3) |
 
 ## Events
 
@@ -373,8 +391,9 @@ nachladen.
 |---|---|
 | `GET /api/v1/depots/{id}/analysis` | Analyse, bei jeder Anfrage gerechnet (seit D4.4) |
 | `GET /api/v1/depots/{id}/hints` | Hinweise des jüngsten Laufs mit Status und Texten (seit D5.2; gefiltert wird im UI) |
-| `POST /api/v1/depots/{id}/hints/{key}/ack` | zur Kenntnis nehmen |
-| `GET`/`PUT /api/v1/depots/{id}/hint-params` | Schwellen (mit `If-Match`) |
+| `POST /api/v1/depots/{id}/hints/{key}/ack` | zur Kenntnis nehmen, Antwort wie `…/hints`; 404 ohne den Hinweis im jüngsten Lauf (seit D5.3) |
+| `GET`/`PUT /api/v1/depots/{id}/hint-params` | Schwellen mit Version und `ETag`, Speichern mit `If-Match` (428 ohne, 409 auf eine alte Version, 422 außerhalb der Grenzen; seit D5.3) |
+| `GET`/`PUT /api/v1/depots/{id}/target-allocation` | Zielallokation ebenso (seit D5.3, [depots.md](depots.md#api)) |
 | `GET /api/v1/hints/catalog` | Katalog mit Texten für das UI |
 | `GET /api/v1/depots/{id}/positions/{isin}/comparison` | Prüfkandidaten |
 

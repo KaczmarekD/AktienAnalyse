@@ -12,8 +12,12 @@ Kein Text sagt "kaufen", "verkaufen" oder nennt ein Kursziel (ein Test prueft de
 - HIN-K06 nur fuer Emittenten mit mindestens zwei Wertpapieren (sonst wie HIN-K01), zusammengefuehrt
   ueber die LEI; HIN-B03 nur mit mindestens zwei Anleihen.
 - HIN-Q03 (seit D5.2) vergleicht mit dem vorherigen Bewertungslauf, der die Aktie kannte.
-- Noch nicht gerechnet: HIN-A01 (Zielallokation, D5.3), HIN-N01/N02 (News, D6), HIN-D02 (Bank,
-  D8). Sie stehen schon im Katalog.
+- HIN-A01 (seit D5.3) vergleicht jede Anlageklasse mit der Zielallokation, sofern es eine gibt;
+  eine Klasse ohne Ziel zaehlt mit 0 %.
+- Noch nicht gerechnet: HIN-N01/N02 (News, D6), HIN-D02 (Bank, D8). Sie stehen schon im Katalog.
+- Kenntnisnahme (D5.3, HIN-05, ``still_acknowledged``): Ein Hinweis bleibt zur Kenntnis genommen,
+  bis er schwerer wird oder sich sein Messwert um die Spanne der Regel (``ACK_SPANS``)
+  verschlechtert; ohne Messwert, solange er besteht.
 - Lebenszyklus (D5.2, HIN-03, ``track``): gegen den vorherigen Lauf neu, besteht oder erledigt;
   ein erledigter Hinweis steht einmal da und faellt im naechsten Lauf weg.
 """
@@ -268,6 +272,8 @@ class HintInput:
     leis: Mapping[str, str] = field(default_factory=dict)  # ISIN -> LEI (FIRDS)
     # D5.2: je ISIN die Scores des vorherigen Bewertungslaufs, der sie kannte (HIN-Q03)
     previous_scores: Mapping[str, Score] = field(default_factory=dict)
+    # D5.3: Zielallokation je Anlageklasse (Anteil), leer ohne Ziel (HIN-A01)
+    target: Mapping[str, float] = field(default_factory=dict)
     # ISIN -> Fondsvolumen in Mio. EUR, nur aus Anbieterdateien (HIN-E03)
     fund_sizes: Mapping[str, float] = field(default_factory=dict)
 
@@ -340,6 +346,13 @@ def _slices(
 
 
 def _allocation(source: HintInput, params: HintParamsV1) -> Iterable[Hint]:
+    as_of = source.analysis.data.oldest_price
+    if source.target and source.data.value.value_eur is not None:
+        actual = {s.key: s.weight for s in source.analysis.allocation.asset_class}
+        for kind in sorted(set(source.target) | (set(actual) - {"unknown"})):
+            deviation = round(abs(actual.get(kind, 0.0) - source.target.get(kind, 0.0)), 9)
+            if deviation > params.a01_deviation:
+                yield Hint("HIN-A01", kind, "info", deviation, params.a01_deviation, as_of)
     cash = next((s.weight for s in source.analysis.allocation.asset_class if s.key == "cash"), 0.0)
     if cash > params.a02_cash:
         yield Hint(
@@ -488,7 +501,18 @@ def track(previous: Sequence[TrackedHint], current: Sequence[Hint]) -> list[Trac
 
 
 # Was einen neuen Lauf ausloest (D5.2, ANA-10); "request": erster Abruf ohne Lauf
-TRIGGERS = ("holdings", "prices", "scores", "securities", "request")
+# D5.3: "settings" nach neuen Schwellen oder neuer Zielallokation
+TRIGGERS = ("holdings", "prices", "scores", "securities", "request", "settings")
+
+
+@dataclass(frozen=True)
+class StoredSettings:
+    """D5.3: Schwellen und Zielallokation eines Depots, je mit Version (0: Standard bzw. ohne)."""
+
+    hint_params: Mapping[str, object] = field(default_factory=dict)
+    hint_params_version: int = 0
+    target: Mapping[str, float] = field(default_factory=dict)
+    target_version: int = 0
 
 
 @dataclass(frozen=True)
@@ -501,3 +525,69 @@ class StoredRun:
     fingerprint: str
     computed_at: datetime
     hints: list[TrackedHint] = field(default_factory=list)
+
+
+# D5.3 (HIN-05): Richtung und Spanne, um die sich ein Messwert verschlechtern darf, bevor ein zur
+# Kenntnis genommener Hinweis wieder erscheint. Ohne Eintrag: nur, wenn er schwerer wird.
+ACK_SPANS: dict[str, tuple[Literal["up", "down"], float]] = {
+    "HIN-K01": ("up", 0.05),
+    "HIN-K02": ("up", 0.05),
+    "HIN-K03": ("up", 0.05),
+    "HIN-K04": ("up", 0.05),
+    "HIN-K05": ("up", 0.05),
+    "HIN-K06": ("up", 0.05),
+    "HIN-A01": ("up", 0.05),
+    "HIN-A02": ("up", 0.05),
+    "HIN-Q02": ("down", 0.10),
+    "HIN-Q03": ("up", 0.10),
+    "HIN-Q04": ("down", 0.05),
+    "HIN-E01": ("up", 0.10),
+    "HIN-E02": ("up", 0.10),
+    "HIN-E03": ("down", 20.0),
+    "HIN-B02": ("down", 5.0),
+    "HIN-B03": ("up", 0.10),
+    "HIN-D01": ("up", 5.0),
+}
+
+
+@dataclass(frozen=True)
+class Ack:
+    """Ein zur Kenntnis genommener Hinweis: Messwert und Schwere in diesem Moment."""
+
+    key: str
+    measured: float | None
+    severity: Severity
+    at: datetime
+    # der juengste Lauf beim Zur-Kenntnis-Nehmen; erscheint der Hinweis danach neu (nach dem
+    # Erledigen), gilt die Kenntnisnahme nicht mehr
+    run_id: int = 0
+
+
+@dataclass(frozen=True)
+class SettingsVersion:
+    """D5.3: eine gespeicherte Version der Schwellen oder der Zielallokation (Datenexport)."""
+
+    version: int
+    values: Mapping[str, object]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class SettingsHistory:
+    """D5.3: alle Versionen der Schwellen und Ziele eines Depots und alle Kenntnisnahmen."""
+
+    hint_params: list[SettingsVersion] = field(default_factory=list)
+    targets: list[SettingsVersion] = field(default_factory=list)
+    acks: list[Ack] = field(default_factory=list)
+
+
+def still_acknowledged(hint: Hint, ack: Ack) -> bool:
+    """``True``, solange der Hinweis nicht schwerer ist und sich nicht um die Spanne verschlechtert hat."""
+    if SEVERITY_ORDER[hint.severity] < SEVERITY_ORDER[ack.severity]:
+        return False
+    span = ACK_SPANS.get(hint.rule)
+    if span is None or hint.measured is None or ack.measured is None:
+        return True
+    direction, width = span
+    change = hint.measured - ack.measured if direction == "up" else ack.measured - hint.measured
+    return round(change, 9) <= width

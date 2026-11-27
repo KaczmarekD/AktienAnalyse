@@ -29,6 +29,9 @@ _RUNS = f"SELECT id FROM portfolio.analysis_run WHERE depot_id IN ({_DEPOTS})"
 # Abhaengige vor denen, auf die sie verweisen
 PER_USER: tuple[tuple[str, str], ...] = (
     ("hint", f"analysis_run_id IN ({_RUNS})"),  # D5.2
+    ("hint_ack", f"depot_id IN ({_DEPOTS})"),  # D5.3
+    ("hint_params", f"depot_id IN ({_DEPOTS})"),
+    ("target_allocation", f"depot_id IN ({_DEPOTS})"),
     ("analysis_run", f"depot_id IN ({_DEPOTS})"),
     ("holding_line", f"snapshot_id IN ({_SNAPSHOTS})"),
     ("cash_line", f"snapshot_id IN ({_SNAPSHOTS})"),

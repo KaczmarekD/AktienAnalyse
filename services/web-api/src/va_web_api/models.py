@@ -19,7 +19,12 @@ from va_contracts.portfolio import (
     MAX_NAME,
     MAX_TEXT,
     Amount,
+    HintAckV1,
+    HintParamsV1,
+    HintParamsVersionV1,
     Quantity,
+    TargetClass,
+    TargetVersionV1,
 )
 from va_contracts.profile import ProfileParamsV1
 from va_contracts.securities import IsinStr
@@ -716,6 +721,22 @@ class DepotHint(_Model):
     title: str
     reason: str
     approach: str
+    # D5.3: zur Kenntnis genommen, bis er schwerer wird oder sich der Messwert verschlechtert
+    acknowledged: bool
+
+
+class DepotHintParams(_Model):
+    """D5.3: Schwellen der Hinweise eines Depots; Version 0 heisst Standardwerte."""
+
+    version: int
+    params: HintParamsV1
+
+
+class DepotTarget(_Model):
+    """D5.3: Zielallokation je Anlageklasse (DEP-10), zusammen 100 %; leer ohne Ziel."""
+
+    version: int
+    shares: dict[TargetClass, float]
 
 
 class DepotHints(_Model):
@@ -849,3 +870,7 @@ class DepotExport(_Model):
 
     depot: Depot
     versions: list[Holdings]
+    # D5.3: alle Versionen der Schwellen und der Zielallokation, alle Kenntnisnahmen
+    hint_params: list[HintParamsVersionV1]
+    targets: list[TargetVersionV1]
+    acks: list[HintAckV1]

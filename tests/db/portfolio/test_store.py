@@ -48,6 +48,11 @@ TABLES = (
     "security_view",  # D3.4
     "price_view",
     "fx_view",
+    "analysis_run",  # D5.2
+    "hint",
+    "hint_params",  # D5.3
+    "target_allocation",
+    "hint_ack",
 )
 
 
@@ -316,3 +321,108 @@ class TestRuns:
         archived = _depot(store, name="Archiv")
         store.set_status(archived.id, "archived", at=T0, event=_event(archived.id, "archived"))
         assert [d.id for d in store.active_depots()] == [active.id]
+
+
+class TestSettings:
+    """D5.3: Schwellen und Zielallokation versioniert, Kenntnisnahmen je Schluessel."""
+
+    def test_versions_and_conflict(self, store):
+        depot = _depot(store)
+        empty = store.settings(depot.id)
+        assert (empty.hint_params, empty.hint_params_version) == ({}, 0)
+        assert (dict(empty.target), empty.target_version) == ({}, 0)
+        store.save_hint_params(depot.id, version=1, params={"k01_warning": 0.2}, by=ANNA, at=T0)
+        store.save_target(depot.id, version=1, shares={"equity": 0.6, "cash": 0.4}, by=ANNA, at=T0)
+        store.save_hint_params(depot.id, version=2, params={"k01_warning": 0.3}, by=ANNA, at=T0)
+        settings = store.settings(depot.id)
+        assert (settings.hint_params, settings.hint_params_version) == ({"k01_warning": 0.3}, 2)
+        assert (dict(settings.target), settings.target_version) == ({"equity": 0.6, "cash": 0.4}, 1)
+        with pytest.raises(VersionConflict) as conflict:
+            store.save_hint_params(depot.id, version=2, params={}, by=ANNA, at=T0)
+        assert conflict.value.newest == 2
+        with pytest.raises(VersionConflict) as conflict:
+            store.save_target(depot.id, version=1, shares={}, by=ANNA, at=T0)
+        assert conflict.value.newest == 1
+        assert store.settings(depot.id + 1).hint_params_version == 0
+
+    def test_the_latest_ack_per_key(self, store):
+        depot = _depot(store)
+        run_id = _run(store, depot.id, [("HIN-K01", "X", "new")])
+        later = T0 + timedelta(hours=1)
+        for key, measured, severity, at in (
+            ("HIN-K01:X", 0.2, "warning", T0),
+            ("HIN-K01:X", 0.25, "critical", later),
+            ("HIN-A02:depot", None, "info", T0),
+        ):
+            store.save_ack(
+                depot.id,
+                key=key,
+                user_id=ANNA,
+                run_id=run_id,
+                measured=measured,
+                severity=severity,
+                at=at,
+            )
+        acks = store.acks(depot.id)
+        assert {k: (a.measured, a.severity, a.at, a.run_id) for k, a in acks.items()} == {
+            "HIN-K01:X": (0.25, "critical", later, run_id),
+            "HIN-A02:depot": (None, "info", T0, run_id),
+        }
+        assert store.acks(depot.id + 1) == {}
+        assert [a.measured for a in store.settings_history(depot.id).acks] == [0.2, 0.25, None]
+
+    def test_since_new_is_the_latest_run_where_a_hint_appeared(self, store):
+        depot = _depot(store)
+        first = _run(store, depot.id, [("HIN-K01", "X", "new"), ("HIN-A02", "depot", "new")])
+        _run(store, depot.id, [("HIN-K01", "X", "existing"), ("HIN-A02", "depot", "existing")])
+        _run(store, depot.id, [("HIN-K01", "X", "resolved"), ("HIN-A02", "depot", "existing")])
+        again = _run(store, depot.id, [("HIN-K01", "X", "new"), ("HIN-A02", "depot", "existing")])
+        assert store.since_new(depot.id) == {"HIN-K01:X": again, "HIN-A02:depot": first}
+        assert store.since_new(depot.id + 1) == {}
+
+    def test_the_history_of_the_settings(self, store):
+        depot = _depot(store)
+        later = T0 + timedelta(days=1)
+        store.save_hint_params(depot.id, version=1, params={"a02_cash": 0.2}, by=ANNA, at=T0)
+        store.save_hint_params(depot.id, version=2, params={"a02_cash": 0.3}, by=ANNA, at=later)
+        store.save_target(depot.id, version=1, shares={"equity": 1.0}, by=ANNA, at=T0)
+        history = store.settings_history(depot.id)
+        assert [(v.version, dict(v.values), v.created_at) for v in history.hint_params] == [
+            (1, {"a02_cash": 0.2}, T0),
+            (2, {"a02_cash": 0.3}, later),
+        ]
+        assert [dict(v.values) for v in history.targets] == [{"equity": 1.0}]
+        assert history.acks == []
+
+    def test_the_trigger_settings_is_allowed(self, store):
+        depot = _depot(store)
+        run_id = _run(store, depot.id, [("HIN-A02", "depot", "new")], trigger="settings")
+        run = store.latest_run(depot.id)
+        assert run is not None
+        assert run.id == run_id
+
+
+def _run(store, depot_id: int, hints, trigger: str = "holdings") -> int:
+    """Ein Lauf mit Hinweisen (Regel, Gegenstand, Status), wie ihn ``_refresh`` speichert."""
+    from va_contracts.events.v1 import ANALYSIS_COMPLETED, AnalysisCompletedV1
+    from va_portfolio.domain.hints import Hint, TrackedHint
+
+    def event(run_id: int):
+        data = AnalysisCompletedV1(
+            depot_id=depot_id, owner_user_id=ANNA, analysis_run_id=run_id, info=len(hints)
+        )
+        return new_envelope(ANALYSIS_COMPLETED, data, source="va/test")
+
+    return store.save_run(
+        depot_id,
+        version=1,
+        trigger=trigger,
+        fingerprint=f"{trigger}-{hints}",
+        result={},
+        hints=[
+            TrackedHint(Hint(rule, subject, "info", 0.7, 0.1), status)
+            for rule, subject, status in hints
+        ],
+        at=T0,
+        event=event,
+    )

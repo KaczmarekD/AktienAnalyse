@@ -260,6 +260,55 @@ class HintRow(Base):
     as_of: Mapped[date | None]
 
 
+class HintParams(Base):
+    """D5.3: Schwellen der Hinweise je Depot (``HintParamsV1``); gueltig ist die juengste Version."""
+
+    __tablename__ = "hint_params"
+    __table_args__ = (UniqueConstraint("depot_id", "version"), {"schema": SCHEMA})
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    depot_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.depot.id"))
+    version: Mapped[int]
+    params: Mapped[Any] = mapped_column(JSONB)
+    created_by: Mapped[int]
+    created_at: Mapped[datetime]
+
+
+class TargetAllocation(Base):
+    """D5.3: Zielallokation je Anlageklasse (DEP-10); gueltig ist die juengste Version."""
+
+    __tablename__ = "target_allocation"
+    __table_args__ = (UniqueConstraint("depot_id", "version"), {"schema": SCHEMA})
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    depot_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.depot.id"))
+    version: Mapped[int]
+    shares: Mapped[Any] = mapped_column(JSONB)
+    created_by: Mapped[int]
+    created_at: Mapped[datetime]
+
+
+class HintAck(Base):
+    """D5.3: ein Hinweis zur Kenntnis genommen, mit Messwert und Schwere in diesem Moment."""
+
+    __tablename__ = "hint_ack"
+    __table_args__ = (
+        Index("ix_hint_ack_depot_id_key", "depot_id", "key"),
+        CheckConstraint(in_values("severity", SEVERITIES), name="severity"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    depot_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.depot.id"))
+    key: Mapped[str]
+    user_id: Mapped[int]
+    # der juengste Lauf in diesem Moment: erscheint der Hinweis spaeter neu, endet die Kenntnisnahme
+    analysis_run_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.analysis_run.id"))
+    measured: Mapped[float | None]
+    severity: Mapped[str]
+    at: Mapped[datetime]
+
+
 class PortfolioOutbox(OutboxMixin, Base):
     """Events von portfolio, bis sie veroeffentlicht sind."""
 
