@@ -303,7 +303,7 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D4.5 Ansicht „Analyse“ (`d6803a8`; `AnalysisPanel` im Depot mit Qualität, Allokation, Konzentration, Kosten, Anleihen, Datenlage; offen: Score-Verlauf für Aktien außerhalb von DAX/MDAX; keine Migration; NAS: nichts Neues)
   - [x] D4.6 Neue Aktie sofort einordnen (`85bb1bf`; `marketdata.coverage.fetched`, `scoring.placements.updated`, Migration 0031 `market_data.coverage_fetch`; NAS: nichts Neues in der `.env`, die Consumer gleichen sich beim Start an)
 - [ ] D5 Hinweise (mit `analysis_run` und `portfolio.analysis.completed`, aus D4.4 verschoben)
-  - [ ] D5.1 Regeln und Katalog
+  - [x] D5.1 Regeln und Katalog (`12ad024`; `va_portfolio.domain.hints`, `HintParamsV1`, 19 von 25 Regeln gerechnet; keine Migration; NAS: nichts Neues)
   - [ ] D5.2 Lebenszyklus und Speicher
   - [ ] D5.3 Schwellen, Zielallokation, Kenntnisnahme
   - [ ] D5.4 Ansicht „Hinweise“
