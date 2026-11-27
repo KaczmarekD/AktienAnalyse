@@ -75,6 +75,7 @@ class StatementFigures:
     revenue_history: Sequence[float | None] = ()
     eps_history: Sequence[float | None] = ()
     net_income_history: Sequence[float | None] = ()
+    ebit_history: Sequence[float | None] = ()  # F3.1, juengstes Jahr zuerst
     # Geschaeftsjahre nach Stichtag, juengstes zuerst (F2.1: F-Score, Accruals, CFO/Bilanzsumme)
     years: Sequence[FiscalYear] = ()
 
@@ -117,6 +118,7 @@ class Metrics:
     buyback_yield: float | None
     shareholder_yield: float | None
     net_share_issuance: float | None
+    nopat_normalized: float | None
     roic: float | None
     roa: float | None
     fcf_margin: float | None
@@ -174,13 +176,35 @@ def roic(
     """ROIC = NOPAT / investiertes Kapital, mit effektiver Steuerquote wenn moeglich."""
     if ebit is None or equity is None:
         return None
-    if pretax and pretax > 0 and tax is not None and tax >= 0:
-        tax_rate = min(MAX_TAX_RATE, max(0.0, tax / pretax))
-    else:
-        tax_rate = default_tax_rate
-    nopat = ebit * (1.0 - tax_rate)
+    nopat = ebit * (1.0 - effective_tax_rate(pretax, tax, default_tax_rate))
     invested = equity + (debt or 0.0)
     return safe_div(nopat, invested)
+
+
+def effective_tax_rate(pretax: float | None, tax: float | None, default_tax_rate: float) -> float:
+    """Steuerquote des juengsten Jahres, begrenzt auf [0, ``MAX_TAX_RATE``]; ohne positiven
+    Vorsteuergewinn ``default_tax_rate``."""
+    if pretax and pretax > 0 and tax is not None and tax >= 0:
+        return min(MAX_TAX_RATE, max(0.0, tax / pretax))
+    return default_tax_rate
+
+
+def nopat_normalized(
+    ebit_history: Sequence[float | None],
+    *,
+    pretax: float | None,
+    tax: float | None,
+    fx: float | None,
+    default_tax_rate: float,
+) -> float | None:
+    """Grundlage des Ertragskraftwerts (F3.1, ADR-0011, Punkt 6): Mittelwert der juengsten
+    EBIT-Jahre (wie die Gewinnstabilitaet: bis zu fuenf, davon mindestens vier) nach der
+    effektiven Steuerquote, in Handelswaehrung. Verluste bleiben negativ."""
+    values = _recent(ebit_history)
+    if values is None or fx is None:
+        return None
+    mean = sum(values) / len(values)
+    return mean * (1.0 - effective_tax_rate(pretax, tax, default_tax_rate)) * fx
 
 
 def _recent(history: Sequence[float | None]) -> list[float] | None:
@@ -439,6 +463,13 @@ def compute_metrics(
         buyback_yield=buyback_yield,
         shareholder_yield=sum(yields) if yields else None,
         net_share_issuance=net_share_issuance(shares),
+        nopat_normalized=nopat_normalized(
+            s.ebit_history,
+            pretax=s.pretax_income,
+            tax=s.tax_expense,
+            fx=fx,
+            default_tax_rate=default_tax_rate,
+        ),
         roic=roic(
             ebit=s.ebit,
             equity=s.total_equity,

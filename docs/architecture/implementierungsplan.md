@@ -2981,6 +2981,12 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
   - **Replay-Regression:** Neue Spalten in der CSV zählen nicht als Abweichung, solange die alten
     Spalten in ihrer Reihenfolge bleiben und gleiche Werte haben. Sonst meldete `make regression`
     auf der NAS jede gespeicherte Woche, und das Runbook verlangt Exit 0 vor `make up`.
+- **Plausibilisiert (27.11.2026)** mit den Golden-Kennzahlen echter Titel (r 8 %, g 2 %, 10
+  Jahre): SAP kostet das 3,8-Fache seiner Ertragskraft ohne Wachstum, der Kurs unterstellt rund
+  8 % FCF-Wachstum (bei r ± 1 Punkt 5,6 bis 10,4 %); Qiagen 2,5-fach und 5 %; Zalando 2,7-fach,
+  aber −10 %, denn die FCF-Rendite ist hoch; Lufthansa nur 0,63-fach, ohne positiven FCF kein
+  implizites Wachstum. Allianz, Deutsche Bank und Vonovia bekommen als Finanz- und Immobilienwerte
+  keine Anker.
 
 #### F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung
 

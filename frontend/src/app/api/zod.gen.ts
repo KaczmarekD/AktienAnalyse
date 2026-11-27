@@ -506,6 +506,7 @@ export const zPreview = z.object({
  */
 export const zProfileParamsV1Input = z.object({
   cost_of_capital: z.number().gt(0).lte(0.5).optional().default(0.08),
+  dcf_years: z.int().gte(1).lte(30).optional().default(10),
   drop_negative_value_metrics: z.boolean().optional().default(true),
   industry_prefixes: z
     .array(z.string())
@@ -552,6 +553,7 @@ export const zProfileParamsV1Input = z.object({
  */
 export const zProfileParamsV1Output = z.object({
   cost_of_capital: z.number().gt(0).lte(0.5).optional().default(0.08),
+  dcf_years: z.int().gte(1).lte(30).optional().default(10),
   drop_negative_value_metrics: z.boolean().optional().default(true),
   industry_prefixes: z
     .array(z.string())

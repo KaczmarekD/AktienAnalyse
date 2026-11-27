@@ -27,6 +27,7 @@ from va_contracts.events.v1 import (
 from va_contracts.profile import ProfileParamsV1
 from va_platform.bus import follow_up
 
+from ..domain.anchors import add_anchors
 from ..domain.profile import ScoringProfileParams
 from ..domain.scoring import ScoringConfig, score
 
@@ -66,7 +67,8 @@ class SnapshotCompletedHandler:
             if active.label is not None:
                 log.info("Scoring mit Profil %s", active.label)
             frame = pd.DataFrame([f.to_flat() for f in snap.fundamentals], columns=_FLAT_COLUMNS)
-            scored = score(frame, cfg) if snap.fundamentals else frame.iloc[0:0]
+            # Die Anker (F3.1) kommen nach score() und gehen nicht in den Composite ein
+            scored = add_anchors(score(frame, cfg), cfg) if snap.fundamentals else frame.iloc[0:0]
             scoring_run_id = self._store.record_scoring(
                 snap.fetch_run_id,
                 frame,

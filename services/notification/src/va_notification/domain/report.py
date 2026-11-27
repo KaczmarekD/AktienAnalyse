@@ -225,6 +225,9 @@ def build_report(
         "earnings_stability",
         "revenue_growth_5y",
         "eps_growth_5y",
+        # F3.1: fundamentale Anker, nicht im Composite
+        "price_to_epv",
+        "implied_fcf_growth",
         "errors",
     ]
     export = scored.reindex(columns=[c for c in cols_order if c in scored.columns])

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import Field
 
@@ -16,6 +16,19 @@ _SCORE_COLUMNS = ("value_score", "quality_score", "composite_score")
 # Welche Regel das Value-Trap-Flag gesetzt hat (F2.3): die bisherige (hoher Value-, niedriger
 # Quality-Score) oder die mit Momentum und F-Score (ADR-0011, Punkt 5)
 ValueTrapReason = Literal["quality", "momentum"]
+
+# Fundamentale Anker je Titel (F3.1, ADR-0011, Punkt 6), mit der Sensitivitaet bei Kapitalkosten
+# 1 Prozentpunkt darunter (``_r_low``) und darueber (``_r_high``)
+AnchorKey = Literal[
+    "epv_per_share",
+    "price_to_epv",
+    "implied_fcf_growth",
+    "price_to_epv_r_low",
+    "price_to_epv_r_high",
+    "implied_fcf_growth_r_low",
+    "implied_fcf_growth_r_high",
+]
+ANCHOR_KEYS: tuple[AnchorKey, ...] = get_args(AnchorKey)
 
 
 class RankingRowV1(Contract):
@@ -41,6 +54,8 @@ class RankingRowV1(Contract):
     # F2.3 (additiv): Fehlt bei aelteren Events; ein Flag ohne Grund stammt von der bisherigen
     # Regel
     value_trap_reason: ValueTrapReason | None = None
+    # F3.1 (additiv): nicht im Composite; fehlt bei aelteren Events und bei Finanzwerten
+    anchors: dict[AnchorKey, float | None] = Field(default_factory=dict)
 
     def to_flat(self) -> dict[str, Any]:
         """Eine Zeile wie die Ausgabe von ``score()``: Faktor-Raenge als ``rank_<name>``."""
@@ -55,6 +70,7 @@ class RankingRowV1(Contract):
             industry_rule=self.industry_rule,
         )
         flat.update({f"rank_{name}": rank for name, rank in self.factor_ranks.items()})
+        flat.update({str(key): value for key, value in self.anchors.items()})
         return flat
 
     @classmethod
@@ -71,6 +87,7 @@ class RankingRowV1(Contract):
             rank_overall=int(flat["rank_overall"]),
             value_trap_flag=bool(flat.get("value_trap_flag", False)),
             value_trap_reason=missing_to_none(flat.get("value_trap_reason")),
+            anchors={key: missing_to_none(flat[key]) for key in ANCHOR_KEYS if key in flat},
             industry_rule=bool(flat.get("industry_rule", False)),
             factor_ranks={
                 key.removeprefix("rank_"): missing_to_none(value)

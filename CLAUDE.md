@@ -221,6 +221,13 @@ Momentum-Rang ≤ 0,30 und F-Score ≤ 3, also ein fallendes Messer ohne fundame
 „momentum“). Das 12-1-Momentum (`MarketData.momentum_12_1`) rechnet market-data aus `close`
 und `dividend` der gespeicherten Kurse; es geht nicht in den Composite ein.
 
+**Fundamentale Anker** (seit F3.1, `va_scoring.domain.anchors`, nicht im Composite): der
+Ertragskraftwert (EPV = normalisierter NOPAT / `cost_of_capital` − Nettoverschuldung, je Aktie
+und als Preis/EPV) und das implizite FCF-Wachstum per Reverse DCF auf den Börsenwert
+(`dcf_years` Jahre, danach `terminal_growth`), beides auch bei ±1 Prozentpunkt Kapitalkosten.
+`nopat_normalized` liefert market-data (Mittel der EBIT-Jahre nach effektiver Steuer); Finanzwerte
+bekommen keine Anker. Sie stehen in `scoring.anchor_value`, im Event und in der CSV.
+
 ## Konventionen
 
 **Datenfluss-Format**: Innerhalb des Codes arbeiten wir mit der

@@ -130,6 +130,7 @@ class ScoringProfileParams(ProfileParamsV1):
                 "trap_momentum_rule": cfg.trap_momentum_rule,
                 "trap_momentum_max_rank": cfg.trap_momentum_max_rank,
                 "trap_fscore_max": cfg.trap_fscore_max,
+                "dcf_years": cfg.dcf_years,
             }
         )
 
@@ -162,6 +163,7 @@ class ScoringProfileParams(ProfileParamsV1):
             trap_momentum_rule=self.trap_momentum_rule,
             trap_momentum_max_rank=self.trap_momentum_max_rank,
             trap_fscore_max=self.trap_fscore_max,
+            dcf_years=self.dcf_years,
         )
 
 

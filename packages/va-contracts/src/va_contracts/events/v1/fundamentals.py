@@ -48,6 +48,8 @@ class ValueMetricsV1(Contract):
     shareholder_yield: float | None = None
     # F2.2 (additiv): Veraenderung der Aktienanzahl in 12 Monaten, um Splits bereinigt
     net_share_issuance: float | None = None
+    # F3.1 (additiv): mittlerer EBIT nach Steuern in Handelswaehrung, fuer den Ertragskraftwert
+    nopat_normalized: float | None = None
 
 
 class QualityMetricsV1(Contract):

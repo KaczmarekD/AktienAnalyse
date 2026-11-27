@@ -794,6 +794,7 @@ def fetch_one(
         revenue_history=_history(_pick(income, "revenue")),
         eps_history=_history(_pick(income, "diluted_eps")),
         net_income_history=_history(_pick(income, "net_income")),
+        ebit_history=_history(_pick(income, "ebit")),
         years=_fiscal_years(income, balance, cashflow),
     )
     market = MarketFigures(

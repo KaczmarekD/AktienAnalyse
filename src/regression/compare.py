@@ -77,9 +77,13 @@ def compare_factor_scores(expected: pd.DataFrame, actual: pd.DataFrame) -> list[
 
 
 def compare_csv(expected: bytes, actual: bytes) -> list[Difference]:
-    """CSV des Reports Zeile fuer Zeile: Die Reihenfolge ist das Ranking und zaehlt."""
+    """CSV des Reports Zeile fuer Zeile: Die Reihenfolge ist das Ranking und zaehlt.
+
+    Neue Spalten (etwa die Anker seit F3.1) sind keine Abweichung, solange die alten in ihrer
+    Reihenfolge bleiben; verglichen werden die alten.
+    """
     old, new = _read_csv(expected), _read_csv(actual)
-    if list(old.columns) != list(new.columns):
+    if [c for c in new.columns if c in set(old.columns)] != list(old.columns):
         return [Difference("csv", "", "spalten", ", ".join(old.columns), ", ".join(new.columns))]
     found: list[Difference] = []
     for i in range(max(len(old), len(new))):

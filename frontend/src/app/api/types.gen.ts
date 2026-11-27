@@ -1107,6 +1107,12 @@ export type ProfileParamsV1Input = {
    */
   cost_of_capital?: number;
   /**
+   * Dcf Years
+   *
+   * Jahre mit eigenem Wachstum im Reverse DCF
+   */
+  dcf_years?: number;
+  /**
    * Drop Negative Value Metrics
    *
    * Negative Multiples aus dem Value-Ranking ausschliessen
@@ -1228,6 +1234,12 @@ export type ProfileParamsV1Output = {
    * Kapitalkosten r fuer das gerechtfertigte KBV
    */
   cost_of_capital?: number;
+  /**
+   * Dcf Years
+   *
+   * Jahre mit eigenem Wachstum im Reverse DCF
+   */
+  dcf_years?: number;
   /**
    * Drop Negative Value Metrics
    *

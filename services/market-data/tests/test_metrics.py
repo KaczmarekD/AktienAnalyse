@@ -465,7 +465,14 @@ class TestNetShareIssuance:
 class TestNopatNormalized:
     """Mittelwert der jüngsten EBIT-Jahre nach Steuern, in Handelswährung."""
 
-    def _nopat(self, ebit=(100.0, 120.0, 80.0, 100.0), *, pretax=100.0, tax=30.0, fx=1.0):
+    def _nopat(
+        self,
+        ebit: tuple[float | None, ...] = (100.0, 120.0, 80.0, 100.0),
+        *,
+        pretax: float | None = 100.0,
+        tax: float | None = 30.0,
+        fx: float | None = 1.0,
+    ):
         return nopat_normalized(list(ebit), pretax=pretax, tax=tax, fx=fx, default_tax_rate=TAX)
 
     def test_mean_ebit_after_the_effective_tax(self):

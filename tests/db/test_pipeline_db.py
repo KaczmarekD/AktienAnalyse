@@ -257,12 +257,10 @@ class TestFullRun:
             assert not scores.loc["TINY.DE", "passed_filter"]
             assert scores["passed_filter"].sum() == 3
             assert len(sc.get_factor_scores_df(run.scoring_run_id)) > 0
-            # F3.1: die Anker des Laufs, nur bekannte Schluessel
-            from va_contracts.events.v1.ranking import ANCHOR_KEYS
-
-            anchors = sc.get_anchor_values_df(run.scoring_run_id)
-            assert len(anchors) > 0
-            assert set(anchors["anchor"]) <= set(ANCHOR_KEYS)
+            # F3.1: Die Testdaten haben nur zwei EBIT-Jahre und einen FCF, der neben dem
+            # Boersenwert verschwindet: kein Anker. Das Schreiben pruefen die Tests von
+            # anchor_rows und vom Repository.
+            assert sc.get_anchor_values_df(run.scoring_run_id).empty
 
             rep = ReportingRepository(s)
             report = rep.get_report_for_run(run.id)

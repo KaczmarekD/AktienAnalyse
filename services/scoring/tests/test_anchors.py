@@ -101,13 +101,19 @@ def _frame(**overrides: Any) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _row(out: pd.DataFrame, symbol: str) -> dict[str, Any]:
+    """Eine Zeile als dict: Werte ohne pandas-Typen fuer die Vergleiche."""
+    return next(
+        {str(k): v for k, v in r.items()} for r in out.to_dict("records") if r["symbol"] == symbol
+    )
+
+
 class TestAddAnchors:
     def test_keys_match_the_contract(self):
         assert set(ANCHOR_COLUMNS) == set(ANCHOR_KEYS)
 
     def test_values_per_title(self):
-        out = add_anchors(_frame(), ScoringConfig()).set_index("symbol")
-        sap = out.loc["SAP.DE"]
+        sap = _row(add_anchors(_frame(), ScoringConfig()), "SAP.DE")
         # EPV = 80 / 0,08 - 200 = 800
         assert sap["epv_per_share"] == pytest.approx(80.0)
         assert sap["price_to_epv"] == pytest.approx(1000.0 / 800.0)
@@ -117,7 +123,7 @@ class TestAddAnchors:
         assert sap["implied_fcf_growth"] == pytest.approx(expected)
 
     def test_sensitivity_one_point_either_side(self):
-        sap = add_anchors(_frame(), ScoringConfig()).set_index("symbol").loc["SAP.DE"]
+        sap = _row(add_anchors(_frame(), ScoringConfig()), "SAP.DE")
         # Höhere Kapitalkosten: weniger Ertragskraft, mehr nötiges Wachstum
         assert sap["price_to_epv_r_low"] < sap["price_to_epv"] < sap["price_to_epv_r_high"]
         assert (
@@ -129,17 +135,18 @@ class TestAddAnchors:
 
     def test_no_anchors_for_financials_even_without_the_industry_rule(self):
         cfg = ScoringConfig(industry_rules=False)
-        dbk = add_anchors(_frame(), cfg).set_index("symbol").loc["DBK.DE"]
-        assert dbk[list(ANCHOR_COLUMNS)].isna().all()
+        dbk = _row(add_anchors(_frame(), cfg), "DBK.DE")
+        assert all(pd.isna(dbk[key]) for key in ANCHOR_COLUMNS)
 
     def test_negative_earnings_power_has_no_price_ratio(self):
-        sap = add_anchors(_frame(nopat_normalized=-8.0), ScoringConfig()).iloc[0]
+        sap = _row(add_anchors(_frame(nopat_normalized=-8.0), ScoringConfig()), "SAP.DE")
         assert sap["epv_per_share"] == pytest.approx((-8.0 / 0.08 - 200.0) / 10.0)
         assert np.isnan(sap["price_to_epv"])
 
     def test_parameters_come_from_the_config(self):
         cfg = ScoringConfig(cost_of_capital=0.10, terminal_growth=0.0, dcf_years=1)
-        sap = add_anchors(_frame(p_fcf=1000.0 / 100.0, market_cap=1100.0), cfg).iloc[0]
+        # FCF = 1100 / 11 = 100, also Wert = 1000 x (1 + g) wie im Beispiel von Hand
+        sap = _row(add_anchors(_frame(p_fcf=11.0, market_cap=1100.0), cfg), "SAP.DE")
         assert sap["implied_fcf_growth"] == pytest.approx(0.10, abs=1e-6)
 
     def test_missing_columns_give_empty_anchors(self):

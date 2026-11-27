@@ -73,6 +73,8 @@ export const PARAMS: ProfileParamsV1Output = {
   trap_momentum_rule: false,
   trap_momentum_max_rank: 0.3,
   trap_fscore_max: 3,
+  // F3.1 (ADR-0011): Jahre des Reverse DCF der fundamentalen Anker
+  dcf_years: 10,
 };
 
 export const RANKING: Ranking = {

@@ -202,9 +202,7 @@ class TestCompareCsv:
         assert compare_csv(_csv(CSV_ROWS), _csv(rows)) == []
         changed = [{**r, "price_to_epv": 1.2} for r in CSV_ROWS]
         changed[0]["composite_score"] = 0.1
-        assert [d.field for d in compare_csv(_csv(CSV_ROWS), _csv(changed))] == [
-            "composite_score"
-        ]
+        assert [d.field for d in compare_csv(_csv(CSV_ROWS), _csv(changed))] == ["composite_score"]
 
     def test_reordered_columns_are_one_difference(self):
         rows = [

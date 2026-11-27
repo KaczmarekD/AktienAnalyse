@@ -17,6 +17,7 @@ from va_platform.serialization import json_safe, to_python
 
 from ...domain.profile import ProfileVersionRef
 from .models import (
+    AnchorValue,
     FactorScore,
     InputSnapshot,
     Profile,
@@ -52,6 +53,15 @@ class ScoreRow:
     value_trap_flag: bool | None
     rank_overall: int | None
     value_trap_reason: str | None = None  # F2.3
+
+
+@dataclass(frozen=True)
+class AnchorRow:
+    """Ein Anker eines Titels (F3.1)."""
+
+    instrument_id: int
+    anchor: str
+    value: float
 
 
 @dataclass(frozen=True)
@@ -136,6 +146,13 @@ class ScoringRepository:
             self.session.execute(
                 insert(FactorScore),
                 [{"scoring_run_id": scoring_run_id, **_clean(asdict(r))} for r in rows],
+            )
+
+    def write_anchor_values(self, scoring_run_id: int, rows: Sequence[AnchorRow]) -> None:
+        if rows:
+            self.session.execute(
+                insert(AnchorValue),
+                [{"scoring_run_id": scoring_run_id, **asdict(r)} for r in rows],
             )
 
     # --- Profile (P2b.1, ADR-0009): nur anfuegen ----------------------------
@@ -317,6 +334,16 @@ class ScoringRepository:
             .order_by(_instrument.c.symbol, FactorScore.factor_key)
         )
         return _frame(self.session, stmt, ["symbol", *columns])
+
+    def get_anchor_values_df(self, scoring_run_id: int) -> pd.DataFrame:
+        """Die Anker eines Laufs (F3.1), nach Symbol und Anker."""
+        stmt = (
+            select(_instrument.c.symbol, AnchorValue.anchor, AnchorValue.value)
+            .join(_instrument, _instrument.c.id == AnchorValue.instrument_id)
+            .where(AnchorValue.scoring_run_id == scoring_run_id)
+            .order_by(_instrument.c.symbol, AnchorValue.anchor)
+        )
+        return _frame(self.session, stmt, ["symbol", "anchor", "value"])
 
     def get_score_history(self, symbol: str) -> pd.DataFrame:
         columns = [

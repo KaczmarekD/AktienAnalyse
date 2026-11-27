@@ -62,6 +62,8 @@ class ValueMetrics:
     shareholder_yield: float | None = None  # dividend + buyback
     # Veraenderung der Aktienanzahl in 12 Monaten, um Splits bereinigt (F2.2); negativ = Rueckkauf
     net_share_issuance: float | None = None
+    # Mittlerer EBIT nach Steuern in Handelswaehrung, Grundlage des Ertragskraftwerts (F3.1)
+    nopat_normalized: float | None = None
 
 
 @dataclass

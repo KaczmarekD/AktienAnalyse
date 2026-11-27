@@ -123,6 +123,10 @@ class ProfileParamsV1(Contract):
     trap_fscore_max: int = Field(
         default=3, ge=0, le=9, description="F-Score, bis zu dem die Regel greift"
     )
+    # F3.1 (ADR-0011, Punkt 6): Jahre mit eigenem Wachstum im Reverse DCF
+    dcf_years: int = Field(
+        default=10, ge=1, le=30, description="Jahre mit eigenem Wachstum im Reverse DCF"
+    )
 
     @model_validator(mode="after")
     def _justified_pb_defined(self) -> Self:

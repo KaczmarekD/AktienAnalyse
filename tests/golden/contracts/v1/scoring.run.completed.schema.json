@@ -61,6 +61,7 @@
             "dividend_yield": null,
             "ev_ebit": null,
             "net_share_issuance": null,
+            "nopat_normalized": null,
             "p_fcf": null,
             "pb_ratio": null,
             "pe_ratio": null,
@@ -252,6 +253,14 @@
           "maximum": 0.5,
           "title": "Cost Of Capital",
           "type": "number"
+        },
+        "dcf_years": {
+          "default": 10,
+          "description": "Jahre mit eigenem Wachstum im Reverse DCF",
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Dcf Years",
+          "type": "integer"
         },
         "drop_negative_value_metrics": {
           "default": true,
@@ -623,6 +632,31 @@
     "RankingRowV1": {
       "description": "Fundamentaldaten plus Bewertung. notification rendert Mail und CSV allein daraus.\n\nValue- und Quality-Score sind Perzentilraenge zwischen 0 und 1, ``None`` ohne genug\nFaktoren. Der Composite-Score ist ihr gewichtetes Mittel. Er hat bewusst keine\nObergrenze: Die Gewichte werden erst ab 1 % Abweichung normiert, ein Wert knapp\nueber 1 darf den Lauf nicht kippen. ``factor_ranks`` haelt die Raenge je Faktor,\nSchluessel wie im Scoring-Profil (z. B. ``ev_ebit``, ``roic``).",
       "properties": {
+        "anchors": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "propertyNames": {
+            "enum": [
+              "epv_per_share",
+              "price_to_epv",
+              "implied_fcf_growth",
+              "price_to_epv_r_low",
+              "price_to_epv_r_high",
+              "implied_fcf_growth_r_low",
+              "implied_fcf_growth_r_high"
+            ]
+          },
+          "title": "Anchors",
+          "type": "object"
+        },
         "composite_score": {
           "anyOf": [
             {
@@ -869,6 +903,18 @@
           ],
           "default": null,
           "title": "Net Share Issuance"
+        },
+        "nopat_normalized": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nopat Normalized"
         },
         "p_fcf": {
           "anyOf": [

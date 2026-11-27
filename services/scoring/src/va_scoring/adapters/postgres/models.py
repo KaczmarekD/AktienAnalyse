@@ -87,6 +87,23 @@ class FactorScore(Base):
     percentile_rank: Mapped[float | None]
 
 
+class AnchorValue(Base):
+    """Fundamentale Anker je Lauf und Titel im Long-Format (F3.1, Migration 0027).
+
+    Nur Werte, die es gibt; ``anchor`` ist ein Schluessel aus ``ANCHOR_KEYS``.
+    """
+
+    __tablename__ = "anchor_value"
+    __table_args__ = {"schema": "scoring"}  # noqa: RUF012
+
+    scoring_run_id: Mapped[int] = mapped_column(
+        ForeignKey("scoring.scoring_run.id"), primary_key=True
+    )
+    instrument_id: Mapped[int] = mapped_column(primary_key=True)  # -> market_data.instrument
+    anchor: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[float]
+
+
 class Profile(Base):
     """Ein Scoring-Profil. Sein Inhalt steht in den Versionen."""
 

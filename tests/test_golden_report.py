@@ -1,7 +1,7 @@
 """Golden-Master fuer die Samstags-Mail (Arbeitspaket P0.1).
 
-Eingefrorener Datensatz (``golden/input_fundamentals.json``) -> ``score()`` ->
-``build_report()``. HTML je Indexquelle und die Metadaten muessen byte-gleich
+Eingefrorener Datensatz (``golden/input_fundamentals.json``) -> ``score()`` -> seit F3.1
+``add_anchors()`` wie im Handler -> ``build_report()``. HTML je Indexquelle und die Metadaten muessen byte-gleich
 mit ``tests/golden/`` sein, die CSV inhaltlich gleich (Gleitkommazahlen mit
 Toleranz fuer die letzte Stelle) und im selben Format. Das ist das
 Sicherungsnetz fuer alle spaeteren Umbauten: Aendert sich die Mail ungewollt,
@@ -24,6 +24,7 @@ import pytest
 from tests.conftest import GOLDEN_DIR
 from va_market_data.domain.universe import FALLBACK_SOURCE
 from va_notification.domain.report import ReportArtifacts, build_report
+from va_scoring.domain.anchors import add_anchors
 from va_scoring.domain.scoring import ScoringConfig, score
 
 GOLDEN_INPUT = GOLDEN_DIR / "input_fundamentals.json"
@@ -57,7 +58,8 @@ CASES: dict[str, dict[str, object]] = {
 @pytest.fixture(scope="module")
 def scored() -> pd.DataFrame:
     records = json.loads(GOLDEN_INPUT.read_text(encoding="utf-8"))
-    return score(pd.DataFrame(records), ScoringConfig())
+    # F3.1: Anker wie im Handler von scoring, damit die CSV der echten Mail entspricht
+    return add_anchors(score(pd.DataFrame(records), ScoringConfig()), ScoringConfig())
 
 
 def _report(scored: pd.DataFrame, case: str) -> ReportArtifacts:

@@ -10,11 +10,12 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from va_contracts.events.v1.ranking import ANCHOR_KEYS
 from va_platform.db import session_scope
 from va_platform.serialization import to_python
 
 from ...domain.profile import DEFAULT_PROFILE_NAME
-from .repository import FactorScoreRow, ScoreRow, ScoringRepository
+from .repository import AnchorRow, FactorScoreRow, ScoreRow, ScoringRepository
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
@@ -63,6 +64,7 @@ class PostgresScoringStore:
             )
             repo.write_score_results(scoring_run_id, score_rows(df_all, scored, ids))
             repo.write_factor_scores(scoring_run_id, factor_rows(scored, ids, cfg))
+            repo.write_anchor_values(scoring_run_id, anchor_rows(scored, ids))
             # P5.1a: eigene Kopie der Eingangsdaten fuer die Vorschau
             repo.write_input_snapshot(fetch_run_id, input_rows(df_all))
             return scoring_run_id
@@ -118,6 +120,18 @@ def score_rows(
         if sym not in passed
     ]
     return results
+
+
+def anchor_rows(scored: pd.DataFrame, ids: Mapping[str, int]) -> list[AnchorRow]:
+    """Die Anker (F3.1) im Long-Format, nur Werte, die es gibt."""
+    rows: list[AnchorRow] = []
+    present = [key for key in ANCHOR_KEYS if key in scored.columns]
+    for record in scored.to_dict("records"):
+        for key in present:
+            value = to_python(record.get(key))
+            if value is not None:
+                rows.append(AnchorRow(ids[str(record["symbol"])], key, float(value)))
+    return rows
 
 
 def _symbols(df: pd.DataFrame) -> list[str]:

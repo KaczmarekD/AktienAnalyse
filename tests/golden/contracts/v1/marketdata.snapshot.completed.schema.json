@@ -61,6 +61,7 @@
             "dividend_yield": null,
             "ev_ebit": null,
             "net_share_issuance": null,
+            "nopat_normalized": null,
             "p_fcf": null,
             "pb_ratio": null,
             "pe_ratio": null,
@@ -574,6 +575,18 @@
           ],
           "default": null,
           "title": "Net Share Issuance"
+        },
+        "nopat_normalized": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nopat Normalized"
         },
         "p_fcf": {
           "anyOf": [

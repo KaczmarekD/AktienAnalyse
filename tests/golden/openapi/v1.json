@@ -2169,6 +2169,14 @@
             "title": "Cost Of Capital",
             "type": "number"
           },
+          "dcf_years": {
+            "default": 10,
+            "description": "Jahre mit eigenem Wachstum im Reverse DCF",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Dcf Years",
+            "type": "integer"
+          },
           "drop_negative_value_metrics": {
             "default": true,
             "description": "Negative Multiples aus dem Value-Ranking ausschliessen",
@@ -2330,6 +2338,14 @@
             "maximum": 0.5,
             "title": "Cost Of Capital",
             "type": "number"
+          },
+          "dcf_years": {
+            "default": 10,
+            "description": "Jahre mit eigenem Wachstum im Reverse DCF",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Dcf Years",
+            "type": "integer"
           },
           "drop_negative_value_metrics": {
             "default": true,

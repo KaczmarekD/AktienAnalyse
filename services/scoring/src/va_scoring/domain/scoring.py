@@ -135,6 +135,10 @@ class ScoringConfig:
     trap_momentum_max_rank: float = 0.30
     trap_fscore_max: int = 3
 
+    # Fundamentale Anker (F3.1): Jahre mit eigenem Wachstum im Reverse DCF; Kapitalkosten und
+    # Endwachstum sind cost_of_capital und terminal_growth
+    dcf_years: int = 10
+
 
 def _percentile_rank(series: pd.Series, direction: str, drop_non_positive: bool) -> pd.Series:
     """Perzentilrang. NaN bleibt NaN. direction='low' -> niedrig wird zu hohem Score."""
