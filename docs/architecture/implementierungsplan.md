@@ -3950,5 +3950,57 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
   Playwright im E2E-Stack: ein Nutzer legt ein Depot an, der Wert stimmt, ein zweiter Nutzer
   sieht es nicht.
 - **Review:** `/code-review high`.
+- **Entwurf (27.11.2026):**
+  - **Routen:**
+    - `/depots` („Meine Depots“) und `/depots/:depotId`, beide nur mit echter Sitzung
+      (`ownerGuard`, mit Einmal-Passwort zum Konto).
+    - `/` führt Angemeldete zu `/depots`, sonst zum Ranking; nach der Anmeldung ohne Rücksprung
+      ebenfalls `/depots`.
+    - „Depots“ steht in der Navigation vorn, nur mit Anmeldung.
+  - **Meine Depots:**
+    - Je Depot eine Karte: Name, Art, Wert mit Stand (ältester Kurs), Zahl der Positionen.
+    - Hinweise „unvollständig“ (Positionen ohne Wert) und „wird geprüft“.
+    - Archivierte nur auf Wunsch.
+    - „Neues Depot“ öffnet einen Dialog (Name, Art, Beschreibung) und führt zum neuen Depot.
+  - **Depot:**
+    - Kennzahlen Wert, Kasse, Einstand, Differenz.
+    - Positionen als Tabelle: Wertpapier, Menge, Kurs mit Datum und Quelle, Wert, Einstand,
+      Differenz; ein fehlender Wert mit Grund.
+    - „Bearbeiten“ ändert den Depotstand im selben Blatt: Menge, Einheit, Einstand, Notiz,
+      Kasse, Wertpapier über die Suche. Gespeichert wird mit `If-Match`; ein Konflikt zeigt
+      eine Rückmeldung mit „Neu laden“.
+    - „Datei“: CSV herunterladen; eine Datei wählen zeigt den Abgleich (neu, geändert,
+      gleich, entfällt, nicht erkannt). „Übernehmen“ geht nur ohne abgelehnte Zeilen.
+    - „Verlauf“: alle Depotstände mit Herkunft und Unterschied.
+    - Umbenennen, Archivieren (mit Rückfrage) und Wiederherstellen.
+  - **Bausteine:**
+    - Pipes `eur` (Betrag aus dem Dezimal-String der API) und `dec` (Menge, Kurs) in
+      `format.ts`, im Styleguide ergänzt.
+    - Die Texte der Depot-Seiten stehen in `depots/controls.ts`, nicht im Start-Bundle;
+      neue Begriffe in der Gruppe „Depots“ des Glossars.
+  - **Ohne Live-Aktualisierung:** Die Seiten laden nach eigenen Aktionen nach. Das Topic
+    `user:<id>` abonniert das UI noch nicht (später mit den Hinweisen, D5).
+  - **E2E:** Ein Nutzer legt ein Depot mit Kasse an, der Wert ist die Kasse. In der
+    Replay-Fixture gibt es keine Tageskurse, eine Position zeigt deshalb „Kurs fehlt“. Ein
+    zweiter Nutzer (über die Nutzerverwaltung angelegt) sieht das Depot nicht. Die neuen Routen
+    kommen in die axe-Prüfung.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - **Start-Bundle:** `mat-select` hätte das Start-Bundle um 9 kB über die Grenze von 500 kB
+    gehoben (Overlay und A11y teilt es mit der Hülle). Die Einheit ist deshalb ein natives `select`
+    mit `matNativeControl`. Das Start-Bundle wächst um 3 kB auf 496 kB (Icons, Routen, Guards und
+    die Request-Bausteine der Depot-Seiten aus `common.gen.ts`).
+  - **Feldfehler** als `span.field-error`, nicht `mat-error`: Die Felder haben kein Formular-Control.
+  - **Zahlen im Feld:** Dezimalkomma und Tausenderpunkte (`parseAmount`). An die API gehen sie als
+    Text mit Punkt, Anzeige über die neuen Pipes `eur` und `dec`.
+  - **Nach der Anmeldung** ohne Rücksprung führt `safeNext` zu `/`; dort wählt `startGuard`
+    „Meine Depots“, ohne Anmeldung das Ranking. Abmelden ohne Sitzungspflicht führt weiter zum
+    Ranking.
+  - **Glossar:** neue Gruppe „Depots“ (Depot, Beobachtungsliste, Wertpapier, Menge,
+    Schlusskurs, Wert, Kasse, Einstand, Differenz, Stand, Positionen, Depotstand,
+    unvollständig, wird geprüft). „Schlusskurs“, weil `price` schon der Kurs im Ranking ist.
+  - **Review (`/code-review high`):** behoben, dass der Editor seine Eingaben verwarf, sobald das
+    Depot nachlud (etwa nach „Umbenennen“ während des Bearbeitens), und dass die Kasse kein Minus
+    zuließ (Dispo, der Vertrag erlaubt es). Offen gelassen: Die Seiten aktualisieren sich nicht von
+    selbst, wenn ein anderer Tab speichert; „Speichern“ meldet das als Konflikt.
 
 **Fertig, wenn:** ein Nutzer ein Depot anlegt, der Wert stimmt und fremde Depots unsichtbar sind.

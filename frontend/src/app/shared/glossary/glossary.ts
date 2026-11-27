@@ -12,6 +12,7 @@ export const GROUPS = [
   'Stammdaten',
   'Läufe',
   'Profile',
+  'Depots',
 ] as const;
 
 export type GlossaryGroup = (typeof GROUPS)[number];
@@ -475,6 +476,78 @@ export const GLOSSARY = {
     label: 'Δ',
     tip: ({ top }) =>
       `Veränderung des Rangs gegenüber dem aktiven Profil. ↑ 2: zwei Plätze besser. „neu“: vorher nicht in den Top ${top ?? 20}.`,
+  },
+  // Depots (D3.6)
+  depot: {
+    group: 'Depots',
+    label: 'Depot',
+    tip: 'Wertpapiere, die du hältst, mit Menge und Kasse. Nur du siehst deine Depots.',
+  },
+  watchlist: {
+    group: 'Depots',
+    label: 'Beobachtungsliste',
+    tip: 'Wertpapiere ohne Menge, die du verfolgen willst. Sie zeigt Kurse, hat aber keinen Wert.',
+  },
+  security: {
+    group: 'Depots',
+    label: 'Wertpapier',
+    tip: 'Aktie, ETF oder Anleihe, erkannt an der ISIN. Name und Art kommen aus den Stammdaten.',
+  },
+  quantity: {
+    group: 'Depots',
+    label: 'Menge',
+    tip: 'Stückzahl, bei Anleihen der Nennwert in Euro. Bruchstücke aus Sparplänen sind erlaubt.',
+  },
+  close: {
+    group: 'Depots',
+    label: 'Schlusskurs',
+    short: 'Kurs',
+    tip: 'Letzter Schlusskurs in der Währung des Handelsplatzes, bei Anleihen in Prozent vom Nennwert.',
+  },
+  depot_value: {
+    group: 'Depots',
+    label: 'Wert',
+    tip: 'Menge mal letzter Kurs in Euro, bei Anleihen Nennwert mal Kurs durch 100, dazu die Kasse. Positionen ohne Kurs zählen nicht mit.',
+  },
+  cash: {
+    group: 'Depots',
+    label: 'Kasse',
+    tip: 'Guthaben auf dem Verrechnungskonto in Euro. Es zählt zum Wert des Depots.',
+  },
+  cost_basis: {
+    group: 'Depots',
+    label: 'Einstand',
+    tip: 'Was du für die ganze Position bezahlt hast, in Euro. Er dient nur der Differenz.',
+  },
+  difference: {
+    group: 'Depots',
+    label: 'Differenz',
+    tip: 'Wert minus Einstand, nur für Positionen mit beidem. Keine Rendite pro Jahr.',
+  },
+  price_date: {
+    group: 'Depots',
+    label: 'Stand',
+    tip: 'Datum des ältesten Kurses, der in den Wert eingeht. So alt ist der Wert höchstens.',
+  },
+  positions: {
+    group: 'Depots',
+    label: 'Positionen',
+    tip: 'Wertpapiere im neuesten Depotstand, je ISIN eine Zeile.',
+  },
+  holdings_version: {
+    group: 'Depots',
+    label: 'Depotstand',
+    tip: 'Ein vollständiger Stand der Positionen. Jede Änderung und jede Datei legt einen neuen an, alte bleiben.',
+  },
+  incomplete: {
+    group: 'Depots',
+    label: 'unvollständig',
+    tip: 'Mindestens eine Position hat keinen Wert, etwa weil der Kurs fehlt. Der Wert zählt nur die übrigen.',
+  },
+  pending: {
+    group: 'Depots',
+    label: 'wird geprüft',
+    tip: 'Für dieses Wertpapier fehlen noch die Stammdaten. Sie kommen mit dem nächsten Abruf.',
   },
 } satisfies Record<string, GlossaryEntry>;
 

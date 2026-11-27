@@ -69,6 +69,37 @@ export class MrdPipe implements PipeTransform {
   }
 }
 
+/** Zahl aus der API, die als Text kommt (Dezimalzahl, D3.4); leer oder kaputt ist sie keine. */
+function decimal(value: string | number | null | undefined): number | undefined {
+  if (value == null || value === '') {
+    return undefined;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+/** Betrag in Euro aus der API, z. B. Wert eines Depots (2.315,00 €). */
+@Pipe({ name: 'eur' })
+export class EurPipe implements PipeTransform {
+  private readonly locale = inject(LOCALE_ID);
+
+  transform(value: string | number | null | undefined, digits = '1.2-2'): string {
+    const number = decimal(value);
+    return number === undefined ? MISSING : `${formatNumber(number, this.locale, digits)} €`;
+  }
+}
+
+/** Menge oder Kurs aus der API, mit so vielen Nachkommastellen wie nötig (12,5; 0,123456). */
+@Pipe({ name: 'dec' })
+export class DecPipe implements PipeTransform {
+  private readonly locale = inject(LOCALE_ID);
+
+  transform(value: string | number | null | undefined, digits = '1.0-8'): string {
+    const number = decimal(value);
+    return number === undefined ? MISSING : formatNumber(number, this.locale, digits);
+  }
+}
+
 const RUN_STATUS: Record<string, string> = {
   running: 'läuft',
   success: 'erfolgreich',

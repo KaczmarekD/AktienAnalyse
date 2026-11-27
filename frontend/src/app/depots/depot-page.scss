@@ -1,0 +1,30 @@
+// Ein Depot (D3.6): nur Einmaliges, der Rest kommt aus den Mustern
+
+.meta .badge {
+  margin-left: 0;
+  margin-right: var(--va-space-xs);
+}
+
+.tools {
+  margin-bottom: var(--va-space-lg);
+}
+
+.stat-grid {
+  margin-bottom: var(--va-space-lg);
+}
+
+.name {
+  display: block;
+}
+
+.hint {
+  display: block;
+}
+
+app-section + app-section,
+app-holdings-editor + app-import-panel,
+app-section + app-import-panel,
+app-import-panel + app-section {
+  display: block;
+  margin-top: var(--va-space-lg);
+}

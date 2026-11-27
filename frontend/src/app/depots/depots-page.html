@@ -1,0 +1,100 @@
+<app-page-header>
+  Meine Depots
+  <button
+    pageAction
+    matButton="filled"
+    type="button"
+    data-action="create"
+    [matTooltip]="controls.create"
+    (click)="create()"
+  >
+    <app-icon name="add" />
+    Neues Depot
+  </button>
+</app-page-header>
+<p class="intro">
+  Deine Depots und Beobachtungslisten. Den Wert rechnet der Server aus den letzten Schlusskursen.
+  Nur du siehst deine Depots.
+</p>
+<div class="cluster">
+  <mat-slide-toggle
+    data-option="archived"
+    [checked]="archived()"
+    [matTooltip]="controls.showArchived"
+    (change)="archived.set($event.checked)"
+    >Archivierte zeigen</mat-slide-toggle
+  >
+</div>
+
+@if (depots(); as depots) {
+  @if (depots.length === 0) {
+    <app-state
+      empty="Noch kein Depot. Lege mit „Neues Depot“ das erste an."
+      emptyIcon="account_balance_wallet"
+    />
+  } @else {
+    <div class="card-grid">
+      @for (depot of depots; track depot.id) {
+        <app-section [heading]="depot.name" [attr.data-depot]="depot.id">
+          <a
+            sectionActions
+            matButton="outlined"
+            data-action="open"
+            [routerLink]="['/depots', depot.id]"
+            [matTooltip]="controls.open"
+            >Öffnen</a
+          >
+          <p class="badges">
+            <span class="badge" data-kind tabindex="0" [matTooltip]="kindTip(depot)">{{
+              kinds[depot.kind]
+            }}</span>
+            @if (depot.status === 'archived') {
+              <span
+                class="badge badge--muted"
+                data-archived
+                tabindex="0"
+                [matTooltip]="controls.archived"
+                ><app-icon name="archive" />archiviert</span
+              >
+            }
+            @if (depot.valuation; as valuation) {
+              @if (!valuation.complete) {
+                <span
+                  class="badge badge--muted"
+                  data-incomplete
+                  tabindex="0"
+                  [matTooltip]="incompleteTip(valuation.unvalued)"
+                  ><app-icon name="warning" />unvollständig</span
+                >
+              }
+              @if (valuation.pending > 0) {
+                <span
+                  class="badge badge--muted"
+                  data-pending
+                  tabindex="0"
+                  [matTooltip]="tips.pending"
+                  >{{ valuation.pending }} wird geprüft</span
+                >
+              }
+            }
+          </p>
+          <dl class="kv-list">
+            @if (depot.kind === 'depot') {
+              <dt><app-term key="depot_value" /></dt>
+              <dd class="num" data-value>{{ depot.valuation?.value_eur | eur }}</dd>
+              <dt><app-term key="price_date" /></dt>
+              <dd data-price-date>{{ depot.valuation?.price_date | day }}</dd>
+            }
+            <dt><app-term key="positions" /></dt>
+            <dd class="num" data-positions>{{ depot.positions }}</dd>
+          </dl>
+          @if (depot.description) {
+            <p class="hint">{{ depot.description }}</p>
+          }
+        </app-section>
+      }
+    </div>
+  }
+} @else {
+  <app-state [error]="error()" loading="Lade die Depots …" />
+}

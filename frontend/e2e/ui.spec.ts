@@ -64,7 +64,8 @@ test('Ranking zeigt die Titel in der Reihenfolge der API', async ({ page }) => {
   const top = ranking.rows.filter((row) => row.rank !== null).slice(0, 5);
   expect(top.length).toBeGreaterThan(0);
 
-  await page.goto('/');
+  // D3.6: Angemeldete starten auf „Meine Depots“, das Ranking hat seine eigene Route
+  await page.goto('/ranking');
   await expect(page).toHaveURL(/\/ranking$/);
   const rows = dataRows(page);
   for (const [i, row] of top.entries()) {

@@ -1,0 +1,213 @@
+<app-back-link to="/depots">Meine Depots</app-back-link>
+
+@if (depot(); as depot) {
+  <app-page-header>
+    {{ depot.name }}
+    @if (!archived() && !editing()) {
+      <button
+        pageAction
+        matButton="filled"
+        type="button"
+        data-action="edit"
+        [disabled]="busy()"
+        [matTooltip]="controls.edit"
+        (click)="edit()"
+      >
+        <app-icon name="edit" />
+        Bearbeiten
+      </button>
+    }
+  </app-page-header>
+  <p class="meta" data-meta>
+    <span class="badge" data-kind tabindex="0" [matTooltip]="kindTip()">{{
+      kinds[depot.kind]
+    }}</span>
+    <app-term key="holdings_version">Depotstand {{ depot.version }}</app-term>
+    · angelegt am {{ depot.created_at | day }}
+    @if (depot.description) {
+      · {{ depot.description }}
+    }
+  </p>
+  <div class="cluster tools">
+    <button
+      matButton="outlined"
+      type="button"
+      data-action="rename"
+      [disabled]="archived() || busy()"
+      [matTooltip]="controls.rename"
+      (click)="rename()"
+    >
+      Umbenennen
+    </button>
+    @if (archived()) {
+      <button
+        matButton="outlined"
+        type="button"
+        data-action="restore"
+        [disabled]="busy()"
+        [matTooltip]="controls.restore"
+        (click)="restore()"
+      >
+        <app-icon name="unarchive" />
+        Wiederherstellen
+      </button>
+    } @else {
+      <button
+        matButton="outlined"
+        type="button"
+        data-action="archive"
+        [disabled]="busy()"
+        [matTooltip]="controls.archive"
+        (click)="archive()"
+      >
+        <app-icon name="archive" />
+        Archivieren
+      </button>
+    }
+  </div>
+  @if (archived()) {
+    <p class="notice" role="status" data-archived-notice>
+      <app-icon name="archive" />
+      Dieses Depot ist archiviert und schreibgeschützt. Wiederherstellen, um es zu ändern.
+    </p>
+  }
+  <app-notice [notice]="notice()" />
+
+  @if (depot.kind === 'depot') {
+    <div class="stat-grid">
+      <app-stat-card label="Wert" data-stat-value [tip]="tips.value">
+        {{ valuation()?.value_eur | eur }}
+        <span statSub>{{ valueSub() }}</span>
+      </app-stat-card>
+      <app-stat-card label="Kasse" data-stat-cash [tip]="tips.cash">
+        {{ valuation()?.cash_eur | eur }}
+      </app-stat-card>
+      <app-stat-card label="Einstand" data-stat-cost [tip]="tips.cost">
+        {{ valuation()?.cost_basis_eur | eur }}
+      </app-stat-card>
+      <app-stat-card label="Differenz" data-stat-difference [tip]="tips.difference">
+        {{ valuation()?.difference_eur | eur }}
+        <span statSub>Stand {{ valuation()?.price_date | day }}</span>
+      </app-stat-card>
+    </div>
+  }
+
+  @if (editing(); as holdings) {
+    <app-holdings-editor
+      [depotId]="depot.id"
+      [kind]="depot.kind"
+      [holdings]="holdings"
+      [names]="names()"
+      (saved)="onSaved($event)"
+      (cancelled)="editing.set(undefined)"
+      (reload)="reloadEditor()"
+    />
+  } @else {
+    <app-section heading="Positionen" data-positions>
+      @if (positions().length === 0) {
+        <app-state
+          empty="Noch keine Position. „Bearbeiten“ fügt Wertpapiere hinzu, „Datei wählen“ übernimmt eine Datei."
+          emptyIcon="account_balance_wallet"
+        />
+      } @else {
+        <div class="table-sheet">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col"><app-term key="security" /></th>
+                @if (depot.kind === 'depot') {
+                  <th scope="col" class="num"><app-term key="quantity" /></th>
+                }
+                <th scope="col" class="num"><app-term key="close" variant="short" /></th>
+                @if (depot.kind === 'depot') {
+                  <th scope="col" class="num"><app-term key="depot_value" /></th>
+                  <th scope="col" class="num"><app-term key="cost_basis" /></th>
+                  <th scope="col" class="num"><app-term key="difference" /></th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (position of positions(); track position.isin) {
+                <tr [attr.data-position]="position.isin">
+                  <td>
+                    <span class="name">{{ position.name ?? position.isin }}</span>
+                    <span class="hint">{{ position.isin }}</span>
+                    @if (position.pending) {
+                      <span
+                        class="badge badge--muted"
+                        data-pending
+                        tabindex="0"
+                        [matTooltip]="tips.pending"
+                        >wird geprüft</span
+                      >
+                    }
+                  </td>
+                  @if (depot.kind === 'depot') {
+                    <td class="num">
+                      {{ position.quantity | dec }}
+                      @if (position.unit === 'nominal') {
+                        <span class="hint">{{ units.nominal }}</span>
+                      }
+                    </td>
+                  }
+                  <td class="num" data-price>
+                    <span tabindex="0" [matTooltip]="priceTip(position)"
+                      >{{ position.price | dec: '1.2-4' }}
+                      {{ position.percent_of_par ? '%' : (position.price_currency ?? '') }}</span
+                    >
+                    <span class="hint">{{ position.price_date | day }}</span>
+                  </td>
+                  @if (depot.kind === 'depot') {
+                    <td class="num" data-value>
+                      @if (missingOf(position); as missing) {
+                        <span
+                          class="badge badge--muted"
+                          data-missing
+                          tabindex="0"
+                          [matTooltip]="missing.tip"
+                          >{{ missing.label }}</span
+                        >
+                      } @else {
+                        {{ position.value_eur | eur }}
+                      }
+                    </td>
+                    <td class="num">{{ position.cost_basis_eur | eur }}</td>
+                    <td class="num">{{ position.difference_eur | eur }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </app-section>
+  }
+
+  <app-import-panel [depotId]="depot.id" [readonly]="archived()" (imported)="onImported()" />
+
+  <app-section heading="Verlauf" data-history>
+    @if (history(); as history) {
+      @if (history.length === 0) {
+        <p class="hint">Noch kein Depotstand gespeichert.</p>
+      } @else {
+        <ul class="divided-list">
+          @for (entry of history; track entry.version) {
+            <li [attr.data-version]="entry.version">
+              <span tabindex="0" [matTooltip]="tips.version">Depotstand {{ entry.version }}</span>
+              · {{ entry.created_at | dayTime }} · {{ sources[entry.source] }} ·
+              {{ entry.positions }} Positionen
+              <span class="hint"
+                >{{ entry.added }} neu, {{ entry.changed }} geändert,
+                {{ entry.removed }} entfallen</span
+              >
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      <p class="hint">Lade den Verlauf …</p>
+    }
+  </app-section>
+} @else {
+  <app-state [error]="error()" loading="Lade das Depot …" />
+}

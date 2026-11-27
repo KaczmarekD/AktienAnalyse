@@ -1,12 +1,32 @@
 import { Routes } from '@angular/router';
 
-import { adminGuard, authGuard, loginGuard, sessionGuard } from './shared/auth/auth.guard';
+import {
+  adminGuard,
+  authGuard,
+  loginGuard,
+  ownerGuard,
+  sessionGuard,
+  startGuard,
+} from './shared/auth/auth.guard';
 
 // Routenparameter kommen als Inputs in die Seiten (withComponentInputBinding, app.config.ts).
 // D1.4: Die Ansichten schützt authGuard (mit Sitzungspflicht nur angemeldet), das eigene Konto
-// und die Nutzerverwaltung brauchen immer eine echte Sitzung.
+// und die Nutzerverwaltung brauchen immer eine echte Sitzung. D3.6: die Depots ebenso
+// (ownerGuard); die Startseite führt Angemeldete zu „Meine Depots“ (startGuard).
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'ranking' },
+  { path: '', pathMatch: 'full', canActivate: [startGuard], children: [] },
+  {
+    path: 'depots',
+    title: 'Meine Depots · Value-Analyzer',
+    canActivate: [ownerGuard],
+    loadComponent: () => import('./depots/depots-page').then((m) => m.DepotsPage),
+  },
+  {
+    path: 'depots/:depotId',
+    title: 'Depot · Value-Analyzer',
+    canActivate: [ownerGuard],
+    loadComponent: () => import('./depots/depot-page').then((m) => m.DepotPage),
+  },
   {
     path: 'ranking',
     title: 'Ranking · Value-Analyzer',

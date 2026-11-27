@@ -253,11 +253,17 @@ describe('App', () => {
       const links = (fixture: ComponentFixture<App>) =>
         Array.from(element(fixture).querySelectorAll('nav a')).map((a) => a.getAttribute('href'));
       expect(links(await render({ required: true, user: ADMIN }))).toEqual([
+        '/depots',
         '/ranking',
         '/runs',
         '/profiles',
         '/admin/users',
       ]);
+    });
+
+    it('offers "Depots" only with a login (D3.6)', async () => {
+      const fixture = await render({ required: false });
+      expect(element(fixture).querySelector('nav a[href="/depots"]')).toBeNull();
     });
 
     it('hides "Nutzer" from users', async () => {

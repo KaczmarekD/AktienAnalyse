@@ -20,7 +20,14 @@ import type { Me } from '../../api/types.gen';
 import { me } from '../../testing/auth';
 import { FakeWebSocket, realtimeTestingProviders } from '../../testing/realtime';
 import { RealtimeService } from '../realtime/realtime.service';
-import { adminGuard, authGuard, loginGuard, sessionGuard } from './auth.guard';
+import {
+  adminGuard,
+  authGuard,
+  loginGuard,
+  ownerGuard,
+  sessionGuard,
+  startGuard,
+} from './auth.guard';
 import { authInterceptor, jsonWritesInterceptor } from './auth.interceptor';
 import { AuthStore, safeNext, SESSION_ENDED } from './auth.store';
 import { ACCOUNT_CONTROLS } from './controls';
@@ -280,7 +287,33 @@ describe('Guards', () => {
   it('lead a logged-in user away from the login page to the return path', async () => {
     await start({ user: me() });
     expect(await guard(loginGuard, '/login', { next: '/runs' })).toBe('/runs');
-    expect(await guard(loginGuard, '/login', { next: 'https://boese.example' })).toBe('/ranking');
+    // D3.6: ohne gültigen Rücksprung zur Startseite, die wählt „Meine Depots“
+    expect(await guard(loginGuard, '/login', { next: 'https://boese.example' })).toBe('/');
+  });
+
+  it('need a real session for the depots, also without a login requirement (D3.6)', async () => {
+    await start({ required: false });
+    expect(await guard(ownerGuard, '/depots')).toBe('/login?next=%2Fdepots');
+  });
+
+  it('let the owner see the depots (D3.6)', async () => {
+    await start({ user: me() });
+    expect(await guard(ownerGuard, '/depots/3')).toBe(true);
+  });
+
+  it('send the owner with a one-time password to the account page first (D3.6)', async () => {
+    await start({ user: me({ must_change_password: true }) });
+    expect(await guard(ownerGuard, '/depots')).toBe('/account');
+  });
+
+  it('start logged-in users on their depots (D3.6)', async () => {
+    await start({ user: me() });
+    expect(await guard(startGuard, '/')).toBe('/depots');
+  });
+
+  it('start everyone else on the ranking, without a login requirement (D3.6)', async () => {
+    await start({ required: false });
+    expect(await guard(startGuard, '/')).toBe('/ranking');
   });
 
   it('show the login page to everyone else', async () => {
@@ -335,8 +368,8 @@ describe('safeNext', () => {
     '/\\boese.example',
     'https://boese.example',
     '/login',
-  ])('falls back to the ranking for %s', (next) => {
-    expect(safeNext(next)).toBe('/ranking');
+  ])('falls back to the start page for %s', (next) => {
+    expect(safeNext(next)).toBe('/');
   });
 });
 

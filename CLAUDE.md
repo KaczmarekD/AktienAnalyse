@@ -256,7 +256,18 @@ und `protocol.ts` ändern sich im selben Commit. Anmeldung (D1.4) unter `fronten
   schreibende Anfragen ohne Inhalt als `{}` mit JSON-Header, sonst lehnt das web-api sie ab (415).
 - Das Start-Bundle liegt knapp unter der Grenze von 500 kB: Der Store nutzt die Request-Bausteine
   ohne zod, die Seiten Anmelden, Konto und Nutzer laden nach und haben ihre Tooltips in
-  `shared/auth/controls.ts`.
+  `shared/auth/controls.ts`. Achtung: Was eine nachgeladene Seite aus `api/@angular/common.gen.ts`
+  oder aus Modulen der Hülle (Overlay, A11y) nutzt, landet trotzdem im Start-Bundle, weil die Hülle
+  dieselben Module lädt. Deshalb natives `select` statt `mat-select`.
+
+Depots im UI (D3.6) unter `frontend/src/app/depots/`:
+- `/depots` („Meine Depots“, Startseite nach der Anmeldung über `startGuard`) und
+  `/depots/:depotId`, beide nur mit echter Sitzung (`ownerGuard`).
+- Bewertung aus `valuation`, Bearbeiten mit `If-Match` (`HoldingsEditor`), Datei mit Abgleich
+  (`ImportPanel`), Verlauf, Umbenennen, Archivieren.
+- Texte in `depots/controls.ts`, Begriffe in der Glossar-Gruppe „Depots“, Beträge über die
+  Pipes `eur` und `dec`.
+- Live-Aktualisierung über `user:<id>` fehlt noch.
 
 **Gestaltung des UI nach dem Styleguide** ([docs/architecture/styleguide.md](docs/architecture/styleguide.md)):
 Farben nur aus `--mat-sys-*`, ihre Werte stehen allein in der Papier-Palette
@@ -434,7 +445,8 @@ bis ADR-0014 sind seit 06.11.2026 angenommen (ADR-0012 ersetzt ADR-0007). Umgese
 HTTPS über DSM, NATS-Nutzer je Dienst, Mail-Bestätigung, Datenexport, Löschkommando), D2
 (Wertpapiere, Abdeckung, Tageskurse, ETF- und Anleihedaten) und von D3 der Dienst portfolio mit
 Depots und Depotständen (D3.1) samt Endpunkten im web-api (D3.2), der Abdeckung aus den
-Depots (D3.3), der Bewertung (D3.4) und der Datei im eigenen Format (D3.5). Das
+Depots (D3.3), der Bewertung (D3.4), der Datei im eigenen Format (D3.5) und der Oberfläche
+„Meine Depots“ (D3.6), D3 damit fertig. Das
 Zertifikat für die NAS wählt der User (Runbook: beide Wege).
 Entscheidungen: `docs/adr/` (ADR-0001 bis ADR-0014), Recherche: `docs/research/`. Dieses Dokument beschreibt den **Ist-Stand**. Bei
 Widersprüchen gelten die ADRs. Pläne und Recherche-Ergebnisse werden in `docs/`

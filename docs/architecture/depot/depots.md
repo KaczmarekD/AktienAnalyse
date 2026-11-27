@@ -8,8 +8,10 @@
 > web-api aus der Tabelle unten ohne Import und Zielallokation (D3.2), die Abdeckung aus den
 > Depots (D3.3, `portfolio.coverage.changed`), die Bewertung aus den Kopien der Marktdaten (D3.4,
 > `security_view`, `price_view`, `fx_view`, `valuation` in `GET /depots` und `GET /depots/{id}`).
-> Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import`, `…/holdings/csv`).
-> Die Oberfläche folgt mit D3.6.
+> Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import`, `…/holdings/csv`),
+> seit D3.6 die Oberfläche: „Meine Depots“ (`/depots`, Startseite nach der Anmeldung) und das
+> Depot (`/depots/:id`) mit Positionen, Bearbeiten, Datei und Verlauf. Die Reiter Analyse,
+> Hinweise, News und Einstellungen folgen mit D4 und später.
 
 ## Begriffe
 

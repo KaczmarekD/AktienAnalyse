@@ -1,0 +1,27 @@
+// Meine Depots (D3.6): nur Einmaliges, der Rest kommt aus den Mustern
+
+// Zeilenlänge des Einleitungssatzes, nur hier (wie bei den Profilen)
+.intro {
+  max-width: 70ch;
+  margin: 0 0 var(--va-space-md);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cluster {
+  margin-bottom: var(--va-space-lg);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-sm);
+  margin: 0 0 var(--va-space-sm);
+
+  .badge {
+    margin-left: 0;
+  }
+}
+
+.hint {
+  margin: var(--va-space-sm) 0 0;
+}

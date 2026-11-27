@@ -24,6 +24,26 @@ export const sessionGuard: CanActivateFn = async (_route, state) => {
   return auth.user() ? true : loginTree(router, state.url);
 };
 
+/** D3.6: Depots gehören einer Person: nur mit echter Sitzung, mit Einmal-Passwort erst das Konto. */
+export const ownerGuard: CanActivateFn = async (_route, state) => {
+  const auth = inject(AuthStore);
+  const router = inject(Router);
+  await auth.whenReady();
+  const user = auth.user();
+  if (!user) {
+    return loginTree(router, state.url);
+  }
+  return user.must_change_password ? router.createUrlTree(['/account']) : true;
+};
+
+/** D3.6: die Startseite. Angemeldet „Meine Depots“, sonst das Ranking (ohne Sitzungspflicht). */
+export const startGuard: CanActivateFn = async () => {
+  const auth = inject(AuthStore);
+  const router = inject(Router);
+  await auth.whenReady();
+  return router.createUrlTree([auth.user() ? '/depots' : '/ranking']);
+};
+
 /** Die Nutzerverwaltung: nur ein Admin mit echter Sitzung und eigenem Passwort. */
 export const adminGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthStore);

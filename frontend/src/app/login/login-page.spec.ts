@@ -103,12 +103,12 @@ describe('LoginPage', () => {
     expect(navigate).toHaveBeenCalledWith('/runs/3');
   });
 
-  it('goes to the ranking without a return path or with a foreign one', async () => {
+  it('goes to the start page without a return path or with a foreign one', async () => {
     const fixture = await render('https://boese.example');
     spyNavigation();
     fakeAuth().next = me();
     await answer(fixture, await submit(fixture), 204);
-    expect(navigate).toHaveBeenCalledWith('/ranking');
+    expect(navigate).toHaveBeenCalledWith('/'); // D3.6: dort „Meine Depots“
   });
 
   it('sends a user with a one-time password to the account page first', async () => {

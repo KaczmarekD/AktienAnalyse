@@ -86,7 +86,16 @@ async function pages(request: APIRequestContext): Promise<string[]> {
   const symbol = await rankedSymbol(request);
   const runs = await getJson<RunSummary[]>(request, '/api/v1/runs');
   const profiles = await getJson<ProfileSummary[]>(request, '/api/v1/scoring/profiles');
+  // D3.6: ein Depot des angemeldeten Nutzers, angelegt, falls es noch keins gibt
+  let depots = await getJson<{ id: number }[]>(request, '/api/v1/depots');
+  if (depots.length === 0) {
+    const created = await request.post('/api/v1/depots', { data: { name: 'Axe-Depot' } });
+    expect(created.status(), 'Depot anlegen').toBe(201);
+    depots = [(await created.json()) as { id: number }];
+  }
   return [
+    '/depots',
+    `/depots/${depots[0].id}`,
     '/ranking',
     `/instruments/${encodeURIComponent(symbol)}`,
     '/runs',

@@ -6,6 +6,8 @@ export type ControlText = string | ((n: number) => string);
 
 /** Tooltips der Bedienelemente (Spec, Katalog „Bedienelemente“); {n} kommt aus den Daten. */
 export const CONTROLS = {
+  // D3.6: nur mit Anmeldung
+  'nav.depots': 'Deine Depots und Beobachtungslisten mit Wert und Positionen.',
   'nav.ranking': 'Alle Titel nach Composite, mit Filtern und Kennzahlen.',
   'nav.runs': 'Verlauf aller Läufe, neuen Lauf starten, Mails ansehen.',
   'nav.profiles': 'Gewichte und Faktoren des Scorings ansehen und ändern.',

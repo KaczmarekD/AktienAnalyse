@@ -32,6 +32,15 @@ const NAV: readonly NavItem[] = [
   { path: '/profiles', label: 'Profile', icon: 'tune', tip: CONTROLS['nav.profiles'], also: [] },
 ];
 
+/** D3.6: nur mit echter Sitzung; Depots gehören einer Person */
+const DEPOTS: NavItem = {
+  path: '/depots',
+  label: 'Depots',
+  icon: 'account_balance_wallet',
+  tip: CONTROLS['nav.depots'],
+  also: [],
+};
+
 /** D1.4: nur für Admins mit echter Sitzung */
 const USERS: NavItem = {
   path: '/admin/users',
@@ -66,13 +75,17 @@ export class App {
   protected readonly realtime = inject(RealtimeService);
   protected readonly auth = inject(AuthStore);
   protected readonly controls = CONTROLS;
-  /** Navigation: mit Sitzungspflicht erst nach der Anmeldung, „Nutzer“ nur für Admins. */
+  /**
+   * Navigation: mit Sitzungspflicht erst nach der Anmeldung, „Depots“ nur angemeldet (D3.6),
+   * „Nutzer“ nur für Admins.
+   */
   protected readonly nav = computed(() => {
     const auth = this.auth;
     if (!auth.ready() || (auth.required() && !auth.user())) {
       return [];
     }
-    return auth.canManageUsers() ? [...NAV, USERS] : NAV;
+    const items = auth.user() ? [DEPOTS, ...NAV] : [...NAV];
+    return auth.canManageUsers() ? [...items, USERS] : items;
   });
 
   private readonly router = inject(Router);
@@ -89,7 +102,7 @@ export class App {
   /** Der Bereich der aktuellen Route; er ist in der Navigation markiert. */
   protected readonly section = computed(() => {
     const url = this.url();
-    return [...NAV, USERS].find((item) =>
+    return [DEPOTS, ...NAV, USERS].find((item) =>
       [item.path, ...item.also].some((path) => belongsTo(url, path)),
     )?.path;
   });

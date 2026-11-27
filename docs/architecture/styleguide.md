@@ -146,7 +146,8 @@ Tabellen sind tabellarisch, das setzt `_patterns.scss` für jede Tabelle, `.num`
 - Liste: `leaderboard`, `history`, `tune`, `help`, `info`, `warning`, `error`, `check_circle`,
   `progress_activity`, `play_arrow`, `download`, `content_copy`, `search`, `view_column`,
   `arrow_back`, `arrow_upward`, `arrow_downward`, `cloud_off`, `close`, `expand_more`, `edit`,
-  seit D1.4 `person`, `logout`, `login`, `group`. Ein neues Icon kommt zuerst in diese Liste.
+  seit D1.4 `person`, `logout`, `login`, `group`, seit D3.6 `account_balance_wallet`, `add`,
+  `delete`, `upload`, `archive`, `unarchive`. Ein neues Icon kommt zuerst in diese Liste.
 - Icons sind Schmuck (`aria-hidden`). Steht eins allein in einem Icon-Button, braucht der Button
   `aria-label` und Tooltip mit demselben Text.
 
@@ -410,6 +411,13 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
   Quality), ist ein `mat-slider` in Schritten von 5 %. Feldfehler nennen den erlaubten Bereich in
   der Einheit des Felds, mit Icon `error`.
 - **Selten geänderte Felder** liegen in einem geschlossenen `mat-expansion-panel` „Erweitert“.
+- **Auswahl aus wenigen Werten** (D3.6, Einheit im Depot): natives `select` mit
+  `matNativeControl` im `mat-form-field`, kein `mat-select`. `mat-select` zieht Teile von Overlay
+  und A11y in das Start-Bundle, auch wenn nur eine nachgeladene Ansicht es nutzt; beim
+  Depot-Editor waren das 9 kB.
+- **Feldfehler ohne Angular Forms** (Felder mit eigenem Signal, etwa im Depot-Editor): ein
+  `span.field-error` unter dem Feld. `mat-error` erscheint dort nicht, es braucht ein
+  Formular-Control im Fehlerzustand.
 
 ## Muster-Klassen
 
@@ -472,6 +480,8 @@ Material bekommen denselben Ring aus `_patterns.scss`.
   | Pipe | Wofür | Beispiel |
   |---|---|---|
   | `num` | Scores, Multiples | 0,78; mit `num: '1.1-1'` 14,4 |
+  | `eur` | Beträge in Euro aus der API (Dezimalzahl als Text, D3.6) | 2.315,00 € |
+  | `dec` | Mengen und Kurse aus der API, so viele Nachkommastellen wie nötig (D3.6) | 12,5; 0,123456 |
   | `pct` | Anteile; Gewichte mit `pct: '1.0-0'` | 12,3 %; 60 % |
   | `mrd` | Beträge in Milliarden | 140,0 Mrd |
   | `day` | Datum | 30.10.2026 |

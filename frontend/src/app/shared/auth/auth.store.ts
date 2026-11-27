@@ -19,6 +19,8 @@ import { RealtimeService } from '../realtime/realtime.service';
 
 export const SESSION_ENDED = 'Deine Sitzung ist abgelaufen. Bitte melde dich neu an.';
 const HOME = '/ranking';
+/** D3.6: Ziel nach der Anmeldung ohne Rücksprung; die Startseite wählt „Meine Depots“. */
+const START = '/';
 
 /** Rücksprung nach der Anmeldung: nur ein Pfad dieser App, sonst das Ranking. */
 export function safeNext(next: unknown): string {
@@ -29,7 +31,7 @@ export function safeNext(next: unknown): string {
     next.includes('\\') ||
     /^\/login([/?#]|$)/.test(next)
   ) {
-    return HOME;
+    return START;
   }
   return next;
 }

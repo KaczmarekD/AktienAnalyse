@@ -6,7 +6,9 @@ import '../locale';
 import {
   DayPipe,
   DayTimePipe,
+  DecPipe,
   DurationPipe,
+  EurPipe,
   IndexSourcePipe,
   MISSING,
   OrDashPipe,
@@ -108,5 +110,32 @@ describe('IndexSourcePipe', () => {
     expect(source.transform('iShares')).toBe('iShares');
     expect(source.transform('Fallback-CSV')).toBe('Ersatzliste');
     expect(source.transform(null)).toBe(MISSING);
+  });
+});
+
+describe('EurPipe (D3.6)', () => {
+  it('shows an amount from the API in euro', () => {
+    const eur = pipe(EurPipe);
+    expect(plain(eur.transform('2315.00'))).toBe('2.315,00 €');
+    expect(plain(eur.transform('0.5'))).toBe('0,50 €');
+    expect(plain(eur.transform(-12.345))).toBe('-12,35 €');
+  });
+
+  it('shows a dash for a missing or broken amount', () => {
+    const eur = pipe(EurPipe);
+    expect(eur.transform(null)).toBe(MISSING);
+    expect(eur.transform('')).toBe(MISSING);
+    expect(eur.transform('kaputt')).toBe(MISSING);
+  });
+});
+
+describe('DecPipe (D3.6)', () => {
+  it('shows quantities and prices with as many decimals as needed', () => {
+    const dec = pipe(DecPipe);
+    expect(dec.transform('10.00000000')).toBe('10');
+    expect(dec.transform('12.5')).toBe('12,5');
+    expect(dec.transform('0.123456')).toBe('0,123456');
+    expect(dec.transform('231.5', '1.2-4')).toBe('231,50');
+    expect(dec.transform(null)).toBe(MISSING);
   });
 });
