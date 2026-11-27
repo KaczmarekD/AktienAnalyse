@@ -295,7 +295,7 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D3.6 Oberfläche „Meine Depots“ (`ae1bfaa`; `/depots` als Startseite nach der Anmeldung, Depot-Detail mit Bearbeiten, Datei und Verlauf, Playwright-Test; keine Migration; NAS: nichts Neues)
 - [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
   - [x] D4.1 Einordnung in scoring (`9b52350`; `place()`, `placements[]`, Ranking-Zeilen mit `isin` und `composite_percentile`; Migration 0027 `scoring.placement`; Ranking, CSV und Mail unverändert; NAS: nichts Neues)
-  - [ ] D4.2 Scores im Depot
+  - [x] D4.2 Scores im Depot (`c591a5f`; Consumer `portfolio` mit `scoring.run.completed`, Migration 0028 `portfolio.score_view`, `PositionValueV1.score`, Spalten im Depot; NAS: nichts Neues in der `.env`, Scores im Depot ab dem nächsten Bewertungslauf oder sofort mit einem Lauf aus dem UI)
   - [ ] D4.3 ETF und Anleihen rechnen
   - [ ] D4.4 Depot-Analyse
   - [ ] D4.5 Ansicht „Analyse“
