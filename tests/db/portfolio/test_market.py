@@ -118,6 +118,22 @@ def test_newest_score_per_isin(market):
     assert market.market([]).scores == {}
 
 
+def test_the_ranking_of_a_scoring_run(market):
+    """D5.5: die Titel des Rankings eines Laufs, mit Namen; Einordnungen und andere Laeufe nicht."""
+    market.record_scores(
+        [
+            _score(SAP, 8, rank=12, name="SAP SE", sector="Technology"),
+            _score(APPLE, 8, reference="outside"),
+        ],
+        at=T0,
+    )
+    market.record_scores([_score(SAP, 9, rank=3)], at=T0)
+    [sap] = market.universe(8)
+    assert (sap.isin, sap.rank, sap.name, sap.sector) == (SAP, 12, "SAP SE", "Technology")
+    assert [s.rank for s in market.universe(9)] == [3]
+    assert market.universe(7) == []
+
+
 def test_the_score_role_never_changes_or_deletes(market, portfolio_engine):
     market.record_scores([_score(SAP, 8)], at=T0)
     for statement in (

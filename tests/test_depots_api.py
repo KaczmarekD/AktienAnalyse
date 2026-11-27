@@ -604,3 +604,82 @@ class TestFile:
             f'attachment; filename="depot-{depot_id}-v1.csv"'
         )
         assert response.content.decode("utf-8-sig").splitlines()[1] == f"{SAP};10;;;stueck"
+
+
+class TestComparison:
+    """D5.5 (HIN-06): Pruefkandidaten, standardmaessig aus, nur zu Aktien im eigenen Depot."""
+
+    IFX = "DE0006231004"
+    AIR = "NL0000235190"
+
+    @pytest.fixture
+    def compared(self, identity, store) -> Iterator[TestClient]:
+        market = MemoryMarketStore()
+
+        def score(isin: str, composite: float, rank: int, sector: str = "Technology") -> Score:
+            return Score(
+                isin=isin,
+                scoring_run_id=8,
+                as_of=date(2026, 11, 20),
+                symbol=f"{isin[-4:]}.DE",
+                reference="universe",
+                rank=rank,
+                composite_score=composite,
+                composite_percentile=composite,
+                sector=sector,
+                name=f"Titel {isin[-4:]}",
+            )
+
+        market.record_scores(
+            [score(SAP, 0.3, 40), score(self.IFX, 0.7, 4), score(self.AIR, 0.9, 1, sector="x")],
+            at=None,  # type: ignore[arg-type]
+        )
+        client = _client(identity, store, "anna", market)
+        yield client
+        client.__exit__(None, None, None)
+
+    def _depot(self, client: TestClient) -> int:
+        depot_id = _create(client)
+        response = _write(
+            client,
+            "PUT",
+            f"/api/v1/depots/{depot_id}/holdings",
+            json={"lines": [{"isin": SAP, "quantity": "10"}], "cash": [{"amount": "100"}]},
+            headers={"If-Match": '"0"'},
+        )
+        assert response.status_code == 200, response.text
+        return depot_id
+
+    def test_off_by_default_then_on(self, compared):
+        depot_id = self._depot(compared)
+        url = f"/api/v1/depots/{depot_id}/positions/{SAP}/comparison"
+        off = compared.get(url)
+        assert off.status_code == 200, off.text
+        assert (off.json()["enabled"], off.json()["candidates"]) == (False, [])
+        assert compared.get(f"/api/v1/depots/{depot_id}/hints").json()["candidates"] is False
+        params = compared.get(f"/api/v1/depots/{depot_id}/hint-params").json()["params"]
+        saved = _write(
+            compared,
+            "PUT",
+            f"/api/v1/depots/{depot_id}/hint-params",
+            json={**params, "candidates": True},
+            headers={"If-Match": '"0"'},
+        )
+        assert saved.status_code == 200, saved.text
+        on = compared.get(url).json()
+        assert (on["enabled"], on["sector"], on["scoring_run_id"]) == (True, "Technology", 8)
+        assert [(c["isin"], c["name"], c["rank"]) for c in on["candidates"]] == [
+            (self.IFX, "Titel 1004", 4)
+        ]
+        assert compared.get(f"/api/v1/depots/{depot_id}/hints").json()["candidates"] is True
+
+    def test_only_stocks_of_the_own_depot(self, compared, identity, store):
+        depot_id = self._depot(compared)
+        base = f"/api/v1/depots/{depot_id}/positions"
+        assert compared.get(f"{base}/{self.IFX}/comparison").status_code == 404
+        assert compared.get(f"{base}/keine-isin/comparison").status_code == 422
+        other = _client(identity, store, "ben", MemoryMarketStore())
+        try:
+            assert other.get(f"{base}/{SAP}/comparison").status_code == 404
+        finally:
+            other.__exit__(None, None, None)

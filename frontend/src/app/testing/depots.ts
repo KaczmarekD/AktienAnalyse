@@ -282,6 +282,7 @@ export function hints(list: DepotHint[], values: Partial<DepotHints> = {}): Depo
     computed_at: '2026-11-22T10:05:00Z',
     version: 2,
     hints: list,
+    candidates: false,
     ...values,
   };
 }

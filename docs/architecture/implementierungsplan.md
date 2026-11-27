@@ -4359,5 +4359,16 @@ zeigen den Disclaimer.
 - **Test:** bis zu drei Titel aus dem Referenzuniversum, selber Sektor, höherer Composite, ohne
   Value-Trap, nicht im Depot; Überschrift „Zum Vergleich im selben Sektor“.
 - **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - Nur Titel aus dem Bewertungslauf, aus dem die Scores der Aktie stammen, damit Composite und
+    Rang vergleichbar sind; `Score.name` aus der Ranking-Zeile (ältere Zeilen ohne Namen zeigen
+    das Symbol).
+  - RPC `portfolio.depots.comparison`, `GET /depots/{id}/positions/{isin}/comparison` (ISIN als
+    Muster im Pfad, sonst 422), `DepotHintsV1.candidates`; Schalter im Dialog „Schwellen“.
+  - Tests: `test_candidates.py` (Domain, Service, RPC), DB (`universe`), API (aus, ein, nur
+    eigene Aktien), Komponenten (Vergleich unter einem Hinweis, Schalter im Dialog). Kein
+    Browser-Test: In den Replay-Daten hat die Aktie des E2E-Depots weder HIN-Q01 noch HIN-Q02.
+  - **Review (`/code-review high`):** behoben, dass die Überschrift des Vergleichs eine Ebene
+    übersprang (h4 statt h3).
 
 **Fertig, wenn:** jede Regel des Katalogs getestet und im UI sichtbar ist.

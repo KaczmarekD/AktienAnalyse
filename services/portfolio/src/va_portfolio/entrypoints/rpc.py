@@ -22,7 +22,9 @@ from typing import TYPE_CHECKING, Any
 
 from va_contracts.portfolio import (
     CashLineV1,
+    ComparisonCandidateV1,
     DepotAnalysisV1,
+    DepotComparisonV1,
     DepotExportV1,
     DepotHintsV1,
     DepotSettingsV1,
@@ -47,6 +49,7 @@ from va_contracts.portfolio import (
 from va_contracts.rpc.v1 import (
     DEPOTS_ANALYSIS,
     DEPOTS_ARCHIVE,
+    DEPOTS_COMPARISON,
     DEPOTS_CREATE,
     DEPOTS_EXPORT,
     DEPOTS_GET,
@@ -66,6 +69,7 @@ from va_contracts.rpc.v1 import (
     HOLDINGS_SAVE,
     TARGET_SAVE,
     DepotAnalysisReplyV1,
+    DepotComparisonReplyV1,
     DepotExportReplyV1,
     DepotHintsReplyV1,
     DepotListReplyV1,
@@ -85,6 +89,7 @@ from ..domain.hints import HINT_CATALOG, NOT_EVALUATED
 
 if TYPE_CHECKING:
     from va_contracts.rpc.v1 import (
+        ComparisonRequestV1,
         DepotCreateRequestV1,
         DepotExportRequestV1,
         DepotListRequestV1,
@@ -102,7 +107,13 @@ if TYPE_CHECKING:
         TargetSaveRequestV1,
     )
 
-    from ..application.depots import DepotService, DepotSummary, HistoryEntry, ImportPreview
+    from ..application.depots import (
+        Comparison,
+        DepotService,
+        DepotSummary,
+        HistoryEntry,
+        ImportPreview,
+    )
     from ..domain.depots import Snapshot
     from ..domain.hints import SettingsHistory, StoredRun, StoredSettings
     from ..domain.valuation import DepotValue, PositionValue, Score
@@ -152,12 +163,14 @@ def _score(score: Score | None) -> PositionScoreV1 | None:
     )
 
 
-def _hints(run: StoredRun | None, acknowledged: set[str] | None = None) -> DepotHintsV1:
+def _hints(
+    run: StoredRun | None, acknowledged: set[str] | None = None, *, candidates: bool = False
+) -> DepotHintsV1:
     """D5.2: ein Lauf mit seinen Hinweisen, die Texte aus dem Katalog; seit D5.3 mit den noch
     zur Kenntnis genommenen."""
     acknowledged = acknowledged or set()
     if run is None:
-        return DepotHintsV1()
+        return DepotHintsV1(candidates=candidates)
     hints = []
     for tracked in run.hints:
         hint, entry = tracked.hint, HINT_CATALOG[tracked.hint.rule]
@@ -179,7 +192,35 @@ def _hints(run: StoredRun | None, acknowledged: set[str] | None = None) -> Depot
             )
         )
     return DepotHintsV1(
-        analysis_run_id=run.id, computed_at=run.computed_at, version=run.version, hints=hints
+        analysis_run_id=run.id,
+        computed_at=run.computed_at,
+        version=run.version,
+        hints=hints,
+        candidates=candidates,
+    )
+
+
+def _comparison(comparison: Comparison) -> DepotComparisonV1:
+    """D5.5: Pruefkandidaten mit den Werten des Rankings; Name, sonst fehlt er."""
+    return DepotComparisonV1(
+        isin=comparison.isin,
+        enabled=comparison.enabled,
+        sector=comparison.sector,
+        scoring_run_id=comparison.scoring_run_id,
+        as_of=comparison.as_of,
+        candidates=[
+            ComparisonCandidateV1(
+                isin=score.isin,
+                symbol=score.symbol,
+                name=score.name,
+                rank=score.rank,
+                composite_score=score.composite_score or 0.0,
+                composite_percentile=score.composite_percentile,
+                value_score=score.value_score,
+                quality_score=score.quality_score,
+            )
+            for score in comparison.candidates
+        ],
     )
 
 
@@ -371,7 +412,17 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
 
     def with_acks(depot_id: int, run: StoredRun | None) -> DepotHintsReplyV1:
         acknowledged = service.acknowledged(depot_id, run) if run is not None else set()
-        return DepotHintsReplyV1(hints=_hints(run, acknowledged))
+        enabled = service.candidates_enabled(depot_id)
+        return DepotHintsReplyV1(hints=_hints(run, acknowledged, candidates=enabled))
+
+    def comparison(request: ComparisonRequestV1) -> DepotComparisonReplyV1:
+        def work() -> DepotComparisonReplyV1:
+            result = service.comparison(request.user_id, request.depot_id, request.isin)
+            return DepotComparisonReplyV1(
+                comparison=None if result is None else _comparison(result)
+            )
+
+        return _guarded(DepotComparisonReplyV1, work)
 
     def hints(request: DepotRefRequestV1) -> DepotHintsReplyV1:
         return _guarded(
@@ -552,4 +603,5 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         TARGET_SAVE: save_target,
         HINT_ACK: acknowledge,
         HINTS_CATALOG: catalog,
+        DEPOTS_COMPARISON: comparison,
     }

@@ -329,6 +329,15 @@ Vergleich**: aus dem Referenzuniversum, aus demselben Sektor, mit höherem Compo
 Value-Trap-Flag und nicht schon im Depot. Die Überschrift lautet „Zum Vergleich im selben
 Sektor“, nicht „Ersetzen durch“. Das ist dieselbe Information wie das Ranking, nur gefiltert.
 
+**Umgesetzt (27.11.2026, D5.5):** `va_portfolio.domain.candidates` (`candidates()`, höchstens
+`MAX_CANDIDATES` = 3, bester Composite zuerst). Der Vergleich nimmt die Titel des Rankings aus dem
+Bewertungslauf, aus dem die Scores der Aktie stammen (`MarketReader.universe`, `score_view` mit
+`reference = universe`; die Ranking-Zeilen tragen seit D5.5 den Namen). Standardmäßig aus:
+`HintParamsV1.candidates` schaltet ihn ein (Dialog „Schwellen“), `DepotHintsV1.candidates` sagt
+dem UI, ob es ihn anbietet. Ein Wertpapier, das nicht im neuesten Depotstand steht, ist unbekannt
+(404), wie ein fremdes Depot. Im UI unter einem Hinweis HIN-Q01 oder HIN-Q02 die Schaltfläche
+„Zum Vergleich“; die Titel führen ins Titel-Detail.
+
 ### Lebenszyklus
 
 ```
@@ -409,7 +418,7 @@ nachladen.
 | `GET`/`PUT /api/v1/depots/{id}/hint-params` | Schwellen mit Version und `ETag`, Speichern mit `If-Match` (428 ohne, 409 auf eine alte Version, 422 außerhalb der Grenzen; seit D5.3) |
 | `GET`/`PUT /api/v1/depots/{id}/target-allocation` | Zielallokation ebenso (seit D5.3, [depots.md](depots.md#api)) |
 | `GET /api/v1/hints/catalog` | Katalog mit Texten für das UI, ohne Personenbezug (seit D5.4) |
-| `GET /api/v1/depots/{id}/positions/{isin}/comparison` | Prüfkandidaten |
+| `GET /api/v1/depots/{id}/positions/{isin}/comparison` | Prüfkandidaten zu einer Aktie des Depots, `enabled` falsch, solange sie aus sind; 404 ohne die Aktie im Depot, 503 ohne Marktdaten (seit D5.5) |
 
 ## Tests und Abnahme
 

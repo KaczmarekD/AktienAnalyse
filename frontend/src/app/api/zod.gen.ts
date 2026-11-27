@@ -124,6 +124,22 @@ export const zCashLineOutput = z.object({
 });
 
 /**
+ * ComparisonCandidate
+ *
+ * D5.5: ein Titel zum Vergleich im selben Sektor, Werte wie im Ranking.
+ */
+export const zComparisonCandidate = z.object({
+  composite_percentile: z.number().nullable(),
+  composite_score: z.number(),
+  isin: z.string(),
+  name: z.string().nullable(),
+  quality_score: z.number().nullable(),
+  rank: z.int().nullable(),
+  symbol: z.string(),
+  value_score: z.number().nullable(),
+});
+
+/**
  * ConcentrationTitle
  */
 export const zConcentrationTitle = z.object({
@@ -165,6 +181,20 @@ export const zDataQuality = z.object({
   oldest_score: z.iso.date().nullable(),
   positions: z.int(),
   valued: z.int(),
+});
+
+/**
+ * DepotComparison
+ *
+ * D5.5 (HIN-06): Pruefkandidaten zu einer Aktie; ``enabled`` falsch, solange sie aus sind.
+ */
+export const zDepotComparison = z.object({
+  as_of: z.iso.date().nullable(),
+  candidates: z.array(zComparisonCandidate),
+  enabled: z.boolean(),
+  isin: z.string(),
+  scoring_run_id: z.int().nullable(),
+  sector: z.string().nullable(),
 });
 
 /**
@@ -210,6 +240,7 @@ export const zDepotHint = z.object({
  */
 export const zDepotHints = z.object({
   analysis_run_id: z.int().nullable(),
+  candidates: z.boolean(),
   computed_at: z.iso.datetime({ offset: true }).nullable(),
   hints: z.array(zDepotHint),
   version: z.int(),
@@ -1578,6 +1609,16 @@ export const zPreviewImportPath = z.object({
  * Successful Response
  */
 export const zPreviewImportResponse = zImportPreview;
+
+export const zDepotComparisonPath = z.object({
+  depot_id: z.int(),
+  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/),
+});
+
+/**
+ * Successful Response
+ */
+export const zDepotComparisonResponse = zDepotComparison;
 
 export const zRestoreDepotPath = z.object({
   depot_id: z.int(),

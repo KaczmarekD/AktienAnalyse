@@ -440,6 +440,32 @@ class HintV1(Contract):
     acknowledged: bool = False
 
 
+class ComparisonCandidateV1(Contract):
+    """D5.5: ein Titel zum Vergleich: Referenzuniversum, selber Sektor, hoeherer Composite, ohne
+    Value-Trap-Flag, nicht im Depot. Werte wie im Ranking desselben Bewertungslaufs."""
+
+    isin: IsinStr
+    symbol: str
+    name: str | None = None
+    rank: int | None = None
+    composite_score: float
+    composite_percentile: float | None = None
+    value_score: float | None = None
+    quality_score: float | None = None
+
+
+class DepotComparisonV1(Contract):
+    """D5.5 (HIN-06): Pruefkandidaten zu einer Aktie des Depots, hoechstens drei.
+    ``enabled`` falsch, solange sie in den Schwellen aus sind (Standard)."""
+
+    isin: IsinStr
+    enabled: bool
+    sector: str | None = None
+    scoring_run_id: int | None = None
+    as_of: date | None = None
+    candidates: list[ComparisonCandidateV1] = Field(default_factory=list)
+
+
 class HintRuleV1(Contract):
     """D5.4: ein Eintrag des Katalogs der Hinweise mit seinen Texten, fuer das UI."""
 
@@ -459,6 +485,8 @@ class DepotHintsV1(Contract):
     computed_at: datetime | None = None
     version: int = Field(default=0, ge=0)  # Depotstand des Laufs
     hints: list[HintV1] = Field(default_factory=list)
+    # D5.5 (additiv): Pruefkandidaten eingeschaltet (HIN-06), das UI bietet sie dann an
+    candidates: bool = False
 
 
 # --- D5.3: Einstellungen je Depot (Schwellen, Zielallokation) ----------------------------------
@@ -531,10 +559,12 @@ __all__ = [
     "BondPositionV1",
     "BondsV1",
     "CashLineV1",
+    "ComparisonCandidateV1",
     "ConcentrationV1",
     "CostsV1",
     "DataQualityV1",
     "DepotAnalysisV1",
+    "DepotComparisonV1",
     "DepotExportV1",
     "DepotHintsV1",
     "DepotKind",

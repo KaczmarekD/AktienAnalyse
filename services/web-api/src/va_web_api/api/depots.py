@@ -32,11 +32,13 @@ from va_contracts.portfolio import (
     HoldingLineV1,
     TargetAllocationV1,
 )
+from va_contracts.securities import ISIN_PATTERN
 
 from ..models import (
     CreateDepot,
     Depot,
     DepotAnalysis,
+    DepotComparison,
     DepotHintParams,
     DepotHints,
     DepotTarget,
@@ -236,6 +238,23 @@ def save_target_allocation(
         lambda: directory.save_target(user.id, depot_id, base_version=base, target=body)
     )
     return _target(settings, response)
+
+
+@router.get(
+    "/depots/{depot_id}/positions/{isin}/comparison", responses={**NOT_FOUND, **UNAVAILABLE}
+)
+def depot_comparison(
+    user: DepotOwner,
+    directory: Directory,
+    depot_id: int,
+    isin: Annotated[str, Path(pattern=ISIN_PATTERN)],
+) -> DepotComparison:
+    """D5.5 (HIN-06): bis zu drei Titel zum Vergleich im selben Sektor; 404, wenn die Aktie
+    nicht im Depot steht, 503 ohne Marktdaten. Aus, solange die Schwellen es nicht einschalten."""
+    comparison = _guarded(lambda: directory.comparison(user.id, depot_id, isin))
+    if comparison is None:
+        raise HTTPException(status_code=503, detail="Vergleich ohne Marktdaten nicht moeglich")
+    return DepotComparison.model_validate(comparison.model_dump())
 
 
 @router.get("/hints/catalog", responses=UNAVAILABLE)

@@ -27,8 +27,8 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
 from va_contracts import new_envelope
@@ -44,6 +44,7 @@ from va_contracts.events.v1 import (
 from va_contracts.portfolio import DepotAnalysisV1, HintParamsV1, TargetAllocationV1
 
 from ..domain.analysis import DepotAnalysis, analyze
+from ..domain.candidates import candidates
 from ..domain.depots import (
     CashLine,
     Depot,
@@ -72,7 +73,7 @@ from ..domain.holdings_file import (
     parse_holdings,
     write_holdings,
 )
-from ..domain.valuation import DepotValue, value_depot
+from ..domain.valuation import DepotValue, Score, value_depot
 from .analysis import analysis_input, fund_isins, fund_sizes, securities
 
 if TYPE_CHECKING:
@@ -222,6 +223,18 @@ class DepotStore(Protocol):
     ) -> int:
         """Lauf, Hinweise und Event (mit der ID des Laufs) in einer Transaktion."""
         ...
+
+
+@dataclass(frozen=True)
+class Comparison:
+    """D5.5: Pruefkandidaten zu einer Aktie; ``enabled`` falsch, solange sie aus sind."""
+
+    isin: str
+    enabled: bool
+    sector: str | None = None
+    scoring_run_id: int | None = None
+    as_of: date | None = None
+    candidates: list[Score] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -588,6 +601,45 @@ class DepotService:
         if self._store.latest_run(depot.id) is None:
             self._refresh(depot, "request")
         return self._store.latest_run(depot.id)
+
+    def comparison(self, user_id: int, depot_id: int, isin: str) -> Comparison | None:
+        """D5.5, HIN-06: Pruefkandidaten zu einer Aktie des neuesten Depotstands.
+
+        Ein Wertpapier, das nicht im Depot steht, ist unbekannt (wie ein fremdes Depot). Solange
+        die Pruefkandidaten in den Schwellen aus sind, ``enabled`` falsch und keine Titel;
+        ``None`` ohne lesbare Marktdaten.
+        """
+        depot = self._owned(user_id, depot_id)
+        snapshot = self._store.snapshot(depot.id) or Snapshot(depot.id, 0)
+        held = {line.isin for line in snapshot.lines}
+        if isin not in held:
+            msg = f"Kein Wertpapier {isin} im Depot"
+            raise DepotNotFound(msg)
+        if not self.candidates_enabled(depot.id):
+            return Comparison(isin, enabled=False)
+        if self._market is None:
+            return None
+        try:
+            score = self._market.market([isin]).scores.get(isin)
+            universe = self._market.universe(score.scoring_run_id) if score else []
+        except Exception:
+            log.warning("Marktdaten nicht lesbar - kein Vergleich", exc_info=True)
+            return None
+        if score is None:
+            return Comparison(isin, enabled=True)
+        return Comparison(
+            isin,
+            enabled=True,
+            sector=score.sector,
+            scoring_run_id=score.scoring_run_id,
+            as_of=score.as_of,
+            candidates=candidates(score, universe, held),
+        )
+
+    def candidates_enabled(self, depot_id: int) -> bool:
+        """D5.5: Pruefkandidaten in den Schwellen eingeschaltet (``HintParamsV1.candidates``)."""
+        settings = self._store.settings(depot_id)
+        return HintParamsV1.model_validate(settings.hint_params).candidates
 
     def settings(self, user_id: int, depot_id: int) -> StoredSettings:
         """D5.3: Schwellen und Zielallokation, ohne gespeicherte die Standardwerte."""

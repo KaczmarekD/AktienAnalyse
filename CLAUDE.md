@@ -118,7 +118,9 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   `portfolio.depots.hints`): der jüngste Lauf mit Status und Texten des Katalogs. Seit D5.3
   `…/hint-params` und `…/target-allocation` (`GET`/`PUT` mit `ETag`/`If-Match`) und
   `…/hints/{key}/ack`. Seit D5.4 `GET /hints/catalog` (RPC `portfolio.hints.catalog`, die
-  einzige Anfrage an portfolio ohne Nutzer, ohne Persönliches).
+  einzige Anfrage an portfolio ohne Nutzer, ohne Persönliches). Seit D5.5
+  `…/positions/{isin}/comparison` (RPC `portfolio.depots.comparison`): Prüfkandidaten aus dem
+  Ranking desselben Bewertungslaufs (`va_portfolio.domain.candidates`), standardmäßig aus.
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.
@@ -301,7 +303,8 @@ Depots im UI (D3.6) unter `frontend/src/app/depots/`:
   `BOND_SPECIAL` (`depots/controls.ts`). Seit D5.4 der Bereich „Hinweise“ (`HintsPanel`) mit
   Disclaimer, „Zur Kenntnis genommen“ und den Dialogen „Schwellen“ (`HintParamsDialog`, Titel
   aus `GET /hints/catalog`) und „Zielallokation“ (`TargetDialog`), Texte in `HINTS`,
-  `THRESHOLDS` und den Dialog-Konstanten, Einheiten und Gegenstände in `depots/hints.ts`.
+  `THRESHOLDS` und den Dialog-Konstanten, Einheiten und Gegenstände in `depots/hints.ts`. Seit
+  D5.5 unter HIN-Q01/Q02 „Zum Vergleich“ (`COMPARISON`), wenn die Schwellen es einschalten.
 - Texte in `depots/controls.ts`, Begriffe in der Glossar-Gruppe „Depots“, Beträge über die
   Pipes `eur` und `dec`.
 - Live-Aktualisierung über `user:<id>` fehlt noch.

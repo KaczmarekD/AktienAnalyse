@@ -32,6 +32,7 @@ from va_contracts.events.v1 import (
 from va_contracts.rpc.v1 import (
     DEPOTS_ANALYSIS,
     DEPOTS_ARCHIVE,
+    DEPOTS_COMPARISON,
     DEPOTS_CREATE,
     DEPOTS_EXPORT,
     DEPOTS_GET,
@@ -62,6 +63,7 @@ from va_contracts.rpc.v1 import (
     TARGET_SAVE,
     ActivateReplyV1,
     ActivateRequestV1,
+    ComparisonRequestV1,
     DepotCreateRequestV1,
     DepotExportRequestV1,
     DepotListRequestV1,
@@ -120,6 +122,7 @@ if TYPE_CHECKING:
     from va_contracts.portfolio import (
         CashLineV1,
         DepotAnalysisV1,
+        DepotComparisonV1,
         DepotExportV1,
         DepotHintsV1,
         DepotKind,
@@ -427,6 +430,10 @@ class RemoteDepots:
 
     def catalog(self) -> list[HintRuleV1]:
         return self._call(HINTS_CATALOG, HintCatalogRequestV1()).rules
+
+    def comparison(self, user_id: int, depot_id: int, isin: str) -> DepotComparisonV1 | None:
+        request = ComparisonRequestV1(user_id=user_id, depot_id=depot_id, isin=isin)
+        return self._call(DEPOTS_COMPARISON, request).comparison
 
 
 def _raise(reply: RpcReplyV1) -> None:

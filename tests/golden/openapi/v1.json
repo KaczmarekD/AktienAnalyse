@@ -420,6 +420,91 @@
         "title": "CashLine",
         "type": "object"
       },
+      "ComparisonCandidate": {
+        "additionalProperties": false,
+        "description": "D5.5: ein Titel zum Vergleich im selben Sektor, Werte wie im Ranking.",
+        "properties": {
+          "composite_percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Percentile"
+          },
+          "composite_score": {
+            "title": "Composite Score",
+            "type": "number"
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Score"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "value_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Score"
+          }
+        },
+        "required": [
+          "isin",
+          "symbol",
+          "name",
+          "rank",
+          "composite_score",
+          "composite_percentile",
+          "value_score",
+          "quality_score"
+        ],
+        "title": "ComparisonCandidate",
+        "type": "object"
+      },
       "Concentration": {
         "additionalProperties": false,
         "description": "Mit Durchschau; ``lower_bound``: mindestens ein ETF kennt nur seine groessten Positionen\noder keine (dann \"mindestens\"). ``effective_positions`` = 1 / Summe Gewicht^2.",
@@ -879,6 +964,71 @@
         "title": "DepotBonds",
         "type": "object"
       },
+      "DepotComparison": {
+        "additionalProperties": false,
+        "description": "D5.5 (HIN-06): Pruefkandidaten zu einer Aktie; ``enabled`` falsch, solange sie aus sind.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "scoring_run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scoring Run Id"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          }
+        },
+        "required": [
+          "isin",
+          "enabled",
+          "sector",
+          "scoring_run_id",
+          "as_of",
+          "candidates"
+        ],
+        "title": "DepotComparison",
+        "type": "object"
+      },
       "DepotCosts": {
         "additionalProperties": false,
         "properties": {
@@ -1111,6 +1261,10 @@
             ],
             "title": "Analysis Run Id"
           },
+          "candidates": {
+            "title": "Candidates",
+            "type": "boolean"
+          },
           "computed_at": {
             "anyOf": [
               {
@@ -1139,7 +1293,8 @@
           "analysis_run_id",
           "computed_at",
           "version",
-          "hints"
+          "hints",
+          "candidates"
         ],
         "title": "DepotHints",
         "type": "object"
@@ -7052,6 +7207,68 @@
           }
         },
         "summary": "Preview Import",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/positions/{isin}/comparison": {
+      "get": {
+        "description": "D5.5 (HIN-06): bis zu drei Titel zum Vergleich im selben Sektor; 404, wenn die Aktie\nnicht im Depot steht, 503 ohne Marktdaten. Aus, solange die Schwellen es nicht einschalten.",
+        "operationId": "depot_comparison",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotComparison"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Depot Comparison",
         "tags": [
           "depots"
         ]

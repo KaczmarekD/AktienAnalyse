@@ -303,9 +303,25 @@ export const THRESHOLD_DIALOG = {
   value: 'Schwelle in der genannten Einheit. Anteile in Prozent.',
   enabled: 'Abgeschaltete Regeln ergeben keine Hinweise.',
   toggle: 'Schaltet die Regel für dieses Depot an oder ab.',
-  defaults: 'Setzt alle Schwellen auf die Standardwerte und schaltet alle Regeln an.',
+  defaults:
+    'Setzt alle Schwellen auf die Standardwerte, schaltet alle Regeln an und die Prüfkandidaten aus.',
+  candidates:
+    'Zeigt zu Aktien mit Value-Trap-Verdacht oder im unteren Fünftel bis zu drei Titel aus DAX/MDAX zum Vergleich. Standard: aus.',
   save: 'Speichert die Schwellen als neue Version und rechnet die Hinweise neu.',
   reload: 'Lädt die neueste Version. Deine Änderungen gehen dabei verloren.',
+} as const;
+
+/** D5.5: Prüfkandidaten (HIN-06) zu Aktien mit HIN-Q01 oder HIN-Q02. */
+export const COMPARISON = {
+  rules: ['HIN-Q01', 'HIN-Q02'] as readonly string[],
+  show: 'Zeigt bis zu drei Titel aus DAX/MDAX im selben Sektor mit höherem Composite.',
+  hide: 'Blendet die Titel zum Vergleich wieder aus.',
+  heading: 'Zum Vergleich im selben Sektor',
+  note: 'Dieselben Werte wie im Ranking, nur gefiltert: selber Sektor, höherer Composite, ohne Value-Trap-Verdacht, nicht schon im Depot. Keine Empfehlung, etwas zu tauschen.',
+  empty: 'Kein Titel im selben Sektor mit höherem Composite.',
+  title: 'Öffnet das Titel-Detail mit allen Kennzahlen.',
+  rank: 'Rang im Ranking desselben Bewertungslaufs.',
+  failed: 'Der Vergleich ließ sich nicht laden. Ist der Server erreichbar?',
 } as const;
 
 /** D5.4: Texte des Dialogs „Zielallokation“ (DEP-10). */

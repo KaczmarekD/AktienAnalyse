@@ -82,6 +82,7 @@ class Score:
     industry_rule: bool = False
     reason: str | None = None
     sector: str | None = None  # D4.4: fuer die Allokation, Bezeichnung von yfinance
+    name: str | None = None  # D5.5: Titel des Rankings, fuer die Pruefkandidaten
 
 
 def score_reason(value: float | None, quality: float | None) -> str | None:

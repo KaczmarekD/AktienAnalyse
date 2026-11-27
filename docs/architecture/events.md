@@ -123,6 +123,7 @@ ein optionales `error` (`no_data`, `unknown_profile`, `unknown_version`, `confli
 | `rpc.va.portfolio.depots.export` (D3.2) | alle eigenen Depots, auch archivierte, mit allen Depotständen (Datenexport, NUT-12) |
 | `rpc.va.portfolio.depots.hints` (D5.2) | Hinweise des jüngsten Laufs mit Status und Texten des Katalogs (`DepotHintsV1`); ohne Lauf wird vorher gerechnet |
 | `rpc.va.portfolio.depots.settings`, `.hint_params.save`, `.target.save` (D5.3) | Schwellen und Zielallokation mit Versionen (`DepotSettingsV1`), Speichern auf eine Basisversion (`conflict` mit der neuesten, `archived`) |
+| `rpc.va.portfolio.depots.comparison` (D5.5) | Prüfkandidaten zu einer Aktie des Depots (`DepotComparisonV1`): Titel des Rankings desselben Bewertungslaufs, selber Sektor, höherer Composite, ohne Value-Trap, nicht im Depot; `not_found` ohne die Aktie im Depot |
 | `rpc.va.portfolio.hints.catalog` (D5.4) | Katalog der Hinweise mit Texten (`HintRuleV1`, `available` falsch für Regeln, die noch nicht gerechnet werden); die einzige Anfrage an portfolio ohne `user_id`, sie enthält nichts Persönliches |
 | `rpc.va.portfolio.depots.hints.ack` (D5.3) | Hinweis des jüngsten Laufs zur Kenntnis nehmen, Antwort wie `.hints`; ohne ihn `not_found` |
 | `rpc.va.portfolio.depots.analysis` (D4.4) | Analyse des neuesten Depotstands (`DepotAnalysisV1`), bei jeder Anfrage aus den Kopien der Marktdaten gerechnet; ohne lesbare Marktdaten ohne Analyse |

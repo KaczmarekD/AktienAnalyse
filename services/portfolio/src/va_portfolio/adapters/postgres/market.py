@@ -53,6 +53,13 @@ SELECT DISTINCT ON (isin) isin, scoring_run_id, as_of, payload
 FROM portfolio.score_view WHERE isin = ANY(:isins)
 ORDER BY isin, scoring_run_id DESC, id DESC
 """
+# D5.5: die Titel des Rankings eines Bewertungslaufs, je ISIN die juengste Zeile
+_UNIVERSE = """
+SELECT DISTINCT ON (isin) isin, scoring_run_id, as_of, payload
+FROM portfolio.score_view
+WHERE scoring_run_id = :run AND payload ->> 'reference' = 'universe'
+ORDER BY isin, id DESC
+"""
 # Spalten statt payload; payload enthaelt die uebrigen Felder von Score
 _SCORE_COLUMNS = ("isin", "scoring_run_id", "as_of")
 _SCORE_FIELDS = {f.name for f in fields(Score)}
@@ -153,6 +160,11 @@ class PostgresMarketStore:
         with self._engine.connect() as conn:
             rows = conn.execute(text(_PREVIOUS_SCORES), {"isins": wanted}).all()
         return {r.isin: _score(r.isin, r.scoring_run_id, r.as_of, r.payload) for r in rows}
+
+    def universe(self, scoring_run_id: int) -> list[Score]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(_UNIVERSE), {"run": scoring_run_id}).all()
+        return [_score(r.isin, r.scoring_run_id, r.as_of, r.payload) for r in rows]
 
     def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
         wanted = sorted(set(isins))

@@ -232,6 +232,46 @@ export type CashLineOutput = {
 };
 
 /**
+ * ComparisonCandidate
+ *
+ * D5.5: ein Titel zum Vergleich im selben Sektor, Werte wie im Ranking.
+ */
+export type ComparisonCandidate = {
+  /**
+   * Composite Percentile
+   */
+  composite_percentile: number | null;
+  /**
+   * Composite Score
+   */
+  composite_score: number;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Quality Score
+   */
+  quality_score: number | null;
+  /**
+   * Rank
+   */
+  rank: number | null;
+  /**
+   * Symbol
+   */
+  symbol: string;
+  /**
+   * Value Score
+   */
+  value_score: number | null;
+};
+
+/**
  * Concentration
  *
  * Mit Durchschau; ``lower_bound``: mindestens ein ETF kennt nur seine groessten Positionen
@@ -474,6 +514,38 @@ export type DepotBonds = {
 };
 
 /**
+ * DepotComparison
+ *
+ * D5.5 (HIN-06): Pruefkandidaten zu einer Aktie; ``enabled`` falsch, solange sie aus sind.
+ */
+export type DepotComparison = {
+  /**
+   * As Of
+   */
+  as_of: string | null;
+  /**
+   * Candidates
+   */
+  candidates: Array<ComparisonCandidate>;
+  /**
+   * Enabled
+   */
+  enabled: boolean;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Scoring Run Id
+   */
+  scoring_run_id: number | null;
+  /**
+   * Sector
+   */
+  sector: string | null;
+};
+
+/**
  * DepotCosts
  */
 export type DepotCosts = {
@@ -605,6 +677,10 @@ export type DepotHints = {
    * Analysis Run Id
    */
   analysis_run_id: number | null;
+  /**
+   * Candidates
+   */
+  candidates: boolean;
   /**
    * Computed At
    */
@@ -4012,6 +4088,52 @@ export type PreviewImportResponses = {
 };
 
 export type PreviewImportResponse = PreviewImportResponses[keyof PreviewImportResponses];
+
+export type DepotComparisonData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+    /**
+     * Isin
+     */
+    isin: string;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/positions/{isin}/comparison';
+};
+
+export type DepotComparisonErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type DepotComparisonError = DepotComparisonErrors[keyof DepotComparisonErrors];
+
+export type DepotComparisonResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotComparison;
+};
+
+export type DepotComparisonResponse = DepotComparisonResponses[keyof DepotComparisonResponses];
 
 export type RestoreDepotData = {
   body?: never;

@@ -85,6 +85,7 @@ class TestCatalog:
             "portfolio.depots.target.save",
             "portfolio.depots.hints.ack",
             "portfolio.hints.catalog",  # D5.4: Katalog fuer das UI
+            "portfolio.depots.comparison",  # D5.5: Pruefkandidaten
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 

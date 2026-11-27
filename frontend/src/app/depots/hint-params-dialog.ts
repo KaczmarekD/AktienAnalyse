@@ -32,7 +32,8 @@ type Rule = HintParamsV1['disabled'] extends (infer R)[] | undefined ? R : never
 /**
  * Dialog „Schwellen“ (D5.4, HIN-04): je Regel des Katalogs ihre Schwellen in der Einheit des
  * Messwerts und ein Schalter, der sie abschaltet. Regeln, die noch nicht gerechnet werden (News,
- * Bank), fehlen; ihre Werte bleiben, wie sie sind. Gespeichert wird mit `If-Match` auf die geladene
+ * Bank), fehlen; ihre Werte bleiben, wie sie sind. Seit D5.5 schaltet er die Prüfkandidaten
+ * (HIN-06) ein, standardmäßig sind sie aus. Gespeichert wird mit `If-Match` auf die geladene
  * Version; hat jemand anderes inzwischen gespeichert (409), bietet der Dialog „Neu laden“. Er
  * schließt sich erst nach dem Speichern, mit `true`.
  */
@@ -108,6 +109,14 @@ type Rule = HintParamsV1['disabled'] extends (infer R)[] | undefined ? R : never
             }
           </tbody>
         </table>
+        <mat-checkbox
+          class="candidates"
+          data-toggle="candidates"
+          [checked]="candidates()"
+          [matTooltip]="texts.candidates"
+          (change)="candidates.set($event.checked)"
+          >Prüfkandidaten zum Vergleich zeigen</mat-checkbox
+        >
       }
       @if (conflict()) {
         <p class="notice notice--error" role="alert" data-conflict>
@@ -183,6 +192,11 @@ type Rule = HintParamsV1['disabled'] extends (infer R)[] | undefined ? R : never
       flex-basis: 100%;
     }
 
+    .candidates {
+      display: block;
+      margin-top: var(--va-space-md);
+    }
+
     // Schmal: Regel, Schwellen und Schalter untereinander statt drei Spalten
     @media (max-width: breakpoints.$narrow) {
       thead {
@@ -217,6 +231,8 @@ export class HintParamsDialog {
   protected readonly rules = signal<HintRule[]>([]);
   protected readonly values = signal<Record<ThresholdField, string>>(thresholdValues({}));
   protected readonly disabled = signal<ReadonlySet<string>>(new Set());
+  /** D5.5: Prüfkandidaten (HIN-06), standardmäßig aus */
+  protected readonly candidates = signal(false);
   protected readonly saving = signal(false);
   protected readonly conflict = signal(false);
   protected readonly notice = signal<Notice | undefined>(undefined);
@@ -278,6 +294,7 @@ export class HintParamsDialog {
   protected defaults(): void {
     this.values.set(thresholdValues(zHintParamsV1.parse({})));
     this.disabled.set(new Set());
+    this.candidates.set(false);
     this.touched.set(true);
   }
 
@@ -299,6 +316,7 @@ export class HintParamsDialog {
     this.version = params.data.version;
     this.values.set(thresholdValues(zHintParamsV1.parse(this.params)));
     this.disabled.set(new Set(this.params.disabled ?? []));
+    this.candidates.set(this.params.candidates ?? false);
     this.rules.set(catalog.data.filter((rule) => rule.available));
     this.touched.set(false);
   }
@@ -308,7 +326,11 @@ export class HintParamsDialog {
     if (Object.keys(this.errors()).length) {
       return;
     }
-    const body: HintParamsV1 = { ...this.params, disabled: [...this.disabled()] as Rule[] };
+    const body: HintParamsV1 = {
+      ...this.params,
+      disabled: [...this.disabled()] as Rule[],
+      candidates: this.candidates(),
+    };
     for (const threshold of THRESHOLDS) {
       const result = parseThreshold(threshold, this.values()[threshold.field]);
       if ('value' in result) {

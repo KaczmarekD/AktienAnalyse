@@ -194,6 +194,7 @@ def _ranked(row: RankingRowV1, scoring_run_id: int, as_of: date) -> Score:
         industry_rule=row.industry_rule,
         reason=score_reason(row.value_score, row.quality_score),
         sector=row.fundamentals.identity.sector,
+        name=row.fundamentals.identity.name,
     )
 
 

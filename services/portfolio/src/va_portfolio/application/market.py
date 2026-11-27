@@ -48,6 +48,10 @@ class MarketReader(Protocol):
         """D5.2: je ISIN die Scores des vorherigen Bewertungslaufs, der sie kannte (HIN-Q03)."""
         ...
 
+    def universe(self, scoring_run_id: int) -> list[Score]:
+        """D5.5: die Titel des Rankings eines Bewertungslaufs (``reference = universe``)."""
+        ...
+
     def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
         """D4.4: je ISIN das juengste ganze ``SecurityV1`` (ETF- und Anleihedaten) als JSON."""
         ...

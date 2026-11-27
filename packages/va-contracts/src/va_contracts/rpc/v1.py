@@ -21,6 +21,7 @@ from ..portfolio import (
     MAX_LINES,
     CashLineV1,
     DepotAnalysisV1,
+    DepotComparisonV1,
     DepotExportV1,
     DepotHintsV1,
     DepotKind,
@@ -281,6 +282,20 @@ class DepotReplyV1(RpcReplyV1):
     depot: DepotV1 | None = None
 
 
+class ComparisonRequestV1(Contract):
+    """D5.5: Pruefkandidaten zu einer Aktie des Depots (HIN-06)."""
+
+    user_id: PositiveId
+    depot_id: PositiveId
+    isin: IsinStr
+
+
+class DepotComparisonReplyV1(RpcReplyV1):
+    """Ohne lesbare Marktdaten ohne Vergleich."""
+
+    comparison: DepotComparisonV1 | None = None
+
+
 class HintCatalogRequestV1(Contract):
     """D5.4: der Katalog der Hinweise; ohne Nutzer, er ist fuer alle gleich."""
 
@@ -463,6 +478,10 @@ TARGET_SAVE = RpcSpec("portfolio.depots.target.save", TargetSaveRequestV1, Depot
 HINT_ACK = RpcSpec("portfolio.depots.hints.ack", HintAckRequestV1, DepotHintsReplyV1)
 # D5.4: Katalog der Hinweise fuer das UI
 HINTS_CATALOG = RpcSpec("portfolio.hints.catalog", HintCatalogRequestV1, HintCatalogReplyV1)
+# D5.5: Pruefkandidaten
+DEPOTS_COMPARISON = RpcSpec(
+    "portfolio.depots.comparison", ComparisonRequestV1, DepotComparisonReplyV1
+)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -497,12 +516,14 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         TARGET_SAVE,
         HINT_ACK,
         HINTS_CATALOG,
+        DEPOTS_COMPARISON,
     )
 }
 
 __all__ = [
     "DEPOTS_ANALYSIS",
     "DEPOTS_ARCHIVE",
+    "DEPOTS_COMPARISON",
     "DEPOTS_CREATE",
     "DEPOTS_EXPORT",
     "DEPOTS_GET",

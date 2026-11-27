@@ -125,6 +125,16 @@ describe('HintParamsDialog', () => {
     expect(el('[data-conflict]')).toBeNull();
   });
 
+  it('switches the comparison candidates on, off by default', async () => {
+    await open();
+    const toggle = el<HTMLInputElement>('[data-toggle="candidates"] input');
+    expect(toggle.checked).toBe(false);
+    toggle.click();
+    TestBed.tick();
+    const request = await save();
+    expect((request.request.body as Record<string, unknown>)['candidates']).toBe(true);
+  });
+
   it('resets to the defaults of the catalog', async () => {
     await open();
     el('button[data-action="defaults"]').click();

@@ -156,21 +156,75 @@
       <span class="label" tabindex="0" [matTooltip]="tips.approach">Ansatzpunkt:</span>
       {{ hint.approach }}
     </p>
-    @if (acknowledgeable && !readonly()) {
-      <button
-        matButton
-        type="button"
-        data-action="ack"
-        [disabled]="busy() !== undefined"
-        [matTooltip]="tips.ack"
-        (click)="acknowledge(hint)"
-      >
-        @if (busy() === hint.key) {
-          Speichert …
-        } @else {
-          Zur Kenntnis nehmen
+    <div class="actions">
+      @if (comparable(hint)) {
+        <button
+          matButton
+          type="button"
+          data-action="compare"
+          [attr.aria-expanded]="isComparing(hint)"
+          [matTooltip]="isComparing(hint) ? compare.hide : compare.show"
+          (click)="toggleComparison(hint)"
+        >
+          <app-icon name="expand_more" />
+          Zum Vergleich
+        </button>
+      }
+      @if (acknowledgeable && !readonly()) {
+        <button
+          matButton
+          type="button"
+          data-action="ack"
+          [disabled]="busy() !== undefined"
+          [matTooltip]="tips.ack"
+          (click)="acknowledge(hint)"
+        >
+          @if (busy() === hint.key) {
+            Speichert …
+          } @else {
+            Zur Kenntnis nehmen
+          }
+        </button>
+      }
+    </div>
+    @if (isComparing(hint)) {
+      <div class="comparison" data-comparison>
+        @switch (comparisonState(hint)) {
+          @case ('loading') {
+            <p class="hint" role="status">Lade den Vergleich …</p>
+          }
+          @case ('error') {
+            <p class="notice notice--error" role="alert">{{ compare.failed }}</p>
+          }
+          @default {
+            <h3 class="comparison-title">{{ compare.heading }}</h3>
+            <p class="hint">{{ compare.note }}</p>
+            @if (candidatesOf(hint); as candidates) {
+              <ul class="divided-list">
+                @for (candidate of candidates; track candidate.isin) {
+                  <li [attr.data-candidate]="candidate.isin">
+                    <a
+                      class="name"
+                      [routerLink]="['/instruments', candidate.symbol]"
+                      [matTooltip]="compare.title"
+                      >{{ candidate.name ?? candidate.symbol }}</a
+                    >
+                    <span class="hint">{{ candidate.symbol }}</span>
+                    <app-score [value]="candidate.composite_score" bar />
+                    @if (candidate.rank) {
+                      <span class="hint" tabindex="0" [matTooltip]="compare.rank"
+                        >Rang {{ candidate.rank }}</span
+                      >
+                    }
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="hint" data-no-candidates>{{ compare.empty }}</p>
+            }
+          }
         }
-      </button>
+      </div>
     }
   </li>
 </ng-template>

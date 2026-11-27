@@ -157,6 +157,53 @@ describe('HintsPanel', () => {
     expect(text(fixture)).toContain('Zur Kenntnis genommen (2)');
   });
 
+  it('offers candidates to compare for a weak stock when switched on', async () => {
+    const q02 = hint({
+      rule: 'HIN-Q02',
+      subject: SAP,
+      severity: 'info',
+      measured: 0.12,
+      threshold: 0.2,
+      title: 'Unteres Fünftel',
+    });
+    const fixture = await render(hints([q02], { candidates: true }));
+    const item = `[data-hint="HIN-Q02:${SAP}"]`;
+    query(fixture, `${item} button[data-action="compare"]`)[0].click();
+    await settle(fixture);
+    TestBed.inject(HttpTestingController)
+      .expectOne(`${URL.replace('/hints', '')}/positions/${SAP}/comparison`)
+      .flush({
+        isin: SAP,
+        enabled: true,
+        sector: 'Technology',
+        scoring_run_id: 8,
+        as_of: '2026-11-20',
+        candidates: [
+          {
+            isin: 'DE0006231004',
+            symbol: 'IFX.DE',
+            name: 'Infineon',
+            rank: 4,
+            composite_score: 0.71,
+            composite_percentile: 0.9,
+            value_score: 0.6,
+            quality_score: 0.8,
+          },
+        ],
+      });
+    await settle(fixture);
+    expect(cell(fixture, `${item} [data-comparison]`)).toContain('Zum Vergleich im selben Sektor');
+    expect(cell(fixture, `${item} [data-candidate="DE0006231004"]`)).toContain('Infineon');
+    expect(cell(fixture, `${item} [data-candidate="DE0006231004"]`)).toContain('Rang 4');
+    expect(controlsWithoutTooltip(fixture)).toEqual([]);
+  });
+
+  it('offers no comparison while it is switched off', async () => {
+    const q01 = hint({ rule: 'HIN-Q01', subject: SAP, title: 'Verdacht auf eine Value-Falle' });
+    const fixture = await render(hints([q01]));
+    expect(query(fixture, 'button[data-action="compare"]')).toHaveLength(0);
+  });
+
   it('is read-only for an archived depot', async () => {
     const fixture = await render(LIST, 200, true);
     expect(query(fixture, 'button[data-action="ack"]')).toHaveLength(0);

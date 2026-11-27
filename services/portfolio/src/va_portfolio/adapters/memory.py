@@ -295,6 +295,13 @@ class MemoryMarketStore:
                 ][-1]
         return previous
 
+    def universe(self, scoring_run_id: int) -> list[Score]:
+        latest: dict[str, Score] = {}
+        for score in self.score_history:
+            if score.scoring_run_id == scoring_run_id and score.reference == "universe":
+                latest[score.isin] = score
+        return list(latest.values())
+
     def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
         return {i: p for i, p in self.payloads.items() if i in set(isins)}
 

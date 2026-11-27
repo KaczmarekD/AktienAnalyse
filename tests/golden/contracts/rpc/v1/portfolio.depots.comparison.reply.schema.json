@@ -1,0 +1,220 @@
+{
+  "$defs": {
+    "ComparisonCandidateV1": {
+      "description": "D5.5: ein Titel zum Vergleich: Referenzuniversum, selber Sektor, hoeherer Composite, ohne\nValue-Trap-Flag, nicht im Depot. Werte wie im Ranking desselben Bewertungslaufs.",
+      "properties": {
+        "composite_percentile": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Percentile"
+        },
+        "composite_score": {
+          "title": "Composite Score",
+          "type": "number"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "quality_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quality Score"
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rank"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "value_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Score"
+        }
+      },
+      "required": [
+        "isin",
+        "symbol",
+        "composite_score"
+      ],
+      "title": "ComparisonCandidateV1",
+      "type": "object"
+    },
+    "DepotComparisonV1": {
+      "description": "D5.5 (HIN-06): Pruefkandidaten zu einer Aktie des Depots, hoechstens drei.\n``enabled`` falsch, solange sie in den Schwellen aus sind (Standard).",
+      "properties": {
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/ComparisonCandidateV1"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "scoring_run_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scoring Run Id"
+        },
+        "sector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sector"
+        }
+      },
+      "required": [
+        "isin",
+        "enabled"
+      ],
+      "title": "DepotComparisonV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal",
+            "not_found",
+            "archived"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "description": "Ohne lesbare Marktdaten ohne Vergleich.",
+  "properties": {
+    "comparison": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DepotComparisonV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "DepotComparisonReplyV1",
+  "type": "object"
+}

@@ -725,6 +725,30 @@ class DepotHint(_Model):
     acknowledged: bool
 
 
+class ComparisonCandidate(_Model):
+    """D5.5: ein Titel zum Vergleich im selben Sektor, Werte wie im Ranking."""
+
+    isin: str
+    symbol: str
+    name: str | None
+    rank: int | None
+    composite_score: float
+    composite_percentile: float | None
+    value_score: float | None
+    quality_score: float | None
+
+
+class DepotComparison(_Model):
+    """D5.5 (HIN-06): Pruefkandidaten zu einer Aktie; ``enabled`` falsch, solange sie aus sind."""
+
+    isin: str
+    enabled: bool
+    sector: str | None
+    scoring_run_id: int | None
+    as_of: date | None
+    candidates: list[ComparisonCandidate]
+
+
 class HintRule(_Model):
     """D5.4: ein Eintrag des Katalogs der Hinweise; ``available`` falsch: noch nicht gerechnet."""
 
@@ -757,6 +781,8 @@ class DepotHints(_Model):
     computed_at: datetime | None
     version: int
     hints: list[DepotHint]
+    # D5.5: Pruefkandidaten eingeschaltet (HIN-06)
+    candidates: bool
 
 
 class Depot(_Model):

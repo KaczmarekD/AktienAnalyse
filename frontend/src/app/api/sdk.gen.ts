@@ -31,6 +31,9 @@ import type {
   DepotAnalysisData,
   DepotAnalysisErrors,
   DepotAnalysisResponses,
+  DepotComparisonData,
+  DepotComparisonErrors,
+  DepotComparisonResponses,
   DepotHintsData,
   DepotHintsErrors,
   DepotHintsResponses,
@@ -179,6 +182,8 @@ import {
   zCurrentSessionResponse,
   zDepotAnalysisPath,
   zDepotAnalysisResponse,
+  zDepotComparisonPath,
+  zDepotComparisonResponse,
   zDepotHintsPath,
   zDepotHintsResponse,
   zDepotHistoryPath,
@@ -882,6 +887,29 @@ export const previewImport = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Depot Comparison
+ *
+ * D5.5 (HIN-06): bis zu drei Titel zum Vergleich im selben Sektor; 404, wenn die Aktie
+ * nicht im Depot steht, 503 ohne Marktdaten. Aus, solange die Schwellen es nicht einschalten.
+ */
+export const depotComparison = <ThrowOnError extends boolean = false>(
+  options: Options<DepotComparisonData, ThrowOnError>,
+): RequestResult<DepotComparisonResponses, DepotComparisonErrors, ThrowOnError> =>
+  (options.client ?? client).get<DepotComparisonResponses, DepotComparisonErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zDepotComparisonPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zDepotComparisonResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/positions/{isin}/comparison',
+    ...options,
   });
 
 /**

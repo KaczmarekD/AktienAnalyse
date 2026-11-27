@@ -20,13 +20,25 @@ describe('Zeitpunkte der API', () => {
         cash: [],
       };
       expect(zHoldings.safeParse(holdings).success, at).toBe(true);
-      const hints = { analysis_run_id: 7, computed_at: at, version: 1, hints: [] };
+      const hints = {
+        analysis_run_id: 7,
+        computed_at: at,
+        version: 1,
+        hints: [],
+        candidates: false,
+      };
       expect(zDepotHints.safeParse(hints).success, at).toBe(true);
     }
   });
 
   it('lehnt weiter ab, was kein Zeitpunkt ist', () => {
-    const hints = { analysis_run_id: 7, computed_at: 'gestern', version: 1, hints: [] };
+    const hints = {
+      analysis_run_id: 7,
+      computed_at: 'gestern',
+      version: 1,
+      hints: [],
+      candidates: false,
+    };
     expect(zDepotHints.safeParse(hints).success).toBe(false);
   });
 });

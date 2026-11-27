@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from va_contracts.portfolio import (
         CashLineV1,
         DepotAnalysisV1,
+        DepotComparisonV1,
         DepotExportV1,
         DepotHintsV1,
         DepotKind,
@@ -223,6 +224,9 @@ class DepotDirectory(Protocol):
 
     # D5.4: Katalog der Hinweise, fuer alle gleich
     def catalog(self) -> list[HintRuleV1]: ...
+
+    # D5.5: Pruefkandidaten zu einer Aktie des Depots; ``None`` ohne Marktdaten
+    def comparison(self, user_id: int, depot_id: int, isin: str) -> DepotComparisonV1 | None: ...
 
 
 class ProfileConflict(Exception):

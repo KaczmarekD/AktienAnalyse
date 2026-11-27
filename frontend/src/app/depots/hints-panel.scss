@@ -47,3 +47,20 @@
 .label {
   color: var(--mat-sys-on-surface-variant);
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--va-space-sm);
+}
+
+// D5.5: Prüfkandidaten eingerückt unter dem Hinweis
+.comparison {
+  padding-left: var(--va-space-md);
+  border-left: var(--va-divider);
+}
+
+.comparison-title {
+  margin: 0;
+  font: var(--mat-sys-title-small);
+}

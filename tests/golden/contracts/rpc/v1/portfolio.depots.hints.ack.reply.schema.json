@@ -16,6 +16,11 @@
           "default": null,
           "title": "Analysis Run Id"
         },
+        "candidates": {
+          "default": false,
+          "title": "Candidates",
+          "type": "boolean"
+        },
         "computed_at": {
           "anyOf": [
             {

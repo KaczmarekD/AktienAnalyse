@@ -23,6 +23,8 @@ import type {
   CurrentSessionResponse,
   DepotAnalysisData,
   DepotAnalysisResponse,
+  DepotComparisonData,
+  DepotComparisonResponse,
   DepotHintsData,
   DepotHintsResponse,
   DepotHistoryData,
@@ -484,6 +486,22 @@ export const previewImportRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'POST',
     url: '/api/v1/depots/{depot_id}/import/preview',
+    ...options,
+  });
+
+/**
+ * Depot Comparison
+ *
+ * D5.5 (HIN-06): bis zu drei Titel zum Vergleich im selben Sektor; 404, wenn die Aktie
+ * nicht im Depot steht, 503 ohne Marktdaten. Aus, solange die Schwellen es nicht einschalten.
+ */
+export const depotComparisonRequest = <ThrowOnError extends boolean = false>(
+  options: Options<DepotComparisonData, ThrowOnError>,
+): HttpRequest<DepotComparisonResponse> =>
+  (options?.client ?? client).requestOptions<DepotComparisonResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/positions/{isin}/comparison',
     ...options,
   });
 
@@ -1206,6 +1224,20 @@ export const previewImportResource = <ThrowOnError extends boolean = false>(
   httpResource<PreviewImportResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? previewImportRequest(opts) : undefined;
+  });
+
+/**
+ * Depot Comparison
+ *
+ * D5.5 (HIN-06): bis zu drei Titel zum Vergleich im selben Sektor; 404, wenn die Aktie
+ * nicht im Depot steht, 503 ohne Marktdaten. Aus, solange die Schwellen es nicht einschalten.
+ */
+export const depotComparisonResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<DepotComparisonData, ThrowOnError> | undefined,
+) =>
+  httpResource<DepotComparisonResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? depotComparisonRequest(opts) : undefined;
   });
 
 /**
