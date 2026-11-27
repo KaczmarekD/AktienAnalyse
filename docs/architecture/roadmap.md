@@ -18,7 +18,7 @@
 | 4 | Events und Echtzeit (NATS, Eventmanager, WebSocket) | ✅ im Code erledigt (P4.1–P4.9): NATS, Outbox/Inbox, idempotente Handler, Eventmanager mit Projektionen, WebSocket-Hub, Echtzeit im UI, Runs aus dem UI mit Scheduler und Watchdog, Request/Reply, REST aus Projektionen |
 | 5 | Aufteilen in Services (Zielarchitektur) | ✅ im Code erledigt (P5.1a–P5.6): ein Container je Service, End-to-End-Test des ganzen Stacks, eine DB-Rolle je Service, Scheduler im web-api und NATS als Standard, Tracing, Runbook; NAS: Umstellung offen |
 | U | Umgebungen: lokaler Stack und NAS ([umgebungen.md](umgebungen.md)) | 🚧 U1, U4 und U5 (lokaler End-to-End-Test) erledigt, U2 nach dem NAS-Deployment |
-| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), angenommen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; ADR-0011 angenommen (06.11.2026), F2.1 bis F2.4 und F3.1 im Code erledigt; F2.5 wartet auf den ersten Lauf auf der NAS, weiter mit F3.2 |
+| F | Fundamentaldaten: F1 Stichtagsdaten sichern ([ADR-0010](../adr/0010-stichtagsdaten-konsens-quartale-kurse.md)), F2/F3 Auswertung ([ADR-0011](../adr/0011-fundamentale-anker-und-belegte-faktoren.md), angenommen) | 🚧 F1 im Code erledigt (F1.1–F1.6), NAS: mit der Umstellung; ADR-0011 angenommen (06.11.2026), F2.1 bis F2.4, F3.1 und F3.2a im Code erledigt; F2.5 und F3.2b warten auf Daten von der NAS |
 | G | Gestaltung des UI: klar, ruhig, jeder Begriff erklärt ([Spec](ui-neugestaltung.md)) | ✅ G0 bis G8 umgesetzt und abgenommen (06.11.2026); NAS: mit dem nächsten Deployment |
 | D | Depots, mehrere Nutzer, News, Berichte, Bankanbindung ([Spezifikation](depot/README.md), [ADR-0012](../adr/0012-mehrbenutzer-mit-lokalen-konten.md) bis [ADR-0014](../adr/0014-bankanbindung-nur-lesend-ueber-ports.md)) | 🚧 Spezifikation steht, ADR-0012 bis ADR-0014 angenommen (06.11.2026); D1.1 (Konten, Anmeldung, Sitzungen), D1.2 (Sitzungspflicht, Rollen), D1.3 (WebSocket je Nutzer), D1.4 (Anmeldung und Nutzerverwaltung im UI), D1.5 (HTTPS, Proxys, NATS-Nutzer) und D1.6 (Mail-Bestätigung, Export, Löschkommando) im Code erledigt, D1 damit fertig; D2.1 (Wertpapiere und Suche), D2.2 (Abdeckung im Wochenlauf), D2.3 (Tageskurse), D2.4 (ETF-Daten, Stammdaten im Wochenlauf) und D2.5 (Kurse der Bundesanleihen) erledigt, D2 damit fertig; D3.1 (Dienst portfolio, Depots), D3.2 (Endpunkte im web-api), D3.3 (Abdeckung aus den Depots), D3.4 (Bewertung), D3.5 (Datei im eigenen Format) und D3.6 (Oberfläche „Meine Depots“) erledigt, D3 damit fertig |
 
@@ -231,6 +231,8 @@ angenommen am 06.11.2026):
 - [ ] F2.5 Standardprofil v2 aktivieren
 - [x] F3.1 Ertragskraftwert und implizites Wachstum (`7a88847`, Migration `0029`; CSV mit zwei Spalten, vom User abgenommen)
 - [ ] F3.2 Titel-Detail: Anker, Wertlinie und Renditezerlegung
+  - [x] F3.2a Anker im Titel-Detail (`a6b39ae`, Migration `0030`, vom User abgenommen)
+  - [ ] F3.2b Wertlinie und Renditezerlegung (braucht die Historie von der NAS)
 
 **Fertig, wenn:** über ADR-0011 entschieden ist. Wird es angenommen, außerdem: Das Standardprofil v2
 ist aktiv, und das Titel-Detail zeigt die Anker.
