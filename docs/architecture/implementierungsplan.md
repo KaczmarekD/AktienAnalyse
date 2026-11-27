@@ -4244,3 +4244,64 @@ und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
 
 **Fertig, wenn:** eine Aktie im Depot dieselben Scores zeigt wie im Ranking und die Golden-Master
 unverändert sind.
+
+#### Stufe D5 – Hinweise
+
+Spezifikation: [depot/analyse.md](depot/analyse.md#hinweise). Geschnitten am 27.11.2026 in fünf
+Pakete. Hinweise sind regelbasierte Beobachtungen, nie „kaufen“ oder „verkaufen“; UI und Bericht
+zeigen den Disclaimer.
+
+- **Ausgangslage im Code:** Die Analyse (D4.4) rechnet bei jeder Anfrage. `analysis_run` und
+  `portfolio.analysis.completed` sind aus D4.4 hierher verschoben, weil erst der Lebenszyklus der
+  Hinweise gespeicherte Läufe braucht. Migrationen ab 0032, vorher mit Track F abstimmen.
+- **Später:** HIN-N01 und HIN-N02 mit D6 (News), HIN-D02 mit D8 (Bank).
+
+**D5.1 Regeln und Katalog** (HIN-01, 02, 04 teilweise)
+- **Test:** reine Funktionen in `va_portfolio.domain.hints`, je Regel ein Test knapp unter und
+  knapp über der Schwelle:
+  - Katalog `HINT_CATALOG` (ID, Titel, Begründung, Ansatzpunkt, Gruppe) wie `FACTOR_INFO`.
+  - `HintParamsV1` (Contract) mit Standardwerten, Grenzen und Schalter je Regel.
+  - `evaluate()` aus Analyse und Bewertung: Konzentration (K01 bis K06), Kasse (A02),
+    Qualität (Q01, Q02, Q04 bis Q06; Q03 braucht den vorherigen Bewertungslauf), ETFs (E01 bis
+    E03), Anleihen (B01 bis B03), Datenlage (D01, D03).
+  - Jeder Hinweis trägt Schlüssel (`HIN-K01:<ISIN>`, `HIN-A02:depot`), Schwere, Messwert,
+    Schwelle und Datenstand. Kein Hinweis enthält „kaufen“ oder „verkaufen“ (Test über den
+    Katalog).
+- **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** `va_portfolio.domain.hints` und `HintParamsV1`, ohne Migration,
+  API oder UI. Festlegungen in [analyse.md](depot/analyse.md#katalog-erste-fassung) (K01/K02 nur
+  Aktien, K06 und B03 erst ab zwei Wertpapieren, `XS` kein Land). Tests:
+  `services/portfolio/tests/test_hints.py`, je Regel knapp unter und knapp über der Schwelle,
+  Katalog gegen `HintRuleId`, kein „kaufen“ oder „verkaufen“.
+  - **Review (`/code-review high`):** behoben, dass K02 die Anleihen mitzählte (jetzt dieselben
+    Aktien wie K01) und dass `XS` als Land K04 auslösen konnte.
+
+**D5.2 Lebenszyklus und Speicher** (HIN-03, ANA-10)
+- **Test:**
+  - `analysis_run` und `hint` (Migration, nur anfügen); Status je Hinweis gegen den vorherigen
+    Lauf: neu, besteht (Schwere kann steigen), erledigt.
+  - Neu gerechnet bei neuem Depotstand, neuen Kursen, neuem Bewertungslauf und neuen Stammdaten;
+    ein Lauf nur, wenn sich das Ergebnis ändert.
+  - Q03 aus dem vorherigen Bewertungslauf (`score_view`).
+  - `portfolio.analysis.completed` (depot_id, Besitzer, Lauf, Zahl der Hinweise nach Schwere und
+    der neuen; ohne ISINs und Beträge) an das Topic `user:<id>`; `GET /depots/{id}/hints`.
+- **Review:** `/code-review high`, `/security-review` (neues Event, neuer Endpunkt).
+
+**D5.3 Schwellen, Zielallokation, Kenntnisnahme** (HIN-04, HIN-05, DEP-10, HIN-A01)
+- **Test:** `hint_params` und `target_allocation` je Depot (versioniert, nur anfügen, `If-Match`),
+  `hint_ack` mit Wiederkehr, wenn der Hinweis schwerer wird oder sich der Messwert um die
+  Spanne der Regel verschlechtert; HIN-A01 aus der Zielallokation. Endpunkte nach analyse.md.
+- **Review:** `/code-review high`, `/security-review`.
+
+**D5.4 Ansicht „Hinweise“** (HIN-01 bis 05)
+- **Test:** Hinweise im Depot nach Schwere, mit Messwert, Schwelle, Datenstand und Ansatzpunkt,
+  Status, „zur Kenntnis genommen“, Einstellungen der Schwellen und der Zielallokation,
+  Disclaimer; Playwright mit axe.
+- **Review:** `/code-review high`.
+
+**D5.5 Prüfkandidaten** (HIN-06, Soll, standardmäßig aus)
+- **Test:** bis zu drei Titel aus dem Referenzuniversum, selber Sektor, höherer Composite, ohne
+  Value-Trap, nicht im Depot; Überschrift „Zum Vergleich im selben Sektor“.
+- **Review:** `/code-review high`.
+
+**Fertig, wenn:** jede Regel des Katalogs getestet und im UI sichtbar ist.

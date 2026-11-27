@@ -99,6 +99,9 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   Seit D4.3 rechnen `va_portfolio.domain.bonds` (Stückzinsen, Rendite per Bisektion, Duration,
   Kupontermine, Sonderformen) und `va_portfolio.domain.funds` (laufende Kosten, Durchschau,
   Überschneidung, Look-through-Score); beide nutzt seit D4.4 die Analyse des Depots.
+  Seit D5.1 die Regeln der Hinweise (`va_portfolio.domain.hints`, `HINT_CATALOG`, `evaluate`,
+  Schwellen in `HintParamsV1`), noch ohne Speicher und Endpunkt (D5.2). Kein Hinweis sagt
+  „kaufen“ oder „verkaufen“; ein Test prüft den Katalog.
   Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import` mit `If-Match`,
   `…/holdings/csv`): JSON mit Base64, höchstens 640 KiB und 1000 Zeilen. Lesen, Abgleich und
   Schreiben macht portfolio (`va_portfolio.domain.holdings_file`).

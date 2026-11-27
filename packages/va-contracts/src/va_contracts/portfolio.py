@@ -16,7 +16,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base import Contract, PositiveId
 from .securities import AssetClass, IsinStr
@@ -334,6 +334,81 @@ class DepotAnalysisV1(Contract):
     data: DataQualityV1
 
 
+# --- D5: Hinweise (docs/architecture/depot/analyse.md, Abschnitt Hinweise) ---------------------
+# Schwere eines Hinweises (HIN-02)
+HintSeverity = Literal["info", "warning", "critical"]
+# Die Regeln des Katalogs; ein Test haelt sie gleich mit va_portfolio.domain.hints.HINT_CATALOG
+HintRuleId = Literal[
+    "HIN-K01",
+    "HIN-K02",
+    "HIN-K03",
+    "HIN-K04",
+    "HIN-K05",
+    "HIN-K06",
+    "HIN-A01",
+    "HIN-A02",
+    "HIN-Q01",
+    "HIN-Q02",
+    "HIN-Q03",
+    "HIN-Q04",
+    "HIN-Q05",
+    "HIN-Q06",
+    "HIN-E01",
+    "HIN-E02",
+    "HIN-E03",
+    "HIN-B01",
+    "HIN-B02",
+    "HIN-B03",
+    "HIN-N01",
+    "HIN-N02",
+    "HIN-D01",
+    "HIN-D02",
+    "HIN-D03",
+]
+Share = Annotated[float, Field(gt=0, le=1)]  # Anteil am Depot, 0,1 = 10 %
+
+
+class HintParamsV1(Contract):
+    """Schwellen der Hinweise je Depot (HIN-04), mit Standardwerten aus dem Katalog.
+
+    Anteile als Bruchteil (0,1 = 10 %), TER und Kurs in Prozent, Fondsvolumen in Millionen EUR.
+    ``disabled``: abgeschaltete Regeln. Ein gespeicherter Stand ohne ein spaeter neues Feld bekommt
+    beim Lesen den Standardwert, wie bei den Scoring-Profilen.
+    """
+
+    k01_warning: Share = 0.10  # Einzeltitel, Warnung
+    k01_critical: Share = 0.20  # Einzeltitel, kritisch
+    k02_top5: Share = 0.50
+    k03_sector: Share = 0.30
+    k04_country: Share = 0.50
+    k05_foreign_currency: Share = 0.50
+    k06_issuer: Share = 0.10
+    a01_deviation: Share = 0.05  # Prozentpunkte zur Zielallokation (D5.3)
+    a02_cash: Share = 0.10
+    q02_percentile: Share = 0.20
+    q03_drop: Share = 0.20  # Rueckgang des Composite-Perzentils (D5.2)
+    q04_quality: Share = 0.30
+    e01_ter: float = Field(default=0.5, gt=0, le=5)
+    e02_overlap: Share = 0.50
+    e03_fund_size: float = Field(default=100.0, gt=0, le=100_000)
+    b01_days: int = Field(default=90, ge=1, le=3650)
+    b02_price: float = Field(default=80.0, gt=0, le=200)
+    b03_maturity_year: Share = 0.50
+    d01_trading_days: int = Field(default=5, ge=1, le=60)
+    d02_bank_days: int = Field(default=30, ge=1, le=365)  # D8
+    n01_days: int = Field(default=7, ge=1, le=90)  # D6
+    n02_days: int = Field(default=30, ge=1, le=365)  # D6
+    disabled: list[HintRuleId] = Field(default_factory=list)
+    candidates: bool = False  # Pruefkandidaten (HIN-06), standardmaessig aus
+
+    @model_validator(mode="after")
+    def _critical_above_warning(self) -> HintParamsV1:
+        if self.k01_critical <= self.k01_warning:
+            msg = "k01_critical muss ueber k01_warning liegen"
+            raise ValueError(msg)
+        return self
+
+
 __all__ = [
     "MAX_FILE_BYTES",
     "MAX_LINES",
@@ -355,6 +430,9 @@ __all__ = [
     "DepotV1",
     "DepotValuationV1",
     "FundQualityV1",
+    "HintParamsV1",
+    "HintRuleId",
+    "HintSeverity",
     "HistoryEntryV1",
     "HoldingLineV1",
     "HoldingUnit",

@@ -310,6 +310,18 @@ Katalogeintrag (ID, Titel, Begründung, Ansatzpunkt), so wie `FACTOR_INFO` für 
 Der Katalog wächst mit der Spezifikation. Eine neue Regel braucht ID, Standardschwelle in
 `HintParamsV1`, Katalogtext und Test.
 
+**Umgesetzt (27.11.2026, D5.1):** `va_portfolio.domain.hints` (`HINT_CATALOG`, `evaluate()`) und
+`HintParamsV1` (`va_contracts.portfolio`, Standardwerte wie oben, Grenzen, `disabled`,
+`candidates`). Gerechnet werden K01 bis K06, A02, Q01, Q02, Q04 bis Q06, E01 bis E03, B01 bis B03,
+D01 und D03; A01 kommt mit der Zielallokation (D5.3), Q03 mit dem vorherigen Lauf (D5.2), N01/N02
+mit D6, D02 mit D8. Festlegungen:
+- K01 und K02 zählen Aktien, direkt und in den ETFs; Anleihen decken B03 und K06 ab.
+- K06 nur für Emittenten mit mindestens zwei Wertpapieren (eines deckt K01 ab), über die LEI.
+- B03 nur mit mindestens zwei Anleihen; eine einzelne stünde immer zu 100 % in einem Jahr.
+- K04 kennt `XS` (internationale Anleihen) nicht als Land.
+- E03 nur mit dem Fondsvolumen aus Anbieterdateien (`fund_sizes`, in Mio. EUR).
+- D01 zählt Handelstage Montag bis Freitag, ohne Feiertage.
+
 ### Prüfkandidaten
 
 Zu einer Aktie mit HIN-Q01 oder HIN-Q02 zeigt das UI auf Wunsch bis zu drei Titel **zum
