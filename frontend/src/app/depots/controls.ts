@@ -177,6 +177,162 @@ export function countryName(code: string): string {
   }
 }
 
+/** D5.4: Tooltips und Texte der Hinweise (docs/architecture/depot/analyse.md, Abschnitt Hinweise). */
+export const HINTS = {
+  section:
+    'Beobachtungen aus festen Regeln zum neuesten Depotstand, neu gerechnet nach jedem Depotstand und nach neuen Kursen, Scores oder Stammdaten.',
+  disclaimer:
+    'Hinweise sind Beobachtungen, keine Anlageempfehlung. Sie nennen, was du prüfen kannst; was du kaufst oder verkaufst, entscheidest du selbst.',
+  noRun: 'Noch keine Hinweise: Für die Rechnung fehlen Kurse oder Stammdaten.',
+  empty: 'Keine offenen Hinweise.',
+  measured: 'Gemessener Wert zum Datenstand.',
+  threshold: 'Ab diesem Wert entsteht der Hinweis. Einstellbar unter „Schwellen“.',
+  asOf: 'Datenstand: so alt sind die Zahlen hinter dem Hinweis höchstens.',
+  approach: 'Was du prüfen kannst.',
+  ack: 'Blendet den Hinweis aus, bis er schwerer wird oder sich der Wert deutlich verschlechtert.',
+  acknowledged:
+    'Zur Kenntnis genommen. Wird der Hinweis schwerer oder der Wert deutlich schlechter, erscheint er wieder.',
+  showAcknowledged: 'Zeigt die Hinweise, die du zur Kenntnis genommen hast.',
+  hideAcknowledged: 'Blendet die zur Kenntnis genommenen Hinweise wieder aus.',
+  resolved: 'Seit dem vorigen Stand erledigt: Die Regel greift nicht mehr.',
+  thresholds: 'Schwellen der Hinweise für dieses Depot einstellen und Regeln abschalten.',
+  target: 'Zielallokation je Anlageklasse festlegen. Weicht das Depot ab, gibt es einen Hinweis.',
+  readonly: 'Das Depot ist archiviert und schreibgeschützt.',
+} as const;
+
+/** D5.4: Schwere eines Hinweises (HIN-02). */
+export const SEVERITY = {
+  critical: { label: 'Kritisch', tip: 'Deutlich über der Schwelle: zuerst prüfen.' },
+  warning: { label: 'Warnung', tip: 'Über der Schwelle: bald prüfen.' },
+  info: { label: 'Info', tip: 'Zur Information: im Blick behalten.' },
+} as const;
+
+/** D5.4: Status eines Hinweises gegen den vorigen Stand (HIN-03). */
+export const HINT_STATUS = {
+  new: { label: 'neu', tip: 'Seit dem vorigen Stand neu.' },
+  existing: { label: 'besteht', tip: 'Bestand schon beim vorigen Stand.' },
+  resolved: {
+    label: 'erledigt',
+    tip: 'Seit dem vorigen Stand erledigt: Die Regel greift nicht mehr.',
+  },
+} as const;
+
+/** Einheit einer Schwelle und des Messwerts ihrer Regel. */
+export type HintUnit = 'share' | 'points' | 'percent' | 'score' | 'mio' | 'days' | 'tradingDays';
+
+/** Was hinter einer Zahl der Einheit steht; Anteile und Punkte gibt man in Prozent ein. */
+export const HINT_UNIT: Record<HintUnit, string> = {
+  share: '%',
+  points: 'Prozentpunkte',
+  percent: '%',
+  score: '',
+  mio: 'Mio. €',
+  days: 'Tage',
+  tradingDays: 'Handelstage',
+};
+
+/** Eine Schwelle der Hinweise (``HintParamsV1``) mit Regel, Beschriftung, Einheit und Grenzen. */
+export interface Threshold {
+  rule: string;
+  field: ThresholdField;
+  label: string;
+  unit: HintUnit;
+  /** Grenzen in der Einheit der Eingabe; die untere ist ausgeschlossen, außer bei ganzen Zahlen */
+  min: number;
+  max: number;
+}
+
+export type ThresholdField =
+  | 'k01_warning'
+  | 'k01_critical'
+  | 'k02_top5'
+  | 'k03_sector'
+  | 'k04_country'
+  | 'k05_foreign_currency'
+  | 'k06_issuer'
+  | 'a01_deviation'
+  | 'a02_cash'
+  | 'q02_percentile'
+  | 'q03_drop'
+  | 'q04_quality'
+  | 'e01_ter'
+  | 'e02_overlap'
+  | 'e03_fund_size'
+  | 'b01_days'
+  | 'b02_price'
+  | 'b03_maturity_year'
+  | 'd01_trading_days';
+
+const SHARE = { unit: 'share', min: 0, max: 100 } as const;
+
+/** D5.4: die einstellbaren Schwellen je Regel (HIN-04), Grenzen wie in ``HintParamsV1``. */
+export const THRESHOLDS: readonly Threshold[] = [
+  { rule: 'HIN-K01', field: 'k01_warning', label: 'Warnung über', ...SHARE },
+  { rule: 'HIN-K01', field: 'k01_critical', label: 'kritisch über', ...SHARE },
+  { rule: 'HIN-K02', field: 'k02_top5', label: 'über', ...SHARE },
+  { rule: 'HIN-K03', field: 'k03_sector', label: 'über', ...SHARE },
+  { rule: 'HIN-K04', field: 'k04_country', label: 'über', ...SHARE },
+  { rule: 'HIN-K05', field: 'k05_foreign_currency', label: 'über', ...SHARE },
+  { rule: 'HIN-K06', field: 'k06_issuer', label: 'über', ...SHARE },
+  { rule: 'HIN-A01', field: 'a01_deviation', label: 'über', unit: 'points', min: 0, max: 100 },
+  { rule: 'HIN-A02', field: 'a02_cash', label: 'über', ...SHARE },
+  { rule: 'HIN-Q02', field: 'q02_percentile', label: 'Perzentil bis', ...SHARE },
+  { rule: 'HIN-Q03', field: 'q03_drop', label: 'gefallen um', unit: 'points', min: 0, max: 100 },
+  { rule: 'HIN-Q04', field: 'q04_quality', label: 'Score bis', unit: 'score', min: 0, max: 1 },
+  { rule: 'HIN-E01', field: 'e01_ter', label: 'über', unit: 'percent', min: 0, max: 5 },
+  { rule: 'HIN-E02', field: 'e02_overlap', label: 'ab', ...SHARE },
+  { rule: 'HIN-E03', field: 'e03_fund_size', label: 'unter', unit: 'mio', min: 0, max: 100000 },
+  { rule: 'HIN-B01', field: 'b01_days', label: 'in weniger als', unit: 'days', min: 1, max: 3650 },
+  { rule: 'HIN-B02', field: 'b02_price', label: 'unter', unit: 'percent', min: 0, max: 200 },
+  { rule: 'HIN-B03', field: 'b03_maturity_year', label: 'über', ...SHARE },
+  {
+    rule: 'HIN-D01',
+    field: 'd01_trading_days',
+    label: 'älter als',
+    unit: 'tradingDays',
+    min: 1,
+    max: 60,
+  },
+];
+
+/** D5.4: Texte des Dialogs „Schwellen“. */
+export const THRESHOLD_DIALOG = {
+  intro:
+    'Ab welchem Wert ein Hinweis entsteht. Gilt nur für dieses Depot; jede Änderung legt eine neue Version an.',
+  rule: 'Regel des Katalogs mit ihrer Gruppe.',
+  value: 'Schwelle in der genannten Einheit. Anteile in Prozent.',
+  enabled: 'Abgeschaltete Regeln ergeben keine Hinweise.',
+  toggle: 'Schaltet die Regel für dieses Depot an oder ab.',
+  defaults: 'Setzt alle Schwellen auf die Standardwerte und schaltet alle Regeln an.',
+  save: 'Speichert die Schwellen als neue Version und rechnet die Hinweise neu.',
+  reload: 'Lädt die neueste Version. Deine Änderungen gehen dabei verloren.',
+} as const;
+
+/** D5.4: Texte des Dialogs „Zielallokation“ (DEP-10). */
+export const TARGET_DIALOG = {
+  intro:
+    'Wie sich der Wert des Depots auf die Anlageklassen verteilen soll, zusammen 100 %. Leer: ohne Ziel.',
+  share: 'Ziel-Anteil am Wert des Depots in Prozent.',
+  sum: 'Summe der Ziele. Sie muss 100 % ergeben.',
+  clear: 'Leert alle Felder. Gespeichert heißt das: ohne Zielallokation.',
+  save: 'Speichert die Zielallokation als neue Version und rechnet die Hinweise neu.',
+} as const;
+
+/** Anlageklassen der Zielallokation in ihrer Reihenfolge. */
+export const TARGET_CLASSES = ['equity', 'etf', 'bond', 'other', 'cash'] as const;
+
+/** Meldung einer abgelehnten Anfrage (FastAPI: detail als Text oder Liste). */
+export function detailOf(error: unknown): string | undefined {
+  const detail = (error as { detail?: unknown } | null)?.detail;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.map((item) => String((item as { msg?: unknown }).msg ?? '')).join('; ');
+  }
+  return undefined;
+}
+
 /** Herkunft eines Depotstands. */
 export const SOURCE = {
   manual: 'von Hand',

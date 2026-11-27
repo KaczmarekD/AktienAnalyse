@@ -1,0 +1,6 @@
+{
+  "description": "D5.4: der Katalog der Hinweise; ohne Nutzer, er ist fuer alle gleich.",
+  "properties": {},
+  "title": "HintCatalogRequestV1",
+  "type": "object"
+}

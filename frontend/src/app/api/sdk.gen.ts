@@ -81,6 +81,9 @@ import type {
   GetTargetAllocationResponses,
   HealthData,
   HealthResponses,
+  HintCatalogData,
+  HintCatalogErrors,
+  HintCatalogResponses,
   HoldingsCsvData,
   HoldingsCsvErrors,
   HoldingsCsvResponses,
@@ -209,6 +212,7 @@ import {
   zGetTargetAllocationPath,
   zGetTargetAllocationResponse,
   zHealthResponse,
+  zHintCatalogResponse,
   zHoldingsCsvPath,
   zHoldingsCsvQuery,
   zImportHoldingsBody,
@@ -974,6 +978,28 @@ export const health = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zHealthResponse.parseAsync(data),
     url: '/api/v1/health',
+    ...options,
+  });
+
+/**
+ * Hint Catalog
+ *
+ * D5.4: die Regeln der Hinweise mit ihren Texten, fuer die Einstellungen im UI.
+ */
+export const hintCatalog = <ThrowOnError extends boolean = false>(
+  options?: Options<HintCatalogData, ThrowOnError>,
+): RequestResult<HintCatalogResponses, HintCatalogErrors, ThrowOnError> =>
+  (options?.client ?? client).get<HintCatalogResponses, HintCatalogErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: z.never().optional(),
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zHintCatalogResponse.parseAsync(data),
+    url: '/api/v1/hints/catalog',
     ...options,
   });
 

@@ -1,11 +1,26 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 // Meine Depots im echten Browser (D3.6, Abnahme von D3): Ein Nutzer legt ein Depot an, trägt
 // Kasse ein und übernimmt eine Datei; der Wert stimmt. Ein zweiter Nutzer sieht es nicht.
 // Die Replay-Fixture hat keine Tageskurse: Die Position aus der Datei zeigt „Kurs fehlt“, der
 // Wert ist die Kasse. Den zweiten Nutzer legt der Test über die Nutzerverwaltung an.
+// Seit D5.4 auch die Hinweise: zur Kenntnis nehmen, Zielallokation, Schwellen, axe.
 
 const SAP = 'DE0007164600';
+
+/** Befunde von axe der Stufen „serious“ und „critical“, wie in design.spec.ts. */
+async function seriousViolations(page: Page): Promise<string[]> {
+  const result = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  return result.violations
+    .filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')
+    .map(
+      (violation) =>
+        `${violation.id}: ${violation.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+    );
+}
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -88,8 +103,49 @@ test('ein Nutzer legt ein Depot an, der Wert stimmt, ein zweiter sieht es nicht'
   await expect(row.locator('[data-missing]')).toContainText('Kurs fehlt');
   await expect(page.locator('[data-stat-value]')).toContainText('1.000,50 €');
   await expect(page.locator('[data-history] [data-version]')).toHaveCount(2);
+  // Einen gespeicherten Stand bearbeiten: Die Zeitpunkte kommen von Postgres mit Offset (+01:00)
+  await page.locator('button[data-action="edit"]').click();
+  await expect(page.locator('[data-editor]')).toBeVisible();
+  await page.locator('button[data-action="discard"]').click();
+  await expect(page.locator('[data-editor]')).toHaveCount(0);
+
   // D4.5: Die Analyse rechnet mit; ohne Kurs zählt SAP noch nicht mit
   await expect(page.locator('[data-analysis] [data-valued]')).toContainText('0 von 1 Positionen');
+
+  // D5.4: Hinweise. Ohne Kurs ist der Wert die Kasse: 100 % Kasse ergibt HIN-A02.
+  const hints = page.locator('[data-hints]');
+  await expect(hints.locator('[data-disclaimer]')).toContainText('keine Anlageempfehlung');
+  const cash = hints.locator('[data-open] [data-hint="HIN-A02:depot"]');
+  await expect(cash).toContainText('100 %');
+  await cash.locator('button[data-action="ack"]').click();
+  await expect(cash).toHaveCount(0);
+  await expect(hints.locator('button[data-action="toggle-acknowledged"]')).toContainText('(1)');
+
+  // Zielallokation: halb Aktien, halb Kasse; die Kasse weicht um 50 Punkte ab
+  await hints.locator('button[data-action="target"]').click();
+  const target = page.locator('mat-dialog-container');
+  await target.locator('[data-field="equity"]').fill('50');
+  await target.locator('[data-field="cash"]').fill('50');
+  await target.locator('button[data-action="save"]').click();
+  await expect(target).toHaveCount(0);
+  await expect(hints.locator('[data-hint="HIN-A01:cash"]')).toContainText('50 Prozentpunkte');
+
+  // Schwellen: HIN-A01 abschalten; vorher axe mit offenem Dialog und auf der Seite
+  await hints.locator('button[data-action="thresholds"]').click();
+  const thresholds = page.locator('mat-dialog-container');
+  await expect(thresholds.locator('[data-rule="HIN-A01"]')).toBeVisible();
+  expect(await seriousViolations(page), 'axe im Dialog „Schwellen“').toEqual([]);
+  await thresholds.locator('[data-toggle="HIN-A01"] input').uncheck();
+  await thresholds.locator('button[data-action="save"]').click();
+  await expect(thresholds).toHaveCount(0);
+  // Abgeschaltet: nicht mehr offen, sondern unter „Erledigt“
+  await expect(hints.locator('[data-open] [data-hint^="HIN-A01:"]')).toHaveCount(0);
+  await expect(hints.locator('[data-resolved] [data-hint="HIN-A01:cash"]')).toBeVisible();
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
+    expect(await seriousViolations(page), `axe auf dem Depot (${scheme})`).toEqual([]);
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
 
   // In der Liste mit Wert
   await page.goto('/depots');

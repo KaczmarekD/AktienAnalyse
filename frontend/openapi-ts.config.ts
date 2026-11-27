@@ -10,7 +10,9 @@ export default defineConfig({
   plugins: [
     '@hey-api/client-angular',
     '@hey-api/typescript',
-    { name: 'zod', compatibilityVersion: 4 },
+    // Zeitpunkte nach RFC 3339 mit Offset: Postgres liefert sie in der Zeitzone der Sitzung
+    // (Europe/Berlin, +01:00), nicht nur mit Z
+    { name: 'zod', compatibilityVersion: 4, dates: { offset: true } },
     { name: '@hey-api/sdk', validator: 'zod' },
     // httpResource: Signals statt Observables, laedt neu, wenn sich Parameter aendern
     { name: '@angular/common', httpRequests: true, httpResources: true },

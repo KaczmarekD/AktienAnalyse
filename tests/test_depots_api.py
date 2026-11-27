@@ -468,6 +468,15 @@ class TestValuation:
         assert [a["key"] for a in depot["acks"]] == [key]
         assert (depot["hint_params"], depot["targets"]) == ([], [])
 
+    def test_the_catalog_of_the_hints(self, valued):
+        response = valued.get("/api/v1/hints/catalog")
+        assert response.status_code == 200
+        rules = response.json()
+        assert len(rules) == 25
+        k01 = next(r for r in rules if r["rule"] == "HIN-K01")
+        assert (k01["group"], k01["available"]) == ("Konzentration", True)
+        assert next(r for r in rules if r["rule"] == "HIN-N01")["available"] is False
+
     def test_settings_of_a_foreign_depot_are_404(self, valued, identity, store):
         depot_id = self._depot(valued)
         other = _client(identity, store, "ben", MemoryMarketStore())

@@ -4337,6 +4337,23 @@ zeigen den Disclaimer.
   Status, „zur Kenntnis genommen“, Einstellungen der Schwellen und der Zielallokation,
   Disclaimer; Playwright mit axe.
 - **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - `GET /api/v1/hints/catalog` (RPC `portfolio.hints.catalog`, `HintRuleV1`): Titel der Regeln
+    für den Dialog „Schwellen“, auch für Regeln, die gerade keinen Hinweis ergeben. Ausnahme von
+    „jede Anfrage an portfolio nennt den Nutzer“, im Test begründet.
+  - Bereich „Hinweise“ auf der Depot-Seite statt eines Reiters, wie die Analyse; Dialoge
+    „Schwellen“ und „Zielallokation“ aus dem Bereich.
+  - Standardwerte der Schwellen aus `zHintParamsV1` (OpenAPI), nicht von Hand gespiegelt.
+  - `detailOf` nur noch in `depots/controls.ts`.
+  - Gefunden im E2E-Stack: Die Prüfung des Clients (zod) nahm nur Zeitpunkte mit `Z` an,
+    Postgres liefert sie in der Zeitzone der Sitzung (Europe/Berlin, `+01:00`). Eine erfolgreiche
+    Antwort galt so als Fehler, „Zur Kenntnis nehmen“ und, schon seit D3.6, „Bearbeiten“ eines
+    gespeicherten Depotstands scheiterten. Behoben im Generator (`dates.offset` in
+    `frontend/openapi-ts.config.ts`), dazu `shared/api-dates.spec.ts` und im Browser-Test das
+    Bearbeiten eines gespeicherten Stands.
+  - Tests: Komponenten (`hints-panel`, `hint-params-dialog`, `target-dialog`), API, Contracts,
+    Playwright in `frontend/e2e/depots.spec.ts` (zur Kenntnis nehmen, Zielallokation, Regel
+    abschalten, axe mit offenem Dialog und auf dem Depot, hell und dunkel).
 
 **D5.5 Prüfkandidaten** (HIN-06, Soll, standardmäßig aus)
 - **Test:** bis zu drei Titel aus dem Referenzuniversum, selber Sektor, höherer Composite, ohne

@@ -432,7 +432,7 @@ Braucht die Box eine eigene Schaltfläche (Konflikt mit „Neu laden“), wird s
 | `.bar` | Balken in Tinte auf Vertiefung 4, innen ein `span` mit der Breite in Prozent | Composite, Perzentil eines Faktors |
 | `.badge` | kurzer neutraler Zustand, Vertiefung 2, Icon vorne erlaubt | neu abgerufen, aktiv: Version 3 |
 | `.badge.badge--muted` | Hinweis, Vertiefung 4 | offline, teilweise |
-| `.badge.badge--error` | Warnung, die zum Handeln auffordert, volle Tinte | nur über `app-value-trap-badge` |
+| `.badge.badge--error` | Warnung, die zum Handeln auffordert, volle Tinte | über `app-value-trap-badge` und für kritische Hinweise im Depot (D5.4) |
 | `.notice` | Rückmeldung nach einer Aktion, Vertiefung 3 | über `app-notice` |
 | `.notice.notice--error` | Konflikt oder gescheiterte Aktion, gedämpfte Warnung | über `app-notice` oder `app-state`, mit Schaltfläche direkt |
 | `.cluster` | Zeile aus Bedienelementen oder Links, bricht um | Filter über dem Ranking, Lauf starten |

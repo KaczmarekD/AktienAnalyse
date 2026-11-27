@@ -1,0 +1,132 @@
+{
+  "$defs": {
+    "HintRuleV1": {
+      "description": "D5.4: ein Eintrag des Katalogs der Hinweise mit seinen Texten, fuer das UI.",
+      "properties": {
+        "approach": {
+          "title": "Approach",
+          "type": "string"
+        },
+        "available": {
+          "default": true,
+          "title": "Available",
+          "type": "boolean"
+        },
+        "group": {
+          "title": "Group",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "HIN-K01",
+            "HIN-K02",
+            "HIN-K03",
+            "HIN-K04",
+            "HIN-K05",
+            "HIN-K06",
+            "HIN-A01",
+            "HIN-A02",
+            "HIN-Q01",
+            "HIN-Q02",
+            "HIN-Q03",
+            "HIN-Q04",
+            "HIN-Q05",
+            "HIN-Q06",
+            "HIN-E01",
+            "HIN-E02",
+            "HIN-E03",
+            "HIN-B01",
+            "HIN-B02",
+            "HIN-B03",
+            "HIN-N01",
+            "HIN-N02",
+            "HIN-D01",
+            "HIN-D02",
+            "HIN-D03"
+          ],
+          "title": "Rule",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "group",
+        "title",
+        "reason",
+        "approach"
+      ],
+      "title": "HintRuleV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal",
+            "not_found",
+            "archived"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/HintRuleV1"
+      },
+      "title": "Rules",
+      "type": "array"
+    }
+  },
+  "title": "HintCatalogReplyV1",
+  "type": "object"
+}

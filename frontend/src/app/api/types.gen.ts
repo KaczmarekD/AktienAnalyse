@@ -1130,6 +1130,38 @@ export type HintParamsVersionV1 = {
 };
 
 /**
+ * HintRule
+ *
+ * D5.4: ein Eintrag des Katalogs der Hinweise; ``available`` falsch: noch nicht gerechnet.
+ */
+export type HintRule = {
+  /**
+   * Approach
+   */
+  approach: string;
+  /**
+   * Available
+   */
+  available: boolean;
+  /**
+   * Group
+   */
+  group: string;
+  /**
+   * Reason
+   */
+  reason: string;
+  /**
+   * Rule
+   */
+  rule: string;
+  /**
+   * Title
+   */
+  title: string;
+};
+
+/**
  * HistoryEntry
  *
  * Ein Depotstand im Verlauf, mit dem Unterschied zum vorherigen.
@@ -4136,6 +4168,35 @@ export type HealthResponses = {
 };
 
 export type HealthResponse = HealthResponses[keyof HealthResponses];
+
+export type HintCatalogData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/v1/hints/catalog';
+};
+
+export type HintCatalogErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type HintCatalogResponses = {
+  /**
+   * Response Hint Catalog
+   *
+   * Successful Response
+   */
+  200: Array<HintRule>;
+};
+
+export type HintCatalogResponse = HintCatalogResponses[keyof HintCatalogResponses];
 
 export type GetInstrumentData = {
   body?: never;

@@ -2,7 +2,11 @@
 import type {
   Depot,
   DepotAnalysis,
+  DepotHint,
+  DepotHintParams,
+  DepotHints,
   DepotValuation,
+  HintRule,
   Holdings,
   PositionScore,
   PositionValue,
@@ -252,3 +256,82 @@ export function analysis(values: Partial<DepotAnalysis> = {}): DepotAnalysis {
     ...values,
   };
 }
+
+/** Ein Hinweis (D5.4), Standard: SAP ist ein großer Einzeltitel. */
+export function hint(values: Partial<DepotHint> & Pick<DepotHint, 'rule' | 'subject'>): DepotHint {
+  return {
+    key: `${values.rule}:${values.subject}`,
+    severity: 'warning',
+    status: 'existing',
+    measured: null,
+    threshold: null,
+    as_of: '2026-11-20',
+    group: 'Konzentration',
+    title: 'Großer Einzeltitel',
+    reason: 'Ein einzelnes Unternehmen trägt einen großen Teil des Depots.',
+    approach: 'Gewicht und Doppelung über ETFs prüfen.',
+    acknowledged: false,
+    ...values,
+  };
+}
+
+/** Die Hinweise des jüngsten Laufs. */
+export function hints(list: DepotHint[], values: Partial<DepotHints> = {}): DepotHints {
+  return {
+    analysis_run_id: 7,
+    computed_at: '2026-11-22T10:05:00Z',
+    version: 2,
+    hints: list,
+    ...values,
+  };
+}
+
+/** Ein Ausschnitt des Katalogs: Regeln mit Schwelle, eine ohne, eine für später. */
+export const CATALOG: HintRule[] = [
+  {
+    rule: 'HIN-K01',
+    group: 'Konzentration',
+    title: 'Großer Einzeltitel',
+    reason: 'Ein einzelnes Unternehmen trägt einen großen Teil des Depots.',
+    approach: 'Gewicht prüfen.',
+    available: true,
+  },
+  {
+    rule: 'HIN-A02',
+    group: 'Allokation',
+    title: 'Viel Kasse',
+    reason: 'Ein großer Teil des Werts liegt als Kasse.',
+    approach: 'Liquiditätsbedarf prüfen.',
+    available: true,
+  },
+  {
+    rule: 'HIN-Q01',
+    group: 'Qualität',
+    title: 'Verdacht auf Value-Falle',
+    reason: 'Billig, aber schwache Qualität.',
+    approach: 'Qualitativ prüfen.',
+    available: true,
+  },
+  {
+    rule: 'HIN-D01',
+    group: 'Datenlage',
+    title: 'Kurs fehlt oder ist alt',
+    reason: 'Ohne aktuellen Kurs ist der Wert unvollständig.',
+    approach: 'Kursquelle prüfen.',
+    available: true,
+  },
+  {
+    rule: 'HIN-N01',
+    group: 'News',
+    title: 'Ad-hoc-Mitteilung',
+    reason: 'Eine Pflichtmitteilung zu einer Position.',
+    approach: 'Mitteilung lesen.',
+    available: false,
+  },
+];
+
+/** Gespeicherte Schwellen: K01 enger als der Standard, Q01 abgeschaltet. */
+export const PARAMS: DepotHintParams = {
+  version: 2,
+  params: { k01_warning: 0.15, k01_critical: 0.25, disabled: ['HIN-Q01', 'HIN-N01'] },
+};

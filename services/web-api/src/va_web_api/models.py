@@ -725,6 +725,17 @@ class DepotHint(_Model):
     acknowledged: bool
 
 
+class HintRule(_Model):
+    """D5.4: ein Eintrag des Katalogs der Hinweise; ``available`` falsch: noch nicht gerechnet."""
+
+    rule: str
+    group: str
+    title: str
+    reason: str
+    approach: str
+    available: bool
+
+
 class DepotHintParams(_Model):
     """D5.3: Schwellen der Hinweise eines Depots; Version 0 heisst Standardwerte."""
 

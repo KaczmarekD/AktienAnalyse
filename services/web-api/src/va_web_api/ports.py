@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         DepotSettingsV1,
         DepotV1,
         HintParamsV1,
+        HintRuleV1,
         HistoryEntryV1,
         HoldingLineV1,
         HoldingsV1,
@@ -219,6 +220,9 @@ class DepotDirectory(Protocol):
     ) -> DepotSettingsV1: ...
 
     def acknowledge(self, user_id: int, depot_id: int, key: str) -> DepotHintsV1 | None: ...
+
+    # D5.4: Katalog der Hinweise, fuer alle gleich
+    def catalog(self) -> list[HintRuleV1]: ...
 
 
 class ProfileConflict(Exception):

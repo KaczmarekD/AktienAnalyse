@@ -10,7 +10,7 @@ import { createDepot, updateDepot } from '../api/sdk.gen';
 import type { Depot } from '../api/types.gen';
 import { FORM_FIELD_DEFAULTS } from '../shared/ui/form-field';
 import { Notice, NoticeBox } from '../shared/ui/notice';
-import { DEPOT_CONTROLS } from './controls';
+import { DEPOT_CONTROLS, detailOf } from './controls';
 
 /** Ohne Depot legt der Dialog eins an, mit Depot ändert er Name und Beschreibung. */
 export interface DepotDialogData {
@@ -19,18 +19,6 @@ export interface DepotDialogData {
 
 const MAX_NAME = 100;
 const MAX_TEXT = 500;
-
-/** Meldung einer abgelehnten Anfrage (FastAPI: detail als Text oder Liste). */
-function detailOf(error: unknown): string | undefined {
-  const detail = (error as { detail?: unknown } | null)?.detail;
-  if (typeof detail === 'string') {
-    return detail;
-  }
-  if (Array.isArray(detail)) {
-    return detail.map((item) => String((item as { msg?: unknown }).msg ?? '')).join('; ');
-  }
-  return undefined;
-}
 
 /**
  * Dialog „Neues Depot“ und „Depot umbenennen“ (D3.6, DEP-01): Name, Art (nur beim Anlegen) und

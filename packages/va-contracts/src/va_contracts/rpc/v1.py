@@ -28,6 +28,7 @@ from ..portfolio import (
     DepotSettingsV1,
     DepotV1,
     HintParamsV1,
+    HintRuleV1,
     HistoryEntryV1,
     HoldingLineV1,
     HoldingsV1,
@@ -280,6 +281,14 @@ class DepotReplyV1(RpcReplyV1):
     depot: DepotV1 | None = None
 
 
+class HintCatalogRequestV1(Contract):
+    """D5.4: der Katalog der Hinweise; ohne Nutzer, er ist fuer alle gleich."""
+
+
+class HintCatalogReplyV1(RpcReplyV1):
+    rules: list[HintRuleV1] = Field(default_factory=list)
+
+
 class DepotHintsReplyV1(RpcReplyV1):
     """D5.2: die Hinweise des juengsten Laufs; ein fehlender Lauf wird vorher gerechnet."""
 
@@ -452,6 +461,8 @@ HINT_PARAMS_SAVE = RpcSpec(
 )
 TARGET_SAVE = RpcSpec("portfolio.depots.target.save", TargetSaveRequestV1, DepotSettingsReplyV1)
 HINT_ACK = RpcSpec("portfolio.depots.hints.ack", HintAckRequestV1, DepotHintsReplyV1)
+# D5.4: Katalog der Hinweise fuer das UI
+HINTS_CATALOG = RpcSpec("portfolio.hints.catalog", HintCatalogRequestV1, HintCatalogReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -485,6 +496,7 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         HINT_PARAMS_SAVE,
         TARGET_SAVE,
         HINT_ACK,
+        HINTS_CATALOG,
     )
 }
 
@@ -499,6 +511,7 @@ __all__ = [
     "DEPOTS_RESTORE",
     "DEPOTS_SETTINGS",
     "DEPOTS_UPDATE",
+    "HINTS_CATALOG",
     "HINT_ACK",
     "HINT_PARAMS_SAVE",
     "HOLDINGS_FILE",

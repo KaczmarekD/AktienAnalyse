@@ -84,6 +84,7 @@ class TestCatalog:
             "portfolio.depots.hint_params.save",
             "portfolio.depots.target.save",
             "portfolio.depots.hints.ack",
+            "portfolio.hints.catalog",  # D5.4: Katalog fuer das UI
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 
@@ -281,9 +282,13 @@ class TestDepots:
     """D3.1: Depots per Request/Reply; Mengen als Zahl im String, jede Anfrage nennt den Nutzer."""
 
     def test_every_request_names_the_user(self):
+        # D5.4: Der Katalog der Hinweise ist fuer alle gleich und enthaelt nichts Persoenliches
+        without_user = {"portfolio.hints.catalog"}
         for name, spec in RPCS.items():
-            if name.startswith("portfolio."):
+            if name.startswith("portfolio.") and name not in without_user:
                 assert "user_id" in spec.request.model_fields, name
+        for name in without_user:
+            assert not RPCS[name].request.model_fields, name
 
     def test_quantities_travel_as_strings(self):
         from decimal import Decimal

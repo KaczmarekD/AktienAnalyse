@@ -10,7 +10,7 @@ import { AppIcon } from '../shared/ui/icon';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { AppSection } from '../shared/ui/section';
 import { Term } from '../shared/ui/term';
-import { DEPOT_CONTROLS, IMPORT_STATUS } from './controls';
+import { DEPOT_CONTROLS, detailOf, IMPORT_STATUS } from './controls';
 
 /** Wie portfolio (D3.5): höchstens 640 KiB. */
 export const MAX_FILE_BYTES = 640 * 1024;
@@ -24,12 +24,6 @@ export async function fileBase64(file: Blob): Promise<string> {
     binary += String.fromCharCode(...bytes.subarray(start, start + chunk));
   }
   return btoa(binary);
-}
-
-/** Meldung einer abgelehnten Anfrage (422, 413: Text des Servers). */
-function detailOf(error: unknown): string | undefined {
-  const detail = (error as { detail?: unknown } | null)?.detail;
-  return typeof detail === 'string' ? detail : undefined;
 }
 
 /**

@@ -1,0 +1,176 @@
+<app-section heading="Hinweise" data-hints>
+  @if (result()?.computed_at; as at) {
+    <span sectionInfo class="hint" tabindex="0" data-computed [matTooltip]="tips.section"
+      >Stand {{ at | dayTime }}</span
+    >
+  }
+  <div sectionActions class="cluster">
+    <button
+      matButton="outlined"
+      type="button"
+      data-action="thresholds"
+      [disabled]="readonly()"
+      [matTooltip]="readonly() ? tips.readonly : tips.thresholds"
+      (click)="openThresholds()"
+    >
+      <app-icon name="tune" />
+      Schwellen
+    </button>
+    <button
+      matButton="outlined"
+      type="button"
+      data-action="target"
+      [disabled]="readonly()"
+      [matTooltip]="readonly() ? tips.readonly : tips.target"
+      (click)="openTarget()"
+    >
+      Zielallokation
+    </button>
+  </div>
+
+  <p class="hint disclaimer" data-disclaimer>{{ tips.disclaimer }}</p>
+  <app-notice [notice]="notice()" />
+
+  @if (result(); as result) {
+    @if (result.analysis_run_id === null) {
+      <app-state [empty]="tips.noRun" emptyIcon="info" />
+    } @else {
+      @if (open().length === 0) {
+        <p class="hint" data-no-hints>{{ tips.empty }}</p>
+      } @else {
+        <ul class="divided-list hints" data-open>
+          @for (hint of open(); track hint.key) {
+            <ng-container
+              *ngTemplateOutlet="item; context: { $implicit: hint, acknowledgeable: true }"
+            />
+          }
+        </ul>
+      }
+
+      @if (acknowledged().length) {
+        <button
+          matButton
+          type="button"
+          data-action="toggle-acknowledged"
+          [attr.aria-expanded]="showAcknowledged()"
+          [matTooltip]="showAcknowledged() ? tips.hideAcknowledged : tips.showAcknowledged"
+          (click)="showAcknowledged.set(!showAcknowledged())"
+        >
+          <app-icon name="expand_more" />
+          Zur Kenntnis genommen ({{ acknowledged().length }})
+        </button>
+        @if (showAcknowledged()) {
+          <ul class="divided-list hints" data-acknowledged>
+            @for (hint of acknowledged(); track hint.key) {
+              <ng-container
+                *ngTemplateOutlet="item; context: { $implicit: hint, acknowledgeable: false }"
+              />
+            }
+          </ul>
+        }
+      }
+
+      @if (resolved().length) {
+        <app-section heading="Erledigt seit dem vorigen Stand" [level]="3" data-resolved>
+          <ul class="divided-list">
+            @for (hint of resolved(); track hint.key) {
+              <li [attr.data-hint]="hint.key">
+                <span class="badge badge--muted" tabindex="0" [matTooltip]="statuses.resolved.tip">
+                  <app-icon name="check_circle" />
+                  {{ statuses.resolved.label }}
+                </span>
+                <span class="title">{{ hint.title }}</span>
+                @if (subject(hint); as subject) {
+                  <span class="hint">{{ subject }}</span>
+                }
+              </li>
+            }
+          </ul>
+        </app-section>
+      }
+    }
+  } @else {
+    <app-state [error]="error()" loading="Lade die Hinweise …" />
+  }
+</app-section>
+
+<ng-template #item let-hint let-acknowledgeable="acknowledgeable">
+  <li
+    [attr.data-hint]="hint.key"
+    [attr.data-severity]="hint.severity"
+    [attr.data-status]="hint.status"
+  >
+    <div class="head">
+      <span
+        class="badge"
+        tabindex="0"
+        data-severity-badge
+        [class.badge--error]="hint.severity === 'critical'"
+        [class.badge--muted]="hint.severity === 'info'"
+        [matTooltip]="severity(hint).tip"
+      >
+        <app-icon [name]="severity(hint).icon" />
+        {{ severity(hint).label }}
+      </span>
+      @if (hint.status === 'new') {
+        <span class="badge badge--muted" tabindex="0" data-new [matTooltip]="statuses.new.tip">{{
+          statuses.new.label
+        }}</span>
+      }
+      @if (hint.acknowledged) {
+        <span
+          class="badge badge--muted"
+          tabindex="0"
+          data-ack-badge
+          [matTooltip]="tips.acknowledged"
+          >zur Kenntnis genommen</span
+        >
+      }
+      <span class="title">{{ hint.title }}</span>
+      @if (subject(hint); as subject) {
+        <span class="subject" data-subject>{{ subject }}</span>
+      }
+    </div>
+    <dl class="kv-list facts">
+      @if (measure(hint, hint.measured); as measured) {
+        <div data-measured>
+          <dt tabindex="0" [matTooltip]="tips.measured">gemessen</dt>
+          <dd>{{ measured }}</dd>
+        </div>
+      }
+      @if (measure(hint, hint.threshold); as threshold) {
+        <div data-threshold>
+          <dt tabindex="0" [matTooltip]="tips.threshold">Schwelle</dt>
+          <dd>{{ threshold }}</dd>
+        </div>
+      }
+      @if (hint.as_of) {
+        <div data-as-of>
+          <dt tabindex="0" [matTooltip]="tips.asOf">Stand</dt>
+          <dd>{{ hint.as_of | day }}</dd>
+        </div>
+      }
+    </dl>
+    <p class="reason">{{ hint.reason }}</p>
+    <p class="approach" data-approach>
+      <span class="label" tabindex="0" [matTooltip]="tips.approach">Ansatzpunkt:</span>
+      {{ hint.approach }}
+    </p>
+    @if (acknowledgeable && !readonly()) {
+      <button
+        matButton
+        type="button"
+        data-action="ack"
+        [disabled]="busy() !== undefined"
+        [matTooltip]="tips.ack"
+        (click)="acknowledge(hint)"
+      >
+        @if (busy() === hint.key) {
+          Speichert …
+        } @else {
+          Zur Kenntnis nehmen
+        }
+      </button>
+    }
+  </li>
+</ng-template>

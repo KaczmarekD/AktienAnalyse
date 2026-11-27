@@ -12,8 +12,9 @@
 > seit D3.6 die Oberfläche: „Meine Depots“ (`/depots`, Startseite nach der Anmeldung) und das
 > Depot (`/depots/:id`) mit Positionen, Bearbeiten, Datei und Verlauf. Seit D4.2 trägt jede
 > Aktie ihre Scores (`score_view`, `PositionValueV1.score`, Spalten im Depot). Seit D5.3 die
-> Zielallokation (`target_allocation`, `…/target-allocation`, Grundlage von HIN-A01). Die Reiter
-> Analyse, Hinweise, News und Einstellungen folgen mit D4 und später.
+> Zielallokation (`target_allocation`, `…/target-allocation`, Grundlage von HIN-A01). Seit D5.4
+> zeigt das Depot nach der Analyse die Hinweise mit den Dialogen „Schwellen“ und
+> „Zielallokation“. Die Reiter News und Einstellungen folgen später.
 
 ## Begriffe
 

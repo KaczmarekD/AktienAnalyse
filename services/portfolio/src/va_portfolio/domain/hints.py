@@ -62,6 +62,10 @@ class HintRule:
     approach: str
 
 
+# Im Katalog, aber noch nicht gerechnet: News (D6) und Bank (D8)
+NOT_EVALUATED = frozenset({"HIN-N01", "HIN-N02", "HIN-D02"})
+
+
 def _rule(rule_id: str, group: str, title: str, reason: str, approach: str) -> HintRule:
     return HintRule(rule_id, group, title, reason, approach)
 

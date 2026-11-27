@@ -365,6 +365,20 @@ werden. Der Hinweis verschwindet nicht aus der Antwort, er trägt `acknowledged`
 ihn aus (D5.4). `/me/export` enthält alle Versionen der Schwellen und Ziele und alle
 Kenntnisnahmen (`DepotExportV1.hint_params`, `targets`, `acks`).
 
+**Umgesetzt (27.11.2026, D5.4):** der Bereich „Hinweise“ im Depot (`HintsPanel` unter
+`frontend/src/app/depots/`) nach der Analyse: offene Hinweise nach Schwere, neue zuerst, je
+Hinweis Schwere, Status, Gegenstand, Messwert und Schwelle in der Einheit der Regel, Datenstand,
+Begründung und Ansatzpunkt; „Zur Kenntnis genommen“ blendet aus, ein Schalter zeigt die
+ausgeblendeten, die erledigten stehen darunter. Der Disclaimer steht über der Liste. Die Dialoge
+„Schwellen“ (`HintParamsDialog`: Anteile in Prozent, jede Regel abschaltbar, Standardwerte aus
+`zHintParamsV1`) und „Zielallokation“ (`TargetDialog`, Summe 100 % oder leer) speichern mit
+`If-Match` und bieten nach einem Konflikt „Neu laden“. Die Titel der Regeln kommen aus
+`GET /api/v1/hints/catalog` (RPC `portfolio.hints.catalog`, `HintRuleV1`, `available` falsch für
+News und Bank); Regeln, die noch nicht gerechnet werden, fehlen im Dialog, ihre Werte bleiben.
+Texte in `HINTS`, `SEVERITY`, `HINT_STATUS`, `THRESHOLDS`, `THRESHOLD_DIALOG`, `TARGET_DIALOG`
+(`depots/controls.ts`), Rechnen und Beschriften in `depots/hints.ts`. Live-Aktualisierung über
+`user:<id>` fehlt weiter.
+
 ## Datenmodell (Schema `portfolio`)
 
 | Tabelle | Inhalt | Schreibweise |
@@ -394,7 +408,7 @@ nachladen.
 | `POST /api/v1/depots/{id}/hints/{key}/ack` | zur Kenntnis nehmen, Antwort wie `…/hints`; 404 ohne den Hinweis im jüngsten Lauf (seit D5.3) |
 | `GET`/`PUT /api/v1/depots/{id}/hint-params` | Schwellen mit Version und `ETag`, Speichern mit `If-Match` (428 ohne, 409 auf eine alte Version, 422 außerhalb der Grenzen; seit D5.3) |
 | `GET`/`PUT /api/v1/depots/{id}/target-allocation` | Zielallokation ebenso (seit D5.3, [depots.md](depots.md#api)) |
-| `GET /api/v1/hints/catalog` | Katalog mit Texten für das UI |
+| `GET /api/v1/hints/catalog` | Katalog mit Texten für das UI, ohne Personenbezug (seit D5.4) |
 | `GET /api/v1/depots/{id}/positions/{isin}/comparison` | Prüfkandidaten |
 
 ## Tests und Abnahme

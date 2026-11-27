@@ -176,6 +176,17 @@ class TestOverRpc:
         [k01] = [h for h in reply.hints.hints if h.key == K01]
         assert k01.acknowledged is True
 
+    def test_the_catalog_names_every_rule_and_what_comes_later(self):
+        from va_contracts.rpc.v1 import HINTS_CATALOG, HintCatalogRequestV1
+        from va_portfolio.domain.hints import HINT_CATALOG
+
+        _, _, service, _ = _setup()
+        reply = handlers(service)[HINTS_CATALOG](HintCatalogRequestV1())
+        rules = reply.rules  # type: ignore[attr-defined]
+        assert [r.rule for r in rules] == list(HINT_CATALOG)
+        assert {r.rule for r in rules if not r.available} == {"HIN-N01", "HIN-N02", "HIN-D02"}
+        assert all(r.title and r.reason and r.approach for r in rules)
+
     def test_a_foreign_depot_is_not_found(self):
         _, _, service, depot_id = _setup()
         reply = handlers(service)[DEPOTS_SETTINGS](

@@ -117,7 +117,8 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   jeder Anfrage gerechnet; ohne Marktdaten 503. Seit D5.2 `…/hints` (RPC
   `portfolio.depots.hints`): der jüngste Lauf mit Status und Texten des Katalogs. Seit D5.3
   `…/hint-params` und `…/target-allocation` (`GET`/`PUT` mit `ETag`/`If-Match`) und
-  `…/hints/{key}/ack`.
+  `…/hints/{key}/ack`. Seit D5.4 `GET /hints/catalog` (RPC `portfolio.hints.catalog`, die
+  einzige Anfrage an portfolio ohne Nutzer, ohne Persönliches).
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.
@@ -270,7 +271,8 @@ Tippfehler.
 **Frontend** (`frontend/`, Angular 22 mit Angular Material, ab P3.5): Der API-Client unter
 `frontend/src/app/api/` entsteht mit hey-api aus dem OpenAPI-Snapshot
 `tests/golden/openapi/v1.json` (`make ui-api`) und wird nie von Hand geändert. Die CI prüft, dass
-er zum Snapshot passt. Ändert sich die API, kommen neuer Snapshot und neuer Client in denselben
+er zum Snapshot passt. Seine Prüfung (zod) nimmt Zeitpunkte mit Offset an (`dates.offset`):
+Postgres liefert sie in der Zeitzone der Sitzung, auf der NAS `+01:00`. Ändert sich die API, kommen neuer Snapshot und neuer Client in denselben
 Commit. Die API ändert sich nur additiv: `oasdiff breaking` (P3.8, `make api-breaking`) vergleicht
 den Snapshot in der CI mit dem Abzweigpunkt von `main` und bricht bei inkompatiblen Änderungen
 ab. Braucht es einen Bruch, kommt er als `/api/v2`. Das UI ruft nur relative Pfade (`/api/v1/...`,
@@ -296,7 +298,10 @@ Depots im UI (D3.6) unter `frontend/src/app/depots/`:
   (`ImportPanel`), Verlauf, Umbenennen, Archivieren. Seit D4.2 Composite mit Perzentil, Value
   und Quality je Aktie; Titel aus DAX/MDAX führen ins Titel-Detail. Seit D4.5 der Bereich
   „Analyse“ (`AnalysisPanel`, `GET /depots/{id}/analysis`), Texte in `ANALYSIS`, `SLICE`,
-  `BOND_SPECIAL` (`depots/controls.ts`).
+  `BOND_SPECIAL` (`depots/controls.ts`). Seit D5.4 der Bereich „Hinweise“ (`HintsPanel`) mit
+  Disclaimer, „Zur Kenntnis genommen“ und den Dialogen „Schwellen“ (`HintParamsDialog`, Titel
+  aus `GET /hints/catalog`) und „Zielallokation“ (`TargetDialog`), Texte in `HINTS`,
+  `THRESHOLDS` und den Dialog-Konstanten, Einheiten und Gegenstände in `depots/hints.ts`.
 - Texte in `depots/controls.ts`, Begriffe in der Glossar-Gruppe „Depots“, Beträge über die
   Pipes `eur` und `dec`.
 - Live-Aktualisierung über `user:<id>` fehlt noch.

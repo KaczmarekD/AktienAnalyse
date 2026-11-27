@@ -56,6 +56,8 @@ import type {
   GetTargetAllocationResponse,
   HealthData,
   HealthResponse,
+  HintCatalogData,
+  HintCatalogResponse,
   HoldingsCsvData,
   ImportHoldingsData,
   ImportHoldingsResponse,
@@ -538,6 +540,21 @@ export const healthRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'GET',
     url: '/api/v1/health',
+    ...options,
+  });
+
+/**
+ * Hint Catalog
+ *
+ * D5.4: die Regeln der Hinweise mit ihren Texten, fuer die Einstellungen im UI.
+ */
+export const hintCatalogRequest = <ThrowOnError extends boolean = false>(
+  options?: Options<HintCatalogData, ThrowOnError>,
+): HttpRequest<HintCatalogResponse> =>
+  (options?.client ?? client).requestOptions<HintCatalogResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/hints/catalog',
     ...options,
   });
 
@@ -1237,6 +1254,19 @@ export const healthResource = <ThrowOnError extends boolean = false>(
   httpResource<HealthResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? healthRequest(opts) : undefined;
+  });
+
+/**
+ * Hint Catalog
+ *
+ * D5.4: die Regeln der Hinweise mit ihren Texten, fuer die Einstellungen im UI.
+ */
+export const hintCatalogResource = <ThrowOnError extends boolean = false>(
+  options?: () => Options<HintCatalogData, ThrowOnError> | undefined,
+) =>
+  httpResource<HintCatalogResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? hintCatalogRequest(opts) : undefined;
   });
 
 /**

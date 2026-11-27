@@ -578,6 +578,22 @@ export const GLOSSARY = {
     label: 'wird geprüft',
     tip: 'Für dieses Wertpapier fehlen noch die Stammdaten. Sie kommen mit dem nächsten Abruf.',
   },
+  // D5.4: Hinweise
+  depot_hint: {
+    group: 'Depots',
+    label: 'Hinweis zum Depot',
+    tip: 'Beobachtung aus einer festen Regel mit Messwert, Schwelle und Ansatzpunkt. Keine Anlageempfehlung.',
+  },
+  target_allocation: {
+    group: 'Depots',
+    label: 'Zielallokation',
+    tip: 'Wie sich der Wert auf Aktien, ETFs, Anleihen und Kasse verteilen soll. Abweichungen ergeben Hinweise.',
+  },
+  acknowledged: {
+    group: 'Depots',
+    label: 'zur Kenntnis genommen',
+    tip: 'Ausgeblendeter Hinweis. Er erscheint wieder, wenn er schwerer wird oder sich der Wert deutlich verschlechtert.',
+  },
 } satisfies Record<string, GlossaryEntry>;
 
 export type TermKey = keyof typeof GLOSSARY;

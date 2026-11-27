@@ -24,7 +24,7 @@ import { AppIcon } from '../shared/ui/icon';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { AppSection } from '../shared/ui/section';
 import { Term } from '../shared/ui/term';
-import { DEPOT_CONTROLS, parseAmount, toInput, UNIT } from './controls';
+import { DEPOT_CONTROLS, detailOf, parseAmount, toInput, UNIT } from './controls';
 
 /** Wartezeit der Suche nach dem letzten Tastendruck (ms); Tests setzen 0. */
 export const SEARCH_DEBOUNCE_MS = new InjectionToken<number>('SEARCH_DEBOUNCE_MS', {
@@ -46,18 +46,6 @@ interface Row {
 interface RowErrors {
   quantity?: string;
   cost?: string;
-}
-
-/** Meldung einer abgelehnten Anfrage (422: Text von portfolio). */
-function detailOf(error: unknown): string | undefined {
-  const detail = (error as { detail?: unknown } | null)?.detail;
-  if (typeof detail === 'string') {
-    return detail;
-  }
-  if (Array.isArray(detail)) {
-    return detail.map((item) => String((item as { msg?: unknown }).msg ?? '')).join('; ');
-  }
-  return undefined;
 }
 
 /**

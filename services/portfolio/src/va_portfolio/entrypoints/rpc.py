@@ -31,6 +31,7 @@ from va_contracts.portfolio import (
     HintAckV1,
     HintParamsV1,
     HintParamsVersionV1,
+    HintRuleV1,
     HintV1,
     HistoryEntryV1,
     HoldingLineV1,
@@ -56,6 +57,7 @@ from va_contracts.rpc.v1 import (
     DEPOTS_UPDATE,
     HINT_ACK,
     HINT_PARAMS_SAVE,
+    HINTS_CATALOG,
     HOLDINGS_FILE,
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
@@ -69,6 +71,7 @@ from va_contracts.rpc.v1 import (
     DepotListReplyV1,
     DepotReplyV1,
     DepotSettingsReplyV1,
+    HintCatalogReplyV1,
     HistoryReplyV1,
     HoldingsFileReplyV1,
     HoldingsReplyV1,
@@ -78,7 +81,7 @@ from va_contracts.rpc.v1 import (
 
 from ..application.depots import ArchivedDepot, DepotNotFound
 from ..domain.depots import CashLine, DepotError, HoldingLine, VersionConflict
-from ..domain.hints import HINT_CATALOG
+from ..domain.hints import HINT_CATALOG, NOT_EVALUATED
 
 if TYPE_CHECKING:
     from va_contracts.rpc.v1 import (
@@ -88,6 +91,7 @@ if TYPE_CHECKING:
         DepotRefRequestV1,
         DepotUpdateRequestV1,
         HintAckRequestV1,
+        HintCatalogRequestV1,
         HintParamsSaveRequestV1,
         HoldingsFileRequestV1,
         HoldingsGetRequestV1,
@@ -177,6 +181,21 @@ def _hints(run: StoredRun | None, acknowledged: set[str] | None = None) -> Depot
     return DepotHintsV1(
         analysis_run_id=run.id, computed_at=run.computed_at, version=run.version, hints=hints
     )
+
+
+def _catalog() -> list[HintRuleV1]:
+    """D5.4: der Katalog in seiner Reihenfolge, mit dem Vermerk, was noch nicht gerechnet wird."""
+    return [
+        HintRuleV1(
+            rule=rule.id,  # type: ignore[arg-type]  # ein Test haelt Katalog und HintRuleId gleich
+            group=rule.group,
+            title=rule.title,
+            reason=rule.reason,
+            approach=rule.approach,
+            available=rule.id not in NOT_EVALUATED,
+        )
+        for rule in HINT_CATALOG.values()
+    ]
 
 
 def _settings(settings: StoredSettings) -> DepotSettingsV1:
@@ -345,6 +364,10 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
             )
 
         return _guarded(DepotAnalysisReplyV1, work)
+
+    def catalog(request: HintCatalogRequestV1) -> HintCatalogReplyV1:
+        del request
+        return HintCatalogReplyV1(rules=_catalog())
 
     def with_acks(depot_id: int, run: StoredRun | None) -> DepotHintsReplyV1:
         acknowledged = service.acknowledged(depot_id, run) if run is not None else set()
@@ -528,4 +551,5 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         HINT_PARAMS_SAVE: save_params,
         TARGET_SAVE: save_target,
         HINT_ACK: acknowledge,
+        HINTS_CATALOG: catalog,
     }

@@ -9,7 +9,7 @@ import * as z from 'zod';
  */
 export const zAccount = z.object({
   active: z.boolean(),
-  created_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime({ offset: true }).nullable(),
   display_name: z.string().nullable(),
   email: z.string().nullable(),
   id: z.int(),
@@ -210,7 +210,7 @@ export const zDepotHint = z.object({
  */
 export const zDepotHints = z.object({
   analysis_run_id: z.int().nullable(),
-  computed_at: z.iso.datetime().nullable(),
+  computed_at: z.iso.datetime({ offset: true }).nullable(),
   hints: z.array(zDepotHint),
   version: z.int(),
 });
@@ -324,7 +324,7 @@ export const zHealth = z.object({
  * D5.3: ein Hinweis zur Kenntnis genommen, mit Messwert und Schwere in diesem Moment.
  */
 export const zHintAckV1 = z.object({
-  at: z.iso.datetime(),
+  at: z.iso.datetime({ offset: true }),
   key: z.string().max(200),
   measured: z.number().nullish(),
   severity: z.enum(['info', 'warning', 'critical']),
@@ -412,9 +412,23 @@ export const zDepotHintParams = z.object({
  * D5.3: eine gespeicherte Version der Schwellen eines Depots (Datenexport, NUT-12).
  */
 export const zHintParamsVersionV1 = z.object({
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   params: zHintParamsV1,
   version: z.int().gte(1),
+});
+
+/**
+ * HintRule
+ *
+ * D5.4: ein Eintrag des Katalogs der Hinweise; ``available`` falsch: noch nicht gerechnet.
+ */
+export const zHintRule = z.object({
+  approach: z.string(),
+  available: z.boolean(),
+  group: z.string(),
+  reason: z.string(),
+  rule: z.string(),
+  title: z.string(),
 });
 
 /**
@@ -425,7 +439,7 @@ export const zHintParamsVersionV1 = z.object({
 export const zHistoryEntry = z.object({
   added: z.int(),
   changed: z.int(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   created_by: z.int().nullable(),
   positions: z.int(),
   removed: z.int(),
@@ -482,7 +496,7 @@ export const zHoldingLineOutput = z.object({
  */
 export const zHoldings = z.object({
   cash: z.array(zCashLineOutput),
-  created_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime({ offset: true }).nullable(),
   created_by: z.int().nullable(),
   depot_id: z.int(),
   lines: z.array(zHoldingLineOutput),
@@ -736,7 +750,7 @@ export const zDepotValuation = z.object({
  * ``valuation`` (D3.4): fehlt, solange portfolio keine Marktdaten hat oder sie nicht lesbar sind.
  */
 export const zDepot = z.object({
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   description: z.string().nullable(),
   id: z.int(),
   kind: z.enum(['depot', 'watchlist']),
@@ -866,7 +880,7 @@ export const zProfileParamsV1Output = z.object({
  */
 export const zProfileSummary = z.object({
   active_version: z.int().nullable(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   id: z.int(),
   latest_version: z.int().nullable(),
   name: z.string(),
@@ -889,7 +903,7 @@ export const zProfileUpdate = z.object({
 export const zProfileVersion = z.object({
   active: z.boolean(),
   comment: z.string().nullable(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   params: zProfileParamsV1Output,
   parent_version: z.int().nullable(),
   version: z.int(),
@@ -900,7 +914,7 @@ export const zProfileVersion = z.object({
  */
 export const zProfileDetail = z.object({
   active_version: z.int().nullable(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   id: z.int(),
   latest_version: z.int().nullable(),
   name: z.string(),
@@ -1010,7 +1024,7 @@ export const zImportPreview = z.object({
  */
 export const zReport = z.object({
   csv_filename: z.string(),
-  generated_at: z.iso.datetime(),
+  generated_at: z.iso.datetime({ offset: true }),
   html: z.string(),
   id: z.int(),
   run_id: z.int().nullable(),
@@ -1028,14 +1042,14 @@ export const zRunDetail = z.object({
   exit_code: z.int().nullable(),
   failed_count: z.int().nullable(),
   fetch_run_id: z.int().nullable(),
-  finished_at: z.iso.datetime().nullable(),
+  finished_at: z.iso.datetime({ offset: true }).nullable(),
   force_refresh: z.boolean(),
   id: z.int(),
   kind: z.string(),
   report_id: z.int().nullable(),
   scored_count: z.int().nullable(),
   scoring_run_id: z.int().nullable(),
-  started_at: z.iso.datetime(),
+  started_at: z.iso.datetime({ offset: true }),
   status: z.string(),
   universe_mode: z.string().nullable(),
   universe_size: z.int().nullable(),
@@ -1056,7 +1070,7 @@ export const zRunProfile = z.object({
  * Ranking
  */
 export const zRanking = z.object({
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   fetch_run_id: z.int().nullable(),
   fetched_on: z.iso.date().nullable(),
   origin: z.string(),
@@ -1094,12 +1108,12 @@ export const zRunSummary = z.object({
   dry_run: z.boolean(),
   exit_code: z.int().nullable(),
   failed_count: z.int().nullable(),
-  finished_at: z.iso.datetime().nullable(),
+  finished_at: z.iso.datetime({ offset: true }).nullable(),
   force_refresh: z.boolean(),
   id: z.int(),
   kind: z.string(),
   scored_count: z.int().nullable(),
-  started_at: z.iso.datetime(),
+  started_at: z.iso.datetime({ offset: true }),
   status: z.string(),
   universe_mode: z.string().nullable(),
   universe_size: z.int().nullable(),
@@ -1137,7 +1151,7 @@ export const zSavedProfileVersion = z.object({
  */
 export const zScorePoint = z.object({
   composite_score: z.number().nullable(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   origin: z.string(),
   passed_filter: z.boolean(),
   quality_score: z.number().nullable(),
@@ -1186,10 +1200,10 @@ export const zSecurityHit = z.object({
  * Eine gueltige Sitzung des eigenen Kontos; ``current`` ist die dieser Anfrage.
  */
 export const zSessionInfo = z.object({
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   current: z.boolean(),
-  expires_at: z.iso.datetime(),
-  last_seen: z.iso.datetime(),
+  expires_at: z.iso.datetime({ offset: true }),
+  last_seen: z.iso.datetime({ offset: true }),
   user_agent: z.string().nullable(),
 });
 
@@ -1265,7 +1279,7 @@ export const zTargetAllocationV1 = z.object({
  * D5.3: eine gespeicherte Version der Zielallokation eines Depots (Datenexport, NUT-12).
  */
 export const zTargetVersionV1 = z.object({
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
   target: zTargetAllocationV1,
   version: z.int().gte(1),
 });
@@ -1293,7 +1307,7 @@ export const zDataExport = z.object({
   credentials: z.array(z.record(z.string(), z.unknown())),
   depots: z.array(zDepotExport).optional(),
   email_confirmations: z.array(z.record(z.string(), z.unknown())),
-  exported_at: z.iso.datetime(),
+  exported_at: z.iso.datetime({ offset: true }),
   logins: z.array(z.record(z.string(), z.unknown())),
   profiles: z.array(z.record(z.string(), z.unknown())),
   sessions: z.array(z.record(z.string(), z.unknown())),
@@ -1602,6 +1616,13 @@ export const zSaveTargetAllocationResponse = zDepotTarget;
  * Successful Response
  */
 export const zHealthResponse = zHealth;
+
+/**
+ * Response Hint Catalog
+ *
+ * Successful Response
+ */
+export const zHintCatalogResponse = z.array(zHintRule);
 
 export const zGetInstrumentPath = z.object({
   symbol: z.string(),

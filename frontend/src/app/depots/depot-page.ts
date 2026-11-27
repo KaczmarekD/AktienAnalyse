@@ -43,6 +43,7 @@ import {
 } from './controls';
 import { DepotDialog } from './depot-dialog';
 import { AnalysisPanel } from './analysis-panel';
+import { HintsPanel } from './hints-panel';
 import { HoldingsEditor } from './holdings-editor';
 import { ImportPanel } from './import-panel';
 
@@ -52,7 +53,7 @@ import { ImportPanel } from './import-panel';
  * Datei im eigenen Format und der Verlauf der Depotstände. Archivierte Depots sind
  * schreibgeschützt, bis sie wiederhergestellt sind. Seit D4.2 trägt jede Aktie ihre Scores aus
  * dem jüngsten Bewertungslauf: Titel aus DAX/MDAX führen ins Titel-Detail, andere sind ins
- * Referenzuniversum eingeordnet.
+ * Referenzuniversum eingeordnet. Seit D5.4 folgen auf die Analyse die Hinweise.
  */
 @Component({
   selector: 'app-depot-page',
@@ -66,6 +67,7 @@ import { ImportPanel } from './import-panel';
     DayTimePipe,
     DecPipe,
     EurPipe,
+    HintsPanel,
     HoldingsEditor,
     ImportPanel,
     MatButtonModule,

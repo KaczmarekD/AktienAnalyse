@@ -2032,6 +2032,46 @@
         "title": "HintParamsVersionV1",
         "type": "object"
       },
+      "HintRule": {
+        "additionalProperties": false,
+        "description": "D5.4: ein Eintrag des Katalogs der Hinweise; ``available`` falsch: noch nicht gerechnet.",
+        "properties": {
+          "approach": {
+            "title": "Approach",
+            "type": "string"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule",
+          "group",
+          "title",
+          "reason",
+          "approach",
+          "available"
+        ],
+        "title": "HintRule",
+        "type": "object"
+      },
       "HistoryEntry": {
         "additionalProperties": false,
         "description": "Ein Depotstand im Verlauf, mit dem Unterschied zum vorherigen.",
@@ -7213,6 +7253,38 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/hints/catalog": {
+      "get": {
+        "description": "D5.4: die Regeln der Hinweise mit ihren Texten, fuer die Einstellungen im UI.",
+        "operationId": "hint_catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HintRule"
+                  },
+                  "title": "Response Hint Catalog",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Hint Catalog",
+        "tags": [
+          "depots"
         ]
       }
     },

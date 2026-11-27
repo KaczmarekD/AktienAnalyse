@@ -440,6 +440,18 @@ class HintV1(Contract):
     acknowledged: bool = False
 
 
+class HintRuleV1(Contract):
+    """D5.4: ein Eintrag des Katalogs der Hinweise mit seinen Texten, fuer das UI."""
+
+    rule: HintRuleId
+    group: str
+    title: str
+    reason: str
+    approach: str
+    # False: steht im Katalog, wird aber erst mit den News (D6) oder der Bank (D8) gerechnet
+    available: bool = True
+
+
 class DepotHintsV1(Contract):
     """Die Hinweise des juengsten Laufs; ``analysis_run_id`` leer ohne Lauf (ohne Marktdaten)."""
 
@@ -536,6 +548,7 @@ __all__ = [
     "HintParamsV1",
     "HintParamsVersionV1",
     "HintRuleId",
+    "HintRuleV1",
     "HintSeverity",
     "HintStatus",
     "HintV1",

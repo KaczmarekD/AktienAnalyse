@@ -42,6 +42,7 @@ from va_contracts.rpc.v1 import (
     DEPOTS_UPDATE,
     HINT_ACK,
     HINT_PARAMS_SAVE,
+    HINTS_CATALOG,
     HOLDINGS_FILE,
     HOLDINGS_GET,
     HOLDINGS_HISTORY,
@@ -71,6 +72,7 @@ from va_contracts.rpc.v1 import (
     FactorsRequestV1,
     FactorV1,
     HintAckRequestV1,
+    HintCatalogRequestV1,
     HintParamsSaveRequestV1,
     HoldingsFileRequestV1,
     HoldingsGetRequestV1,
@@ -124,6 +126,7 @@ if TYPE_CHECKING:
         DepotSettingsV1,
         DepotV1,
         HintParamsV1,
+        HintRuleV1,
         HistoryEntryV1,
         HoldingLineV1,
         HoldingsV1,
@@ -421,6 +424,9 @@ class RemoteDepots:
     def acknowledge(self, user_id: int, depot_id: int, key: str) -> DepotHintsV1 | None:
         request = HintAckRequestV1(user_id=user_id, depot_id=depot_id, key=key)
         return self._call(HINT_ACK, request).hints
+
+    def catalog(self) -> list[HintRuleV1]:
+        return self._call(HINTS_CATALOG, HintCatalogRequestV1()).rules
 
 
 def _raise(reply: RpcReplyV1) -> None:

@@ -40,6 +40,7 @@ from ..models import (
     DepotHintParams,
     DepotHints,
     DepotTarget,
+    HintRule,
     HistoryEntry,
     Holdings,
     ImportFile,
@@ -235,6 +236,14 @@ def save_target_allocation(
         lambda: directory.save_target(user.id, depot_id, base_version=base, target=body)
     )
     return _target(settings, response)
+
+
+@router.get("/hints/catalog", responses=UNAVAILABLE)
+def hint_catalog(user: DepotOwner, directory: Directory) -> list[HintRule]:
+    """D5.4: die Regeln der Hinweise mit ihren Texten, fuer die Einstellungen im UI."""
+    del user  # nur mit echter Sitzung, wie die Depots
+    rules = _guarded(directory.catalog)
+    return [HintRule.model_validate(rule.model_dump()) for rule in rules]
 
 
 @router.post("/depots/{depot_id}/hints/{key}/ack", responses={**NOT_FOUND, **UNAVAILABLE})
