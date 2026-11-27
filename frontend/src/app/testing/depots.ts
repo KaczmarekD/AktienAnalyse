@@ -1,5 +1,11 @@
 // Antworten des web-api für die Tests der Depot-Seiten (D3.6).
-import type { Depot, DepotValuation, Holdings, PositionValue } from '../api/types.gen';
+import type {
+  Depot,
+  DepotValuation,
+  Holdings,
+  PositionScore,
+  PositionValue,
+} from '../api/types.gen';
 
 export const SAP = 'DE0007164600';
 export const APPLE = 'US0378331005';
@@ -53,6 +59,27 @@ export function position(
     cost_basis_eur: null,
     difference_eur: null,
     missing: null,
+    score: null,
+    ...values,
+  };
+}
+
+/** Scores einer Aktie aus einem Bewertungslauf (D4.2), Standard: Titel des Rankings. */
+export function score(values: Partial<PositionScore> = {}): PositionScore {
+  return {
+    scoring_run_id: 8,
+    as_of: '2026-11-20',
+    symbol: 'SAP.DE',
+    reference: 'universe',
+    rank: 12,
+    value_score: 0.41,
+    quality_score: 0.83,
+    composite_score: 0.578,
+    composite_percentile: 0.71,
+    value_trap_flag: false,
+    value_trap_reason: null,
+    industry_rule: false,
+    reason: null,
     ...values,
   };
 }
@@ -88,8 +115,25 @@ export const DETAIL = depot({
         value_eur: '2315.00',
         cost_basis_eur: '2000',
         difference_eur: '315.00',
+        score: score(),
       }),
-      position({ isin: APPLE, quantity: '3', pending: true, missing: 'price' }),
+      position({
+        isin: APPLE,
+        quantity: '3',
+        pending: true,
+        missing: 'price',
+        score: score({
+          symbol: 'AAPL',
+          reference: 'outside',
+          rank: null,
+          value_score: 0.12,
+          quality_score: 0.97,
+          composite_score: 0.46,
+          composite_percentile: 0.38,
+          value_trap_flag: true,
+          value_trap_reason: 'momentum',
+        }),
+      }),
     ],
   }),
 });

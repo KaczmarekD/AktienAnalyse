@@ -482,6 +482,30 @@ class Security(_Model):
 DepotKindName = Literal["depot", "watchlist"]
 
 
+class PositionScore(_Model):
+    """Scores einer Aktie im Depot (D4.2) aus dem juengsten Bewertungslauf, der sie kennt.
+
+    ``reference``: ``universe`` = Titel des Rankings, mit denselben Werten wie dort und seinem
+    Rang; ``below_size_filter`` = Universumstitel unter dem Groessenfilter, ``outside`` = Aktie
+    ausserhalb von DAX/MDAX, beide ins Referenzuniversum eingeordnet. Ohne Composite nennt
+    ``reason`` den Grund. ``as_of``: Stand des Abrufs dieses Bewertungslaufs.
+    """
+
+    scoring_run_id: int
+    as_of: date
+    symbol: str
+    reference: Literal["universe", "below_size_filter", "outside"]
+    rank: int | None
+    value_score: float | None
+    quality_score: float | None
+    composite_score: float | None
+    composite_percentile: float | None
+    value_trap_flag: bool
+    value_trap_reason: Literal["quality", "momentum"] | None
+    industry_rule: bool
+    reason: Literal["no_value", "no_quality", "no_data"] | None
+
+
 class PositionValue(_Model):
     """Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.
 
@@ -507,6 +531,7 @@ class PositionValue(_Model):
     cost_basis_eur: Decimal | None
     difference_eur: Decimal | None
     missing: Literal["price", "fx", "unit"] | None
+    score: PositionScore | None  # D4.2: nur bei Aktien, die ein Bewertungslauf kennt
 
 
 class DepotValuation(_Model):

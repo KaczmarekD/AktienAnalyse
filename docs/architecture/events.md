@@ -75,7 +75,7 @@ haben (`EventSpec.max_age`): Der `ReliableBus` überspringt es erst danach, nich
 | `va.screening.run.requested` | web-api | market-data | run_id, trigger (`scheduled`/`manual`), options (`force_refresh`, `dry_run`, `notify`) |
 | `live.va.marketdata.fetch.progressed` | market-data | web-api | run_id, done, total, symbol, ok |
 | `va.marketdata.snapshot.completed` | market-data | scoring, web-api | run_id, trigger, options, fetch_run_id, as_of, success_share, universe (Quelle, Stichtag, Größe, Zu-/Abgänge), fundamentals[], seit D2.2 covered[] (Aktien der Abdeckung, `index = "-"`, nicht im Ranking) |
-| `va.scoring.run.completed` | scoring | notification, web-api | run_id (leer genau bei Rescore), trigger, options, scoring_run_id, fetch_run_id, as_of, universe, value_weight, quality_weight, Profil (id, version, Name), seit G3 die Parameter des Laufs (`params`, optional), ranking[] (mindestens eine Zeile, mit Perzentilen je Faktor, seit F2.4 mit `industry_rule` für Titel unter der Branchenregel, seit F2.3 mit `value_trap_reason`, seit D4.1 mit `isin` und `composite_percentile`), seit D4.1 `placements[]` (die Aktien der Abdeckung und die Universumstitel unter dem Größenfilter, eingeordnet ins Referenzuniversum, optional; notification und web-api lesen es nicht) |
+| `va.scoring.run.completed` | scoring | notification, portfolio (seit D4.2: `score_view`), web-api | run_id (leer genau bei Rescore), trigger, options, scoring_run_id, fetch_run_id, as_of, universe, value_weight, quality_weight, Profil (id, version, Name), seit G3 die Parameter des Laufs (`params`, optional), ranking[] (mindestens eine Zeile, mit Perzentilen je Faktor, seit F2.4 mit `industry_rule` für Titel unter der Branchenregel, seit F2.3 mit `value_trap_reason`, seit D4.1 mit `isin` und `composite_percentile`), seit D4.1 `placements[]` (die Aktien der Abdeckung und die Universumstitel unter dem Größenfilter, eingeordnet ins Referenzuniversum, optional; notification und web-api lesen es nicht) |
 | `va.scoring.profile.saved` | scoring | web-api | profile_id, version |
 | `va.scoring.profile.activated` | scoring | web-api | profile_id, version |
 | `va.notification.report.sent` | notification | web-api | run_id, report_id, subject, dry_run |
@@ -240,7 +240,7 @@ NATS. Er umhüllt den Bus je Service, mit Inbox und Outbox aus dessen Schema.
 |---|---|---|
 | `market-data` | `va.screening.run.requested`, seit D2.3 `va.marketdata.prices.requested`, seit D3.3 `va.portfolio.coverage.changed` | Der Abruf dauert Minuten. Währenddessen In-Progress-Acks senden, sonst stellt JetStream nach `ack_wait` erneut zu. Eine neue ISIN der Abdeckung löst market-data selbst auf (eigene Wertpapiere, sonst ESMA FIRDS und OpenFIGI) und frischt ihre Stammdaten gleich auf (`va.marketdata.securities.updated`). |
 | `scoring` | `va.marketdata.snapshot.completed` | speichert den Snapshot zusätzlich lokal, für Vorschau und Rescore |
-| `portfolio` | `va.marketdata.securities.updated`, `va.marketdata.prices.completed` | seit D3.4: Kopien von Stammdaten, Kursen und Währungskursen (`security_view`, `price_view`, `fx_view`) für die Bewertung der Depots; keine Folge-Events |
+| `portfolio` | `va.marketdata.securities.updated`, `va.marketdata.prices.completed`, seit D4.2 `va.scoring.run.completed` | seit D3.4: Kopien von Stammdaten, Kursen und Währungskursen (`security_view`, `price_view`, `fx_view`) für die Bewertung der Depots, seit D4.2 die Scores (`score_view`: Ranking-Zeilen und Einordnungen mit ISIN); keine Folge-Events |
 | `notification` | `va.scoring.run.completed`, `va.screening.run.failed` | ignoriert `trigger=rescore`, bei `dry_run` nur rendern und speichern |
 | `web-api` | `va.>` | Projektionen und WebSocket, siehe [web-api-realtime.md](web-api-realtime.md) |
 | `batch` | `va.marketdata.snapshot.completed`, `va.scoring.run.completed`, `va.notification.report.sent`, `va.screening.run.failed` | seit P4.3: der `RunTracker` des Batches, Vorläufer der Run-Projektion im web-api |
@@ -279,7 +279,7 @@ Nutzername in der `NATS_URL` des Dienstes.
 | Nutzer | Sendet | Liest | RPC |
 |---|---|---|---|
 | `market-data` | `va.marketdata.>`, `live.va.marketdata.>`, `va.screening.run.failed` | Consumer `market-data` | seit D2.1 antwortet auf `rpc.va.marketdata.>` |
-| `portfolio` (D3.1) | `va.portfolio.>`, `va.screening.run.failed` | noch kein Consumer (ab D3.4) | antwortet auf `rpc.va.portfolio.>` |
+| `portfolio` (D3.1) | `va.portfolio.>`, `va.screening.run.failed` | Consumer `portfolio` (seit D3.4, seit D4.2 auch `va.scoring.run.completed`) | antwortet auf `rpc.va.portfolio.>` |
 | `scoring` | `va.scoring.>`, `va.screening.run.failed` | Consumer `scoring` | antwortet auf `rpc.va.scoring.>` |
 | `notification` | `va.notification.>`, `va.screening.run.failed` | Consumer `notification`, seit D1.6 `notification-private` (`VA_PRIVATE`) | antwortet auf `rpc.va.notification.>` |
 | `web-api` | `va.screening.run.requested`, `va.screening.run.failed`, seit D1.6 `priv.va.identity.>`, seit D2.3 `va.marketdata.prices.requested` | Consumer `web-api`, `live.va.>`, einzelne Nachrichten aus `VA_EVENTS` (Nachspielen); nichts aus `VA_PRIVATE` | fragt `rpc.va.scoring.>`, `rpc.va.notification.>`, seit D2.1 `rpc.va.marketdata.>`, seit D3.1 `rpc.va.portfolio.>` |

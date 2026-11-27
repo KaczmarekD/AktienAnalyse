@@ -49,6 +49,33 @@ export const MISSING_VALUE = {
   },
 } as const;
 
+/** D4.2: Woher die Scores einer Aktie kommen (``reference`` der API). */
+export const SCORE_REFERENCE = {
+  universe: {
+    label: 'DAX/MDAX',
+    tip: 'Titel des Rankings: dieselben Scores wie dort. Der Name führt ins Titel-Detail.',
+  },
+  below_size_filter: {
+    label: 'unter dem Größenfilter',
+    tip: 'Titel aus DAX/MDAX, zu klein für das Ranking. Eingeordnet, als stünde er allein dabei.',
+  },
+  outside: {
+    label: 'außerhalb DAX/MDAX',
+    tip: 'Eingeordnet in DAX/MDAX: die Ränge, die die Aktie dort hätte. Die übrigen Titel bleiben, wie sie sind.',
+  },
+} as const;
+
+/** D4.2: Warum eine Aktie keinen Composite hat (``reason`` der API). */
+export const SCORE_REASON = {
+  no_quality: { label: 'ohne Quality', tip: 'Es fehlen Quality-Kennzahlen, etwa bei Banken.' },
+  no_value: { label: 'ohne Value', tip: 'Es fehlen Value-Kennzahlen.' },
+  no_data: { label: 'ohne Daten', tip: 'Es fehlen Value- und Quality-Kennzahlen.' },
+} as const;
+
+/** D4.2: Tooltip, wenn eine Position keine Scores hat. */
+export const NO_SCORE =
+  'Scores gibt es für Aktien, sobald ein Bewertungslauf sie kennt. ETFs und Anleihen haben keine.';
+
 /** Herkunft eines Depotstands. */
 export const SOURCE = {
   manual: 'von Hand',

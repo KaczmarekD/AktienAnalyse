@@ -1,13 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { formatDate } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  LOCALE_ID,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 
 import { depotHistoryResource, getDepotResource } from '../api/@angular/common.gen';
 import { archiveDepot, getHoldings, restoreDepot } from '../api/sdk.gen';
 import type { Holdings, PositionValue } from '../api/types.gen';
 import { optionalNumber } from '../shared/api-error';
-import { DayPipe, DayTimePipe, DecPipe, EurPipe } from '../shared/format';
+import { DAY, DayPipe, DayTimePipe, DecPipe, EurPipe, PctPipe } from '../shared/format';
 import { ENTRIES, termTip } from '../shared/glossary/glossary';
 import { loaded, loadError } from '../shared/resource';
 import { BackLink } from '../shared/ui/back-link';
@@ -15,11 +25,22 @@ import { ConfirmData, ConfirmDialog } from '../shared/ui/confirm-dialog';
 import { AppIcon } from '../shared/ui/icon';
 import { Notice, NoticeBox } from '../shared/ui/notice';
 import { PageHeader } from '../shared/ui/page-header';
+import { Score } from '../shared/ui/score';
 import { AppSection } from '../shared/ui/section';
 import { StatCard } from '../shared/ui/stat-card';
 import { AppState } from '../shared/ui/state';
 import { Term } from '../shared/ui/term';
-import { DEPOT_CONTROLS, KIND, MISSING_VALUE, SOURCE, UNIT } from './controls';
+import { ValueTrapBadge } from '../shared/ui/value-trap-badge';
+import {
+  DEPOT_CONTROLS,
+  KIND,
+  MISSING_VALUE,
+  NO_SCORE,
+  SCORE_REASON,
+  SCORE_REFERENCE,
+  SOURCE,
+  UNIT,
+} from './controls';
 import { DepotDialog } from './depot-dialog';
 import { HoldingsEditor } from './holdings-editor';
 import { ImportPanel } from './import-panel';
@@ -28,7 +49,9 @@ import { ImportPanel } from './import-panel';
  * Ein Depot (/depots/:depotId, D3.6, DEP-02 bis 07, 09, 13): Kennzahlen Wert, Kasse, Einstand
  * und Differenz, die Positionen mit Kurs, Datum und Quelle, „Bearbeiten“ im selben Blatt, die
  * Datei im eigenen Format und der Verlauf der Depotstände. Archivierte Depots sind
- * schreibgeschützt, bis sie wiederhergestellt sind.
+ * schreibgeschützt, bis sie wiederhergestellt sind. Seit D4.2 trägt jede Aktie ihre Scores aus
+ * dem jüngsten Bewertungslauf: Titel aus DAX/MDAX führen ins Titel-Detail, andere sind ins
+ * Referenzuniversum eingeordnet.
  */
 @Component({
   selector: 'app-depot-page',
@@ -47,8 +70,12 @@ import { ImportPanel } from './import-panel';
     MatTooltipModule,
     NoticeBox,
     PageHeader,
+    PctPipe,
+    RouterLink,
+    Score,
     StatCard,
     Term,
+    ValueTrapBadge,
   ],
   templateUrl: './depot-page.html',
   styleUrl: './depot-page.scss',
@@ -60,11 +87,14 @@ export class DepotPage {
   });
 
   private readonly dialog = inject(MatDialog);
+  private readonly locale = inject(LOCALE_ID);
   protected readonly controls = DEPOT_CONTROLS;
   protected readonly kinds = KIND;
   protected readonly units = UNIT;
   protected readonly sources = SOURCE;
   protected readonly missing = MISSING_VALUE;
+  protected readonly references = SCORE_REFERENCE;
+  protected readonly noScore = NO_SCORE;
   protected readonly tips = {
     value: termTip(ENTRIES.depot_value),
     cash: termTip(ENTRIES.cash),
@@ -134,6 +164,23 @@ export class DepotPage {
 
   protected missingOf(position: PositionValue): { label: string; tip: string } | undefined {
     return position.missing ? MISSING_VALUE[position.missing] : undefined;
+  }
+
+  /** D4.2: warum es keinen Composite gibt, nur bei einer Aktie mit Scores. */
+  protected reasonOf(position: PositionValue): { label: string; tip: string } | undefined {
+    const reason = position.score?.reason;
+    return reason ? SCORE_REASON[reason] : undefined;
+  }
+
+  /** D4.2: Bewertungslauf und Stand der Scores, für den Tooltip des Composite. */
+  protected scoreTip(position: PositionValue): string {
+    const score = position.score;
+    if (!score) {
+      return NO_SCORE;
+    }
+    const rank = score.rank ? `Rang ${score.rank} im Ranking, ` : '';
+    const day = formatDate(score.as_of, DAY, this.locale);
+    return `${rank}Bewertungslauf ${score.scoring_run_id} mit Daten vom ${day}.`;
   }
 
   protected reload(): void {

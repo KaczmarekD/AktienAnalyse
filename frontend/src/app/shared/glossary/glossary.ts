@@ -84,6 +84,12 @@ export const GLOSSARY = {
         : 'Gesamtscore aus Value und Quality nach den Gewichten des Profils. 0 bis 1, höher ist besser. Nur Titel mit beiden Teilscores bekommen ihn.',
     long: 'Der Composite fasst beide Teilscores nach den Gewichten des Profils zusammen. Ein Titel ohne Value- oder Quality-Score bekommt keinen, sonst stünde ein Titel ohne Quality-Daten besser da als einer mit mittelmäßiger Quality.',
   },
+  // D4.2: für Schwellen und Aussagen wie „unteres Fünftel“; der Composite streut eng um 0,5
+  composite_percentile: {
+    group: 'Scores und Ranking',
+    label: 'Perzentil',
+    tip: 'Rang des Composite unter allen Titeln mit Composite, 0 bis 100 %. 80 % heißt: besser als vier Fünftel.',
+  },
   value_score: {
     group: 'Scores und Ranking',
     label: 'Value',

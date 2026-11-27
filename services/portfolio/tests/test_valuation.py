@@ -15,7 +15,14 @@ from decimal import Decimal
 import pytest
 
 from va_portfolio.domain.depots import CashLine, HoldingLine
-from va_portfolio.domain.valuation import Market, Quote, SecurityInfo, value_depot
+from va_portfolio.domain.valuation import (
+    Market,
+    Quote,
+    Score,
+    SecurityInfo,
+    score_reason,
+    value_depot,
+)
 
 SAP = "DE0007164600"
 APPLE = "US0378331005"
@@ -162,3 +169,44 @@ class TestDepot:
         assert [p.quote.close for p in value.positions] == [Decimal("231.5"), Decimal("190")]  # type: ignore[union-attr]
         assert all(p.value_eur is None and p.missing is None for p in value.positions)
         assert value.complete
+
+
+class TestScores:
+    """D4.2: Scores je Aktie aus dem juengsten Bewertungslauf, der sie kennt."""
+
+    def _sap(self) -> Score:
+        return Score(
+            isin=SAP,
+            scoring_run_id=7,
+            as_of=FRIDAY,
+            symbol="SAP.DE",
+            reference="universe",
+            rank=12,
+            value_score=0.41,
+            quality_score=0.83,
+            composite_score=0.578,
+            composite_percentile=0.71,
+        )
+
+    def test_a_position_carries_its_score(self):
+        market = _market(scores={SAP: self._sap()})
+        depot = value_depot("depot", [_line(SAP), _line(APPLE)], [], market)
+        sap, apple = depot.positions
+        assert sap.score == self._sap()
+        assert apple.score is None
+
+    def test_without_price_the_score_stays(self):
+        market = _market(quotes={}, scores={SAP: self._sap()})
+        [sap] = value_depot("depot", [_line(SAP)], [], market).positions
+        assert (sap.missing, sap.score) == ("price", self._sap())
+
+    def test_a_watchlist_has_scores(self):
+        market = _market(scores={SAP: self._sap()})
+        [sap] = value_depot("watchlist", [_line(SAP, None)], [], market).positions
+        assert sap.score == self._sap()
+
+    def test_reason_without_composite(self):
+        assert score_reason(0.4, 0.6) is None
+        assert score_reason(0.4, None) == "no_quality"
+        assert score_reason(None, 0.6) == "no_value"
+        assert score_reason(None, None) == "no_data"

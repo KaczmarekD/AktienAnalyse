@@ -29,6 +29,7 @@ from va_contracts.portfolio import (
     HoldingsV1,
     ImportEntryV1,
     ImportPreviewV1,
+    PositionScoreV1,
     PositionValueV1,
     RejectedRowV1,
 )
@@ -76,7 +77,7 @@ if TYPE_CHECKING:
 
     from ..application.depots import DepotService, DepotSummary, HistoryEntry, ImportPreview
     from ..domain.depots import Snapshot
-    from ..domain.valuation import DepotValue, PositionValue
+    from ..domain.valuation import DepotValue, PositionValue, Score
 
 
 def _position(position: PositionValue) -> PositionValueV1:
@@ -98,6 +99,28 @@ def _position(position: PositionValue) -> PositionValueV1:
         cost_basis_eur=line.cost_basis_eur,
         difference_eur=position.difference_eur,
         missing=position.missing,
+        score=_score(position.score),
+    )
+
+
+def _score(score: Score | None) -> PositionScoreV1 | None:
+    """D4.2: die Scores der Position, ohne Bewertungslauf ``None``."""
+    if score is None:
+        return None
+    return PositionScoreV1(
+        scoring_run_id=score.scoring_run_id,
+        as_of=score.as_of,
+        symbol=score.symbol,
+        reference=score.reference,  # type: ignore[arg-type]
+        rank=score.rank,
+        value_score=score.value_score,
+        quality_score=score.quality_score,
+        composite_score=score.composite_score,
+        composite_percentile=score.composite_percentile,
+        value_trap_flag=score.value_trap_flag,
+        value_trap_reason=score.value_trap_reason,  # type: ignore[arg-type]
+        industry_rule=score.industry_rule,
+        reason=score.reason,  # type: ignore[arg-type]
     )
 
 

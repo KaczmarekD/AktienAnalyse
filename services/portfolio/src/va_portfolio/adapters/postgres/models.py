@@ -186,6 +186,26 @@ class FxView(Base):
     received_at: Mapped[datetime]
 
 
+class ScoreView(Base):
+    """D4.2: Kopie der Scores aus ``scoring.run.completed`` (Ranking-Zeilen und Einordnungen mit
+    ISIN); gueltig ist je ISIN der juengste Bewertungslauf. ``scoring_run_id`` verweist auf
+    ``scoring.scoring_run`` (nur logisch, anderes Schema). ``payload``: die uebrigen Felder von
+    ``Score`` (Symbol, Herkunft, Rang, Scores, Value-Trap, Grund)."""
+
+    __tablename__ = "score_view"
+    __table_args__ = (
+        Index("ix_score_view_isin_scoring_run_id", "isin", "scoring_run_id"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str]
+    scoring_run_id: Mapped[int]
+    as_of: Mapped[date]
+    payload: Mapped[Any] = mapped_column(JSONB)
+    received_at: Mapped[datetime]
+
+
 class PortfolioOutbox(OutboxMixin, Base):
     """Events von portfolio, bis sie veroeffentlicht sind."""
 

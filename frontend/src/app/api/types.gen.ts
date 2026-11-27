@@ -890,6 +890,71 @@ export type PasswordReset = {
 };
 
 /**
+ * PositionScore
+ *
+ * Scores einer Aktie im Depot (D4.2) aus dem juengsten Bewertungslauf, der sie kennt.
+ *
+ * ``reference``: ``universe`` = Titel des Rankings, mit denselben Werten wie dort und seinem
+ * Rang; ``below_size_filter`` = Universumstitel unter dem Groessenfilter, ``outside`` = Aktie
+ * ausserhalb von DAX/MDAX, beide ins Referenzuniversum eingeordnet. Ohne Composite nennt
+ * ``reason`` den Grund. ``as_of``: Stand des Abrufs dieses Bewertungslaufs.
+ */
+export type PositionScore = {
+  /**
+   * As Of
+   */
+  as_of: string;
+  /**
+   * Composite Percentile
+   */
+  composite_percentile: number | null;
+  /**
+   * Composite Score
+   */
+  composite_score: number | null;
+  /**
+   * Industry Rule
+   */
+  industry_rule: boolean;
+  /**
+   * Quality Score
+   */
+  quality_score: number | null;
+  /**
+   * Rank
+   */
+  rank: number | null;
+  /**
+   * Reason
+   */
+  reason: 'no_value' | 'no_quality' | 'no_data' | null;
+  /**
+   * Reference
+   */
+  reference: 'universe' | 'below_size_filter' | 'outside';
+  /**
+   * Scoring Run Id
+   */
+  scoring_run_id: number;
+  /**
+   * Symbol
+   */
+  symbol: string;
+  /**
+   * Value Score
+   */
+  value_score: number | null;
+  /**
+   * Value Trap Flag
+   */
+  value_trap_flag: boolean;
+  /**
+   * Value Trap Reason
+   */
+  value_trap_reason: 'quality' | 'momentum' | null;
+};
+
+/**
  * PositionValue
  *
  * Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.
@@ -956,6 +1021,7 @@ export type PositionValue = {
    * Quantity
    */
   quantity: string | null;
+  score: PositionScore | null;
   /**
    * Unit
    */

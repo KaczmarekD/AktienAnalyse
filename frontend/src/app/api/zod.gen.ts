@@ -335,6 +335,32 @@ export const zPasswordReset = z.object({
 });
 
 /**
+ * PositionScore
+ *
+ * Scores einer Aktie im Depot (D4.2) aus dem juengsten Bewertungslauf, der sie kennt.
+ *
+ * ``reference``: ``universe`` = Titel des Rankings, mit denselben Werten wie dort und seinem
+ * Rang; ``below_size_filter`` = Universumstitel unter dem Groessenfilter, ``outside`` = Aktie
+ * ausserhalb von DAX/MDAX, beide ins Referenzuniversum eingeordnet. Ohne Composite nennt
+ * ``reason`` den Grund. ``as_of``: Stand des Abrufs dieses Bewertungslaufs.
+ */
+export const zPositionScore = z.object({
+  as_of: z.iso.date(),
+  composite_percentile: z.number().nullable(),
+  composite_score: z.number().nullable(),
+  industry_rule: z.boolean(),
+  quality_score: z.number().nullable(),
+  rank: z.int().nullable(),
+  reason: z.enum(['no_value', 'no_quality', 'no_data']).nullable(),
+  reference: z.enum(['universe', 'below_size_filter', 'outside']),
+  scoring_run_id: z.int(),
+  symbol: z.string(),
+  value_score: z.number().nullable(),
+  value_trap_flag: z.boolean(),
+  value_trap_reason: z.enum(['quality', 'momentum']).nullable(),
+});
+
+/**
  * PositionValue
  *
  * Eine bewertete Position (D3.4): letzter Kurs mit Datum und Quelle, Wert in EUR.
@@ -374,6 +400,7 @@ export const zPositionValue = z.object({
     .string()
     .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
     .nullable(),
+  score: zPositionScore.nullable(),
   unit: z.enum(['pieces', 'nominal']),
   value_eur: z
     .string()

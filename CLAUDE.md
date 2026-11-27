@@ -93,6 +93,9 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   seinen Kopien (Consumer `portfolio`: `securities.updated`, `prices.completed` →
   `security_view`, `price_view`, `fx_view`). Wert = Menge × letzter Kurs × Währungskurs,
   Anleihen Nennwert × Kurs / 100. Ein fehlender Kurs fehlt sichtbar (`missing`, `complete`).
+  Seit D4.2 trägt jede Aktie ihre Scores (`PositionValueV1.score`): portfolio kopiert
+  `scoring.run.completed` (Ranking-Zeilen und Einordnungen mit ISIN) nach `score_view`, je ISIN
+  gilt der jüngste Bewertungslauf. Ein Titel aus DAX/MDAX hat dieselben Werte wie im Ranking.
   Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import` mit `If-Match`,
   `…/holdings/csv`): JSON mit Base64, höchstens 640 KiB und 1000 Zeilen. Lesen, Abgleich und
   Schreiben macht portfolio (`va_portfolio.domain.holdings_file`).
@@ -264,7 +267,8 @@ Depots im UI (D3.6) unter `frontend/src/app/depots/`:
 - `/depots` („Meine Depots“, Startseite nach der Anmeldung über `startGuard`) und
   `/depots/:depotId`, beide nur mit echter Sitzung (`ownerGuard`).
 - Bewertung aus `valuation`, Bearbeiten mit `If-Match` (`HoldingsEditor`), Datei mit Abgleich
-  (`ImportPanel`), Verlauf, Umbenennen, Archivieren.
+  (`ImportPanel`), Verlauf, Umbenennen, Archivieren. Seit D4.2 Composite mit Perzentil, Value
+  und Quality je Aktie; Titel aus DAX/MDAX führen ins Titel-Detail.
 - Texte in `depots/controls.ts`, Begriffe in der Glossar-Gruppe „Depots“, Beträge über die
   Pipes `eur` und `dec`.
 - Live-Aktualisierung über `user:<id>` fehlt noch.

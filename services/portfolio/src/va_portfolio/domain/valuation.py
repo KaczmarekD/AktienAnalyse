@@ -12,12 +12,14 @@ Reine Rechnung aus dem Depotstand und den Kopien der Marktdaten (``Market``):
   Positionen mit Einstand und Wert (DEP-13, nur Anzeige).
 - Werte in EUR auf Cent gerundet (kaufmaennisch); Kurse und Waehrungskurse unveraendert.
 - Eine Beobachtungsliste hat keine Mengen, also keinen Wert, nur die Kurse.
+- Seit D4.2 traegt jede Position die Scores ihrer ISIN aus dem juengsten Bewertungslauf, der sie
+  kennt (``Score``), auch in einer Beobachtungsliste; ohne fehlen sie.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Literal
@@ -58,12 +60,49 @@ class Quote:
 
 
 @dataclass(frozen=True)
+class Score:
+    """Scores einer Aktie aus einem Bewertungslauf (D4.2, Kopie aus ``scoring.run.completed``).
+
+    ``reference``: ``universe`` (Titel des Rankings, mit ``rank``), ``below_size_filter`` oder
+    ``outside`` (eingeordnet, D4.1). ``as_of``: Stand des Abrufs des Bewertungslaufs.
+    """
+
+    isin: str
+    scoring_run_id: int
+    as_of: date
+    symbol: str
+    reference: str
+    rank: int | None = None
+    value_score: float | None = None
+    quality_score: float | None = None
+    composite_score: float | None = None
+    composite_percentile: float | None = None
+    value_trap_flag: bool = False
+    value_trap_reason: str | None = None
+    industry_rule: bool = False
+    reason: str | None = None
+
+
+def score_reason(value: float | None, quality: float | None) -> str | None:
+    """Warum es keinen Composite gibt (wie ``PlacementV1.reason``); mit beiden ``None``."""
+    if value is None and quality is None:
+        return "no_data"
+    if value is None:
+        return "no_value"
+    if quality is None:
+        return "no_quality"
+    return None
+
+
+@dataclass(frozen=True)
 class Market:
     """Die Kopien der Marktdaten fuer eine Bewertung, je ISIN bzw. Waehrung das Juengste."""
 
     securities: Mapping[str, SecurityInfo]
     quotes: Mapping[str, Quote]
     fx: Mapping[str, Decimal]  # Waehrung -> 1 Einheit in EUR; EUR ist immer 1
+    # D4.2: je ISIN die Scores aus dem juengsten Bewertungslauf, der sie kennt
+    scores: Mapping[str, Score] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -74,6 +113,7 @@ class PositionValue:
     fx_rate: Decimal | None
     value_eur: Decimal | None
     missing: Missing | None  # nur bei einer Menge ohne Wert
+    score: Score | None = None  # D4.2
 
     @property
     def pending(self) -> bool:
@@ -144,8 +184,10 @@ def value_position(line: HoldingLine, market: Market) -> PositionValue:
     quote = market.quotes.get(line.isin)
     fx_rate = _fx(quote.currency, market.fx) if quote is not None else None
 
+    score = market.scores.get(line.isin)
+
     def result(value: Decimal | None, missing: Missing | None) -> PositionValue:
-        return PositionValue(line, security, quote, fx_rate, value, missing)
+        return PositionValue(line, security, quote, fx_rate, value, missing, score)
 
     if line.quantity is None:  # Beobachtungsliste
         return result(None, None)

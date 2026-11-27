@@ -6,6 +6,8 @@ portfolio liest keine Tabellen von market-data. Es haelt eigene Kopien aus den E
   fuer die Analyse in D5), gueltig ist je ISIN der juengste Stand (``as_of``).
 - ``marketdata.prices.completed`` -> ``price_view`` und ``fx_view``, gueltig ist je ISIN bzw.
   Waehrung der juengste Handelstag.
+- ``scoring.run.completed`` -> ``score_view`` (D4.2): die Ranking-Zeilen und Einordnungen mit
+  ISIN, gueltig ist je ISIN der juengste Bewertungslauf (``scoring_run_id``).
 
 Alles nur angefuegt. Ein Event kommt einmal (Inbox des ``ReliableBus``); kommt es nach einem
 Absturz doch zweimal, stehen dieselben Zeilen doppelt da, gelesen wird ohnehin das Juengste.
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
     from datetime import date, datetime
     from decimal import Decimal
 
-    from ..domain.valuation import Market, Quote, SecurityInfo
+    from ..domain.valuation import Market, Quote, Score, SecurityInfo
 
 
 @dataclass(frozen=True)
@@ -51,3 +53,7 @@ class MarketStore(MarketReader, Protocol):
     def record_prices(
         self, quotes: Sequence[Quote], rates: Sequence[FxRate], *, at: datetime
     ) -> None: ...
+
+    def record_scores(self, scores: Sequence[Score], *, at: datetime) -> None:
+        """D4.2: die Scores eines Bewertungslaufs, je ISIN eine Zeile."""
+        ...

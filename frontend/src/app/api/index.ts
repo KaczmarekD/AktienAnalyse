@@ -231,6 +231,7 @@ export type {
   NewAccount,
   PasswordChange,
   PasswordReset,
+  PositionScore,
   PositionValue,
   Preview,
   PreviewImportData,

@@ -31,7 +31,12 @@ CONSUMERS = {
         "va.screening.run.requested",
     ],
     "scoring": ["va.marketdata.snapshot.completed"],
-    "portfolio": ["va.marketdata.prices.completed", "va.marketdata.securities.updated"],
+    # D4.2: dazu die Scores
+    "portfolio": [
+        "va.marketdata.prices.completed",
+        "va.marketdata.securities.updated",
+        "va.scoring.run.completed",
+    ],
     "notification": ["va.scoring.run.completed", "va.screening.run.failed"],
     "web-api": ["va.>"],
     # P4.3: der RunTracker des Batches, Vorlaeufer der Run-Projektion im web-api

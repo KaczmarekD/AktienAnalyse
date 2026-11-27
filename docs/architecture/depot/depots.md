@@ -10,8 +10,9 @@
 > `security_view`, `price_view`, `fx_view`, `valuation` in `GET /depots` und `GET /depots/{id}`).
 > Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import`, `…/holdings/csv`),
 > seit D3.6 die Oberfläche: „Meine Depots“ (`/depots`, Startseite nach der Anmeldung) und das
-> Depot (`/depots/:id`) mit Positionen, Bearbeiten, Datei und Verlauf. Die Reiter Analyse,
-> Hinweise, News und Einstellungen folgen mit D4 und später.
+> Depot (`/depots/:id`) mit Positionen, Bearbeiten, Datei und Verlauf. Seit D4.2 trägt jede
+> Aktie ihre Scores (`score_view`, `PositionValueV1.score`, Spalten im Depot). Die Reiter
+> Analyse, Hinweise, News und Einstellungen folgen mit D4 und später.
 
 ## Begriffe
 
@@ -106,7 +107,7 @@ wird nur angefügt.
 | `security_view` | isin, payload (JSONB), received_at | lokale Kopie der Stammdaten aus market-data, anfügen |
 | `price_view` | isin, trade_date, close, currency, percent_of_par, source, symbol, received_at | lokale Kopie der Kurse, anfügen |
 | `fx_view` | currency, trade_date, rate_to_eur, received_at | lokale Kopie der Währungskurse (1 Einheit in EUR), anfügen (D3.4) |
-| `score_view` | scoring_run_id, isin, payload (JSONB) | lokale Kopie der Scores und Einordnungen (`PlacementV1`) aus scoring, anfügen |
+| `score_view` | scoring_run_id, isin, as_of, payload (JSONB) | lokale Kopie der Scores aus scoring: Ranking-Zeilen mit Rang und Einordnungen (`PlacementV1`), je ISIN gilt der jüngste Bewertungslauf; anfügen (seit D4.2, Migration 0028) |
 | `depot_link` | depot_id, connection_id, account_id (aus `bank.account`), at, active | anfügen, gültig ist die jüngste Zeile je Depot (ab D8) || `outbox`, `inbox` | wie in den anderen Schemas | wie dort |
 
 Der aktuelle Bestand ist der Depotstand mit der höchsten Version. Ein Depotstand kopiert alle

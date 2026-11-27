@@ -11,7 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from ..domain.depots import Depot, Snapshot, VersionConflict
-from ..domain.valuation import Market, Quote, SecurityInfo
+from ..domain.valuation import Market, Quote, Score, SecurityInfo
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Sequence
@@ -139,6 +139,7 @@ class MemoryMarketStore:
         self.quotes: dict[str, Quote] = {}
         self.fx: dict[str, tuple[date, Decimal]] = {}
         self.payloads: dict[str, dict[str, Any]] = {}
+        self.scores: dict[str, Score] = {}
 
     def record_securities(
         self, copies: Sequence[SecurityCopy], *, as_of: date, at: datetime
@@ -163,10 +164,18 @@ class MemoryMarketStore:
             if known_rate is None or known_rate[0] <= rate.trade_date:
                 self.fx[rate.currency] = (rate.trade_date, rate.rate_to_eur)
 
+    def record_scores(self, scores: Sequence[Score], *, at: datetime) -> None:
+        del at
+        for score in scores:
+            known = self.scores.get(score.isin)
+            if known is None or known.scoring_run_id <= score.scoring_run_id:
+                self.scores[score.isin] = score
+
     def market(self, isins: Collection[str]) -> Market:
         wanted = set(isins)
         return Market(
             securities={i: s for i, (_, s) in self.securities.items() if i in wanted},
             quotes={i: q for i, q in self.quotes.items() if i in wanted},
             fx={c: rate for c, (_, rate) in self.fx.items()},
+            scores={i: s for i, s in self.scores.items() if i in wanted},
         )
