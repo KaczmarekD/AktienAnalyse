@@ -4095,6 +4095,17 @@ und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
     Duration, Kupontermine. Sonderformen ohne Rendite.
   - Beispielrechnungen gegen nachgerechnete Werte (Bundesanleihe).
 - **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** `va_portfolio.domain.funds` und `va_portfolio.domain.bonds`, ohne
+  Migration, API oder UI (das kommt mit D4.4 und D4.5). Nachgerechnet von Hand:
+  - Kurs 100 an einem Kupontermin: Rendite = Kupon, keine Stückzinsen.
+  - 5 % über zwei Jahre zu 98,16661: Rendite 6 %, Macaulay 1,95195, modifiziert 1,84146.
+  - Bund 2,6 % 15.08.2033 am 20.11.2026: Stückzinsen 2,6 × 97/365 (ACT/ACT ICMA); der Preis
+    aus der gefundenen Rendite ergibt wieder den Dirty-Preis.
+  - Nullkupon: (100 / Kurs) ^ (1 / Jahre) − 1; 30E/360 mit 230 Tagen.
+  - Annahmen (FIRDS ohne Kupontermine und Zinsmethode) und Sonderformen in
+    [analyse.md](depot/analyse.md#anleihen).
+  - **Review (`/code-review high`):** ergänzt, dass ein Kurs außerhalb der Grenzen der
+    Bisektion einen Grund bekommt (`out_of_range`) statt still keine Rendite.
 
 **D4.4 Depot-Analyse** (ANA-08 bis 10)
 - **Test:**

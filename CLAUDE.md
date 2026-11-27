@@ -96,6 +96,9 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   Seit D4.2 trägt jede Aktie ihre Scores (`PositionValueV1.score`): portfolio kopiert
   `scoring.run.completed` (Ranking-Zeilen und Einordnungen mit ISIN) nach `score_view`, je ISIN
   gilt der jüngste Bewertungslauf. Ein Titel aus DAX/MDAX hat dieselben Werte wie im Ranking.
+  Seit D4.3 rechnen `va_portfolio.domain.bonds` (Stückzinsen, Rendite per Bisektion, Duration,
+  Kupontermine, Sonderformen) und `va_portfolio.domain.funds` (laufende Kosten, Durchschau,
+  Überschneidung, Look-through-Score), noch ohne Endpunkt (D4.4).
   Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import` mit `If-Match`,
   `…/holdings/csv`): JSON mit Base64, höchstens 640 KiB und 1000 Zeilen. Lesen, Abgleich und
   Schreiben macht portfolio (`va_portfolio.domain.holdings_file`).
