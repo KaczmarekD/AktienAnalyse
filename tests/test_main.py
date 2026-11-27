@@ -103,6 +103,9 @@ class FakeRecorder:
             raise ConnectionError("db hiccup")
         return ProfileVersionRef(1, "Standard", 1, dict(params))
 
+    def record_placements(self, scoring_run_id, placements):  # D4.1
+        pass
+
     def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None, instrument_ids=None):
         self.calls.append(("record_scoring", fetch_run_id))
         self.scoring_profile = profile

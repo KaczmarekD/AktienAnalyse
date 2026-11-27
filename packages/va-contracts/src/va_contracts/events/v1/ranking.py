@@ -7,7 +7,8 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from ...base import Contract, missing_to_none
+from ...base import Contract, PositiveId, missing_to_none
+from ...securities import IsinStr
 from .fundamentals import FundamentalsV1
 
 # Spalten von score(), die keine Faktor-Raenge sind
@@ -41,6 +42,10 @@ class RankingRowV1(Contract):
     # F2.3 (additiv): Fehlt bei aelteren Events; ein Flag ohne Grund stammt von der bisherigen
     # Regel
     value_trap_reason: ValueTrapReason | None = None
+    # D4.1 (additiv, nicht in ``to_flat``: Mail und CSV bleiben gleich): ISIN aus dem Abruf und
+    # der Rang des Composite unter allen Titeln mit Composite, fuer die Depots (portfolio)
+    isin: IsinStr | None = None
+    composite_percentile: float | None = Field(default=None, ge=0, le=1)
 
     def to_flat(self) -> dict[str, Any]:
         """Eine Zeile wie die Ausgabe von ``score()``: Faktor-Raenge als ``rank_<name>``."""
@@ -78,4 +83,62 @@ class RankingRowV1(Contract):
                 if isinstance(key, str) and key.startswith("rank_") and key != "rank_overall"
             },
             **{key: missing_to_none(flat.get(key)) for key in _SCORE_COLUMNS},
+        )
+
+
+# D4.1: Warum eine eingeordnete Aktie keinen Composite hat
+PlacementReason = Literal["no_value", "no_quality", "no_data"]
+
+
+class PlacementV1(Contract):
+    """Eine Aktie aus den Depots, eingeordnet ins Referenzuniversum (D4.1, ANA-01 bis 03).
+
+    Ihre Raenge sind die, die sie haette, wenn man sie allein dem Referenzuniversum hinzufuegte;
+    die Raenge der Referenz aendern sich nicht. ``below_size_filter``: ein Titel des Universums
+    unter dem Groessenfilter, sonst einer ausserhalb (Abdeckung). Ohne Composite nennt ``reason``
+    den Grund. Ohne Nutzer und Mengen (WP-09).
+    """
+
+    symbol: str
+    isin: IsinStr | None = None
+    instrument_id: PositiveId | None = None
+    value_score: float | None = Field(default=None, ge=0, le=1)
+    quality_score: float | None = Field(default=None, ge=0, le=1)
+    composite_score: float | None = Field(default=None, ge=0)
+    composite_percentile: float | None = Field(default=None, ge=0, le=1)
+    factor_ranks: dict[str, float | None] = Field(default_factory=dict)
+    value_trap_flag: bool = False
+    value_trap_reason: ValueTrapReason | None = None
+    industry_rule: bool = False
+    below_size_filter: bool = False
+    reason: PlacementReason | None = None
+
+    @classmethod
+    def from_flat(
+        cls,
+        flat: Mapping[Any, Any],
+        *,
+        isin: str | None = None,
+        instrument_id: int | None = None,
+        below_size_filter: bool = False,
+    ) -> PlacementV1:
+        """Aus einer Zeile von ``place()``. NaN wird ``None``."""
+        return cls(
+            symbol=str(flat["symbol"]),
+            isin=isin,
+            instrument_id=instrument_id,
+            value_trap_flag=bool(flat.get("value_trap_flag", False)),
+            value_trap_reason=missing_to_none(flat.get("value_trap_reason")),
+            industry_rule=bool(flat.get("industry_rule", False)),
+            below_size_filter=below_size_filter,
+            reason=missing_to_none(flat.get("reason")),
+            factor_ranks={
+                key.removeprefix("rank_"): missing_to_none(value)
+                for key, value in flat.items()
+                if isinstance(key, str) and key.startswith("rank_")
+            },
+            **{
+                key: missing_to_none(flat.get(key))
+                for key in (*_SCORE_COLUMNS, "composite_percentile")
+            },
         )

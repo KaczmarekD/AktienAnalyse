@@ -294,6 +294,12 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D3.5 Datei im eigenen Format (`ceacd84`; CSV-Import mit Abgleich und Export, keine Migration; NAS: nichts Neues)
   - [x] D3.6 Oberfläche „Meine Depots“ (`ae1bfaa`; `/depots` als Startseite nach der Anmeldung, Depot-Detail mit Bearbeiten, Datei und Verlauf, Playwright-Test; keine Migration; NAS: nichts Neues)
 - [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
+  - [ ] D4.1 Einordnung in scoring (`place()`, `placements[]`)
+  - [ ] D4.2 Scores im Depot
+  - [ ] D4.3 ETF und Anleihen rechnen
+  - [ ] D4.4 Depot-Analyse
+  - [ ] D4.5 Ansicht „Analyse“
+  - [ ] D4.6 Neue Aktie sofort einordnen
 - [ ] D5 Hinweise
 - [ ] D6 News
 - [ ] D7 Berichte mit eigenem Intervall

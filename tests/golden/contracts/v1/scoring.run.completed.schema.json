@@ -241,6 +241,163 @@
       "title": "MarketDataV1",
       "type": "object"
     },
+    "PlacementV1": {
+      "description": "Eine Aktie aus den Depots, eingeordnet ins Referenzuniversum (D4.1, ANA-01 bis 03).\n\nIhre Raenge sind die, die sie haette, wenn man sie allein dem Referenzuniversum hinzufuegte;\ndie Raenge der Referenz aendern sich nicht. ``below_size_filter``: ein Titel des Universums\nunter dem Groessenfilter, sonst einer ausserhalb (Abdeckung). Ohne Composite nennt ``reason``\nden Grund. Ohne Nutzer und Mengen (WP-09).",
+      "properties": {
+        "below_size_filter": {
+          "default": false,
+          "title": "Below Size Filter",
+          "type": "boolean"
+        },
+        "composite_percentile": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Percentile"
+        },
+        "composite_score": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Score"
+        },
+        "factor_ranks": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Factor Ranks",
+          "type": "object"
+        },
+        "industry_rule": {
+          "default": false,
+          "title": "Industry Rule",
+          "type": "boolean"
+        },
+        "instrument_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instrument Id"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isin"
+        },
+        "quality_score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quality Score"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "no_value",
+                "no_quality",
+                "no_data"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "value_score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Score"
+        },
+        "value_trap_flag": {
+          "default": false,
+          "title": "Value Trap Flag",
+          "type": "boolean"
+        },
+        "value_trap_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "quality",
+                "momentum"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Trap Reason"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "title": "PlacementV1",
+      "type": "object"
+    },
     "ProfileParamsV1": {
       "additionalProperties": false,
       "description": "Die Parameter eines Profils mit ihren Regeln.\n\nUnbekannte Felder sind ein Fehler, anders als bei Events: Ein Tippfehler in gespeicherten\nparams oder im Formular darf nicht still wegfallen.",
@@ -623,6 +780,20 @@
     "RankingRowV1": {
       "description": "Fundamentaldaten plus Bewertung. notification rendert Mail und CSV allein daraus.\n\nValue- und Quality-Score sind Perzentilraenge zwischen 0 und 1, ``None`` ohne genug\nFaktoren. Der Composite-Score ist ihr gewichtetes Mittel. Er hat bewusst keine\nObergrenze: Die Gewichte werden erst ab 1 % Abweichung normiert, ein Wert knapp\nueber 1 darf den Lauf nicht kippen. ``factor_ranks`` haelt die Raenge je Faktor,\nSchluessel wie im Scoring-Profil (z. B. ``ev_ebit``, ``roic``).",
       "properties": {
+        "composite_percentile": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Percentile"
+        },
         "composite_score": {
           "anyOf": [
             {
@@ -657,6 +828,19 @@
           "default": false,
           "title": "Industry Rule",
           "type": "boolean"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isin"
         },
         "quality_score": {
           "anyOf": [
@@ -948,6 +1132,13 @@
         }
       ],
       "default": null
+    },
+    "placements": {
+      "items": {
+        "$ref": "#/$defs/PlacementV1"
+      },
+      "title": "Placements",
+      "type": "array"
     },
     "profile": {
       "anyOf": [

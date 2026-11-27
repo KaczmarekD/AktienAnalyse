@@ -19,6 +19,7 @@ from ...domain.profile import ProfileVersionRef
 from .models import (
     FactorScore,
     InputSnapshot,
+    Placement,
     Profile,
     ProfileActivation,
     ProfileVersion,
@@ -63,6 +64,23 @@ class FactorScoreRow:
     direction: str
     raw_value: float | None
     percentile_rank: float | None
+
+
+_PLACEMENT_FIELDS = (
+    "symbol",
+    "isin",
+    "instrument_id",
+    "value_score",
+    "quality_score",
+    "composite_score",
+    "composite_percentile",
+    "factor_ranks",
+    "value_trap_flag",
+    "value_trap_reason",
+    "industry_rule",
+    "below_size_filter",
+    "reason",
+)
 
 
 def config_hash(config: dict[str, Any] | None) -> str | None:
@@ -340,6 +358,26 @@ class ScoringRepository:
             .order_by(ScoringRun.created_at, ScoringRun.id)
         )
         return _frame(self.session, stmt, ["scoring_run_id", "created_at", "origin", *columns])
+
+    # --- Einordnung (D4.1) -------------------------------------------------------------
+
+    def write_placements(self, scoring_run_id: int, rows: Sequence[Mapping[str, Any]]) -> None:
+        """D4.1: die Einordnungen eines Bewertungslaufs (``PlacementV1`` als Spalten)."""
+        if rows:
+            self.session.execute(
+                insert(Placement), [{"scoring_run_id": scoring_run_id, **row} for row in rows]
+            )
+
+    def get_placements(self, scoring_run_id: int) -> list[dict[str, Any]]:
+        stmt = (
+            select(Placement)
+            .where(Placement.scoring_run_id == scoring_run_id)
+            .order_by(Placement.id)
+        )
+        return [
+            {column: getattr(row, column) for column in _PLACEMENT_FIELDS}
+            for row in self.session.scalars(stmt)
+        ]
 
     # --- Eingangsdaten (P5.1a) ---------------------------------------------------------
 

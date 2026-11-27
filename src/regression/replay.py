@@ -196,6 +196,10 @@ class _ScoringCapture:
         default_factory=lambda: pd.DataFrame(columns=list(FACTOR_COLUMNS))
     )
 
+    def record_placements(self, scoring_run_id: int, placements: object) -> None:
+        """D4.1: Die Regression vergleicht das Ranking; Einordnungen speichert sie nicht."""
+        del scoring_run_id, placements
+
     def record_scoring(
         self,
         fetch_run_id: int,  # noqa: ARG002 - Signatur des Ports

@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+from sqlalchemy.exc import IntegrityError
+
+from va_contracts.events.v1 import PlacementV1
 from va_market_data.adapters.postgres import MarketDataRepository
 from va_platform.db import session_scope
 from va_scoring.adapters.postgres import FactorScoreRow, ScoreRow, ScoringRepository
+from va_scoring.adapters.postgres.store import PostgresScoringStore
 
 T0 = datetime(2026, 10, 3, 5, 30, tzinfo=UTC)
 
@@ -89,3 +94,76 @@ class TestScoring:
         with session_scope(engine) as s:
             history = ScoringRepository(s).get_score_history("SAP.DE")
         assert list(history["composite_score"]) == [0.6, 0.7]
+
+
+def _placement(**values: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "symbol": "AAPL",
+        "isin": None,
+        "instrument_id": None,
+        "value_score": None,
+        "quality_score": None,
+        "composite_score": None,
+        "composite_percentile": None,
+        "factor_ranks": {},
+        "value_trap_flag": False,
+        "value_trap_reason": None,
+        "industry_rule": False,
+        "below_size_filter": False,
+        "reason": None,
+    }
+    return {**row, **values}
+
+
+class TestPlacement:
+    """D4.1: Einordnungen der Depot-Aktien je Bewertungslauf, nur zum Anfügen."""
+
+    def test_placements_roundtrip(self, session):
+        repo = ScoringRepository(session)
+        sid = repo.write_scoring_run(fetch_run_id=7, config={}, app_version="x", origin="live")
+        repo.write_placements(
+            sid,
+            [
+                _placement(
+                    isin="US0378331005",
+                    instrument_id=91,
+                    value_score=0.31,
+                    quality_score=0.94,
+                    composite_score=0.562,
+                    composite_percentile=0.68,
+                    factor_ranks={"ev_ebit": 0.22, "roic": None},
+                ),
+                _placement(
+                    symbol="TINY.DE",
+                    value_score=0.7,
+                    industry_rule=True,
+                    below_size_filter=True,
+                    reason="no_quality",
+                ),
+            ],
+        )
+        repo.write_placements(sid, [])
+        session.commit()
+        placements = repo.get_placements(sid)
+        assert [p["symbol"] for p in placements] == ["AAPL", "TINY.DE"]
+        assert placements[0]["factor_ranks"] == {"ev_ebit": 0.22, "roic": None}
+        assert placements[0]["composite_percentile"] == 0.68
+        assert (placements[1]["reason"], placements[1]["below_size_filter"]) == ("no_quality", True)
+        assert repo.get_placements(sid + 1) == []
+
+    def test_unknown_reason_is_rejected(self, session):
+        repo = ScoringRepository(session)
+        sid = repo.write_scoring_run(fetch_run_id=7, config={}, app_version="x", origin="live")
+        with pytest.raises(IntegrityError):
+            repo.write_placements(sid, [_placement(reason="too_small")])
+
+    def test_the_store_writes_the_event_rows(self, engine):
+        with session_scope(engine) as s:
+            sid = ScoringRepository(s).write_scoring_run(
+                fetch_run_id=7, config={}, app_version="x", origin="live"
+            )
+        placement = PlacementV1(symbol="AAPL", isin="US0378331005", factor_ranks={"pb": 0.4})
+        PostgresScoringStore(engine, app_version="x").record_placements(sid, [placement])
+        with session_scope(engine) as s:
+            [row] = ScoringRepository(s).get_placements(sid)
+        assert PlacementV1.model_validate(row) == placement

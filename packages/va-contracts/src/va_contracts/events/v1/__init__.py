@@ -56,7 +56,7 @@ from .payloads import (
     UniverseInfoV1,
     UniverseMemberV1,
 )
-from .ranking import RankingRowV1
+from .ranking import PlacementReason, PlacementV1, RankingRowV1
 
 __all__ = [
     "BY_DATASCHEMA",
@@ -89,6 +89,8 @@ __all__ = [
     "GrowthV1",
     "IdentityV1",
     "MarketDataV1",
+    "PlacementReason",
+    "PlacementV1",
     "PricesCompletedV1",
     "PricesRequestedV1",
     "ProfileActivatedV1",

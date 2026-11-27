@@ -17,7 +17,11 @@ from ...domain.profile import DEFAULT_PROFILE_NAME
 from .repository import FactorScoreRow, ScoreRow, ScoringRepository
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from sqlalchemy import Engine
+
+    from va_contracts.events.v1 import PlacementV1
 
     from ...domain.profile import ProfileVersionRef
     from ...domain.scoring import ScoringConfig
@@ -66,6 +70,15 @@ class PostgresScoringStore:
             # P5.1a: eigene Kopie der Eingangsdaten fuer die Vorschau
             repo.write_input_snapshot(fetch_run_id, input_rows(df_all))
             return scoring_run_id
+
+    def record_placements(self, scoring_run_id: int, placements: Sequence[PlacementV1]) -> None:
+        """D4.1: die Einordnungen der Depot-Aktien zu einem Bewertungslauf."""
+        if not placements:
+            return
+        with session_scope(self._engine) as s:
+            ScoringRepository(s).write_placements(
+                scoring_run_id, [placement.model_dump() for placement in placements]
+            )
 
     def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
         """Legt "Standard" einmalig an (ENV nur als Startwerte), liefert die aktive Version."""

@@ -87,6 +87,36 @@ class FactorScore(Base):
     percentile_rank: Mapped[float | None]
 
 
+class Placement(Base):
+    """D4.1: eine Aktie aus den Depots, eingeordnet ins Referenzuniversum eines Bewertungslaufs
+    (Migration 0027, nur anfügen). ``below_size_filter``: ein Universumstitel unter dem
+    Größenfilter, sonst einer der Abdeckung. Ohne Nutzer und Mengen."""
+
+    __tablename__ = "placement"
+    __table_args__ = (
+        CheckConstraint(
+            "reason IS NULL OR reason IN ('no_value', 'no_quality', 'no_data')", name="reason"
+        ),
+        {"schema": "scoring"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    scoring_run_id: Mapped[int] = mapped_column(ForeignKey("scoring.scoring_run.id"), index=True)
+    symbol: Mapped[str]
+    isin: Mapped[str | None]
+    instrument_id: Mapped[int | None]  # -> market_data.instrument (logisch)
+    value_score: Mapped[float | None]
+    quality_score: Mapped[float | None]
+    composite_score: Mapped[float | None]
+    composite_percentile: Mapped[float | None]
+    factor_ranks: Mapped[dict[str, Any]]
+    value_trap_flag: Mapped[bool]
+    value_trap_reason: Mapped[str | None]
+    industry_rule: Mapped[bool]
+    below_size_filter: Mapped[bool]
+    reason: Mapped[str | None]
+
+
 class Profile(Base):
     """Ein Scoring-Profil. Sein Inhalt steht in den Versionen."""
 

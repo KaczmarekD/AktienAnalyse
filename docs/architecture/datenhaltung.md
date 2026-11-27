@@ -53,7 +53,7 @@ Batch.
 | Schema | Besitzer-Service (Phase 5) | Ergänzungen |
 |---|---|---|
 | `market_data` | `market-data` | `outbox`, `inbox` |
-| `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie der Eingangsdaten (`input_snapshot`, seit P5.1a, Migration `0013`, nur zum Anfügen; daraus rechnet die Vorschau), `outbox`, `inbox` |
+| `scoring` | `scoring` | Profil-Tabellen (unten), lokale Kopie der Eingangsdaten (`input_snapshot`, seit P5.1a, Migration `0013`, nur zum Anfügen; daraus rechnet die Vorschau), Einordnung der Depot-Aktien (`placement`, seit D4.1, Migration `0027`, nur zum Anfügen, ohne Nutzer und Mengen), `outbox`, `inbox` |
 | `reporting` | `notification` | `outbox`, `inbox` |
 | `batch` | `web-api` | Runs werden vom web-api angelegt (Scheduler/UI); `outbox` (`screening.run.requested`), `inbox` |
 | `identity` (seit D1.1, Migration `0015`) | `web-api` | Konten, Profile, Status, Passwort-Hashes, Sitzungen (nur SHA-256 der ID), Aktivität, Widerrufe, Anmeldeversuche; `outbox`, `inbox`. Alles nur zum Anfügen. Persönliche Daten: nur `va_identity`, nicht in `SCHEMAS` ([nutzer.md](depot/nutzer.md#datenmodell)) |

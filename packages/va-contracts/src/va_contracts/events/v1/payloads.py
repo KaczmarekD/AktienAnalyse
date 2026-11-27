@@ -11,7 +11,7 @@ from ...base import Contract, PositiveId
 from ...profile import ProfileParamsV1
 from ...securities import IsinStr, SecurityV1
 from .fundamentals import FundamentalsV1
-from .ranking import RankingRowV1
+from .ranking import PlacementV1, RankingRowV1
 
 # Wer einen Run ausgeloest hat. "rescore": Neubewertung nach einer Profil-Aktivierung,
 # ohne Abruf, ohne batch.run, ohne Mail und ohne Healthcheck-Ping.
@@ -137,6 +137,9 @@ class ScoringRunCompletedV1(_RunScoped):
     # und Faktoren des Laufs. Fehlt bei aelteren Events und beim Replay.
     params: ProfileParamsV1 | None = None
     ranking: list[RankingRowV1] = Field(min_length=1)
+    # D4.1 (additiv): die Aktien der Depots, eingeordnet ins Referenzuniversum; notification
+    # ignoriert sie, die Mail bleibt gleich
+    placements: list[PlacementV1] = Field(default_factory=list)
 
 
 class ProfileSavedV1(Contract):
