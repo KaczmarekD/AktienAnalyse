@@ -296,7 +296,7 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
 - [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
   - [x] D4.1 Einordnung in scoring (`9b52350`; `place()`, `placements[]`, Ranking-Zeilen mit `isin` und `composite_percentile`; Migration 0027 `scoring.placement`; Ranking, CSV und Mail unverändert; NAS: nichts Neues)
   - [x] D4.2 Scores im Depot (`c591a5f`; Consumer `portfolio` mit `scoring.run.completed`, Migration 0028 `portfolio.score_view`, `PositionValueV1.score`, Spalten im Depot; NAS: nichts Neues in der `.env`, Scores im Depot ab dem nächsten Bewertungslauf oder sofort mit einem Lauf aus dem UI)
-  - [ ] D4.3 ETF und Anleihen rechnen
+  - [x] D4.3 ETF und Anleihen rechnen (`a77f89f`; `va_portfolio.domain.bonds` und `funds`, reine Funktionen, nachgerechnet von Hand; keine Migration; NAS: nichts Neues)
   - [ ] D4.4 Depot-Analyse
   - [ ] D4.5 Ansicht „Analyse“
   - [ ] D4.6 Neue Aktie sofort einordnen
