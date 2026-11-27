@@ -1,0 +1,335 @@
+<app-section heading="Analyse" data-analysis>
+  <span sectionInfo class="hint" tabindex="0" [matTooltip]="tips.section"
+    >Stand: jetzt gerechnet</span
+  >
+  @if (analysis(); as a) {
+    <app-section heading="Qualität" [level]="3" data-quality>
+      <dl class="kv-list kv-list--grid">
+        <div data-composite>
+          <dt [matTooltip]="tips.composite">Composite</dt>
+          <dd>
+            @if (a.quality.composite !== null) {
+              <app-score [value]="a.quality.composite" bar />
+            } @else {
+              <span class="hint">{{ tips.noData }}</span>
+            }
+          </dd>
+        </div>
+        <div>
+          <dt [matTooltip]="tips.value">Value</dt>
+          <dd>
+            @if (a.quality.value_score !== null) {
+              <app-score [value]="a.quality.value_score" />
+            } @else {
+              <span class="hint">{{ tips.noData }}</span>
+            }
+          </dd>
+        </div>
+        <div>
+          <dt [matTooltip]="tips.qualityScore">Quality</dt>
+          <dd>
+            @if (a.quality.quality_score !== null) {
+              <app-score [value]="a.quality.quality_score" />
+            } @else {
+              <span class="hint">{{ tips.noData }}</span>
+            }
+          </dd>
+        </div>
+        <div data-covered>
+          <dt [matTooltip]="tips.covered">mit Score</dt>
+          <dd>{{ a.quality.covered | pct: '1.0-0' }} von {{ a.quality.equity_eur | eur }}</dd>
+        </div>
+        <div data-value-traps>
+          <dt [matTooltip]="tips.valueTraps">Value-Traps</dt>
+          <dd>{{ a.quality.value_traps }}</dd>
+        </div>
+      </dl>
+      @if (a.quality.quintiles.length) {
+        <table class="data-table quintiles" data-quintiles>
+          <thead>
+            <tr>
+              <th scope="col" [matTooltip]="tips.quintile">Fünftel von DAX/MDAX</th>
+              <th scope="col" class="num" [matTooltip]="tips.quintileCount">Aktien</th>
+              <th scope="col" class="num" [matTooltip]="tips.quintileWeight">Anteil</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (q of quintiles(); track q.quintile) {
+              <tr [attr.data-quintile]="q.quintile">
+                <td>{{ quintileLabel[q.quintile] }}</td>
+                <td class="num">{{ q.count }}</td>
+                <td class="num">
+                  {{ q.weight | pct: '1.0-0' }}
+                  <span class="bar" aria-hidden="true"
+                    ><span [style.width.%]="percent(q.weight)"></span
+                  ></span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+      @if (a.quality.funds.length) {
+        <table class="data-table" data-funds>
+          <thead>
+            <tr>
+              <th scope="col" [matTooltip]="tips.fund">ETF</th>
+              <th scope="col" class="num" [matTooltip]="tips.fundScore">Look-through-Score</th>
+              <th scope="col" class="num" [matTooltip]="tips.fundCovered">bewertet</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (fund of a.quality.funds; track fund.isin) {
+              <tr [attr.data-fund]="fund.isin">
+                <td>{{ name(fund.isin) }}</td>
+                <td class="num">
+                  @if (fund.score !== null) {
+                    <app-score [value]="fund.score" />
+                  } @else {
+                    <span class="hint">{{ tips.noData }}</span>
+                  }
+                </td>
+                <td class="num">
+                  @if (fund.lower_bound) {
+                    <span tabindex="0" [matTooltip]="tips.lowerBound">mindestens</span>
+                  }
+                  {{ fund.covered | pct: '1.0-0' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </app-section>
+
+    <app-section heading="Allokation" [level]="3" data-allocation>
+      <span sectionInfo class="hint" tabindex="0" [matTooltip]="tips.allocation"
+        >mit Durchschau</span
+      >
+      @if (a.value_eur === null) {
+        <p class="hint">{{ tips.noData }}</p>
+      } @else {
+        <div class="allocation">
+          @for (dimension of dimensions; track dimension.key) {
+            <table class="data-table" [attr.data-dimension]="dimension.key">
+              <thead>
+                <tr>
+                  <th scope="col" [matTooltip]="dimension.tip">{{ dimension.heading }}</th>
+                  <th scope="col" class="num" [matTooltip]="tips.share">Anteil</th>
+                  <th scope="col" class="num" [matTooltip]="tips.amount">Wert</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of rows(dimension.key); track row.key) {
+                  <tr [attr.data-slice]="row.key">
+                    <td>{{ row.label }}</td>
+                    <td class="num">
+                      {{ row.weight | pct: '1.0-0' }}
+                      <span class="bar" aria-hidden="true"
+                        ><span [style.width.%]="percent(row.weight)"></span
+                      ></span>
+                    </td>
+                    <td class="num">{{ row.value_eur | eur }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+      }
+    </app-section>
+
+    <app-section heading="Konzentration" [level]="3" data-concentration>
+      <dl class="kv-list kv-list--grid">
+        <div data-largest>
+          <dt [matTooltip]="tips.largest">größter Titel</dt>
+          <dd>
+            @if (a.concentration.largest; as largest) {
+              {{ name(largest.isin, largest.name) }}, {{ largest.weight | pct: '1.0-1' }}
+            } @else {
+              <span class="hint">{{ tips.noData }}</span>
+            }
+          </dd>
+        </div>
+        <div data-top>
+          <dt [matTooltip]="tips.top">Top 5</dt>
+          <dd>
+            @if (a.concentration.lower_bound) {
+              <span tabindex="0" [matTooltip]="tips.lowerBound">mindestens</span>
+            }
+            {{ a.concentration.top_weight | pct: '1.0-0' }}
+          </dd>
+        </div>
+        <div data-effective>
+          <dt [matTooltip]="tips.effective">effektive Zahl</dt>
+          <dd>
+            @if (a.concentration.effective_positions !== null) {
+              {{ a.concentration.effective_positions | num: '1.1-1' }}
+            } @else {
+              <span class="hint">{{ tips.noData }}</span>
+            }
+          </dd>
+        </div>
+      </dl>
+      @if (a.concentration.top.length) {
+        <ol class="divided-list" data-top-titles>
+          @for (title of a.concentration.top; track title.isin) {
+            <li>
+              <span>{{ name(title.isin, title.name) }}</span>
+              <span class="hint">{{ title.weight | pct: '1.0-1' }}</span>
+            </li>
+          }
+        </ol>
+      }
+    </app-section>
+
+    @if (hasAmount(a.costs.etf_eur)) {
+      <app-section heading="Kosten" [level]="3" data-costs>
+        <dl class="kv-list kv-list--grid">
+          <div data-ter>
+            <dt [matTooltip]="tips.ter">TER</dt>
+            <dd>
+              @if (a.costs.ter !== null) {
+                {{ a.costs.ter | num: '1.2-2' }} %
+              } @else {
+                <span class="hint">{{ tips.noData }}</span>
+              }
+            </dd>
+          </div>
+          <div data-running-costs>
+            <dt [matTooltip]="tips.runningCosts">laufende Kosten</dt>
+            <dd>
+              @if (a.costs.running_costs_eur !== null) {
+                {{ a.costs.running_costs_eur | eur }} im Jahr
+              } @else {
+                <span class="hint">{{ tips.noData }}</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt [matTooltip]="tips.costsCovered">mit TER</dt>
+            <dd>{{ a.costs.covered | pct: '1.0-0' }} von {{ a.costs.etf_eur | eur }}</dd>
+          </div>
+        </dl>
+      </app-section>
+    }
+
+    @if (a.bonds.positions.length) {
+      <app-section heading="Anleihen" [level]="3" data-bonds>
+        <dl class="kv-list kv-list--grid">
+          <div data-ytm>
+            <dt [matTooltip]="tips.ytm">Rendite</dt>
+            <dd>
+              @if (a.bonds.ytm !== null) {
+                {{ a.bonds.ytm | pct: '1.2-2' }}
+              } @else {
+                <span class="hint">{{ tips.noData }}</span>
+              }
+            </dd>
+          </div>
+          <div data-duration>
+            <dt [matTooltip]="tips.duration">Duration</dt>
+            <dd>
+              @if (a.bonds.modified_duration !== null) {
+                {{ a.bonds.modified_duration | num: '1.2-2' }} Jahre
+              } @else {
+                <span class="hint">{{ tips.noData }}</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt [matTooltip]="tips.bondsCovered">mit Rendite</dt>
+            <dd>{{ a.bonds.covered | pct: '1.0-0' }} von {{ a.bonds.bond_eur | eur }}</dd>
+          </div>
+        </dl>
+        <div class="table-sheet">
+          <table class="data-table" data-bond-positions>
+            <thead>
+              <tr>
+                <th scope="col" [matTooltip]="tips.bond">Anleihe</th>
+                <th scope="col" class="num" [matTooltip]="tips.amount">Wert</th>
+                <th scope="col" class="num" [matTooltip]="tips.ytm">Rendite</th>
+                <th scope="col" class="num" [matTooltip]="tips.duration">Duration</th>
+                <th scope="col" class="num" [matTooltip]="tips.nextCoupon">nächster Kupon</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (bond of a.bonds.positions; track bond.isin) {
+                <tr [attr.data-bond]="bond.isin">
+                  <td>
+                    {{ name(bond.isin) }}
+                    @if (bond.special) {
+                      <span
+                        class="badge badge--muted"
+                        data-special
+                        tabindex="0"
+                        [matTooltip]="tips.bondNote"
+                        >{{ special[bond.special] ?? bond.special }}</span
+                      >
+                    }
+                  </td>
+                  <td class="num">{{ bond.value_eur | eur }}</td>
+                  <td class="num">{{ bond.ytm | pct: '1.2-2' }}</td>
+                  <td class="num">{{ bond.modified_duration | num: '1.2-2' }}</td>
+                  <td class="num">{{ bond.next_coupon | day }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (a.bonds.maturities.length) {
+          <table class="data-table maturities" data-maturities>
+            <thead>
+              <tr>
+                <th scope="col" [matTooltip]="tips.maturity">fällig</th>
+                <th scope="col" class="num" [matTooltip]="tips.maturityValue">Wert</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (year of a.bonds.maturities; track year.year) {
+                <tr>
+                  <td>{{ year.year }}</td>
+                  <td class="num">{{ year.value_eur | eur }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </app-section>
+    }
+
+    <app-section heading="Datenlage" [level]="3" data-data>
+      <span sectionInfo class="hint" tabindex="0" [matTooltip]="tips.data">Stand der Daten</span>
+      <dl class="kv-list kv-list--grid">
+        <div data-valued>
+          <dt [matTooltip]="tips.valued">mit Kurs</dt>
+          <dd>{{ a.data.valued }} von {{ a.data.positions }} Positionen</dd>
+        </div>
+        <div>
+          <dt [matTooltip]="tips.lookThrough">Durchschau</dt>
+          <dd>
+            @if (a.data.look_through !== null) {
+              {{ a.data.look_through | pct: '1.0-0' }} der ETFs
+            } @else {
+              <span class="hint">{{ tips.noData }}</span>
+            }
+          </dd>
+        </div>
+        <div>
+          <dt [matTooltip]="tips.oldestPrice">ältester Kurs</dt>
+          <dd>{{ a.data.oldest_price | day }}</dd>
+        </div>
+        <div>
+          <dt [matTooltip]="tips.oldestScore">Scores vom</dt>
+          <dd>{{ a.data.oldest_score | day }}</dd>
+        </div>
+        <div>
+          <dt [matTooltip]="tips.oldestFund">ETF-Daten vom</dt>
+          <dd>{{ a.data.oldest_fund_data | day }}</dd>
+        </div>
+      </dl>
+    </app-section>
+  } @else {
+    <app-state [error]="error()" loading="Rechne die Analyse …" />
+  }
+</app-section>

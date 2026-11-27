@@ -4204,6 +4204,20 @@ und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
   Score-Verlauf je Aktie; Playwright mit axe.
 - **Review:** `/code-review high`.
 
+- **Umgesetzt (27.11.2026, D4.5):** `AnalysisPanel` unter den Positionen eines Depots (nicht
+  bei Beobachtungslisten, nicht beim Bearbeiten), lädt neu mit jedem Depotstand.
+  - Qualität (Composite, Value, Quality, Abdeckung, Value-Traps, Fünftel, Look-through-Score je
+    ETF), Allokation (Anlageklasse, Währung, Sektor, Land), Konzentration, Kosten, Anleihen
+    (Rendite, Duration, nächster Kupon, Sonderform, Fälligkeitsprofil), Datenlage.
+  - „keine Daten“ statt Ersatzwerten, „mindestens“ bei unvollständigen ETF-Listen; Länder per
+    `Intl.DisplayNames` (ohne Bundle-Kosten), Sektoren über `sectorName`.
+  - Texte in `depots/controls.ts` (nachgeladen); Start-Bundle 496,54 kB.
+  - Tests: `analysis-panel.spec.ts` (Werte, Beschriftungen, „keine Daten“, „mindestens“,
+    Fehler ohne Marktdaten, Tooltips und Spaltenköpfe), Playwright: Datenlage im E2E-Depot; axe
+    prüft `/depots/:id` mit der Analyse.
+  - Offen: Score-Verlauf für Aktien außerhalb von DAX/MDAX (ANA-04, braucht einen Endpunkt über
+    `score_view`); für Titel aus DAX/MDAX steht er im Titel-Detail.
+
 **D4.6 Neue Aktie sofort einordnen** (WP-13, Rest)
 - **Test:** market-data holt die Fundamentaldaten neu abgedeckter Aktien gleich
   (`marketdata.coverage.fetched`), scoring ordnet sie gegen den letzten Bewertungslauf ein

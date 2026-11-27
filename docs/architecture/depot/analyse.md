@@ -6,7 +6,8 @@
 > Umgesetzt: die Einordnung im Bewertungslauf (D4.1, `place()`, `placements[]`,
 > `scoring.placement`), die Scores je Aktie im Depot (D4.2, `score_view` in portfolio), die
 > Rechnungen für ETFs und Anleihen (D4.3, `va_portfolio.domain.funds` und `bonds`), die
-> Analyse des Depots (D4.4, `va_portfolio.domain.analysis`, `GET /depots/{id}/analysis`).
+> Analyse des Depots (D4.4, `va_portfolio.domain.analysis`, `GET /depots/{id}/analysis`) und
+> ihre Ansicht im Depot (D4.5, `AnalysisPanel`).
 
 ## Grundsatz: bewertet wird gegen ein Referenzuniversum
 
@@ -222,6 +223,14 @@ Hinweise (Vorlauf, Nachrichten, Zielallokation, Kenntnisnahmen kommen mit D5). A
 - Die effektive Zahl zählt Positionen (ein ETF ist eine), Größter und Top 5 rechnen mit
   Durchschau. Ohne Stammdaten ist eine Position mit Score eine Aktie (Scores gibt es nur für Aktien).
 - Fünftel nach Composite-Perzentil: 1 = unterstes (bis 20 %), 5 = oberstes.
+
+**Umgesetzt (27.11.2026, D4.5):** Bereich „Analyse“ im Depot unter den Positionen
+(`frontend/src/app/depots/analysis-panel.*`), nur für Depots mit Positionen: Qualität mit
+Fünfteln und Look-through-Score je ETF, Allokation in vier Tabellen (Sektoren auf Deutsch, Länder
+über `Intl.DisplayNames`), Konzentration, Kosten, Anleihen mit Fälligkeitsprofil, Datenlage. Fehlt
+eine Größe, steht „keine Daten“ da (ANA-09), bei unvollständigen ETF-Listen „mindestens“. Der
+Score-Verlauf (ANA-04) steht für Titel aus DAX/MDAX im Titel-Detail, das der Name im Depot
+verlinkt; für Aktien außerhalb fehlt er noch (braucht einen Endpunkt über `score_view`).
 
 ## Hinweise
 

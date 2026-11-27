@@ -281,7 +281,9 @@ Depots im UI (D3.6) unter `frontend/src/app/depots/`:
   `/depots/:depotId`, beide nur mit echter Sitzung (`ownerGuard`).
 - Bewertung aus `valuation`, Bearbeiten mit `If-Match` (`HoldingsEditor`), Datei mit Abgleich
   (`ImportPanel`), Verlauf, Umbenennen, Archivieren. Seit D4.2 Composite mit Perzentil, Value
-  und Quality je Aktie; Titel aus DAX/MDAX führen ins Titel-Detail.
+  und Quality je Aktie; Titel aus DAX/MDAX führen ins Titel-Detail. Seit D4.5 der Bereich
+  „Analyse“ (`AnalysisPanel`, `GET /depots/{id}/analysis`), Texte in `ANALYSIS`, `SLICE`,
+  `BOND_SPECIAL` (`depots/controls.ts`).
 - Texte in `depots/controls.ts`, Begriffe in der Glossar-Gruppe „Depots“, Beträge über die
   Pipes `eur` und `dec`.
 - Live-Aktualisierung über `user:<id>` fehlt noch.

@@ -42,6 +42,7 @@ import {
   UNIT,
 } from './controls';
 import { DepotDialog } from './depot-dialog';
+import { AnalysisPanel } from './analysis-panel';
 import { HoldingsEditor } from './holdings-editor';
 import { ImportPanel } from './import-panel';
 
@@ -56,6 +57,7 @@ import { ImportPanel } from './import-panel';
 @Component({
   selector: 'app-depot-page',
   imports: [
+    AnalysisPanel,
     AppIcon,
     AppSection,
     AppState,
