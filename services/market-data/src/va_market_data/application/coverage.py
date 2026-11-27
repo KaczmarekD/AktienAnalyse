@@ -314,3 +314,85 @@ def _fetch(
         )
     # Genau die gespeicherten Titel: Event und Datenbank bleiben deckungsgleich
     return pd.DataFrame(saved)
+
+
+# --- D4.6: neue Aktien sofort holen ------------------------------------------------------------
+
+# Hoechstens so lange je Meldung; der Rest kommt mit dem Wochenlauf
+AD_HOC_BUDGET = timedelta(minutes=2)
+AD_HOC_LIMIT = 10  # wie MAX_FETCHED im Event
+
+
+class AdHocStore(Protocol):
+    """Was der sofortige Abruf braucht (D4.6)."""
+
+    def universe_keys(self) -> tuple[set[str], set[str]]:
+        """Symbole und ISINs des juengsten Referenzuniversums."""
+        ...
+
+    def record_coverage_fetch(self, fund: Fundamentals, isin: str) -> None:
+        """Ein sofort geholter Titel, nur zum Anfuegen (``market_data.coverage_fetch``)."""
+        ...
+
+
+@dataclass(frozen=True)
+class Fetched:
+    """Die sofort geholten und gespeicherten Aktien; ``isins``: Symbol -> ISIN."""
+
+    fundamentals: list[Fundamentals] = field(default_factory=list)
+    isins: dict[str, str] = field(default_factory=dict)
+
+
+class _OverBudget(Exception):
+    """Beendet die Abrufschleife nach ``AD_HOC_BUDGET``."""
+
+
+def fetch_added(
+    items: Sequence[CoverageItem],
+    *,
+    store: AdHocStore,
+    fetch: Fetch,
+    limit: int = AD_HOC_LIMIT,
+    budget: timedelta = AD_HOC_BUDGET,
+    timer: Callable[[], float] = time.monotonic,
+) -> Fetched:
+    """Kennzahlen neu abgedeckter Aktien ausserhalb des Universums sofort (D4.6, WP-13).
+
+    Jeder Titel wird gleich gespeichert; im Ergebnis stehen genau die gespeicherten. Wirft nicht:
+    Ein Ausfall kostet nur die sofortige Einordnung, der Wochenlauf holt die Aktien ohnehin.
+    """
+    try:
+        symbols, isins_in_universe = store.universe_keys()
+    except Exception:
+        log.warning("Referenzuniversum nicht lesbar - kein sofortiger Abruf", exc_info=True)
+        return Fetched()
+    tickers = coverage_tickers(items, universe_symbols=symbols, universe_isins=isins_in_universe)[
+        :limit
+    ]
+    isins = {t.symbol: t.isin for t in tickers if t.isin}
+    if not isins:
+        return Fetched()
+    saved: list[Fundamentals] = []
+    start = timer()
+
+    def stored(fund: Fundamentals) -> None:
+        isin = isins.get(fund.symbol)
+        if isin is not None:
+            try:
+                store.record_coverage_fetch(fund, isin)
+            except Exception:
+                log.exception("%s (sofort) konnte nicht gespeichert werden", fund.symbol)
+            else:
+                saved.append(fund)
+        if timer() - start > budget.total_seconds():
+            raise _OverBudget
+
+    try:
+        fetch([t for t in tickers if t.symbol in isins], on_result=stored, history={})
+    except _OverBudget:
+        log.info("Sofortiger Abruf nach %s beendet - der Rest kommt mit dem Wochenlauf", budget)
+    except Exception:
+        log.warning(
+            "Sofortiger Abruf abgebrochen - %d Titel gespeichert", len(saved), exc_info=True
+        )
+    return Fetched(saved, {f.symbol: isins[f.symbol] for f in saved})

@@ -187,3 +187,42 @@ class TestPlacement:
         with session_scope(engine) as s:
             [row] = ScoringRepository(s).get_placements(sid)
         assert PlacementV1.model_validate(row) == placement
+
+
+class TestLatestReference:
+    """D4.6: der juengste Bewertungslauf mit Eingangsdaten und Profil, ohne Rescores."""
+
+    def _run(self, engine, *, origin: str = "live", fetch_run_id: int = 7) -> int:
+        from va_scoring.domain.profile import profile_params
+        from va_scoring.domain.scoring import ScoringConfig
+
+        with session_scope(engine) as s:
+            repo = ScoringRepository(s)
+            ref, _ = repo.ensure_profile(
+                "Standard",
+                profile_params(ScoringConfig(value_weight=0.7, quality_weight=0.3)),
+                comment="x",
+            )
+            repo.write_input_snapshot(
+                fetch_run_id, [{"symbol": "SAP.DE", "market_cap": 2e11, "ev_ebit": 20.0}]
+            )
+            return repo.write_scoring_run(
+                fetch_run_id=fetch_run_id,
+                config={},
+                app_version="x",
+                origin=origin,
+                profile_id=ref.profile_id,
+                profile_version=ref.version,
+            )
+
+    def test_input_and_profile_of_the_latest_run(self, engine):
+        sid = self._run(engine)
+        self._run(engine, origin="rescore")  # ein Rescore bewertet absichtlich anders
+        reference = PostgresScoringStore(engine, app_version="x").latest_reference()
+        assert reference is not None
+        assert reference.scoring_run_id == sid
+        assert list(reference.frame["symbol"]) == ["SAP.DE"]
+        assert reference.config.value_weight == pytest.approx(0.7)
+
+    def test_without_a_run_none(self, engine):
+        assert PostgresScoringStore(engine, app_version="x").latest_reference() is None

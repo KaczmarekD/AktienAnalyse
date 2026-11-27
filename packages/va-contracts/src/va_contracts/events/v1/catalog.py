@@ -9,9 +9,11 @@ from typing import Any
 from ...base import Contract
 from .payloads import (
     CoverageChangedV1,
+    CoverageFetchedV1,
     DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
+    PlacementsUpdatedV1,
     PricesCompletedV1,
     PricesRequestedV1,
     ProfileActivatedV1,
@@ -88,6 +90,13 @@ DEPOT_CHANGED = EventSpec("portfolio.depot.changed", DepotChangedV1, max_age=tim
 COVERAGE_CHANGED = EventSpec(
     "portfolio.coverage.changed", CoverageChangedV1, max_age=timedelta(days=7)
 )
+# D4.6: neue Aktie sofort einordnen; nach einem Tag ist der Wochenlauf ohnehin naeher
+COVERAGE_FETCHED = EventSpec(
+    "marketdata.coverage.fetched", CoverageFetchedV1, max_age=timedelta(hours=24)
+)
+PLACEMENTS_UPDATED = EventSpec(
+    "scoring.placements.updated", PlacementsUpdatedV1, max_age=timedelta(days=7)
+)
 
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
@@ -106,6 +115,8 @@ EVENTS: dict[str, EventSpec[Any]] = {
         SECURITIES_UPDATED,
         DEPOT_CHANGED,
         COVERAGE_CHANGED,
+        COVERAGE_FETCHED,
+        PLACEMENTS_UPDATED,
     )
 }
 

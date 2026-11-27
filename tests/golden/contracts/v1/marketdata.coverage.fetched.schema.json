@@ -1,0 +1,573 @@
+{
+  "$defs": {
+    "FundamentalsV1": {
+      "description": "Ein Titel. Fehlende Werte sind ``None``; Fehler des Abrufs stehen in ``errors``.",
+      "properties": {
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "growth": {
+          "$ref": "#/$defs/GrowthV1",
+          "default": {
+            "eps_growth_5y": null,
+            "revenue_growth_5y": null
+          }
+        },
+        "identity": {
+          "$ref": "#/$defs/IdentityV1"
+        },
+        "market": {
+          "$ref": "#/$defs/MarketDataV1",
+          "default": {
+            "enterprise_value": null,
+            "market_cap": null,
+            "momentum_12_1": null,
+            "price": null,
+            "shares_outstanding": null
+          }
+        },
+        "provenance": {
+          "$ref": "#/$defs/ProvenanceV1",
+          "default": {
+            "fetched_at": null,
+            "fiscal_period_end": null,
+            "statement_fx": null
+          }
+        },
+        "quality": {
+          "$ref": "#/$defs/QualityMetricsV1",
+          "default": {
+            "cfo_assets": null,
+            "debt_to_equity": null,
+            "earnings_stability": null,
+            "f_score": null,
+            "fcf_margin": null,
+            "gross_margin": null,
+            "net_debt_ebitda": null,
+            "operating_accruals": null,
+            "operating_margin": null,
+            "roa": null,
+            "roic": null
+          }
+        },
+        "value": {
+          "$ref": "#/$defs/ValueMetricsV1",
+          "default": {
+            "buyback_yield": null,
+            "dividend_yield": null,
+            "ev_ebit": null,
+            "net_share_issuance": null,
+            "nopat_normalized": null,
+            "p_fcf": null,
+            "pb_ratio": null,
+            "pe_ratio": null,
+            "shareholder_yield": null
+          }
+        }
+      },
+      "required": [
+        "identity"
+      ],
+      "title": "FundamentalsV1",
+      "type": "object"
+    },
+    "GrowthV1": {
+      "properties": {
+        "eps_growth_5y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eps Growth 5Y"
+        },
+        "revenue_growth_5y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revenue Growth 5Y"
+        }
+      },
+      "title": "GrowthV1",
+      "type": "object"
+    },
+    "IdentityV1": {
+      "properties": {
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "financial_currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Financial Currency"
+        },
+        "index": {
+          "title": "Index",
+          "type": "string"
+        },
+        "industry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Industry"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "sector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sector"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "name",
+        "index"
+      ],
+      "title": "IdentityV1",
+      "type": "object"
+    },
+    "MarketDataV1": {
+      "properties": {
+        "enterprise_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enterprise Value"
+        },
+        "market_cap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Market Cap"
+        },
+        "momentum_12_1": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Momentum 12 1"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price"
+        },
+        "shares_outstanding": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shares Outstanding"
+        }
+      },
+      "title": "MarketDataV1",
+      "type": "object"
+    },
+    "ProvenanceV1": {
+      "properties": {
+        "fetched_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fetched At"
+        },
+        "fiscal_period_end": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fiscal Period End"
+        },
+        "statement_fx": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Statement Fx"
+        }
+      },
+      "title": "ProvenanceV1",
+      "type": "object"
+    },
+    "QualityMetricsV1": {
+      "properties": {
+        "cfo_assets": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cfo Assets"
+        },
+        "debt_to_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Debt To Equity"
+        },
+        "earnings_stability": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Earnings Stability"
+        },
+        "f_score": {
+          "anyOf": [
+            {
+              "maximum": 9,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "F Score"
+        },
+        "fcf_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fcf Margin"
+        },
+        "gross_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gross Margin"
+        },
+        "net_debt_ebitda": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Net Debt Ebitda"
+        },
+        "operating_accruals": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operating Accruals"
+        },
+        "operating_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operating Margin"
+        },
+        "roa": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Roa"
+        },
+        "roic": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Roic"
+        }
+      },
+      "title": "QualityMetricsV1",
+      "type": "object"
+    },
+    "ValueMetricsV1": {
+      "properties": {
+        "buyback_yield": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Buyback Yield"
+        },
+        "dividend_yield": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dividend Yield"
+        },
+        "ev_ebit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ev Ebit"
+        },
+        "net_share_issuance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Net Share Issuance"
+        },
+        "nopat_normalized": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nopat Normalized"
+        },
+        "p_fcf": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P Fcf"
+        },
+        "pb_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pb Ratio"
+        },
+        "pe_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pe Ratio"
+        },
+        "shareholder_yield": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shareholder Yield"
+        }
+      },
+      "title": "ValueMetricsV1",
+      "type": "object"
+    }
+  },
+  "description": "market-data -> scoring (D4.6, WP-13): Kennzahlen neu abgedeckter Aktien, sofort geholt.\n\nNur Aktien ausserhalb des Referenzuniversums, die eine neue Fassung der Abdeckung neu\naufgenommen hat; gespeichert in ``market_data.coverage_fetch``. ``isins``: Symbol -> ISIN.\nKeine Nutzer, Depots oder Mengen.",
+  "properties": {
+    "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+    },
+    "fundamentals": {
+      "items": {
+        "$ref": "#/$defs/FundamentalsV1"
+      },
+      "maxItems": 10,
+      "title": "Fundamentals",
+      "type": "array"
+    },
+    "isins": {
+      "additionalProperties": {
+        "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+        "type": "string"
+      },
+      "title": "Isins",
+      "type": "object"
+    }
+  },
+  "required": [
+    "as_of"
+  ],
+  "title": "CoverageFetchedV1",
+  "type": "object"
+}

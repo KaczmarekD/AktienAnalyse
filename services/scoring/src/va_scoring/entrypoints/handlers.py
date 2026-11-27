@@ -20,12 +20,15 @@ import pandas as pd
 
 from va_contracts.base import missing_to_none
 from va_contracts.events.v1 import (
+    COVERAGE_FETCHED,
+    PLACEMENTS_UPDATED,
     REASON_NO_DATA,
     RUN_FAILED,
     SCORING_RUN_COMPLETED,
     SNAPSHOT_COMPLETED,
     FundamentalsV1,
     IdentityV1,
+    PlacementsUpdatedV1,
     PlacementV1,
     ProfileRefV1,
     RankingRowV1,
@@ -45,10 +48,10 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from va_contracts import Envelope
-    from va_contracts.events.v1 import SnapshotCompletedV1
+    from va_contracts.events.v1 import CoverageFetchedV1, SnapshotCompletedV1
     from va_platform.bus import EventBus
 
-    from ..application.ports import ProfileSource, ScoringStore
+    from ..application.ports import ProfileSource, ReferenceSource, ScoringStore
     from ..domain.profile import ProfileVersionRef
 
 log = logging.getLogger(__name__)
@@ -154,23 +157,13 @@ class SnapshotCompletedHandler:
                 "Einordnung der Depot-Aktien fehlgeschlagen - das Ranking bleibt", exc_info=True
             )
             return []
-        placements: list[PlacementV1] = []
-        for row in placed.to_dict("records"):
-            symbol = str(row["symbol"])
-            try:
-                placements.append(
-                    PlacementV1.from_flat(
-                        row,
-                        isin=_isin(snap.isins, symbol),
-                        instrument_id=snap.instrument_ids.get(symbol),
-                        below_size_filter=symbol in small,
-                        sector=sectors.get(symbol),
-                    )
-                )
-            except ValueError:
-                # Lieber einen Titel verlieren als die Einordnung (ValidationError ist ein ValueError)
-                log.warning("Einordnung von %s ungueltig - sie fehlt", symbol, exc_info=True)
-        return placements
+        return _to_placements(
+            placed,
+            isins=snap.isins,
+            instrument_ids=snap.instrument_ids,
+            small=small,
+            sectors=sectors,
+        )
 
     def _fail(
         self,
@@ -206,6 +199,81 @@ def _ranking_row(
             "composite_percentile": missing_to_none(row.get("composite_percentile")),
         }
     )
+
+
+def _to_placements(
+    placed: pd.DataFrame,
+    *,
+    isins: Mapping[str, str],
+    instrument_ids: Mapping[str, int],
+    small: set[str],
+    sectors: Mapping[str, object],
+) -> list[PlacementV1]:
+    """Je Zeile von ``place()`` eine Einordnung; eine ungueltige kostet nur sich selbst."""
+    placements: list[PlacementV1] = []
+    for row in placed.to_dict("records"):
+        symbol = str(row["symbol"])
+        try:
+            placements.append(
+                PlacementV1.from_flat(
+                    row,
+                    isin=_isin(isins, symbol),
+                    instrument_id=instrument_ids.get(symbol),
+                    below_size_filter=symbol in small,
+                    sector=sectors.get(symbol),  # type: ignore[arg-type]
+                )
+            )
+        except ValueError:
+            # Lieber einen Titel verlieren als die Einordnung (ValidationError ist ein ValueError)
+            log.warning("Einordnung von %s ungueltig - sie fehlt", symbol, exc_info=True)
+    return placements
+
+
+class CoverageFetchedHandler:
+    """D4.6: ``marketdata.coverage.fetched`` -> Einordnung gegen den letzten Bewertungslauf ->
+    ``scoring.placements.updated``.
+
+    Referenzuniversum und Profil sind die des juengsten Bewertungslaufs (``latest_reference``),
+    gespeichert wird in ``scoring.placement`` zu dessen ID. Ranking, CSV und Mail bleiben
+    unberuehrt. Ohne Bewertungslauf wartet die Einordnung auf den ersten; ist die Datenbank weg,
+    stellt der Bus erneut zu; ein Fehler in der Rechnung kostet nur die Einordnung.
+    """
+
+    def __init__(self, bus: EventBus, *, store: ScoringStore, reference: ReferenceSource) -> None:
+        self._bus = bus
+        self._store = store
+        self._reference = reference
+
+    def subscribe(self) -> None:
+        self._bus.subscribe(COVERAGE_FETCHED, CONSUMER, self)
+
+    def __call__(self, env: Envelope[CoverageFetchedV1]) -> None:
+        data = env.data
+        reference = self._reference.latest_reference()
+        if reference is None:
+            log.info("Noch kein Bewertungslauf - die Einordnung wartet auf den ersten")
+            return
+        try:
+            candidates = pd.DataFrame(
+                [f.to_flat() for f in data.fundamentals], columns=_FLAT_COLUMNS
+            )
+            sectors = dict(zip(candidates["symbol"], candidates["sector"], strict=True))
+            placed = place(score(reference.frame, reference.config), candidates, reference.config)
+        except Exception:
+            log.warning(
+                "Sofortige Einordnung fehlgeschlagen - sie kommt mit dem Wochenlauf", exc_info=True
+            )
+            return
+        placements = _to_placements(
+            placed, isins=data.isins, instrument_ids={}, small=set(), sectors=sectors
+        )
+        if not placements:
+            return
+        self._store.record_placements(reference.scoring_run_id, placements)
+        updated = PlacementsUpdatedV1(
+            scoring_run_id=reference.scoring_run_id, as_of=data.as_of, placements=placements
+        )
+        self._bus.publish(follow_up(env, PLACEMENTS_UPDATED, updated, source=SOURCE))
 
 
 def _isin(isins: Mapping[str, str], symbol: str) -> str | None:

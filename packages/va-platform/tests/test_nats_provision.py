@@ -30,11 +30,12 @@ CONSUMERS = {
         "va.portfolio.coverage.changed",
         "va.screening.run.requested",
     ],
-    "scoring": ["va.marketdata.snapshot.completed"],
+    "scoring": ["va.marketdata.coverage.fetched", "va.marketdata.snapshot.completed"],
     # D4.2: dazu die Scores
     "portfolio": [
         "va.marketdata.prices.completed",
         "va.marketdata.securities.updated",
+        "va.scoring.placements.updated",
         "va.scoring.run.completed",
     ],
     "notification": ["va.scoring.run.completed", "va.screening.run.failed"],

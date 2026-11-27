@@ -164,8 +164,8 @@ Liste der einmaligen UPDATEs in `va_platform.db.ddl` (`UPDATABLE_TABLES`) wie be
 | `SnapshotCompletedV1` | neues optionales Feld `covered: list[FundamentalsV1] = []`; die Maps `isins` und `instrument_ids` decken auch sie ab |
 | `ScoringRunCompletedV1` | neues optionales Feld `placements: list[PlacementV1] = []`; seit D4.1 dazu `isin` und `composite_percentile` in `RankingRowV1` (optional, nicht in `to_flat`) |
 | `PlacementV1` (neu, D4.1) | symbol, isin, instrument_id, value_score, quality_score, composite_score, composite_percentile, factor_ranks, value_trap_flag, value_trap_reason, industry_rule, below_size_filter, reason (leer oder `no_quality`/`no_value`/`no_data`). Ein Test prüft, dass es keine Nutzer- oder Mengenfelder gibt. |
-| `CoverageFetchedV1` (neu) | Fundamentaldaten der neu abgedeckten Aktien (WP-13), mit ISIN |
-| `PlacementsUpdatedV1` (neu) | scoring_run_id, gegen den eingeordnet wurde, und `placements[]` |
+| `CoverageFetchedV1` (neu, D4.6) | as_of, Fundamentaldaten der neu abgedeckten Aktien außerhalb des Referenzuniversums (höchstens 10, WP-13), isins (Symbol → ISIN) |
+| `PlacementsUpdatedV1` (neu, D4.6) | scoring_run_id, gegen den eingeordnet wurde, as_of (Tag des Abrufs) und `placements[]` |
 | `SecurityV1` (neu) | isin, asset_class, name, currency, country, listing, Stammdaten je Klasse als Untermodell |
 | `SecuritiesUpdatedV1` (neu) | Liste von `SecurityV1` mit Stand, ISINs ohne Stammdaten; höchstens 50 Wertpapiere je Event. `SecurityV1.etf` (D2.4): Fondsdaten, Gewichte, die zehn größten Positionen und ihre Anzahl |
 | `PricesCompletedV1` (neu) | trade_date, Kurse (isin, close, currency), FX-Kurse |

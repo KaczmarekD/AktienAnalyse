@@ -27,6 +27,7 @@ import pandas as pd
 
 from va_contracts.events.v1 import (
     COVERAGE_CHANGED,
+    COVERAGE_FETCHED,
     FETCH_PROGRESSED,
     PRICES_COMPLETED,
     PRICES_REQUESTED,
@@ -45,9 +46,10 @@ from va_contracts.events.v1 import (
     UniverseInfoV1,
     UniverseMemberV1,
 )
+from va_contracts.events.v1.payloads import CoverageFetchedV1
 from va_platform.bus import follow_up
 
-from ..application.coverage import Covered, plan_coverage, take_coverage
+from ..application.coverage import Covered, Fetched, plan_coverage, take_coverage
 from ..application.fetch import success_share
 from ..application.snapshot import take_snapshot
 from .mapping import security_v1
@@ -288,7 +290,8 @@ class CoverageChangedHandler:
     ``follow`` uebernimmt die Menge (``follow_portfolio`` mit den Adaptern, verdrahtet in
     ``entrypoints.service``); wirft er (Datenbank weg), stellt der Bus erneut zu. ``refresh`` holt
     die Stammdaten der neuen Wertpapiere; ein Fehler dort kostet nur diese Events, der Wochenlauf
-    frischt alle auf.
+    frischt alle auf. Seit D4.6 holt ``fetch_added`` die Kennzahlen neuer Aktien ausserhalb des
+    Universums gleich (``marketdata.coverage.fetched``), damit scoring sie einordnet.
     """
 
     def __init__(
@@ -297,11 +300,13 @@ class CoverageChangedHandler:
         *,
         follow: Callable[[Sequence[str], datetime], CoverageUpdate],
         refresh: Callable[[Sequence[CoverageItem]], RefreshResult] | None = None,
+        fetch_added: Callable[[Sequence[CoverageItem]], Fetched] | None = None,
         today: Callable[[], date] = date.today,
     ) -> None:
         self._bus = bus
         self._follow = follow
         self._refresh = refresh
+        self._fetch_added = fetch_added
         self._today = today
 
     def subscribe(self) -> None:
@@ -309,10 +314,19 @@ class CoverageChangedHandler:
 
     def __call__(self, env: Envelope[CoverageChangedV1]) -> None:
         update = self._follow(env.data.isins, env.time)
-        if not update.added or self._refresh is None:
+        if not update.added:
             return
+        if self._refresh is not None:
+            self._publish_securities(env, update.added)
+        if self._fetch_added is not None:
+            self._publish_fetched(env, self._fetch_added(update.added))
+
+    def _publish_securities(
+        self, env: Envelope[CoverageChangedV1], added: Sequence[CoverageItem]
+    ) -> None:
+        assert self._refresh is not None
         try:
-            events = securities_updated(self._refresh(update.added), self._today())
+            events = securities_updated(self._refresh(added), self._today())
         except Exception:
             log.warning(
                 "Stammdaten der neuen Wertpapiere nicht aufgefrischt - der Wochenlauf holt sie",
@@ -321,3 +335,20 @@ class CoverageChangedHandler:
             return
         for updated in events:
             self._bus.publish(follow_up(env, SECURITIES_UPDATED, updated, source=SOURCE))
+
+    def _publish_fetched(self, env: Envelope[CoverageChangedV1], fetched: Fetched) -> None:
+        """D4.6: die sofort geholten Aktien an scoring; ein Fehler kostet nur die Einordnung."""
+        if not fetched.fundamentals:
+            return
+        try:
+            event = CoverageFetchedV1(
+                as_of=self._today(),
+                fundamentals=[
+                    FundamentalsV1.from_flat(fund.to_flat_dict()) for fund in fetched.fundamentals
+                ],
+                isins=fetched.isins,
+            )
+        except Exception:
+            log.warning("Sofort geholte Aktien nicht gemeldet", exc_info=True)
+            return
+        self._bus.publish(follow_up(env, COVERAGE_FETCHED, event, source=SOURCE))

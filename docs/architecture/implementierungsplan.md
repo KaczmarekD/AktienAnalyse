@@ -4223,6 +4223,24 @@ und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
   (`marketdata.coverage.fetched`), scoring ordnet sie gegen den letzten Bewertungslauf ein
   (`scoring.placements.updated`), portfolio übernimmt sie. Ranking und Mail bleiben gleich.
 - **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - market-data: `fetch_added` (höchstens 10 Aktien je Meldung, zwei Minuten, nur Aktien
+    außerhalb des Universums des jüngsten Abrufs), jede gleich gespeichert in
+    `market_data.coverage_fetch` (Migration 0031, nur anfügen, ganzes `FundamentalsV1`). Nicht in
+    `fetch_run`: Sonst verwendete der nächste Lauf den sofortigen Abruf als Abruf des Tages.
+  - Der Handler meldet die sofort geholten Aktien auch, wenn das Auffrischen der Stammdaten
+    scheitert; ein Ausfall kostet nur die sofortige Einordnung.
+  - scoring: `CoverageFetchedHandler` mit `latest_reference` (jüngster Bewertungslauf ohne
+    Rescores, seine Eingangsdaten, sein Profil); `_to_placements` teilt die Prüfung je Zeile mit
+    dem Wochenlauf. portfolio: `PlacementsUpdatedHandler`.
+  - Consumer `scoring` und `portfolio` je ein Subject mehr; `nats.conf` deckt beides schon ab.
+  - Tests: `test_coverage_fetch.py` (market-data), `test_placements_updated.py` (scoring),
+    `test_depot_scores.py` (portfolio), DB, Contracts.
+  - **Review (`/code-review high`):** ohne Befund in der Sache. Geprüft: In-Progress-Acks decken
+    den längeren Handler, `added` enthält nur neue oder geänderte Einträge (eine tägliche Meldung
+    ohne Änderung holt nichts), eine erneute Zustellung holt nichts doppelt. Offen gelassen: Mit
+    `UNIVERSE=DAX_ONLY` (Testbetrieb) speichert der Lauf nur den DAX als Universum; MDAX-Titel in
+    Depots würden dann sofort geholt und als „außerhalb“ eingeordnet.
 
 **Fertig, wenn:** eine Aktie im Depot dieselben Scores zeigt wie im Ranking und die Golden-Master
 unverändert sind.

@@ -268,6 +268,35 @@ class CoverageChangedV1(Contract):
     isins: list[IsinStr] = Field(default_factory=list)
 
 
+# D4.6: so viele neue Aktien holt market-data je Meldung sofort, der Rest wartet auf den Wochenlauf
+MAX_FETCHED = 10
+
+
+class CoverageFetchedV1(Contract):
+    """market-data -> scoring (D4.6, WP-13): Kennzahlen neu abgedeckter Aktien, sofort geholt.
+
+    Nur Aktien ausserhalb des Referenzuniversums, die eine neue Fassung der Abdeckung neu
+    aufgenommen hat; gespeichert in ``market_data.coverage_fetch``. ``isins``: Symbol -> ISIN.
+    Keine Nutzer, Depots oder Mengen.
+    """
+
+    as_of: date  # Tag des Abrufs
+    fundamentals: list[FundamentalsV1] = Field(default_factory=list, max_length=MAX_FETCHED)
+    isins: dict[str, IsinStr] = Field(default_factory=dict)
+
+
+class PlacementsUpdatedV1(Contract):
+    """scoring -> portfolio (D4.6): Aktien, sofort eingeordnet gegen den letzten Bewertungslauf.
+
+    ``scoring_run_id``: der Bewertungslauf, dessen Referenzuniversum und Profil galten; ``as_of``:
+    Tag des Abrufs der Kennzahlen. Der naechste Wochenlauf ersetzt die Einordnung.
+    """
+
+    scoring_run_id: PositiveId
+    as_of: date
+    placements: list[PlacementV1] = Field(default_factory=list)
+
+
 class SecuritiesUpdatedV1(Contract):
     """market-data -> portfolio (ab D3): Stammdaten und ETF-Daten der Abdeckung (D2.4).
 

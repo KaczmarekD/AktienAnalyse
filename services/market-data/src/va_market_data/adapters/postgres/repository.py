@@ -23,6 +23,7 @@ from va_platform.serialization import json_safe, to_python
 from .models import (
     FREQUENCIES,
     ConsensusSnapshot,
+    CoverageFetch,
     CoverageVersion,
     FetchRun,
     FundamentalSnapshot,
@@ -273,6 +274,24 @@ class MarketDataRepository:
                 }
                 for m in members
             ],
+        )
+
+    def get_latest_universe_keys(self) -> tuple[set[str], set[str]]:
+        """D4.6: Symbole und ISINs des Universums im juengsten Abruf, der eins gespeichert hat."""
+        latest = select(func.max(UniverseMemberRow.fetch_run_id)).scalar_subquery()
+        rows = self.session.execute(
+            select(Instrument.symbol, Instrument.isin)
+            .join(UniverseMemberRow, UniverseMemberRow.instrument_id == Instrument.id)
+            .where(UniverseMemberRow.fetch_run_id == latest)
+        ).all()
+        return {r.symbol for r in rows}, {r.isin for r in rows if r.isin}
+
+    def write_coverage_fetch(
+        self, *, isin: str, symbol: str, fetched_at: datetime, payload: dict[str, Any]
+    ) -> None:
+        """D4.6: ein sofort geholter Titel, nur zum Anfuegen."""
+        self.session.add(
+            CoverageFetch(isin=isin, symbol=symbol, fetched_at=fetched_at, payload=payload)
         )
 
     def get_universe(self, fetch_run_id: int) -> pd.DataFrame:

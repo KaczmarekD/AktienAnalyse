@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Collection, Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import InterfaceError, OperationalError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from va_contracts.events.v1 import FundamentalsV1
 from va_platform.db import session_scope
 
 from ...application.fetch import success_share
@@ -26,8 +27,6 @@ from ...domain.history import (
 from .repository import MarketDataRepository, UniverseMember, snapshot_values
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     import pandas as pd
     from sqlalchemy import Engine
     from sqlalchemy.orm import Session
@@ -155,6 +154,22 @@ class PostgresSnapshotStore:
     def coverage(self) -> list[Coverage]:
         with session_scope(self._engine) as s:
             return MarketDataRepository(s).get_coverage()
+
+    def universe_keys(self) -> tuple[set[str], set[str]]:
+        """D4.6: Symbole und ISINs des juengsten Universums."""
+        with session_scope(self._engine) as s:
+            return MarketDataRepository(s).get_latest_universe_keys()
+
+    def record_coverage_fetch(self, fund: Fundamentals, isin: str) -> None:
+        """D4.6: ein sofort geholter Titel als ganzes ``FundamentalsV1``."""
+        payload = FundamentalsV1.from_flat(fund.to_flat_dict()).model_dump(mode="json")
+        with session_scope(self._engine) as s:
+            MarketDataRepository(s).write_coverage_fetch(
+                isin=isin,
+                symbol=fund.symbol,
+                fetched_at=fund.provenance.fetched_at or datetime.now(UTC),
+                payload=payload,
+            )
 
     def coverage_as_of(self) -> datetime | None:
         with session_scope(self._engine) as s:

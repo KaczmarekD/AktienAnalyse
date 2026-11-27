@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
@@ -49,7 +50,25 @@ class ProfileStore(Protocol):
         ...
 
 
-class ScoringAdapter(ScoringStore, ProfileStore, Protocol):
+@dataclass(frozen=True)
+class Reference:
+    """D4.6: das Referenzuniversum eines Bewertungslaufs, um nachtraeglich einzuordnen.
+
+    ``frame``: die Eingangsdaten seines Abrufs (``input_snapshot``), ``config``: sein Profil.
+    """
+
+    scoring_run_id: int
+    frame: pd.DataFrame
+    config: ScoringConfig
+
+
+class ReferenceSource(Protocol):
+    def latest_reference(self) -> Reference | None:
+        """Der juengste Bewertungslauf mit Eingangsdaten und Profil, sonst ``None``."""
+        ...
+
+
+class ScoringAdapter(ScoringStore, ProfileStore, ReferenceSource, Protocol):
     """Speicher von scoring: Bewertungslaeufe und Profile (P2b.3), wie ``PostgresScoringStore``."""
 
 

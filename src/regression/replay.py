@@ -196,6 +196,10 @@ class _ScoringCapture:
         default_factory=lambda: pd.DataFrame(columns=list(FACTOR_COLUMNS))
     )
 
+    def latest_reference(self) -> None:
+        """D4.6: Die Regression ordnet nichts nachtraeglich ein."""
+        return
+
     def record_placements(self, scoring_run_id: int, placements: object) -> None:
         """D4.1: Die Regression vergleicht das Ranking; Einordnungen speichert sie nicht."""
         del scoring_run_id, placements

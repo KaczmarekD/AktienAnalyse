@@ -93,7 +93,8 @@ CONSUMERS = (
             "va.portfolio.coverage.changed",
         ),
     ),
-    ConsumerSpec("scoring", ("va.marketdata.snapshot.completed",)),
+    # D4.6: dazu neu abgedeckte Aktien, sofort eingeordnet
+    ConsumerSpec("scoring", ("va.marketdata.snapshot.completed", "va.marketdata.coverage.fetched")),
     # D3.4: Kopien von Stammdaten und Kursen fuer die Bewertung der Depots, D4.2 der Scores
     ConsumerSpec(
         "portfolio",
@@ -101,6 +102,7 @@ CONSUMERS = (
             "va.marketdata.securities.updated",
             "va.marketdata.prices.completed",
             "va.scoring.run.completed",
+            "va.scoring.placements.updated",
         ),
     ),
     ConsumerSpec("notification", ("va.scoring.run.completed", "va.screening.run.failed")),

@@ -128,3 +128,45 @@ class TestSnapshots:
                 {"id": fetch_run_id},
             ).scalar_one()
         assert role == "universe"
+
+
+class TestRightAway:
+    """D4.6: sofort geholte Aktien und das Universum des juengsten Abrufs."""
+
+    def test_the_universe_of_the_latest_fetch(self, store, engine):
+        from va_market_data.adapters.postgres.repository import MarketDataRepository, UniverseMember
+        from va_platform.db import session_scope
+
+        with session_scope(engine) as s:
+            repo = MarketDataRepository(s)
+            old = repo.write_fetch_run_start(
+                provider="x", provider_version=None, universe_source=None, universe_size=1
+            )
+            repo.write_universe(old, [UniverseMember("OLD.DE", "MDAX", "Alt", "iShares")])
+            new = repo.write_fetch_run_start(
+                provider="x", provider_version=None, universe_source=None, universe_size=1
+            )
+            repo.write_universe(new, [UniverseMember("SAP.DE", "DAX", "SAP", "iShares")])
+            repo.write_isins({"SAP.DE": "DE0007164600"})
+        assert store.universe_keys() == ({"SAP.DE"}, {"DE0007164600"})
+
+    def test_a_fetched_stock_is_kept_whole(self, store, engine):
+        fund = _fund("AAPL", index="-")
+        fund.provenance.fetched_at = T0
+        store.record_coverage_fetch(fund, "US0378331005")
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT isin, symbol, fetched_at, payload FROM market_data.coverage_fetch")
+            ).one()
+        assert (row.isin, row.symbol, row.fetched_at) == ("US0378331005", "AAPL", T0)
+        assert row.payload["identity"]["symbol"] == "AAPL"
+        assert row.payload["market"]["market_cap"] == 5e9
+
+    def test_never_changed_or_deleted(self, store, engine):
+        store.record_coverage_fetch(_fund("AAPL", index="-"), "US0378331005")
+        for statement in (
+            "UPDATE market_data.coverage_fetch SET symbol = 'X'",
+            "DELETE FROM market_data.coverage_fetch",
+        ):
+            with pytest.raises(Exception), engine.begin() as conn:  # noqa: B017, PT011
+                conn.execute(text(statement))

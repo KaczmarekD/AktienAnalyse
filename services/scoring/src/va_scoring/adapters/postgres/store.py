@@ -14,7 +14,8 @@ from va_contracts.events.v1.ranking import ANCHOR_KEYS
 from va_platform.db import session_scope
 from va_platform.serialization import to_python
 
-from ...domain.profile import DEFAULT_PROFILE_NAME
+from ...application.ports import Reference
+from ...domain.profile import DEFAULT_PROFILE_NAME, ScoringProfileParams
 from .repository import AnchorRow, FactorScoreRow, ScoreRow, ScoringRepository
 
 if TYPE_CHECKING:
@@ -81,6 +82,20 @@ class PostgresScoringStore:
             ScoringRepository(s).write_placements(
                 scoring_run_id, [placement.model_dump() for placement in placements]
             )
+
+    def latest_reference(self) -> Reference | None:
+        """D4.6: der juengste Bewertungslauf (ohne Rescores) mit Eingangsdaten und Profil."""
+        with session_scope(self._engine) as s:
+            repo = ScoringRepository(s)
+            run = repo.get_latest_scoring_run()
+            if run is None or run.fetch_run_id is None or run.profile_id is None:
+                return None
+            version = repo.get_profile_version(run.profile_id, run.profile_version or 0)
+            frame = repo.get_input_frame(run.fetch_run_id)
+        if version is None or frame.empty:
+            return None
+        config = ScoringProfileParams.model_validate(version.params).to_config()
+        return Reference(run.id, frame, config)
 
     def ensure_default_profile(self, params: Mapping[str, Any]) -> ProfileVersionRef:
         """Legt "Standard" einmalig an (ENV nur als Startwerte), liefert die aktive Version."""

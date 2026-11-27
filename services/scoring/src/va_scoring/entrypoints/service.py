@@ -21,7 +21,7 @@ from ..application.profiles import StoredProfile
 from ..domain.profile import profile_params
 from ..domain.scoring import ScoringConfig
 from . import rpc
-from .handlers import SnapshotCompletedHandler
+from .handlers import CoverageFetchedHandler, SnapshotCompletedHandler
 from .settings import ScoringSettings
 
 if TYPE_CHECKING:
@@ -49,6 +49,8 @@ def wire(bus: EventBus, store: ScoringAdapter, settings: ScoringSettings) -> Non
     SnapshotCompletedHandler(
         bus, store=store, profile=StoredProfile(store, start_params)
     ).subscribe()
+    # D4.6: neu abgedeckte Aktien sofort gegen den letzten Bewertungslauf einordnen
+    CoverageFetchedHandler(bus, store=store, reference=store).subscribe()
 
 
 def reliable(bus: EventBus, engine: Engine, settings: ScoringSettings) -> EventBus:

@@ -23,10 +23,12 @@ from pydantic import BaseModel, ValidationError
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
     COVERAGE_CHANGED,
+    COVERAGE_FETCHED,
     DEPOT_CHANGED,
     EMAIL_CONFIRMATION_REQUESTED,
     EVENTS,
     FETCH_PROGRESSED,
+    PLACEMENTS_UPDATED,
     PRICES_COMPLETED,
     PRICES_REQUESTED,
     PROFILE_ACTIVATED,
@@ -38,10 +40,12 @@ from va_contracts.events.v1 import (
     SECURITIES_UPDATED,
     SNAPSHOT_COMPLETED,
     CoverageChangedV1,
+    CoverageFetchedV1,
     DepotChangedV1,
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
     FundamentalsV1,
+    PlacementsUpdatedV1,
     PlacementV1,
     PricesCompletedV1,
     PricesRequestedV1,
@@ -280,6 +284,14 @@ def _examples() -> dict[str, Contract]:
             depot_id=3, owner_user_id=1, change="holdings", version=8
         ),
         COVERAGE_CHANGED.type: CoverageChangedV1(isins=["DE0001102580", "US0378331005"]),
+        COVERAGE_FETCHED.type: CoverageFetchedV1(
+            as_of=date(2026, 11, 27),
+            fundamentals=funds[:1],
+            isins={funds[0].symbol: "US0378331005"},
+        ),
+        PLACEMENTS_UPDATED.type: PlacementsUpdatedV1(
+            scoring_run_id=3, as_of=date(2026, 11, 27), placements=[_apple_placement()]
+        ),
         SECURITIES_UPDATED.type: SecuritiesUpdatedV1(
             as_of=date(2026, 11, 21), securities=[_world_etf()], missing=["DE000A383J95"]
         ),
@@ -403,6 +415,9 @@ class TestEventCatalog:
             "marketdata.securities.updated",  # D2.4: Stammdaten und ETF-Daten
             "portfolio.depot.changed",  # D3.1: Depots, nur IDs und Version
             "portfolio.coverage.changed",  # D3.3: Abdeckung, nur ISINs
+            # D4.6: neue Aktie sofort einordnen
+            "marketdata.coverage.fetched",
+            "scoring.placements.updated",
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -967,3 +982,28 @@ class TestPlacement:
         _, ranking = _scored()
         row = ranking[0].model_copy(update={"isin": "DE0007164600", "composite_percentile": 0.5})
         assert row.to_flat() == ranking[0].to_flat()
+
+
+class TestPlacingRightAway:
+    """D4.6: neue Aktie sofort einordnen, ohne Nutzer und Mengen."""
+
+    def test_no_users_or_quantities(self):
+        for model in (CoverageFetchedV1, PlacementsUpdatedV1):
+            for word in ("user", "quantity", "depot", "amount", "email"):
+                assert not any(word in name for name in model.model_fields), (model, word)
+
+    def test_at_most_ten_stocks_per_event(self):
+        fund = FundamentalsV1.model_validate(_nested(_golden_fundamentals()[0]))
+        CoverageFetchedV1(as_of=date(2026, 11, 27), fundamentals=[fund] * 10)
+        with pytest.raises(ValidationError):
+            CoverageFetchedV1(as_of=date(2026, 11, 27), fundamentals=[fund] * 11)
+
+    def test_isins_are_checked(self):
+        with pytest.raises(ValidationError):
+            CoverageFetchedV1(as_of=date(2026, 11, 27), isins={"AAPL": "Apple"})
+
+    def test_wait_a_day_or_a_week(self):
+        assert COVERAGE_FETCHED.max_age == timedelta(hours=24)
+        assert PLACEMENTS_UPDATED.max_age == timedelta(days=7)
+        assert COVERAGE_FETCHED.subject == "va.marketdata.coverage.fetched"
+        assert not COVERAGE_FETCHED.private

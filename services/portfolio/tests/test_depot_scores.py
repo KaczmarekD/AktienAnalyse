@@ -13,9 +13,11 @@ from decimal import Decimal
 
 from va_contracts import new_envelope
 from va_contracts.events.v1 import (
+    PLACEMENTS_UPDATED,
     SCORING_RUN_COMPLETED,
     FundamentalsV1,
     IdentityV1,
+    PlacementsUpdatedV1,
     PlacementV1,
     RankingRowV1,
     RunOptionsV1,
@@ -190,3 +192,39 @@ class TestDepotWithScores:
         _, _, service = _setup()
         depot_id = _depot_with(service, HoldingLine(SAP, Decimal(1)))
         assert _positions(service, depot_id)[SAP].score is None
+
+
+class TestRightAway:
+    """D4.6: eine neue Aktie, sofort gegen den letzten Bewertungslauf eingeordnet."""
+
+    def _updated(self, bus: InProcessBus, scoring_run_id: int, *placements: PlacementV1) -> None:
+        bus.publish(
+            new_envelope(
+                PLACEMENTS_UPDATED,
+                PlacementsUpdatedV1(
+                    scoring_run_id=scoring_run_id, as_of=NEXT_FRIDAY, placements=list(placements)
+                ),
+                source="va/scoring",
+            )
+        )
+
+    def test_the_new_stock_has_scores_at_once(self):
+        bus, market, service = _setup()
+        bus.publish(_completed(8, FRIDAY, [SAP_ROW]))
+        self._updated(bus, 8, APPLE_PLACED)
+        apple = market.scores[APPLE]
+        assert (apple.scoring_run_id, apple.as_of, apple.reference) == (8, NEXT_FRIDAY, "outside")
+        depot_id = _depot_with(service, HoldingLine(APPLE, Decimal(3)))
+        score = _positions(service, depot_id)[APPLE].score
+        assert score is not None
+        assert score.composite_percentile == APPLE_PLACED.composite_percentile
+
+    def test_the_next_weekly_run_replaces_it(self):
+        bus, market, _ = _setup()
+        self._updated(bus, 8, APPLE_PLACED)
+        weekly = APPLE_PLACED.model_copy(update={"composite_score": 0.5})
+        bus.publish(_completed(9, NEXT_FRIDAY, [SAP_ROW], [weekly]))
+        assert (market.scores[APPLE].scoring_run_id, market.scores[APPLE].composite_score) == (
+            9,
+            0.5,
+        )

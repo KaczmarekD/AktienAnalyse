@@ -405,6 +405,10 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   `scoring.run.completed` (`placements[]`) und `scoring.placement`; die Ranking-Zeilen tragen
   `isin` und `composite_percentile` (nicht in `to_flat`). Ranking, CSV und Mail bleiben gleich
   (`tests/test_golden_placement.py`). Scheitert die Einordnung, fehlt sie, der Lauf nicht.
+  Seit D4.6 sofort für neue Aktien der Abdeckung: market-data holt sie gleich
+  (`fetch_added`, höchstens 10, `market_data.coverage_fetch`, `marketdata.coverage.fetched`),
+  scoring ordnet sie gegen den jüngsten Bewertungslauf ein (`CoverageFetchedHandler`,
+  `latest_reference`, `scoring.placements.updated`), portfolio übernimmt sie.
 - Tageskurse (D2.3): An Handelstagen 22:30 stößt das web-api `marketdata.prices.requested` an
   (`PriceScheduler`, `web.price_request`, `WEB_API_PRICE_SCHEDULE`). market-data holt die
   Schlusskurse der Abdeckung per Sammelabruf (`yf.download`), rechnet Pence in Pfund um,

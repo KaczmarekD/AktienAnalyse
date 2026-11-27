@@ -109,7 +109,20 @@ scoring. Abweichungen und Ergänzungen:
   fehlt nur die Zeile in `scoring.placement`.
 - Einen Rescore nach einer Profil-Aktivierung gibt es in scoring noch nicht (nur den Trigger im
   Contract). Kommt er, braucht er die Kandidaten getrennt in `scoring.input_snapshot`.
-- Die Einordnung gegen den letzten Bewertungslauf bei neuer Abdeckung kommt mit D4.6.
+- Die Einordnung gegen den letzten Bewertungslauf bei neuer Abdeckung kam mit D4.6 (unten).
+
+**Umgesetzt (27.11.2026, D4.6):** Nimmt eine neue Fassung der Abdeckung Aktien außerhalb des
+Referenzuniversums auf, holt market-data ihre Kennzahlen gleich (höchstens 10 je Meldung, zwei
+Minuten), speichert sie in `market_data.coverage_fetch` und meldet `marketdata.coverage.fetched`.
+scoring ordnet sie gegen den jüngsten Bewertungslauf ein (seine Eingangsdaten aus
+`input_snapshot`, sein Profil), speichert in `scoring.placement` zu dessen ID und meldet
+`scoring.placements.updated`; portfolio übernimmt sie in `score_view`. Der nächste Wochenlauf ersetzt
+die Einordnung. Abweichungen:
+- Ein eigener Speicher statt `fetch_run`/`fundamental_snapshot`: Ein Abruf außerhalb des
+  Wochenlaufs wäre sonst der „Abruf des Tages“, den der nächste Lauf wiederverwendet.
+- Universumstitel brauchen das nicht: Ihre Scores kommen mit jedem Bewertungslauf in
+  `score_view`, auch wenn sie noch in keinem Depot stehen.
+- Ohne Kurshistorie gibt es kein Momentum; die Regel mit Momentum greift dann nicht.
 
 **Umgesetzt (27.11.2026, D4.2):** portfolio übernimmt `scoring.run.completed` in `score_view`:
 alle Ranking-Zeilen und Einordnungen mit ISIN, nicht nur die Titel in Depots. So hat eine neu

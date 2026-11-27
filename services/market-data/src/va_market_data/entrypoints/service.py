@@ -39,7 +39,13 @@ from ..adapters.yahoo import (
     YahooTextSearch,
     provider_version,
 )
-from ..application.coverage import CoverageUpdate, CoverageWriter, follow_portfolio
+from ..application.coverage import (
+    CoverageUpdate,
+    CoverageWriter,
+    Fetched,
+    fetch_added,
+    follow_portfolio,
+)
 from ..application.fetch import fetch_all
 from ..application.prices import (
     PricesResult,
@@ -89,6 +95,8 @@ class MarketDataAdapters:
     # Batch, Tests) kein Handler fuer portfolio.coverage.changed
     follow_coverage: Callable[[Sequence[str], datetime], CoverageUpdate] | None = None
     refresh_items: Callable[[Sequence[CoverageItem]], RefreshResult] | None = None
+    # D4.6: Kennzahlen neu abgedeckter Aktien sofort; ohne wartet die Einordnung auf den Wochenlauf
+    fetch_added: Callable[[Sequence[CoverageItem]], Fetched] | None = None
 
 
 def live_universe(
@@ -171,6 +179,7 @@ def build_adapters(
         securities=master_data(store, engine) if live else None,
         follow_coverage=portfolio_coverage(store, engine) if live else None,
         refresh_items=refresh_items(engine) if live else None,
+        fetch_added=partial(fetch_added, store=store, fetch=fetch) if live else None,
     )
 
 
@@ -254,7 +263,10 @@ def wire(bus: EventBus, adapters: MarketDataAdapters, settings: MarketDataSettin
         PricesRequestedHandler(bus, collect=adapters.prices).subscribe()
     if adapters.follow_coverage is not None:
         CoverageChangedHandler(
-            bus, follow=adapters.follow_coverage, refresh=adapters.refresh_items
+            bus,
+            follow=adapters.follow_coverage,
+            refresh=adapters.refresh_items,
+            fetch_added=adapters.fetch_added,
         ).subscribe()
 
 

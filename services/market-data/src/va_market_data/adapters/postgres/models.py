@@ -479,3 +479,21 @@ class MarketDataInbox(InboxMixin, Base):
     """Events, die market-data verarbeitet hat, je Consumer einmal (P4.2)."""
 
     __table_args__ = {"schema": "market_data"}  # noqa: RUF012
+
+
+class CoverageFetch(Base):
+    """D4.6: Kennzahlen einer neu abgedeckten Aktie, sofort geholt (ausserhalb eines Abrufs des
+    Universums). ``payload``: das ganze ``FundamentalsV1``. Nur zum Anfuegen; der Wochenlauf holt
+    die Aktie danach wie jede andere der Abdeckung in ``fundamental_snapshot``."""
+
+    __tablename__ = "coverage_fetch"
+    __table_args__ = (
+        Index("ix_coverage_fetch_isin_fetched_at", "isin", "fetched_at"),
+        {"schema": "market_data"},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    isin: Mapped[str] = mapped_column(Text)
+    symbol: Mapped[str] = mapped_column(Text)
+    fetched_at: Mapped[datetime]
+    payload: Mapped[Any] = mapped_column(JSONB)

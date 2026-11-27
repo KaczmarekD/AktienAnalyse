@@ -4,6 +4,8 @@
 - ``marketdata.prices.completed`` -> ``MarketStore.record_prices`` (Kurse und Waehrungskurse)
 - ``scoring.run.completed`` -> ``MarketStore.record_scores`` (D4.2): Ranking-Zeilen und
   Einordnungen (D4.1) mit ISIN; ohne ISIN kann portfolio sie keiner Position zuordnen
+- ``scoring.placements.updated`` -> ebenso (D4.6): neue Aktien, sofort gegen den letzten
+  Bewertungslauf eingeordnet; der naechste Wochenlauf ersetzt sie
 
 Wirft der Speicher, stellt der Bus erneut zu. Folge-Events gibt es nicht: Die Bewertung rechnet
 portfolio bei jeder Anfrage aus den Kopien (``DepotService``).
@@ -16,7 +18,12 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from va_contracts.events.v1 import PRICES_COMPLETED, SCORING_RUN_COMPLETED, SECURITIES_UPDATED
+from va_contracts.events.v1 import (
+    PLACEMENTS_UPDATED,
+    PRICES_COMPLETED,
+    SCORING_RUN_COMPLETED,
+    SECURITIES_UPDATED,
+)
 
 from ..application.market import FxRate, SecurityCopy
 from ..domain.valuation import Quote, Score, SecurityInfo, score_reason
@@ -24,6 +31,7 @@ from ..domain.valuation import Quote, Score, SecurityInfo, score_reason
 if TYPE_CHECKING:
     from va_contracts import Envelope
     from va_contracts.events.v1 import (
+        PlacementsUpdatedV1,
         PlacementV1,
         PricesCompletedV1,
         RankingRowV1,
@@ -117,6 +125,25 @@ class ScoringRunCompletedHandler:
         self._store.record_scores(scores, at=self._clock())
 
 
+class PlacementsUpdatedHandler:
+    """D4.6: sofort eingeordnete Aktien, mit Bewertungslauf und Tag des Abrufs."""
+
+    def __init__(
+        self, bus: EventBus, store: MarketStore, *, clock: Callable[[], datetime] = _utcnow
+    ) -> None:
+        self._bus = bus
+        self._store = store
+        self._clock = clock
+
+    def subscribe(self) -> None:
+        self._bus.subscribe(PLACEMENTS_UPDATED, CONSUMER, self)
+
+    def __call__(self, env: Envelope[PlacementsUpdatedV1]) -> None:
+        data = env.data
+        scores = [_placed(p, data.scoring_run_id, data.as_of) for p in data.placements if p.isin]
+        self._store.record_scores(scores, at=self._clock())
+
+
 def _ranked(row: RankingRowV1, scoring_run_id: int, as_of: date) -> Score:
     """Ein Titel des Rankings: dieselben Werte wie dort, mit Rang."""
     return Score(
@@ -162,3 +189,4 @@ def wire(bus: EventBus, store: MarketStore) -> None:
     SecuritiesUpdatedHandler(bus, store).subscribe()
     PricesCompletedHandler(bus, store).subscribe()
     ScoringRunCompletedHandler(bus, store).subscribe()
+    PlacementsUpdatedHandler(bus, store).subscribe()
