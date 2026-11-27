@@ -295,13 +295,13 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D3.4 Bewertung der Depots (`2e7b451`; Migration 0025, Consumer `portfolio`; NAS: nach dem Update `docker compose restart nats` wegen neuer Rechte in `nats.conf`, nichts Neues in der `.env`)
   - [x] D3.5 Datei im eigenen Format (`ceacd84`; CSV-Import mit Abgleich und Export, keine Migration; NAS: nichts Neues)
   - [x] D3.6 Oberfläche „Meine Depots“ (`ae1bfaa`; `/depots` als Startseite nach der Anmeldung, Depot-Detail mit Bearbeiten, Datei und Verlauf, Playwright-Test; keine Migration; NAS: nichts Neues)
-- [ ] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
+- [x] D4 Analyse: Einordnung ins Referenzuniversum, ETF, Anleihen, Depot
   - [x] D4.1 Einordnung in scoring (`9b52350`; `place()`, `placements[]`, Ranking-Zeilen mit `isin` und `composite_percentile`; Migration 0027 `scoring.placement`; Ranking, CSV und Mail unverändert; NAS: nichts Neues)
   - [x] D4.2 Scores im Depot (`c591a5f`; Consumer `portfolio` mit `scoring.run.completed`, Migration 0028 `portfolio.score_view`, `PositionValueV1.score`, Spalten im Depot; NAS: nichts Neues in der `.env`, Scores im Depot ab dem nächsten Bewertungslauf oder sofort mit einem Lauf aus dem UI)
   - [x] D4.3 ETF und Anleihen rechnen (`a77f89f`; `va_portfolio.domain.bonds` und `funds`, reine Funktionen, nachgerechnet von Hand; keine Migration; NAS: nichts Neues)
   - [x] D4.4 Depot-Analyse (`bb8b06d`; `analyze()`, RPC `portfolio.depots.analysis`, `GET /depots/{id}/analysis`, `PlacementV1.sector`; bei jeder Anfrage gerechnet, `analysis_run` und `portfolio.analysis.completed` nach D5 verschoben; keine Migration; NAS: nichts Neues)
   - [x] D4.5 Ansicht „Analyse“ (`d6803a8`; `AnalysisPanel` im Depot mit Qualität, Allokation, Konzentration, Kosten, Anleihen, Datenlage; offen: Score-Verlauf für Aktien außerhalb von DAX/MDAX; keine Migration; NAS: nichts Neues)
-  - [ ] D4.6 Neue Aktie sofort einordnen
+  - [x] D4.6 Neue Aktie sofort einordnen (`85bb1bf`; `marketdata.coverage.fetched`, `scoring.placements.updated`, Migration 0031 `market_data.coverage_fetch`; NAS: nichts Neues in der `.env`, die Consumer gleichen sich beim Start an)
 - [ ] D5 Hinweise (mit `analysis_run` und `portfolio.analysis.completed`, aus D4.4 verschoben)
 - [ ] D6 News
 - [ ] D7 Berichte mit eigenem Intervall
