@@ -1,0 +1,33 @@
+// Analyse eines Depots (D4.5): nur Einmaliges, der Rest kommt aus den Mustern
+@use '../../styles/breakpoints';
+
+app-section + app-section {
+  display: block;
+  margin-top: var(--va-space-lg);
+}
+
+.kv-list,
+.data-table + .data-table,
+.kv-list + .data-table,
+.kv-list + .table-sheet,
+.table-sheet + .data-table {
+  margin-bottom: var(--va-space-md);
+}
+
+// Vier kleine Tabellen der Allokation nebeneinander, auf schmalen Bildschirmen untereinander
+.allocation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--va-space-lg);
+}
+
+@media (max-width: breakpoints.$narrow) {
+  .allocation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.bar {
+  margin-left: var(--va-space-sm);
+  vertical-align: middle;
+}

@@ -237,6 +237,10 @@
     </app-section>
   }
 
+  @if (depot.kind === 'depot' && positions().length && !editing()) {
+    <app-analysis-panel [depotId]="depot.id" [version]="depot.version" [names]="names()" />
+  }
+
   <app-import-panel [depotId]="depot.id" [readonly]="archived()" (imported)="onImported()" />
 
   <app-section heading="Verlauf" data-history>

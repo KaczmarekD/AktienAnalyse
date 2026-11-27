@@ -76,6 +76,107 @@ export const SCORE_REASON = {
 export const NO_SCORE =
   'Scores gibt es für Aktien, sobald ein Bewertungslauf sie kennt. ETFs und Anleihen haben keine.';
 
+/** D4.5: Tooltips und Texte der Analyse (docs/architecture/depot/analyse.md, Abschnitt Depot). */
+export const ANALYSIS = {
+  section:
+    'Aus dem neuesten Depotstand, den letzten Kursen, dem jüngsten Bewertungslauf und den Stammdaten, bei jedem Aufruf neu gerechnet. Anteile beziehen sich auf den Wert des Depots.',
+  noData: 'keine Daten',
+  quality:
+    'Wertgewichtet über die Aktien mit Score, eingeordnet in DAX/MDAX. Positionen ohne Score zählen nicht mit.',
+  composite: 'Composite der Aktien, gewichtet mit ihrem Wert. 0 bis 1, höher ist besser.',
+  value: 'Value-Score der Aktien, gewichtet mit ihrem Wert.',
+  qualityScore: 'Quality-Score der Aktien, gewichtet mit ihrem Wert.',
+  covered: 'Anteil am Wert der Aktien, für den es einen Composite gibt.',
+  valueTraps: 'Zahl der Aktien mit Verdacht auf eine Value-Falle.',
+  quintile:
+    'Fünftel von DAX/MDAX nach Composite-Perzentil: oberstes = besser als vier Fünftel der Titel.',
+  quintileCount: 'Zahl der Aktien in diesem Fünftel.',
+  quintileWeight: 'Anteil am Wert der Aktien mit Perzentil.',
+  fund: 'ETF im Depot.',
+  fundScore:
+    'Composite der Positionen des ETF, gewichtet mit ihrem Anteil. Erst ab 50 % bewertetem Gewicht.',
+  fundCovered: 'Anteil des ETF, dessen Positionen einen Composite haben.',
+  allocation:
+    'Verteilung des Depots. Sektor und Land mit Durchschau durch die ETFs, soweit ihre Stammdaten sie nennen.',
+  assetClass: 'Aktien, ETFs, Anleihen und Kasse.',
+  currency: 'Währung der Wertpapiere; bei ETFs die Fondswährung, nicht die ihrer Positionen.',
+  sector: 'Sektor der Aktien; bei ETFs nach ihren Stammdaten.',
+  country: 'Land der Aktien und Anleihen nach ISIN (Sitz); bei ETFs nach ihren Stammdaten.',
+  share: 'Anteil am Wert des Depots.',
+  amount: 'Wert in Euro.',
+  concentration: 'Wie stark das Depot an einzelnen Titeln hängt, mit Durchschau durch die ETFs.',
+  largest: 'Titel mit dem größten Anteil, direkt gehalten und in ETFs zusammen.',
+  top: 'Anteil der fünf größten Titel zusammen.',
+  effective:
+    'Effektive Zahl der Positionen: 1 / Summe der quadrierten Gewichte. Ein ETF zählt als eine.',
+  lowerBound:
+    'Mindestens: Ein ETF nennt nur seine größten Positionen oder keine, der Rest fehlt in der Rechnung.',
+  costs: 'Laufende Kosten der ETFs aus ihrer TER.',
+  ter: 'TER (Total Expense Ratio): laufende Kosten eines ETF in Prozent pro Jahr, gewichtet mit dem Wert.',
+  runningCosts: 'Wert der ETFs mal TER: so viel kosten sie etwa im Jahr.',
+  costsCovered: 'Anteil am Wert der ETFs, für den eine TER bekannt ist.',
+  bonds:
+    'Kennzahlen der Anleihen zum letzten Kurs, jährlicher Kupon nach ACT/ACT ICMA wie bei Bundesanleihen.',
+  ytm: 'Rendite bis Fälligkeit pro Jahr, gewichtet mit dem Wert.',
+  duration:
+    'Modifizierte Duration in Jahren: um wie viel Prozent der Kurs etwa fällt, wenn die Rendite um einen Prozentpunkt steigt.',
+  bondsCovered: 'Anteil am Wert der Anleihen, für den es eine Rendite gibt.',
+  bond: 'Anleihe im Depot.',
+  nextCoupon: 'Nächster Kupontermin.',
+  bondNote: 'Warum es keine Rendite gibt.',
+  maturity: 'Jahr der Fälligkeit.',
+  maturityValue: 'Wert der Anleihen, die in diesem Jahr fällig werden.',
+  data: 'Woher die Zahlen kommen und wie alt sie sind.',
+  valued: 'Positionen mit Kurs von allen Positionen. Ohne Kurs zählt eine Position nicht mit.',
+  lookThrough: 'Anteil am Wert der ETFs, deren Positionen bekannt sind.',
+  oldestPrice: 'Ältester Kurs, der in die Analyse eingeht.',
+  oldestScore: 'Datenstand des ältesten Bewertungslaufs der Aktien.',
+  oldestFund: 'Ältester Stand der ETF-Daten.',
+  watchlist: 'Eine Beobachtungsliste hat keine Mengen und damit keine Analyse.',
+} as const;
+
+/** D4.5: Anlageklassen und Schlüssel ohne Zuordnung der Allokation. */
+export const SLICE = {
+  equity: 'Aktien',
+  etf: 'ETFs',
+  bond: 'Anleihen',
+  other: 'Sonstige',
+  cash: 'Kasse',
+  bonds: 'Anleihen',
+  unknown: 'ohne Angabe',
+  no_look_through: 'ohne Durchschau',
+} as const satisfies Record<string, string>;
+
+/** D4.5: Warum eine Anleihe keine Rendite hat (``special`` der API). */
+export const BOND_SPECIAL: Record<string, string> = {
+  floating: 'variabel verzinst',
+  convertible: 'Wandelanleihe',
+  perpetual: 'ohne Fälligkeit',
+  no_terms: 'ohne Kupon in den Stammdaten',
+  matured: 'fällig',
+  out_of_range: 'Kurs unplausibel',
+};
+
+const regions = new Intl.DisplayNames(['de'], { type: 'region' });
+
+/** Land aus dem ISO-Code (ISIN-Präfix); XS = internationale Anleihe, Unbekanntes bleibt. */
+export function countryName(code: string): string {
+  if (code in SLICE) {
+    return SLICE[code as keyof typeof SLICE];
+  }
+  if (code === 'XS') {
+    return 'international';
+  }
+  if (!/^[A-Z]{2}$/.test(code)) {
+    return code;
+  }
+  try {
+    return regions.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 /** Herkunft eines Depotstands. */
 export const SOURCE = {
   manual: 'von Hand',

@@ -88,6 +88,8 @@ test('ein Nutzer legt ein Depot an, der Wert stimmt, ein zweiter sieht es nicht'
   await expect(row.locator('[data-missing]')).toContainText('Kurs fehlt');
   await expect(page.locator('[data-stat-value]')).toContainText('1.000,50 €');
   await expect(page.locator('[data-history] [data-version]')).toHaveCount(2);
+  // D4.5: Die Analyse rechnet mit; ohne Kurs zählt SAP noch nicht mit
+  await expect(page.locator('[data-analysis] [data-valued]')).toContainText('0 von 1 Positionen');
 
   // In der Liste mit Wert
   await page.goto('/depots');

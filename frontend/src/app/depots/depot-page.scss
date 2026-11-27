@@ -22,6 +22,8 @@
 }
 
 app-section + app-section,
+app-section + app-analysis-panel,
+app-analysis-panel + app-import-panel,
 app-holdings-editor + app-import-panel,
 app-section + app-import-panel,
 app-import-panel + app-section {
