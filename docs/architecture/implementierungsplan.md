@@ -2975,7 +2975,8 @@ Aus dem Gesamt-Review am 19.10.2026 entstanden.
     `price_to_epv` und `implied_fcf_growth` vor `errors`; die Mail bleibt gleich. Golden-CSV und
     Replay-Fixtures werden bewusst erneuert.
   - **Speicher:** `scoring.anchor_value` (nur Werte, die es gibt), dazu die Spalte
-    `nopat_normalized` in `market_data.fundamental_snapshot`, eine Migration (`0027`).
+    `nopat_normalized` in `market_data.fundamental_snapshot`, eine Migration (`0028`; D4.1 hat
+    `0027` zuerst gemergt).
   - **Profil:** neuer Parameter `dcf_years` (10, 1 bis 30). Titel-Detail und Projektion kommen
     mit F3.2.
   - **Replay-Regression:** Neue Spalten in der CSV zählen nicht als Abweichung, solange die alten
@@ -4038,3 +4039,98 @@ Pakete, in dieser Reihenfolge. Keins ändert Ranking, CSV oder Samstags-Mail.
     selbst, wenn ein anderer Tab speichert; „Speichern“ meldet das als Konflikt.
 
 **Fertig, wenn:** ein Nutzer ein Depot anlegt, der Wert stimmt und fremde Depots unsichtbar sind.
+
+#### Stufe D4 – Analyse: Einordnung, ETF, Anleihen, Depot
+
+Spezifikation: [depot/analyse.md](depot/analyse.md) (ohne die Hinweise, die sind D5). Geschnitten
+am 27.11.2026 in sechs Pakete, in dieser Reihenfolge. Ranking, Report-CSV, Samstags-Mail, Backfill
+und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
+
+- **Ausgangslage im Code:**
+  - market-data schickt die Aktien der Abdeckung in `covered[]`, scoring liest sie noch nicht.
+  - portfolio bewertet Depots aus Kursen und Stammdaten, kennt aber keine Scores.
+  - Migration: die nächste freie ist 0027 (F2.3 hat 0026).
+- **Referenzuniversum:** DAX/MDAX für alle Titel (offene Frage 4 der Spezifikation, bis dahin
+  so). Weitere Universen kommen über das Rezept „Neues Universum“.
+
+**D4.1 Einordnung in scoring** (ANA-01 bis 03)
+- **Test:** reine Funktion `place()` in `va_scoring.domain` mit den Eigenschaften aus analyse.md:
+  - Ein Kandidat mit den Kennzahlen eines Referenztitels landet neben ihm.
+  - Besser als alle: höchster Rang bei n+1 Werten, schlechter als alle entsprechend.
+  - Die Ränge der Referenztitel ändern sich nicht.
+  - Negative Multiples, Mindestanteil, Composite nur mit beiden Teilscores, Branchenregel und
+    Value-Trap wie im Ranking; ohne Score `reason`.
+  - Golden-File mit eingefrorenem Universum und drei Kandidaten (deutsch, US, Bank).
+- **Kandidaten:** `covered[]` und die Universumstitel unter dem Größenfilter (`below_size_filter`).
+- **Event:** `scoring.run.completed` bekommt `placements[]` (`PlacementV1`, additiv) mit ISIN aus
+  `snapshot.isins`. Die Ranking-Zeilen bekommen `isin` und `composite_percentile` (additiv, nicht
+  in `to_flat`, die CSV bleibt gleich).
+- **Speicher:** `scoring.placement` (Migration 0027, nur anfügen). notification und web-api
+  ignorieren die neuen Felder.
+- **Golden-Master:** Mail, CSV und Replay-Fixtures sind unverändert.
+- **Review:** `/code-review high`.
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - `va_scoring.domain.placement`: `place()` je Kandidat allein in „Referenz plus dieser eine“,
+    mit `_industry_rule_inputs`, `_percentile_rank`, `_composite_mean` und `_momentum_trap` aus
+    `score()`; `composite_percentiles()` für die Ranking-Zeilen.
+  - Kandidaten sind alle Universumstitel unter dem Größenfilter, nicht nur die in Depots: scoring
+    kennt die Depots nicht, und die Abdeckung enthält nur Titel außerhalb des Universums.
+  - Die Einordnung kostet nie den Lauf (Fehler: ohne `placements[]`, Speichern: Warnung).
+  - Tests: `services/scoring/tests/test_placement.py`, `tests/test_golden_placement.py`
+    (Replay-Fixture vom 30.10. und drei Kandidaten), Handler, Contract (`TestPlacement`, Schema
+    additiv), DB (`tests/db/scoring/test_repository.py`).
+  - Einen Rescore gibt es in scoring noch nicht; kommt er, braucht er die Kandidaten getrennt in
+    `scoring.input_snapshot`.
+  - **Review (`/code-review high`):** behoben, dass eine ISIN ohne die Form einer ISIN den ganzen
+    Lauf gekostet hätte (`snapshot.isins` ist nicht geprüft, die Ranking-Zeile schon; jetzt fehlt
+    nur die ISIN dieser Zeile) und dass eine ungültige Einordnung alle anderen mitnahm. Offen
+    gelassen: `placements[]` hat keine Obergrenze, das Event wächst mit der Abdeckung. Gemessen
+    mit der Replay-Fixture: Ranking rund 146 KB, je Einordnung rund 0,6 KB, NATS nimmt 1 MB, also
+    Platz für über 1000 Aktien; zusammen mit der Größe von `covered[]` im Snapshot prüfen.
+
+**D4.2 Scores im Depot** (ANA-01, 04 teilweise)
+- **Test:**
+  - portfolio liest `scoring.run.completed` in `score_view` (je Bewertungslauf und ISIN, aus
+    Ranking-Zeilen und Einordnungen).
+  - Die Bewertung des Depots trägt je Aktie Value, Quality, Composite, Composite-Perzentil,
+    Value-Trap mit Grund, „unter dem Größenfilter“ oder „außerhalb des Referenzmarkts“ und den
+    Bewertungslauf.
+  - UI: Spalten im Depot, Link ins Titel-Detail für Universumstitel.
+  - Abnahme von D4: Eine Aktie aus DAX/MDAX zeigt im Depot dieselben Scores wie im Ranking.
+- **Review:** `/code-review high`.
+
+**D4.3 ETF und Anleihen rechnen** (ANA-05 bis 07)
+- **Test:** reine Funktionen in `va_portfolio.domain`:
+  - ETF: laufende Kosten (Wert × TER), Struktur aus den Stammdaten, Durchschau,
+    Überschneidung, Look-through-Score ab 50 % bewertetem Gewicht; „mindestens“ bei
+    unvollständigen Listen.
+  - Anleihen: Stückzinsen nach Zinsmethode, Rendite bis Fälligkeit (Bisektion), modifizierte
+    Duration, Kupontermine. Sonderformen ohne Rendite.
+  - Beispielrechnungen gegen nachgerechnete Werte (Bundesanleihe).
+- **Review:** `/code-review high`.
+
+**D4.4 Depot-Analyse** (ANA-08 bis 10)
+- **Test:**
+  - `analyze()`: Wert und Gewichte, Allokation nach Anlageklasse, Sektor, Land und Währung (mit
+    Durchschau, sonst „ohne Durchschau“), Konzentration (größter Titel, Top 5, effektive Zahl),
+    Qualität wertgewichtet mit Abdeckung und Fünfteln, Kosten, Anleihen, Datenlage.
+  - Beispieldepots als JSON-Fixtures mit Golden-Files.
+  - `analysis_run` (Migration, nur anfügen), neu gerechnet bei neuem Depotstand, neuen Kursen,
+    neuem Bewertungslauf, neuen Stammdaten.
+  - `portfolio.analysis.completed` (ohne ISINs und Beträge); `GET /depots/{id}/analysis`.
+- **Review:** `/code-review high`, `/security-review` (neues Event, neue Endpunkte).
+
+**D4.5 Ansicht „Analyse“** (ANA-04, 05, 07, 08, 09)
+- **Test:** im Depot ein Bereich „Analyse“: Allokation, Konzentration, Qualität, Kosten,
+  Anleihen, Datenlage, jede Zahl mit Stand und „keine Daten“ statt Ersatzwert;
+  Score-Verlauf je Aktie; Playwright mit axe.
+- **Review:** `/code-review high`.
+
+**D4.6 Neue Aktie sofort einordnen** (WP-13, Rest)
+- **Test:** market-data holt die Fundamentaldaten neu abgedeckter Aktien gleich
+  (`marketdata.coverage.fetched`), scoring ordnet sie gegen den letzten Bewertungslauf ein
+  (`scoring.placements.updated`), portfolio übernimmt sie. Ranking und Mail bleiben gleich.
+- **Review:** `/code-review high`.
+
+**Fertig, wenn:** eine Aktie im Depot dieselben Scores zeigt wie im Ranking und die Golden-Master
+unverändert sind.

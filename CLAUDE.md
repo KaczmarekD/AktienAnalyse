@@ -386,6 +386,13 @@ aktuellen, teils nachträglich korrigierten Stand und maximal 4 Geschäftsjahre.
   bestehenden Lesewege (`get_snapshots_df`, Backfill, Replay, Vorschau, Rescore) sehen nur
   `role = 'universe'`; Ranking, CSV und Mail bleiben gleich. Der Batch im Prozess kennt keine
   Abdeckung.
+- Einordnung (D4.1, [analyse.md](docs/architecture/depot/analyse.md#aktien-einordnung)): scoring
+  ordnet `covered[]` und die Universumstitel unter dem Größenfilter ins Referenzuniversum ein
+  (`va_scoring.domain.placement.place()`): je Titel die Ränge, die er hätte, wenn man ihn allein
+  hinzufügte, mit denselben Regeln wie `score()`, ohne Größenfilter. Ergebnis in
+  `scoring.run.completed` (`placements[]`) und `scoring.placement`; die Ranking-Zeilen tragen
+  `isin` und `composite_percentile` (nicht in `to_flat`). Ranking, CSV und Mail bleiben gleich
+  (`tests/test_golden_placement.py`). Scheitert die Einordnung, fehlt sie, der Lauf nicht.
 - Tageskurse (D2.3): An Handelstagen 22:30 stößt das web-api `marketdata.prices.requested` an
   (`PriceScheduler`, `web.price_request`, `WEB_API_PRICE_SCHEDULE`). market-data holt die
   Schlusskurse der Abdeckung per Sammelabruf (`yf.download`), rechnet Pence in Pfund um,

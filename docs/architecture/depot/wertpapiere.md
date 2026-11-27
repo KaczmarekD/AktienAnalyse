@@ -162,8 +162,8 @@ Liste der einmaligen UPDATEs in `va_platform.db.ddl` (`UPDATABLE_TABLES`) wie be
 | Contract | Änderung |
 |---|---|
 | `SnapshotCompletedV1` | neues optionales Feld `covered: list[FundamentalsV1] = []`; die Maps `isins` und `instrument_ids` decken auch sie ab |
-| `ScoringRunCompletedV1` | neues optionales Feld `placements: list[PlacementV1] = []` |
-| `PlacementV1` (neu) | symbol, isin, instrument_id, value_score, quality_score, composite, composite_percentile, factor_ranks, value_trap, below_size_filter, reason (leer oder `no_quality`/`no_value`/`no_data`) |
+| `ScoringRunCompletedV1` | neues optionales Feld `placements: list[PlacementV1] = []`; seit D4.1 dazu `isin` und `composite_percentile` in `RankingRowV1` (optional, nicht in `to_flat`) |
+| `PlacementV1` (neu, D4.1) | symbol, isin, instrument_id, value_score, quality_score, composite_score, composite_percentile, factor_ranks, value_trap_flag, value_trap_reason, industry_rule, below_size_filter, reason (leer oder `no_quality`/`no_value`/`no_data`). Ein Test prüft, dass es keine Nutzer- oder Mengenfelder gibt. |
 | `CoverageFetchedV1` (neu) | Fundamentaldaten der neu abgedeckten Aktien (WP-13), mit ISIN |
 | `PlacementsUpdatedV1` (neu) | scoring_run_id, gegen den eingeordnet wurde, und `placements[]` |
 | `SecurityV1` (neu) | isin, asset_class, name, currency, country, listing, Stammdaten je Klasse als Untermodell |

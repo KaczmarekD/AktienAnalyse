@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     import pandas as pd
+
+    from va_contracts.events.v1 import PlacementV1
 
     from ..domain.profile import ActiveProfile, ProfileVersionRef
     from ..domain.scoring import ScoringConfig
@@ -30,6 +32,10 @@ class ScoringStore(Protocol):
         profile: ProfileVersionRef | None = None,
         instrument_ids: Mapping[str, int] | None = None,
     ) -> int: ...
+
+    def record_placements(self, scoring_run_id: int, placements: Sequence[PlacementV1]) -> None:
+        """D4.1: die Einordnungen der Depot-Aktien zu diesem Bewertungslauf."""
+        ...
 
 
 class ProfileStore(Protocol):

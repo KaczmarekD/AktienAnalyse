@@ -3,6 +3,8 @@
 > **Status:** Spezifikation, Entwurf vom 04.11.2026. Teil der
 > [Depot-Spezifikation](README.md), Stufen D4 (Analyse) und D5 (Hinweise). Grundsatzentscheidung:
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (vorgeschlagen).
+> Umgesetzt: die Einordnung im Bewertungslauf (D4.1, `place()`, `placements[]`,
+> `scoring.placement`).
 
 ## Grundsatz: bewertet wird gegen ein Referenzuniversum
 
@@ -91,6 +93,20 @@ Test-Eigenschaften:
 - Die Ränge der Referenztitel sind mit und ohne Kandidaten gleich.
 - Ranking, Report-CSV, Backfill der Projektionen und Replay-Regression sind mit und ohne
   Kandidaten gleich.
+
+**Umgesetzt (27.11.2026, D4.1):** `va_scoring.domain.placement.place()` und der Handler von
+scoring. Abweichungen und Ergänzungen:
+- Kandidaten sind `covered[]` und **alle** Universumstitel unter dem Größenfilter (auch ohne
+  Marktkapitalisierung), `below_size_filter = true`. scoring weiß nicht, welche davon in Depots
+  stehen: Die Abdeckung enthält nur Titel außerhalb des Universums, und das Event trägt keine
+  Depot-ISINs. Es sind wenige, und sie enthalten nichts über Nutzer.
+- Auch die Ranking-Zeilen tragen `composite_percentile` und `isin`, damit portfolio Universumstitel
+  über die ISIN findet (D4.2). Beides steht nicht in `to_flat()`, CSV und Mail bleiben gleich.
+- Die Einordnung kostet nie den Lauf: Scheitert sie, fehlt `placements[]`; scheitert das Speichern,
+  fehlt nur die Zeile in `scoring.placement`.
+- Einen Rescore nach einer Profil-Aktivierung gibt es in scoring noch nicht (nur den Trigger im
+  Contract). Kommt er, braucht er die Kandidaten getrennt in `scoring.input_snapshot`.
+- Die Einordnung gegen den letzten Bewertungslauf bei neuer Abdeckung kommt mit D4.6.
 
 ## ETFs
 

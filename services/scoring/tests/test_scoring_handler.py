@@ -40,6 +40,7 @@ class FakeStore:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
         self.calls: list[dict[str, Any]] = []
+        self.placements: list[tuple[int, list[Any]]] = []
 
     def record_scoring(self, fetch_run_id, df_all, scored, cfg, profile=None, instrument_ids=None):
         if self.error:
@@ -56,6 +57,9 @@ class FakeStore:
         )
         return 20
 
+    def record_placements(self, scoring_run_id, placements):
+        self.placements.append((scoring_run_id, list(placements)))
+
 
 @pytest.fixture
 def bus() -> InProcessBus:
@@ -70,7 +74,11 @@ def _probe(bus: InProcessBus) -> list[Envelope[Any]]:
 
 
 def _snapshot(
-    bus: InProcessBus, frame: pd.DataFrame, **options: bool
+    bus: InProcessBus,
+    frame: pd.DataFrame,
+    covered: pd.DataFrame | None = None,
+    isins: dict[str, str] | None = None,
+    **options: bool,
 ) -> Envelope[SnapshotCompletedV1]:
     env = new_envelope(
         SNAPSHOT_COMPLETED,
@@ -84,6 +92,10 @@ def _snapshot(
             universe=UNIVERSE,
             fundamentals=[FundamentalsV1.from_flat(r) for r in frame.to_dict("records")],
             instrument_ids={str(s): i for i, s in enumerate(frame["symbol"], start=1)},
+            covered=[]
+            if covered is None
+            else [FundamentalsV1.from_flat(r) for r in covered.to_dict("records")],
+            isins=isins or {},
         ),
         source="va/test",
         correlationid="1",
@@ -257,3 +269,97 @@ def test_unreadable_profile_fails_the_run_before_scoring(bus, mock_universe_df):
     assert (failed.stage, failed.scoring_run_id) == ("scoring", None)
     assert "db weg" in failed.reason
     assert store.calls == []
+
+
+# --- D4.1: Einordnung ---------------------------------------------------------------------------
+
+APPLE = "US0378331005"
+SMALL = "DE0000000001"
+
+
+def _covered(mock_universe_df: pd.DataFrame) -> pd.DataFrame:
+    row = mock_universe_df[mock_universe_df["symbol"] == "VAL.DE"].copy()
+    row["symbol"] = "AAPL"
+    row["index"] = "-"
+    return row
+
+
+def test_depot_stocks_are_placed_into_the_reference(bus, mock_universe_df):
+    store = FakeStore()
+    _subscribe(bus, store)
+    seen = _probe(bus)
+    _snapshot(
+        bus,
+        mock_universe_df,
+        covered=_covered(mock_universe_df),
+        isins={"AAPL": APPLE, "SMALL.DE": SMALL},
+    )
+    data = seen[0].data
+    placements = {p.symbol: p for p in data.placements}
+    # Die Abdeckung und der Universumstitel unter dem Groessenfilter, sonst keiner
+    assert set(placements) == {"AAPL", "SMALL.DE"}
+    assert placements["AAPL"].isin == APPLE
+    assert placements["AAPL"].below_size_filter is False
+    assert placements["SMALL.DE"].below_size_filter is True
+    assert placements["SMALL.DE"].instrument_id is not None
+    assert placements["AAPL"].composite_score is not None
+    assert placements["AAPL"].factor_ranks
+    assert store.placements == [(20, data.placements)]
+
+
+def test_the_ranking_stays_the_same_with_placements(bus, mock_universe_df):
+    _subscribe(bus, FakeStore())
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df)
+    _snapshot(bus, mock_universe_df, covered=_covered(mock_universe_df))
+    without, with_covered = (env.data for env in seen)
+    strip = {"isin", "composite_percentile"}
+    assert [r.model_dump(exclude=strip) for r in without.ranking] == [
+        r.model_dump(exclude=strip) for r in with_covered.ranking
+    ]
+
+
+def test_ranking_rows_carry_isin_and_composite_percentile(bus, mock_universe_df):
+    _subscribe(bus, FakeStore())
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df, isins={"VAL.DE": "DE0000000002"})
+    ranking = seen[0].data.ranking
+    top = ranking[0]
+    assert (top.fundamentals.symbol, top.isin) == ("VAL.DE", "DE0000000002")
+    assert top.composite_percentile == 1.0
+    with_composite = [r for r in ranking if r.composite_score is not None]
+    assert all(r.composite_percentile is not None for r in with_composite)
+    assert all(r.composite_percentile is None for r in ranking if r.composite_score is None)
+    # Nicht in der flachen Zeile: Mail und CSV bleiben gleich
+    assert "composite_percentile" not in top.to_flat()
+    assert "isin" not in top.to_flat()
+
+
+def test_a_malformed_isin_costs_only_the_isin(bus, mock_universe_df):
+    """``snapshot.isins`` ist nicht geprüft: Eine kaputte ISIN darf den Lauf nicht kosten."""
+    _subscribe(bus, FakeStore())
+    seen = _probe(bus)
+    _snapshot(
+        bus,
+        mock_universe_df,
+        covered=_covered(mock_universe_df),
+        isins={"VAL.DE": "kaputt", "AAPL": "us0378331005"},
+    )
+    assert seen[0].type == SCORING_RUN_COMPLETED.type
+    by_symbol = {r.fundamentals.symbol: r for r in seen[0].data.ranking}
+    assert by_symbol["VAL.DE"].isin is None
+    [apple] = [p for p in seen[0].data.placements if p.symbol == "AAPL"]
+    assert apple.isin is None
+
+
+def test_a_failed_placement_keeps_the_ranking(bus, mock_universe_df, monkeypatch):
+    def broken(*args, **kwargs):
+        msg = "kaputt"
+        raise ValueError(msg)
+
+    monkeypatch.setattr("va_scoring.entrypoints.handlers.place", broken)
+    _subscribe(bus, FakeStore())
+    seen = _probe(bus)
+    _snapshot(bus, mock_universe_df, covered=_covered(mock_universe_df))
+    assert seen[0].type == SCORING_RUN_COMPLETED.type
+    assert seen[0].data.placements == []

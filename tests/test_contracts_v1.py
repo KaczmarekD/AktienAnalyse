@@ -42,6 +42,7 @@ from va_contracts.events.v1 import (
     EmailConfirmationRequestedV1,
     FetchProgressedV1,
     FundamentalsV1,
+    PlacementV1,
     PricesCompletedV1,
     PricesRequestedV1,
     ProfileActivatedV1,
@@ -303,7 +304,11 @@ def _examples() -> dict[str, Contract]:
             value_weight=0.6,
             quality_weight=0.4,
             profile=ProfileRefV1(profile_id=1, version=2, name="Standard"),
-            ranking=ranking[:3],
+            ranking=[
+                ranking[0].model_copy(update={"isin": "DE0007164600", "composite_percentile": 1.0}),
+                *ranking[1:3],
+            ],
+            placements=[_apple_placement()],
         ),
         PROFILE_SAVED.type: ProfileSavedV1(profile_id=1, version=3),
         PROFILE_ACTIVATED.type: ProfileActivatedV1(profile_id=1, version=3),
@@ -320,6 +325,21 @@ def _examples() -> dict[str, Contract]:
             expires_at=datetime(2026, 11, 8, 12, 0, tzinfo=UTC),
         ),
     }
+
+
+def _apple_placement() -> PlacementV1:
+    """D4.1: eine Aktie aus einem Depot, eingeordnet ins Referenzuniversum."""
+    return PlacementV1(
+        symbol="AAPL",
+        isin="US0378331005",
+        instrument_id=91,
+        value_score=0.31,
+        quality_score=0.94,
+        composite_score=0.562,
+        composite_percentile=0.68,
+        factor_ranks={"ev_ebit": 0.22, "roic": 0.99, "p_fcf": None},
+        reason=None,
+    )
 
 
 def _world_etf() -> Any:
@@ -885,3 +905,65 @@ def test_ranking_row_carries_the_anchors():
     )
     with pytest.raises(ValidationError):
         RankingRowV1(**{**row.model_dump(), "anchors": {"kurs_ziel": 1.0}})
+
+
+class TestPlacement:
+    """D4.1: die Einordnung der Depot-Aktien im Event ``scoring.run.completed``."""
+
+    def test_older_events_have_no_placements(self):
+        data = _examples()[SCORING_RUN_COMPLETED.type].model_dump(mode="json")
+        data.pop("placements")
+        for row in data["ranking"]:
+            row.pop("isin")
+            row.pop("composite_percentile")
+        event = ScoringRunCompletedV1.model_validate(data)
+        assert event.placements == []
+        assert event.ranking[0].isin is None
+        assert event.ranking[0].composite_percentile is None
+
+    def test_no_users_or_quantities(self):
+        for word in ("user", "quantity", "depot", "position", "amount", "email"):
+            assert not any(word in name for name in PlacementV1.model_fields), word
+
+    def test_from_flat_turns_nan_into_none(self):
+        flat = {
+            "symbol": "BANK.DE",
+            "value_score": 0.7,
+            "quality_score": float("nan"),
+            "composite_score": float("nan"),
+            "composite_percentile": float("nan"),
+            "value_trap_flag": False,
+            "value_trap_reason": None,
+            "industry_rule": True,
+            "reason": "no_quality",
+            "rank_pb": 0.8,
+            "rank_roic": float("nan"),
+        }
+        placed = PlacementV1.from_flat(flat, isin="DE000CBK1001", below_size_filter=True)
+        assert placed.quality_score is None
+        assert placed.composite_score is None
+        assert placed.factor_ranks == {"pb": 0.8, "roic": None}
+        assert (placed.reason, placed.below_size_filter, placed.industry_rule) == (
+            "no_quality",
+            True,
+            True,
+        )
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            {"reason": "too_small"},
+            {"isin": "SAP"},
+            {"composite_percentile": 1.2},
+            {"instrument_id": 0},
+        ],
+    )
+    def test_invalid_values_are_rejected(self, change):
+        with pytest.raises(ValidationError):
+            PlacementV1(**{**_apple_placement().model_dump(), **change})
+
+    def test_not_in_the_flat_ranking_row(self):
+        """ISIN und Perzentil gehen nicht in CSV und Mail."""
+        _, ranking = _scored()
+        row = ranking[0].model_copy(update={"isin": "DE0007164600", "composite_percentile": 0.5})
+        assert row.to_flat() == ranking[0].to_flat()
