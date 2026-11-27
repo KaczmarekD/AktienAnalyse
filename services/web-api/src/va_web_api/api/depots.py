@@ -29,6 +29,7 @@ from ..models import (
     CreateDepot,
     Depot,
     DepotAnalysis,
+    DepotHints,
     HistoryEntry,
     Holdings,
     ImportFile,
@@ -152,6 +153,16 @@ def depot_analysis(user: DepotOwner, directory: Directory, depot_id: int) -> Dep
     if analysis is None:
         raise HTTPException(status_code=503, detail="Analyse ohne Marktdaten nicht moeglich")
     return DepotAnalysis.model_validate(analysis.model_dump())
+
+
+@router.get("/depots/{depot_id}/hints", responses={**NOT_FOUND, **UNAVAILABLE})
+def depot_hints(user: DepotOwner, directory: Directory, depot_id: int) -> DepotHints:
+    """D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
+    portfolio zuerst einen. Beobachtungen, keine Anlageempfehlung."""
+    hints = _guarded(lambda: directory.hints(user.id, depot_id))
+    if hints is None:  # pragma: no cover - portfolio antwortet mit Hinweisen oder Fehler
+        raise HTTPException(status_code=503, detail="Hinweise nicht verfuegbar")
+    return DepotHints.model_validate(hints.model_dump())
 
 
 @router.put("/depots/{depot_id}", responses={**NOT_FOUND, **UNAVAILABLE, **WRITE})

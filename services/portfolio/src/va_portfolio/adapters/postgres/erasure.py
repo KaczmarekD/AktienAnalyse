@@ -24,9 +24,12 @@ TRIGGER = "va_no_delete"  # aus va_platform.db.ddl.protect_table
 
 _DEPOTS = "SELECT id FROM portfolio.depot WHERE owner_user_id = :id"
 _SNAPSHOTS = f"SELECT id FROM portfolio.holding_snapshot WHERE depot_id IN ({_DEPOTS})"
+_RUNS = f"SELECT id FROM portfolio.analysis_run WHERE depot_id IN ({_DEPOTS})"
 
 # Abhaengige vor denen, auf die sie verweisen
 PER_USER: tuple[tuple[str, str], ...] = (
+    ("hint", f"analysis_run_id IN ({_RUNS})"),  # D5.2
+    ("analysis_run", f"depot_id IN ({_DEPOTS})"),
     ("holding_line", f"snapshot_id IN ({_SNAPSHOTS})"),
     ("cash_line", f"snapshot_id IN ({_SNAPSHOTS})"),
     ("holding_snapshot", f"depot_id IN ({_DEPOTS})"),

@@ -285,6 +285,22 @@ class CoverageFetchedV1(Contract):
     isins: dict[str, IsinStr] = Field(default_factory=dict)
 
 
+class AnalysisCompletedV1(Contract):
+    """portfolio -> web-api (D5.2): ein neuer Lauf der Analyse mit Hinweisen.
+
+    Nur IDs und Zahlen: keine Schluessel, ISINs oder Betraege, das Event liegt im Stream. Das
+    web-api meldet es an die Tabs des Besitzers (Topic ``user:<id>``), die per REST nachladen.
+    """
+
+    depot_id: PositiveId
+    owner_user_id: PositiveId
+    analysis_run_id: PositiveId
+    critical: int = Field(default=0, ge=0)
+    warning: int = Field(default=0, ge=0)
+    info: int = Field(default=0, ge=0)
+    new: int = Field(default=0, ge=0)  # davon neu gegen den vorherigen Lauf
+
+
 class PlacementsUpdatedV1(Contract):
     """scoring -> portfolio (D4.6): Aktien, sofort eingeordnet gegen den letzten Bewertungslauf.
 

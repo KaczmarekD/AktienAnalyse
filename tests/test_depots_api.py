@@ -278,6 +278,15 @@ def test_a_depot_change_goes_to_its_owner_only():
     assert topics_for(envelope) == ("user:7",)
 
 
+def test_a_new_analysis_goes_to_its_owner_only():
+    """D5.2: ``portfolio.analysis.completed`` wie ``depot.changed`` nur an ``user:<id>``."""
+    from va_contracts.events.v1 import ANALYSIS_COMPLETED, AnalysisCompletedV1
+
+    data = AnalysisCompletedV1(depot_id=3, owner_user_id=7, analysis_run_id=12, warning=1)
+    envelope = new_envelope(ANALYSIS_COMPLETED, data, source="va/portfolio")
+    assert topics_for(envelope) == ("user:7",)
+
+
 class TestValuation:
     """D3.4: Bewertung aus den Kopien der Marktdaten in portfolio."""
 
@@ -389,6 +398,28 @@ class TestValuation:
         other = _client(identity, store, "ben", MemoryMarketStore())
         try:
             assert other.get(f"/api/v1/depots/{depot_id}/analysis").status_code == 404
+        finally:
+            other.__exit__(None, None, None)
+
+    def test_the_hints_of_the_own_depot(self, valued):
+        """D5.2: Hinweise mit Status und Texten; ein fremdes Depot ist 404."""
+        depot_id = self._depot(valued)
+        response = valued.get(f"/api/v1/depots/{depot_id}/hints")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["analysis_run_id"] is not None
+        rules = {h["rule"]: h for h in body["hints"]}
+        assert rules["HIN-K01"]["severity"] == "critical"  # SAP 2315 von 2415
+        assert rules["HIN-K01"]["status"] == "new"
+        # Beide Wertpapiere ohne Stammdaten
+        assert {h["subject"] for h in body["hints"] if h["rule"] == "HIN-D03"} == {SAP, BUND}
+        assert rules["HIN-K01"]["approach"]
+
+    def test_the_hints_of_a_foreign_depot_are_404(self, valued, identity, store):
+        depot_id = self._depot(valued)
+        other = _client(identity, store, "ben", MemoryMarketStore())
+        try:
+            assert other.get(f"/api/v1/depots/{depot_id}/hints").status_code == 404
         finally:
             other.__exit__(None, None, None)
 

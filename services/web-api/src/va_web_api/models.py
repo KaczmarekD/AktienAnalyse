@@ -696,6 +696,37 @@ class DepotAnalysis(_Model):
     data: DataQuality
 
 
+# --- Hinweise (D5.2, docs/architecture/depot/analyse.md, Hinweise) ------------------------------
+
+
+class DepotHint(_Model):
+    """Ein Hinweis: Beobachtung, keine Empfehlung. ``key`` = Regel und Gegenstand (ISIN,
+    ``depot``, Sektor, Land, LEI, Jahr); ``status`` gegen den vorherigen Lauf. ``measured`` und
+    ``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl."""
+
+    key: str
+    rule: str
+    subject: str
+    severity: Literal["info", "warning", "critical"]
+    status: Literal["new", "existing", "resolved"]
+    measured: float | None
+    threshold: float | None
+    as_of: date | None
+    group: str
+    title: str
+    reason: str
+    approach: str
+
+
+class DepotHints(_Model):
+    """Die Hinweise des juengsten Laufs der Analyse; ohne Marktdaten ohne Lauf."""
+
+    analysis_run_id: int | None
+    computed_at: datetime | None
+    version: int
+    hints: list[DepotHint]
+
+
 class Depot(_Model):
     """Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
 

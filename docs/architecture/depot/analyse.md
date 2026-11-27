@@ -340,12 +340,20 @@ HIN-B01:DE…  ───►  (fehlt)         →   erledigt
 
 Schlüssel eines Hinweises: Regel und Gegenstand (`HIN-K01:<ISIN>` oder `HIN-A02:depot`).
 
+**Umgesetzt (27.11.2026, D5.2):** `track()` in `va_portfolio.domain.hints`; `analysis_run` und
+`hint` (Migration 0032). Ein neuer Depotstand bekommt gleich seinen Lauf, neue Kurse, Scores
+(Bewertungslauf und sofortige Einordnung) und Stammdaten rechnen alle aktiven Depots neu. Ein Lauf
+entsteht nur, wenn sich Depotstand, Analyse oder Hinweise geändert haben (Fingerabdruck); der
+neueste ist also auch nach Tagen ohne Änderung der gültige. Ein erledigter Hinweis steht in genau
+einem Lauf. HIN-Q03 vergleicht mit dem zweitjüngsten Bewertungslauf in `score_view`. Bis D5.3
+gelten die Standardschwellen.
+
 ## Datenmodell (Schema `portfolio`)
 
 | Tabelle | Inhalt | Schreibweise |
 |---|---|---|
-| `analysis_run` | id, depot_id, snapshot_version, scoring_run_id, prices_as_of, trigger, result (JSONB), computed_at | anfügen |
-| `hint` | analysis_run_id, key, rule_id, severity, subject_isin, measured, threshold, status, payload (JSONB) | anfügen |
+| `analysis_run` | id, depot_id, snapshot_version, trigger, fingerprint, result (JSONB, `DepotAnalysisV1`), computed_at | anfügen, nur bei geändertem Ergebnis (seit D5.2) |
+| `hint` | analysis_run_id, key, rule, subject, severity, status, measured, threshold, as_of | anfügen (seit D5.2) |
 | `hint_params` | depot_id, version, params (JSONB), created_at | anfügen, gültig ist die jüngste Zeile |
 | `hint_ack` | depot_id, key, user_id, measured_at_ack, severity_at_ack, at | anfügen |
 
@@ -364,7 +372,7 @@ nachladen.
 | Methode und Pfad | Zweck |
 |---|---|
 | `GET /api/v1/depots/{id}/analysis` | Analyse, bei jeder Anfrage gerechnet (seit D4.4) |
-| `GET /api/v1/depots/{id}/hints?status=` | Hinweise |
+| `GET /api/v1/depots/{id}/hints` | Hinweise des jüngsten Laufs mit Status und Texten (seit D5.2; gefiltert wird im UI) |
 | `POST /api/v1/depots/{id}/hints/{key}/ack` | zur Kenntnis nehmen |
 | `GET`/`PUT /api/v1/depots/{id}/hint-params` | Schwellen (mit `If-Match`) |
 | `GET /api/v1/hints/catalog` | Katalog mit Texten für das UI |

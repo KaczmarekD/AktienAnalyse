@@ -181,6 +181,40 @@ export const zDepotCosts = z.object({
 });
 
 /**
+ * DepotHint
+ *
+ * Ein Hinweis: Beobachtung, keine Empfehlung. ``key`` = Regel und Gegenstand (ISIN,
+ * ``depot``, Sektor, Land, LEI, Jahr); ``status`` gegen den vorherigen Lauf. ``measured`` und
+ * ``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl.
+ */
+export const zDepotHint = z.object({
+  approach: z.string(),
+  as_of: z.iso.date().nullable(),
+  group: z.string(),
+  key: z.string(),
+  measured: z.number().nullable(),
+  reason: z.string(),
+  rule: z.string(),
+  severity: z.enum(['info', 'warning', 'critical']),
+  status: z.enum(['new', 'existing', 'resolved']),
+  subject: z.string(),
+  threshold: z.number().nullable(),
+  title: z.string(),
+});
+
+/**
+ * DepotHints
+ *
+ * Die Hinweise des juengsten Laufs der Analyse; ohne Marktdaten ohne Lauf.
+ */
+export const zDepotHints = z.object({
+  analysis_run_id: z.int().nullable(),
+  computed_at: z.iso.datetime().nullable(),
+  hints: z.array(zDepotHint),
+  version: z.int(),
+});
+
+/**
  * EmailConfirmation
  *
  * Das Token aus dem Link der Bestaetigungsmail (D1.6).
@@ -1280,6 +1314,15 @@ export const zArchiveDepotPath = z.object({
  * Successful Response
  */
 export const zArchiveDepotResponse = zDepot;
+
+export const zDepotHintsPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zDepotHintsResponse = zDepotHints;
 
 export const zDepotHistoryPath = z.object({
   depot_id: z.int(),

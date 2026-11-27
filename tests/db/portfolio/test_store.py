@@ -269,3 +269,50 @@ class TestRoles:
     def test_every_table_is_protected(self, engine, table):
         with pytest.raises(DBAPIError), engine.begin() as conn:
             conn.execute(text(f"DELETE FROM portfolio.{table}"))
+
+
+class TestRuns:
+    """D5.2: Laeufe der Analyse mit Hinweisen, Event in derselben Transaktion."""
+
+    def test_round_trip_with_hints_and_event(self, store, engine):
+        from va_contracts.events.v1 import ANALYSIS_COMPLETED, AnalysisCompletedV1
+        from va_portfolio.domain.hints import Hint, TrackedHint
+
+        depot = _depot(store)
+        hints = [
+            TrackedHint(Hint("HIN-K01", SAP, "critical", 0.3, 0.2, T0.date()), "new"),
+            TrackedHint(Hint("HIN-A02", "depot", "info", 0.7, 0.1), "resolved"),
+        ]
+
+        def event(run_id: int):
+            data = AnalysisCompletedV1(
+                depot_id=depot.id, owner_user_id=ANNA, analysis_run_id=run_id, critical=1
+            )
+            return new_envelope(ANALYSIS_COMPLETED, data, source="va/test")
+
+        run_id = store.save_run(
+            depot.id,
+            version=1,
+            trigger="holdings",
+            fingerprint="abc",
+            result={"value_eur": "10.00"},
+            hints=hints,
+            at=T0,
+            event=event,
+        )
+        run = store.latest_run(depot.id)
+        assert run is not None
+        assert (run.id, run.version, run.fingerprint) == (run_id, 1, "abc")
+        assert [(t.hint.key, t.status, t.hint.as_of) for t in run.hints] == [
+            (f"HIN-K01:{SAP}", "new", T0.date()),
+            ("HIN-A02:depot", "resolved", None),
+        ]
+        [payload] = _outbox(engine, ANALYSIS_COMPLETED.subject)
+        assert payload["data"]["analysis_run_id"] == run_id
+        assert store.latest_run(depot.id + 1) is None
+
+    def test_only_active_depots(self, store):
+        active = _depot(store, name="Aktiv")
+        archived = _depot(store, name="Archiv")
+        store.set_status(archived.id, "archived", at=T0, event=_event(archived.id, "archived"))
+        assert [d.id for d in store.active_depots()] == [active.id]

@@ -1,6 +1,7 @@
 """Events v1: Payloads, Bestandteile und Katalog (docs/architecture/events.md)."""
 
 from .catalog import (
+    ANALYSIS_COMPLETED,
     BY_DATASCHEMA,
     COVERAGE_CHANGED,
     COVERAGE_FETCHED,
@@ -33,6 +34,7 @@ from .fundamentals import (
 )
 from .payloads import (
     REASON_NO_DATA,
+    AnalysisCompletedV1,
     CoverageChangedV1,
     CoverageFetchedV1,
     DailyCloseV1,
@@ -63,6 +65,7 @@ from .payloads import (
 from .ranking import PlacementReason, PlacementV1, RankingRowV1
 
 __all__ = [
+    "ANALYSIS_COMPLETED",
     "BY_DATASCHEMA",
     "COVERAGE_CHANGED",
     "COVERAGE_FETCHED",
@@ -83,6 +86,7 @@ __all__ = [
     "SCORING_RUN_COMPLETED",
     "SECURITIES_UPDATED",
     "SNAPSHOT_COMPLETED",
+    "AnalysisCompletedV1",
     "CoverageChangedV1",
     "CoverageFetchedV1",
     "DailyCloseV1",

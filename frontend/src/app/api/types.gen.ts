@@ -509,6 +509,88 @@ export type DepotExport = {
 };
 
 /**
+ * DepotHint
+ *
+ * Ein Hinweis: Beobachtung, keine Empfehlung. ``key`` = Regel und Gegenstand (ISIN,
+ * ``depot``, Sektor, Land, LEI, Jahr); ``status`` gegen den vorherigen Lauf. ``measured`` und
+ * ``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl.
+ */
+export type DepotHint = {
+  /**
+   * Approach
+   */
+  approach: string;
+  /**
+   * As Of
+   */
+  as_of: string | null;
+  /**
+   * Group
+   */
+  group: string;
+  /**
+   * Key
+   */
+  key: string;
+  /**
+   * Measured
+   */
+  measured: number | null;
+  /**
+   * Reason
+   */
+  reason: string;
+  /**
+   * Rule
+   */
+  rule: string;
+  /**
+   * Severity
+   */
+  severity: 'info' | 'warning' | 'critical';
+  /**
+   * Status
+   */
+  status: 'new' | 'existing' | 'resolved';
+  /**
+   * Subject
+   */
+  subject: string;
+  /**
+   * Threshold
+   */
+  threshold: number | null;
+  /**
+   * Title
+   */
+  title: string;
+};
+
+/**
+ * DepotHints
+ *
+ * Die Hinweise des juengsten Laufs der Analyse; ohne Marktdaten ohne Lauf.
+ */
+export type DepotHints = {
+  /**
+   * Analysis Run Id
+   */
+  analysis_run_id: number | null;
+  /**
+   * Computed At
+   */
+  computed_at: string | null;
+  /**
+   * Hints
+   */
+  hints: Array<DepotHint>;
+  /**
+   * Version
+   */
+  version: number;
+};
+
+/**
  * DepotQuality
  *
  * Wertgewichtet ueber die Aktien mit Score; ``covered``: Anteil ihres Werts mit Composite.
@@ -3164,6 +3246,48 @@ export type ArchiveDepotResponses = {
 };
 
 export type ArchiveDepotResponse = ArchiveDepotResponses[keyof ArchiveDepotResponses];
+
+export type DepotHintsData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/hints';
+};
+
+export type DepotHintsErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type DepotHintsError = DepotHintsErrors[keyof DepotHintsErrors];
+
+export type DepotHintsResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotHints;
+};
+
+export type DepotHintsResponse = DepotHintsResponses[keyof DepotHintsResponses];
 
 export type DepotHistoryData = {
   body?: never;

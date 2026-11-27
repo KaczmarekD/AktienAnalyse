@@ -15,9 +15,11 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
 from va_portfolio.adapters.postgres.erasure import erase_user
+from va_portfolio.adapters.postgres.market import PostgresMarketStore
 from va_portfolio.adapters.postgres.store import PostgresDepotStore
 from va_portfolio.application.depots import DepotService
 from va_portfolio.domain.depots import CashLine, HoldingLine
+from va_portfolio.domain.valuation import Quote
 
 T0 = datetime(2026, 11, 22, 10, 0, tzinfo=UTC)
 ANNA, BEN = 1, 2
@@ -35,6 +37,9 @@ def _rows(engine: Engine, owner: int) -> dict[str, int]:
         "holding_line": f"snapshot_id IN ({snaps})",
         "cash_line": f"snapshot_id IN ({snaps})",
         "outbox": "(payload -> 'data' ->> 'owner_user_id')::bigint = :id",
+        # D5.2: Laeufe der Analyse und ihre Hinweise
+        "analysis_run": f"depot_id IN ({depots})",
+        "hint": f"analysis_run_id IN (SELECT id FROM portfolio.analysis_run WHERE depot_id IN ({depots}))",
     }
     with engine.connect() as conn:
         return {
@@ -48,7 +53,9 @@ def _rows(engine: Engine, owner: int) -> dict[str, int]:
 
 
 def _fill(portfolio_engine: Engine, owner: int) -> None:
-    service = DepotService(PostgresDepotStore(portfolio_engine), clock=lambda: T0)
+    market = PostgresMarketStore(portfolio_engine)
+    market.record_prices([Quote(SAP, T0.date(), Decimal(100), "EUR")], [], at=T0)
+    service = DepotService(PostgresDepotStore(portfolio_engine), clock=lambda: T0, market=market)
     depot = service.create(owner, "depot", "DKB", None).depot
     service.save(owner, depot.id, 0, [HoldingLine(SAP, Decimal("3"))], [CashLine(Decimal("5"))])
     service.update(owner, depot.id, "Neu", None)
@@ -59,20 +66,16 @@ def test_all_rows_of_the_person_and_only_them(engine, portfolio_engine):
     _fill(portfolio_engine, ANNA)
     _fill(portfolio_engine, BEN)
     assert all(_rows(engine, ANNA).values())
+    ben = _rows(engine, BEN)
     rows = erase_user(engine, ANNA)
     assert rows["portfolio.depot"] == 1
     assert rows["portfolio.holding_line"] == 1
-    assert rows["portfolio.outbox"] == 4  # created, holdings, renamed, archived
+    assert rows["portfolio.analysis_run"] == 1  # D5.2: der neue Depotstand bekam seine Analyse
+    assert rows["portfolio.hint"] >= 1
+    # created, holdings, analysis.completed, renamed, archived
+    assert rows["portfolio.outbox"] == 5
     assert set(_rows(engine, ANNA).values()) == {0}
-    assert _rows(engine, BEN) == {
-        "depot": 1,
-        "depot_version": 2,
-        "depot_status": 2,
-        "holding_snapshot": 1,
-        "holding_line": 1,
-        "cash_line": 1,
-        "outbox": 4,
-    }
+    assert _rows(engine, BEN) == ben
 
 
 def test_a_person_without_depots(engine):

@@ -26,15 +26,26 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from va_contracts.portfolio import DepotKind, DepotState, HoldingUnit, SnapshotSource
+from va_contracts.portfolio import (
+    DepotKind,
+    DepotState,
+    HintSeverity,
+    HintStatus,
+    HoldingUnit,
+    SnapshotSource,
+)
 from va_platform.db import Base, in_values
 from va_platform.messaging import InboxMixin, OutboxMixin, outbox_table_args
+
+from ...domain.hints import TRIGGERS
 
 SCHEMA = "portfolio"
 KINDS: tuple[str, ...] = get_args(DepotKind)
 STATES: tuple[str, ...] = get_args(DepotState)
 UNITS: tuple[str, ...] = get_args(HoldingUnit)
 SOURCES: tuple[str, ...] = get_args(SnapshotSource)
+SEVERITIES: tuple[str, ...] = get_args(HintSeverity)
+HINT_STATUSES: tuple[str, ...] = get_args(HintStatus)
 
 
 class Depot(Base):
@@ -204,6 +215,49 @@ class ScoreView(Base):
     as_of: Mapped[date]
     payload: Mapped[Any] = mapped_column(JSONB)
     received_at: Mapped[datetime]
+
+
+class AnalysisRun(Base):
+    """D5.2: ein Lauf der Analyse eines Depots; nur angefuegt, wenn sich das Ergebnis aendert
+    (``fingerprint``). ``result``: das ganze ``DepotAnalysisV1``."""
+
+    __tablename__ = "analysis_run"
+    __table_args__ = (
+        Index("ix_analysis_run_depot_id", "depot_id"),
+        CheckConstraint(in_values("trigger", TRIGGERS), name="trigger"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    depot_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.depot.id"))
+    snapshot_version: Mapped[int]
+    trigger: Mapped[str]
+    fingerprint: Mapped[str]
+    result: Mapped[Any] = mapped_column(JSONB)
+    computed_at: Mapped[datetime]
+
+
+class HintRow(Base):
+    """D5.2: ein Hinweis eines Laufs mit Status gegen den vorherigen."""
+
+    __tablename__ = "hint"
+    __table_args__ = (
+        Index("ix_hint_analysis_run_id", "analysis_run_id"),
+        CheckConstraint(in_values("severity", SEVERITIES), name="severity"),
+        CheckConstraint(in_values("status", HINT_STATUSES), name="status"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    analysis_run_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.analysis_run.id"))
+    key: Mapped[str]
+    rule: Mapped[str]
+    subject: Mapped[str]
+    severity: Mapped[str]
+    status: Mapped[str]
+    measured: Mapped[float | None]
+    threshold: Mapped[float | None]
+    as_of: Mapped[date | None]
 
 
 class PortfolioOutbox(OutboxMixin, Base):

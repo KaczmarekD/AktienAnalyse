@@ -4286,6 +4286,23 @@ zeigen den Disclaimer.
   - `portfolio.analysis.completed` (depot_id, Besitzer, Lauf, Zahl der Hinweise nach Schwere und
     der neuen; ohne ISINs und Beträge) an das Topic `user:<id>`; `GET /depots/{id}/hints`.
 - **Review:** `/code-review high`, `/security-review` (neues Event, neuer Endpunkt).
+- **Umgesetzt (27.11.2026):** wie im Entwurf, dazu:
+  - `DepotService._evaluate` (Analyse und Hinweise, gemeinsam mit `analysis()`), `_refresh` mit
+    Fingerabdruck (SHA-256 über Depotstand, Analyse und Hinweise), `refresh_all` für die
+    Market-Handler (`after`), `hints()` rechnet ohne Lauf zuerst einen (Auslöser `request`).
+  - Lauf, Hinweise und Event in einer Transaktion (`save_run` mit Event-Fabrik für die ID).
+  - `MarketReader.previous_scores` (zweitjüngster Bewertungslauf je ISIN), `fund_sizes`
+    (Fondsvolumen aus iShares in Mio. EUR) und LEIs aus `security_view`.
+  - `HintV1` trägt die Texte des Katalogs, damit das web-api den Katalog nicht kennen muss.
+  - `src.erase_user` löscht `hint` und `analysis_run` mit dem Depot.
+  - Tests: `test_hint_runs.py` (Lauf beim Speichern, kein Lauf ohne Änderung, Status nach neuem
+    Kurs, Q03, RPC), DB (`save_run`, `previous_scores`, Löschen), API, Contracts.
+  - **Review:** `/code-review high` ohne Befund (Fingerabdruck verhindert doppelte Läufe bei
+    erneuter Zustellung, das Event nach einem Lauf auf Anfrage führt zu keiner Schleife).
+    `/security-review` ohne Befund: Besitz wie bei `depots.get`, `user:<id>` nur für den
+    Besitzer, Event nur mit IDs und Zahlen, Tabellen nur für `va_portfolio`, Löschen deckt sie
+    ab. Offen gelassen: `/me/export` enthält die Läufe und Hinweise nicht (abgeleitete Daten);
+    bei einem internen Datenbankfehler kann das Log Teile der Analyse enthalten, wie anderswo.
 
 **D5.3 Schwellen, Zielallokation, Kenntnisnahme** (HIN-04, HIN-05, DEP-10, HIN-A01)
 - **Test:** `hint_params` und `target_allocation` je Depot (versioniert, nur anfügen, `If-Match`),

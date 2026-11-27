@@ -11,16 +11,19 @@ Kein Text sagt "kaufen", "verkaufen" oder nennt ein Kursziel (ein Test prueft de
   unbekannte Waehrung nicht als Fremdwaehrung.
 - HIN-K06 nur fuer Emittenten mit mindestens zwei Wertpapieren (sonst wie HIN-K01), zusammengefuehrt
   ueber die LEI; HIN-B03 nur mit mindestens zwei Anleihen.
-- Noch nicht gerechnet: HIN-A01 (Zielallokation, D5.3), HIN-Q03 (vorheriger Bewertungslauf, D5.2),
-  HIN-N01/N02 (News, D6), HIN-D02 (Bank, D8). Sie stehen schon im Katalog.
+- HIN-Q03 (seit D5.2) vergleicht mit dem vorherigen Bewertungslauf, der die Aktie kannte.
+- Noch nicht gerechnet: HIN-A01 (Zielallokation, D5.3), HIN-N01/N02 (News, D6), HIN-D02 (Bank,
+  D8). Sie stehen schon im Katalog.
+- Lebenszyklus (D5.2, HIN-03, ``track``): gegen den vorherigen Lauf neu, besteht oder erledigt;
+  ein erledigter Hinweis steht einmal da und faellt im naechsten Lauf weg.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from itertools import combinations
 from typing import TYPE_CHECKING, Literal
@@ -31,9 +34,10 @@ if TYPE_CHECKING:
     from va_contracts.portfolio import HintParamsV1
 
     from .analysis import AnalysisInput, DepotAnalysis, Slice
-    from .valuation import PositionValue
+    from .valuation import PositionValue, Score
 
 Severity = Literal["info", "warning", "critical"]
+Status = Literal["new", "existing", "resolved"]
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 DEPOT = "depot"
 # Schluessel der Allokation, die keinen Sektor oder kein Land bezeichnen
@@ -262,6 +266,8 @@ class HintInput:
     analysis: DepotAnalysis
     today: date
     leis: Mapping[str, str] = field(default_factory=dict)  # ISIN -> LEI (FIRDS)
+    # D5.2: je ISIN die Scores des vorherigen Bewertungslaufs, der sie kannte (HIN-Q03)
+    previous_scores: Mapping[str, Score] = field(default_factory=dict)
     # ISIN -> Fondsvolumen in Mio. EUR, nur aus Anbieterdateien (HIN-E03)
     fund_sizes: Mapping[str, float] = field(default_factory=dict)
 
@@ -355,6 +361,12 @@ def _quality(source: HintInput, params: HintParamsV1) -> Iterable[Hint]:
         p = score.composite_percentile
         if p is not None and p <= params.q02_percentile:
             yield Hint("HIN-Q02", isin, "info", p, params.q02_percentile, as_of)
+        before = source.previous_scores.get(isin)
+        if p is not None and before is not None and before.composite_percentile is not None:
+            # Gerundet: 0,7 - 0,5 ergibt in Gleitkomma knapp unter 0,2
+            drop = round(before.composite_percentile - p, 9)
+            if drop >= params.q03_drop:
+                yield Hint("HIN-Q03", isin, "info", drop, params.q03_drop, as_of)
         q = score.quality_score
         if q is not None and q <= params.q04_quality:
             yield Hint("HIN-Q04", isin, "info", q, params.q04_quality, as_of)
@@ -454,3 +466,38 @@ def evaluate(source: HintInput, params: HintParamsV1) -> list[Hint]:
     disabled = set(params.disabled)
     hints = [h for rule in RULES for h in rule(source, params) if h.rule not in disabled]
     return sorted(hints, key=lambda h: (SEVERITY_ORDER[h.severity], h.rule, h.subject))
+
+
+@dataclass(frozen=True)
+class TrackedHint:
+    """Ein Hinweis mit Status gegen den vorherigen Lauf (HIN-03)."""
+
+    hint: Hint
+    status: Status
+
+
+def track(previous: Sequence[TrackedHint], current: Sequence[Hint]) -> list[TrackedHint]:
+    """Neu, besteht (die Schwere kann sich aendern) oder erledigt; erledigte zuletzt."""
+    before = {t.hint.key: t for t in previous if t.status != "resolved"}
+    tracked = [TrackedHint(h, "existing" if h.key in before else "new") for h in current]
+    now = {h.key for h in current}
+    tracked += [
+        TrackedHint(t.hint, "resolved") for key, t in sorted(before.items()) if key not in now
+    ]
+    return tracked
+
+
+# Was einen neuen Lauf ausloest (D5.2, ANA-10); "request": erster Abruf ohne Lauf
+TRIGGERS = ("holdings", "prices", "scores", "securities", "request")
+
+
+@dataclass(frozen=True)
+class StoredRun:
+    """Ein gespeicherter Lauf der Analyse mit seinen Hinweisen (``portfolio.analysis_run``)."""
+
+    id: int
+    depot_id: int
+    version: int
+    fingerprint: str
+    computed_at: datetime
+    hints: list[TrackedHint] = field(default_factory=list)

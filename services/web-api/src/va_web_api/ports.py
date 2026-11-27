@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         CashLineV1,
         DepotAnalysisV1,
         DepotExportV1,
+        DepotHintsV1,
         DepotKind,
         DepotV1,
         HistoryEntryV1,
@@ -198,6 +199,9 @@ class DepotDirectory(Protocol):
 
     # D4.4: Analyse des neuesten Depotstands; ``None``, wenn portfolio keine Marktdaten hat
     def analysis(self, user_id: int, depot_id: int) -> DepotAnalysisV1 | None: ...
+
+    # D5.2: Hinweise des juengsten Laufs; ``None``, wenn portfolio nicht antwortet wie erwartet
+    def hints(self, user_id: int, depot_id: int) -> DepotHintsV1 | None: ...
 
 
 class ProfileConflict(Exception):

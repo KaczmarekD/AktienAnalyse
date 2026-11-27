@@ -8,6 +8,7 @@ from typing import Any
 
 from ...base import Contract
 from .payloads import (
+    AnalysisCompletedV1,
     CoverageChangedV1,
     CoverageFetchedV1,
     DepotChangedV1,
@@ -97,6 +98,10 @@ COVERAGE_FETCHED = EventSpec(
 PLACEMENTS_UPDATED = EventSpec(
     "scoring.placements.updated", PlacementsUpdatedV1, max_age=timedelta(days=7)
 )
+# D5.2: ein neuer Lauf der Analyse; wie depot.changed nur fuer die offenen Tabs
+ANALYSIS_COMPLETED = EventSpec(
+    "portfolio.analysis.completed", AnalysisCompletedV1, max_age=timedelta(hours=24)
+)
 
 EVENTS: dict[str, EventSpec[Any]] = {
     spec.type: spec
@@ -117,6 +122,7 @@ EVENTS: dict[str, EventSpec[Any]] = {
         COVERAGE_CHANGED,
         COVERAGE_FETCHED,
         PLACEMENTS_UPDATED,
+        ANALYSIS_COMPLETED,
     )
 }
 

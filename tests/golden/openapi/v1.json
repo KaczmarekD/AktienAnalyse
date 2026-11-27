@@ -946,6 +946,156 @@
         "title": "DepotExport",
         "type": "object"
       },
+      "DepotHint": {
+        "additionalProperties": false,
+        "description": "Ein Hinweis: Beobachtung, keine Empfehlung. ``key`` = Regel und Gegenstand (ISIN,\n``depot``, Sektor, Land, LEI, Jahr); ``status`` gegen den vorherigen Lauf. ``measured`` und\n``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent, Tage als Zahl.",
+        "properties": {
+          "approach": {
+            "title": "Approach",
+            "type": "string"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "existing",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "rule",
+          "subject",
+          "severity",
+          "status",
+          "measured",
+          "threshold",
+          "as_of",
+          "group",
+          "title",
+          "reason",
+          "approach"
+        ],
+        "title": "DepotHint",
+        "type": "object"
+      },
+      "DepotHints": {
+        "additionalProperties": false,
+        "description": "Die Hinweise des juengsten Laufs der Analyse; ohne Marktdaten ohne Lauf.",
+        "properties": {
+          "analysis_run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Run Id"
+          },
+          "computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed At"
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/DepotHint"
+            },
+            "title": "Hints",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis_run_id",
+          "computed_at",
+          "version",
+          "hints"
+        ],
+        "title": "DepotHints",
+        "type": "object"
+      },
       "DepotQuality": {
         "additionalProperties": false,
         "description": "Wertgewichtet ueber die Aktien mit Score; ``covered``: Anteil ihres Werts mit Composite.",
@@ -5818,6 +5968,58 @@
           }
         },
         "summary": "Archive Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/hints": {
+      "get": {
+        "description": "D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet\nportfolio zuerst einen. Beobachtungen, keine Anlageempfehlung.",
+        "operationId": "depot_hints",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotHints"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Depot Hints",
         "tags": [
           "depots"
         ]

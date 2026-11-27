@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from pydantic import BaseModel
 
 from va_contracts.events.v1 import (
+    ANALYSIS_COMPLETED,
     DEPOT_CHANGED,
     EVENTS,
     FETCH_PROGRESSED,
@@ -100,8 +101,9 @@ class LoggingBroadcaster:
 def topics_for(envelope: Envelope[Any]) -> tuple[str, ...]:
     if envelope.type == SCORING_RUN_COMPLETED.type and envelope.data.run_id is None:
         return ("ranking",)  # ein Rescore hat keinen Run
-    if envelope.type == DEPOT_CHANGED.type:
-        # D3.2: nur an die Tabs des Besitzers (Topic user:<id>, D1.3); die laden per REST nach
+    if envelope.type in (DEPOT_CHANGED.type, ANALYSIS_COMPLETED.type):
+        # D3.2: nur an die Tabs des Besitzers (Topic user:<id>, D1.3); die laden per REST nach.
+        # D5.2: ebenso ein neuer Lauf der Analyse mit Hinweisen
         return (f"user:{envelope.data.owner_user_id}",)
     return TOPICS.get(envelope.type, ())
 

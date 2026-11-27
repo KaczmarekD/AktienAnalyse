@@ -21,6 +21,7 @@ from ..portfolio import (
     CashLineV1,
     DepotAnalysisV1,
     DepotExportV1,
+    DepotHintsV1,
     DepotKind,
     DepotName,
     DepotV1,
@@ -275,6 +276,12 @@ class DepotReplyV1(RpcReplyV1):
     depot: DepotV1 | None = None
 
 
+class DepotHintsReplyV1(RpcReplyV1):
+    """D5.2: die Hinweise des juengsten Laufs; ein fehlender Lauf wird vorher gerechnet."""
+
+    hints: DepotHintsV1 | None = None
+
+
 class DepotAnalysisReplyV1(RpcReplyV1):
     """D4.4: ``analysis`` leer, wenn portfolio keine Marktdaten lesen kann."""
 
@@ -400,6 +407,8 @@ HOLDINGS_IMPORT = RpcSpec("portfolio.holdings.import", HoldingsImportRequestV1, 
 HOLDINGS_FILE = RpcSpec("portfolio.holdings.file", HoldingsGetRequestV1, HoldingsFileReplyV1)
 # D4.4: Analyse eines Depots
 DEPOTS_ANALYSIS = RpcSpec("portfolio.depots.analysis", DepotRefRequestV1, DepotAnalysisReplyV1)
+# D5.2: Hinweise des juengsten Laufs
+DEPOTS_HINTS = RpcSpec("portfolio.depots.hints", DepotRefRequestV1, DepotHintsReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -428,6 +437,7 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         HOLDINGS_IMPORT,
         HOLDINGS_FILE,
         DEPOTS_ANALYSIS,
+        DEPOTS_HINTS,
     )
 }
 
@@ -437,6 +447,7 @@ __all__ = [
     "DEPOTS_CREATE",
     "DEPOTS_EXPORT",
     "DEPOTS_GET",
+    "DEPOTS_HINTS",
     "DEPOTS_LIST",
     "DEPOTS_RESTORE",
     "DEPOTS_UPDATE",

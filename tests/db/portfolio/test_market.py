@@ -153,3 +153,14 @@ def test_the_newest_whole_security_per_isin(market):
     market.record_securities([_copy(APPLE, "Apple")], as_of=FRIDAY, at=T0)
     assert market.security_payloads([SAP]) == {SAP: {"isin": SAP, "name": "SAP SE"}}
     assert market.security_payloads([]) == {}
+
+
+def test_the_previous_scoring_run_per_isin(market):
+    """D5.2, HIN-Q03: je ISIN der zweitjuengste Bewertungslauf, darin die juengste Zeile."""
+    market.record_scores([_score(SAP, 7, rank=20), _score(APPLE, 7)], at=T0)
+    market.record_scores([_score(SAP, 7, rank=21)], at=T0)  # sofort eingeordnet, gleicher Lauf
+    market.record_scores([_score(SAP, 8, rank=5)], at=T0)
+    previous = market.previous_scores([SAP, APPLE])
+    assert set(previous) == {SAP}  # Apple kennt nur einen Lauf
+    assert (previous[SAP].scoring_run_id, previous[SAP].rank) == (7, 21)
+    assert market.previous_scores([]) == {}

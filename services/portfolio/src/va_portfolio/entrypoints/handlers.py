@@ -56,11 +56,17 @@ def _decimal(value: float) -> Decimal:
 
 class SecuritiesUpdatedHandler:
     def __init__(
-        self, bus: EventBus, store: MarketStore, *, clock: Callable[[], datetime] = _utcnow
+        self,
+        bus: EventBus,
+        store: MarketStore,
+        *,
+        clock: Callable[[], datetime] = _utcnow,
+        after: Callable[[str], object] | None = None,
     ) -> None:
         self._bus = bus
         self._store = store
         self._clock = clock
+        self._after = after
 
     def subscribe(self) -> None:
         self._bus.subscribe(SECURITIES_UPDATED, CONSUMER, self)
@@ -74,15 +80,23 @@ class SecuritiesUpdatedHandler:
             for s in env.data.securities
         ]
         self._store.record_securities(copies, as_of=env.data.as_of, at=self._clock())
+        if self._after is not None:
+            self._after("securities")  # D5.2: Analysen neu rechnen
 
 
 class PricesCompletedHandler:
     def __init__(
-        self, bus: EventBus, store: MarketStore, *, clock: Callable[[], datetime] = _utcnow
+        self,
+        bus: EventBus,
+        store: MarketStore,
+        *,
+        clock: Callable[[], datetime] = _utcnow,
+        after: Callable[[str], object] | None = None,
     ) -> None:
         self._bus = bus
         self._store = store
         self._clock = clock
+        self._after = after
 
     def subscribe(self) -> None:
         self._bus.subscribe(PRICES_COMPLETED, CONSUMER, self)
@@ -102,17 +116,25 @@ class PricesCompletedHandler:
         ]
         rates = [FxRate(f.currency, f.trade_date, _decimal(f.rate_to_eur)) for f in env.data.fx]
         self._store.record_prices(quotes, rates, at=self._clock())
+        if self._after is not None:
+            self._after("prices")  # D5.2: Analysen neu rechnen
 
 
 class ScoringRunCompletedHandler:
     """D4.2: Scores je ISIN aus dem Ranking und den Einordnungen eines Bewertungslaufs."""
 
     def __init__(
-        self, bus: EventBus, store: MarketStore, *, clock: Callable[[], datetime] = _utcnow
+        self,
+        bus: EventBus,
+        store: MarketStore,
+        *,
+        clock: Callable[[], datetime] = _utcnow,
+        after: Callable[[str], object] | None = None,
     ) -> None:
         self._bus = bus
         self._store = store
         self._clock = clock
+        self._after = after
 
     def subscribe(self) -> None:
         self._bus.subscribe(SCORING_RUN_COMPLETED, CONSUMER, self)
@@ -123,17 +145,25 @@ class ScoringRunCompletedHandler:
             _ranked(row, data.scoring_run_id, data.as_of) for row in data.ranking if row.isin
         ] + [_placed(p, data.scoring_run_id, data.as_of) for p in data.placements if p.isin]
         self._store.record_scores(scores, at=self._clock())
+        if self._after is not None:
+            self._after("scores")  # D5.2: Analysen neu rechnen
 
 
 class PlacementsUpdatedHandler:
     """D4.6: sofort eingeordnete Aktien, mit Bewertungslauf und Tag des Abrufs."""
 
     def __init__(
-        self, bus: EventBus, store: MarketStore, *, clock: Callable[[], datetime] = _utcnow
+        self,
+        bus: EventBus,
+        store: MarketStore,
+        *,
+        clock: Callable[[], datetime] = _utcnow,
+        after: Callable[[str], object] | None = None,
     ) -> None:
         self._bus = bus
         self._store = store
         self._clock = clock
+        self._after = after
 
     def subscribe(self) -> None:
         self._bus.subscribe(PLACEMENTS_UPDATED, CONSUMER, self)
@@ -142,6 +172,8 @@ class PlacementsUpdatedHandler:
         data = env.data
         scores = [_placed(p, data.scoring_run_id, data.as_of) for p in data.placements if p.isin]
         self._store.record_scores(scores, at=self._clock())
+        if self._after is not None:
+            self._after("scores")  # D5.2: Analysen neu rechnen
 
 
 def _ranked(row: RankingRowV1, scoring_run_id: int, as_of: date) -> Score:
@@ -185,8 +217,11 @@ def _placed(placement: PlacementV1, scoring_run_id: int, as_of: date) -> Score:
     )
 
 
-def wire(bus: EventBus, store: MarketStore) -> None:
-    SecuritiesUpdatedHandler(bus, store).subscribe()
-    PricesCompletedHandler(bus, store).subscribe()
-    ScoringRunCompletedHandler(bus, store).subscribe()
-    PlacementsUpdatedHandler(bus, store).subscribe()
+def wire(
+    bus: EventBus, store: MarketStore, *, after: Callable[[str], object] | None = None
+) -> None:
+    """``after``: seit D5.2 die Analysen neu rechnen (``DepotService.refresh_all``)."""
+    SecuritiesUpdatedHandler(bus, store, after=after).subscribe()
+    PricesCompletedHandler(bus, store, after=after).subscribe()
+    ScoringRunCompletedHandler(bus, store, after=after).subscribe()
+    PlacementsUpdatedHandler(bus, store, after=after).subscribe()

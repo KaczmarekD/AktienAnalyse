@@ -21,6 +21,8 @@ import type {
   CurrentSessionResponse,
   DepotAnalysisData,
   DepotAnalysisResponse,
+  DepotHintsData,
+  DepotHintsResponse,
   DepotHistoryData,
   DepotHistoryResponse,
   DisableUserData,
@@ -318,6 +320,22 @@ export const archiveDepotRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'POST',
     url: '/api/v1/depots/{depot_id}/archive',
+    ...options,
+  });
+
+/**
+ * Depot Hints
+ *
+ * D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
+ * portfolio zuerst einen. Beobachtungen, keine Anlageempfehlung.
+ */
+export const depotHintsRequest = <ThrowOnError extends boolean = false>(
+  options: Options<DepotHintsData, ThrowOnError>,
+): HttpRequest<DepotHintsResponse> =>
+  (options?.client ?? client).requestOptions<DepotHintsResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/hints',
     ...options,
   });
 
@@ -954,6 +972,20 @@ export const archiveDepotResource = <ThrowOnError extends boolean = false>(
   httpResource<ArchiveDepotResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? archiveDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Depot Hints
+ *
+ * D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
+ * portfolio zuerst einen. Beobachtungen, keine Anlageempfehlung.
+ */
+export const depotHintsResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<DepotHintsData, ThrowOnError> | undefined,
+) =>
+  httpResource<DepotHintsResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? depotHintsRequest(opts) : undefined;
   });
 
 /**

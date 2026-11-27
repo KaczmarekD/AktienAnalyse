@@ -28,6 +28,9 @@ import type {
   DepotAnalysisData,
   DepotAnalysisErrors,
   DepotAnalysisResponses,
+  DepotHintsData,
+  DepotHintsErrors,
+  DepotHintsResponses,
   DepotHistoryData,
   DepotHistoryErrors,
   DepotHistoryResponses,
@@ -156,6 +159,8 @@ import {
   zCurrentSessionResponse,
   zDepotAnalysisPath,
   zDepotAnalysisResponse,
+  zDepotHintsPath,
+  zDepotHintsResponse,
   zDepotHistoryPath,
   zDepotHistoryResponse,
   zDisableUserPath,
@@ -603,6 +608,29 @@ export const archiveDepot = <ThrowOnError extends boolean = false>(
         .parseAsync(data),
     responseValidator: async (data) => await zArchiveDepotResponse.parseAsync(data),
     url: '/api/v1/depots/{depot_id}/archive',
+    ...options,
+  });
+
+/**
+ * Depot Hints
+ *
+ * D5.2: Hinweise des juengsten Laufs mit Status und Texten des Katalogs; ohne Lauf rechnet
+ * portfolio zuerst einen. Beobachtungen, keine Anlageempfehlung.
+ */
+export const depotHints = <ThrowOnError extends boolean = false>(
+  options: Options<DepotHintsData, ThrowOnError>,
+): RequestResult<DepotHintsResponses, DepotHintsErrors, ThrowOnError> =>
+  (options.client ?? client).get<DepotHintsResponses, DepotHintsErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zDepotHintsPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zDepotHintsResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/hints',
     ...options,
   });
 

@@ -22,6 +22,15 @@ from va_platform.db import session_scope
 from va_platform.messaging import Outbox
 
 from ...domain.depots import CashLine, Depot, HoldingLine, Snapshot, VersionConflict
+from ...domain.hints import Hint, StoredRun, TrackedHint
+from .models import (
+    AnalysisRun,
+    DepotStatus,
+    DepotVersion,
+    HintRow,
+    HoldingSnapshot,
+    PortfolioOutbox,
+)
 from .models import (
     CashLine as CashLineRow,
 )
@@ -29,17 +38,11 @@ from .models import (
     Depot as DepotRow,
 )
 from .models import (
-    DepotStatus,
-    DepotVersion,
-    HoldingSnapshot,
-    PortfolioOutbox,
-)
-from .models import (
     HoldingLine as HoldingLineRow,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from datetime import datetime
 
     from sqlalchemy import Connection, Engine
@@ -192,6 +195,87 @@ class PostgresDepotStore:
         return (0, 0) if row is None else (int(row.version), int(row.positions))
 
     # --- Abdeckung (D3.3) ---------------------------------------------------------------
+
+    # --- D5.2: Laeufe der Analyse mit Hinweisen ---
+
+    def active_depots(self) -> list[Depot]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(f"{_DEPOTS} WHERE s.status = 'active' ORDER BY d.id"))
+            return [_depot(row) for row in rows]
+
+    def latest_run(self, depot_id: int) -> StoredRun | None:
+        with self._engine.connect() as conn:
+            run = conn.execute(
+                select(AnalysisRun)
+                .where(AnalysisRun.depot_id == depot_id)
+                .order_by(AnalysisRun.id.desc())
+                .limit(1)
+            ).first()
+            if run is None:
+                return None
+            hints = conn.execute(
+                select(HintRow).where(HintRow.analysis_run_id == run.id).order_by(HintRow.id)
+            ).all()
+        return StoredRun(
+            id=run.id,
+            depot_id=run.depot_id,
+            version=run.snapshot_version,
+            fingerprint=run.fingerprint,
+            computed_at=run.computed_at,
+            hints=[
+                TrackedHint(
+                    Hint(h.rule, h.subject, h.severity, h.measured, h.threshold, h.as_of),
+                    h.status,
+                )
+                for h in hints
+            ],
+        )
+
+    def save_run(
+        self,
+        depot_id: int,
+        *,
+        version: int,
+        trigger: str,
+        fingerprint: str,
+        result: dict[str, Any],
+        hints: Sequence[TrackedHint],
+        at: datetime,
+        event: Callable[[int], Envelope[Any]],
+    ) -> int:
+        with session_scope(self._engine) as session:
+            run_id = session.execute(
+                insert(AnalysisRun)
+                .values(
+                    depot_id=depot_id,
+                    snapshot_version=version,
+                    trigger=trigger,
+                    fingerprint=fingerprint,
+                    result=result,
+                    computed_at=at,
+                )
+                .returning(AnalysisRun.id)
+            ).scalar_one()
+            if hints:
+                session.execute(
+                    insert(HintRow),
+                    [
+                        {
+                            "analysis_run_id": run_id,
+                            "key": t.hint.key,
+                            "rule": t.hint.rule,
+                            "subject": t.hint.subject,
+                            "severity": t.hint.severity,
+                            "status": t.status,
+                            "measured": t.hint.measured,
+                            "threshold": t.hint.threshold,
+                            "as_of": t.hint.as_of,
+                        }
+                        for t in hints
+                    ],
+                )
+            self._outbox.add(session, event(run_id))
+        return run_id
 
     def held_isins(self) -> list[str]:
         with self._engine.connect() as conn:

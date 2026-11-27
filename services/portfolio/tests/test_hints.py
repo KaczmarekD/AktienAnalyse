@@ -19,7 +19,14 @@ from va_portfolio.domain.analysis import AnalysisInput, BondData, EtfData, analy
 from va_portfolio.domain.bonds import BondTerms
 from va_portfolio.domain.depots import CashLine, HoldingLine
 from va_portfolio.domain.funds import Fund, FundHolding
-from va_portfolio.domain.hints import HINT_CATALOG, Hint, HintInput, evaluate
+from va_portfolio.domain.hints import (
+    HINT_CATALOG,
+    Hint,
+    HintInput,
+    TrackedHint,
+    evaluate,
+    track,
+)
 from va_portfolio.domain.valuation import Market, Quote, Score, SecurityInfo, value_depot
 
 SAP = "DE0007164600"
@@ -65,6 +72,7 @@ def _hints(
     pending: set[str] = frozenset(),  # type: ignore[assignment]
     leis: dict[str, str] | None = None,
     fund_sizes: dict[str, float] | None = None,
+    previous: dict[str, Score] | None = None,
     params: HintParamsV1 = DEFAULT,
 ) -> list[Hint]:
     """``values``: Wert je ISIN in EUR (Kurs 1 bzw. 100 % bei Anleihen); Kasse bis 10 000."""
@@ -95,7 +103,14 @@ def _hints(
     rest = 10_000 - sum(values.values()) if cash is None else cash
     value = value_depot("depot", lines, [CashLine(Decimal(str(rest)))], market)
     data = AnalysisInput(value=value, etfs=etfs or {}, bonds=bonds or {})
-    source = HintInput(data, analyze(data), TODAY, leis or {}, fund_sizes or {})
+    source = HintInput(
+        data,
+        analyze(data),
+        TODAY,
+        leis=leis or {},
+        fund_sizes=fund_sizes or {},
+        previous_scores=previous or {},
+    )
     return evaluate(source, params)
 
 
@@ -348,3 +363,45 @@ class TestCatalog:
     def test_critical_must_be_above_warning(self):
         with pytest.raises(ValidationError):
             HintParamsV1(k01_warning=0.2, k01_critical=0.1)
+
+
+class TestPercentileDrop:
+    """D5.2, HIN-Q03: gegen den vorherigen Bewertungslauf."""
+
+    def test_q03_drop(self):
+        now = {SAP: _score(SAP, composite_percentile=0.5)}
+        small = {SAP: _score(SAP, composite_percentile=0.69, scoring_run_id=7)}
+        large = {SAP: _score(SAP, composite_percentile=0.7, scoring_run_id=7)}
+        assert _rule(_hints({SAP: 500}, scores=now, previous=small), "HIN-Q03") == []
+        [hint] = _rule(_hints({SAP: 500}, scores=now, previous=large), "HIN-Q03")
+        assert hint.measured == pytest.approx(0.2)
+
+    def test_without_previous_run_nothing(self):
+        assert _rule(_hints({SAP: 500}), "HIN-Q03") == []
+
+
+class TestLifecycle:
+    """D5.2, HIN-03: neu, besteht, erledigt."""
+
+    K01 = Hint("HIN-K01", SAP, "warning", 0.12, 0.10)
+    A02 = Hint("HIN-A02", "depot", "info", 0.2, 0.1)
+
+    def test_first_run_everything_is_new(self):
+        assert [t.status for t in track([], [self.K01, self.A02])] == ["new", "new"]
+
+    def test_existing_new_and_resolved(self):
+        previous = [TrackedHint(self.K01, "new"), TrackedHint(self.A02, "new")]
+        worse = Hint("HIN-K01", SAP, "critical", 0.21, 0.20)
+        q01 = Hint("HIN-Q01", SAP, "warning")
+        tracked = track(previous, [worse, q01])
+        assert [(t.hint.key, t.status) for t in tracked] == [
+            (f"HIN-K01:{SAP}", "existing"),  # die Schwere ist gestiegen
+            (f"HIN-Q01:{SAP}", "new"),
+            ("HIN-A02:depot", "resolved"),
+        ]
+        assert tracked[0].hint.severity == "critical"
+
+    def test_resolved_shows_once(self):
+        previous = [TrackedHint(self.A02, "resolved")]
+        assert track(previous, []) == []
+        assert [t.status for t in track(previous, [self.A02])] == ["new"]

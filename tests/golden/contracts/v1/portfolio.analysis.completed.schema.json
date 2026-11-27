@@ -1,0 +1,51 @@
+{
+  "description": "portfolio -> web-api (D5.2): ein neuer Lauf der Analyse mit Hinweisen.\n\nNur IDs und Zahlen: keine Schluessel, ISINs oder Betraege, das Event liegt im Stream. Das\nweb-api meldet es an die Tabs des Besitzers (Topic ``user:<id>``), die per REST nachladen.",
+  "properties": {
+    "analysis_run_id": {
+      "minimum": 1,
+      "title": "Analysis Run Id",
+      "type": "integer"
+    },
+    "critical": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Critical",
+      "type": "integer"
+    },
+    "depot_id": {
+      "minimum": 1,
+      "title": "Depot Id",
+      "type": "integer"
+    },
+    "info": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Info",
+      "type": "integer"
+    },
+    "new": {
+      "default": 0,
+      "minimum": 0,
+      "title": "New",
+      "type": "integer"
+    },
+    "owner_user_id": {
+      "minimum": 1,
+      "title": "Owner User Id",
+      "type": "integer"
+    },
+    "warning": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Warning",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "depot_id",
+    "owner_user_id",
+    "analysis_run_id"
+  ],
+  "title": "AnalysisCompletedV1",
+  "type": "object"
+}

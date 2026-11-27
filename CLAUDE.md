@@ -100,14 +100,18 @@ Jeder Service hängt über einen `ReliableBus` am Bus. Er verarbeitet ein Event 
   Kupontermine, Sonderformen) und `va_portfolio.domain.funds` (laufende Kosten, Durchschau,
   Überschneidung, Look-through-Score); beide nutzt seit D4.4 die Analyse des Depots.
   Seit D5.1 die Regeln der Hinweise (`va_portfolio.domain.hints`, `HINT_CATALOG`, `evaluate`,
-  Schwellen in `HintParamsV1`), noch ohne Speicher und Endpunkt (D5.2). Kein Hinweis sagt
-  „kaufen“ oder „verkaufen“; ein Test prüft den Katalog.
+  Schwellen in `HintParamsV1`). Kein Hinweis sagt „kaufen“ oder „verkaufen“; ein Test prüft den
+  Katalog. Seit D5.2 gespeichert (`analysis_run`, `hint`, Status neu/besteht/erledigt): neu
+  gerechnet bei jedem Depotstand und nach neuen Kursen, Scores und Stammdaten
+  (`DepotService.refresh_all` als `after` der Handler), ein Lauf nur bei geändertem Ergebnis,
+  Event `portfolio.analysis.completed` (nur IDs und Zahlen) an `user:<id>`.
   Seit D3.5 die Datei im eigenen Format (`…/import/preview`, `…/import` mit `If-Match`,
   `…/holdings/csv`): JSON mit Base64, höchstens 640 KiB und 1000 Zeilen. Lesen, Abgleich und
   Schreiben macht portfolio (`va_portfolio.domain.holdings_file`).
   Seit D4.4 `…/analysis` (RPC `portfolio.depots.analysis`): Allokation mit Durchschau,
   Konzentration, Qualität, Kosten, Anleihen und Datenlage aus `va_portfolio.domain.analysis`, bei
-  jeder Anfrage gerechnet; ohne Marktdaten 503.
+  jeder Anfrage gerechnet; ohne Marktdaten 503. Seit D5.2 `…/hints` (RPC
+  `portfolio.depots.hints`): der jüngste Lauf mit Status und Texten des Katalogs.
   Ist der Besitzer nicht erreichbar, antworten diese Endpunkte mit 503.
 - Rollen `va_read` (schreibgeschützte Verbindung), `va_web` und seit D1.1 `va_identity`. Die
   Zugangsdaten der Services bekommt es nie.

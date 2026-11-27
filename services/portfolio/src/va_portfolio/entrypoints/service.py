@@ -106,9 +106,14 @@ def setup(
     del settings
     flush = outbox_flusher(bus, engine)
     market = PostgresMarketStore(engine)
-    # D3.4: Stammdaten und Kurse; jedes Event einmal (Inbox), das Hoechstalter steht am Event
-    handlers.wire(ReliableBus(bus, engine, inbox=PortfolioInbox, outbox=PortfolioOutbox), market)
     service = DepotService(PostgresDepotStore(engine), flush=flush, market=market)
+    # D3.4: Stammdaten und Kurse; jedes Event einmal (Inbox), das Hoechstalter steht am Event.
+    # D5.2: danach die Analysen aller aktiven Depots neu rechnen
+    handlers.wire(
+        ReliableBus(bus, engine, inbox=PortfolioInbox, outbox=PortfolioOutbox),
+        market,
+        after=service.refresh_all,
+    )
     for spec, handler in rpc.handlers(service).items():
         bus.serve(spec, handler, queue=QUEUE)
     try:

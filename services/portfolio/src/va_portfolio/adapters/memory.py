@@ -11,10 +11,11 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from ..domain.depots import Depot, Snapshot, VersionConflict
+from ..domain.hints import StoredRun, TrackedHint
 from ..domain.valuation import Market, Quote, Score, SecurityInfo
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Sequence
+    from collections.abc import Callable, Collection, Sequence
     from datetime import date, datetime
     from decimal import Decimal
 
@@ -33,6 +34,8 @@ class MemoryDepotStore:
         # Simuliert eine gleichzeitige Speicherung: Die Version ist schon vergeben
         self.race = False
         self._lock = threading.Lock()
+        self.runs: list[StoredRun] = []  # D5.2
+        self.results: dict[int, dict[str, Any]] = {}
 
     def create_depot(
         self,
@@ -130,6 +133,35 @@ class MemoryDepotStore:
             snaps.append(snapshot)
             self.events.append(event)
 
+    # --- D5.2: Laeufe der Analyse mit Hinweisen ---
+
+    def active_depots(self) -> list[Depot]:
+        return [d for d in self.depots_by_id.values() if d.status == "active"]
+
+    def latest_run(self, depot_id: int) -> StoredRun | None:
+        runs = [r for r in self.runs if r.depot_id == depot_id]
+        return runs[-1] if runs else None
+
+    def save_run(
+        self,
+        depot_id: int,
+        *,
+        version: int,
+        trigger: str,
+        fingerprint: str,
+        result: dict[str, Any],
+        hints: Sequence[TrackedHint],
+        at: datetime,
+        event: Callable[[int], Envelope[Any]],
+    ) -> int:
+        del trigger
+        with self._lock:
+            run = StoredRun(len(self.runs) + 1, depot_id, version, fingerprint, at, list(hints))
+            self.runs.append(run)
+            self.results[run.id] = result
+            self.events.append(event(run.id))
+            return run.id
+
 
 class MemoryMarketStore:
     """Kopien der Marktdaten (D3.4): je ISIN bzw. Waehrung gilt das Juengste."""
@@ -140,6 +172,7 @@ class MemoryMarketStore:
         self.fx: dict[str, tuple[date, Decimal]] = {}
         self.payloads: dict[str, dict[str, Any]] = {}
         self.scores: dict[str, Score] = {}
+        self.score_history: list[Score] = []  # D5.2
 
     def record_securities(
         self, copies: Sequence[SecurityCopy], *, as_of: date, at: datetime
@@ -167,9 +200,20 @@ class MemoryMarketStore:
     def record_scores(self, scores: Sequence[Score], *, at: datetime) -> None:
         del at
         for score in scores:
+            self.score_history.append(score)
             known = self.scores.get(score.isin)
             if known is None or known.scoring_run_id <= score.scoring_run_id:
                 self.scores[score.isin] = score
+
+    def previous_scores(self, isins: Collection[str]) -> dict[str, Score]:
+        previous: dict[str, Score] = {}
+        for isin in set(isins):
+            runs = sorted({s.scoring_run_id for s in self.score_history if s.isin == isin})
+            if len(runs) >= 2:
+                previous[isin] = [
+                    s for s in self.score_history if s.isin == isin and s.scoring_run_id == runs[-2]
+                ][-1]
+        return previous
 
     def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
         return {i: p for i, p in self.payloads.items() if i in set(isins)}

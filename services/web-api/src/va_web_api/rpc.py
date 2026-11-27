@@ -35,6 +35,7 @@ from va_contracts.rpc.v1 import (
     DEPOTS_CREATE,
     DEPOTS_EXPORT,
     DEPOTS_GET,
+    DEPOTS_HINTS,
     DEPOTS_LIST,
     DEPOTS_RESTORE,
     DEPOTS_UPDATE,
@@ -111,6 +112,7 @@ if TYPE_CHECKING:
         CashLineV1,
         DepotAnalysisV1,
         DepotExportV1,
+        DepotHintsV1,
         DepotKind,
         DepotV1,
         HistoryEntryV1,
@@ -374,6 +376,10 @@ class RemoteDepots:
     def analysis(self, user_id: int, depot_id: int) -> DepotAnalysisV1 | None:
         request = DepotRefRequestV1(user_id=user_id, depot_id=depot_id)
         return self._call(DEPOTS_ANALYSIS, request).analysis
+
+    def hints(self, user_id: int, depot_id: int) -> DepotHintsV1 | None:
+        request = DepotRefRequestV1(user_id=user_id, depot_id=depot_id)
+        return self._call(DEPOTS_HINTS, request).hints
 
 
 def _raise(reply: RpcReplyV1) -> None:

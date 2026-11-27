@@ -24,8 +24,10 @@ from va_contracts.portfolio import (
     CashLineV1,
     DepotAnalysisV1,
     DepotExportV1,
+    DepotHintsV1,
     DepotV1,
     DepotValuationV1,
+    HintV1,
     HistoryEntryV1,
     HoldingLineV1,
     HoldingsV1,
@@ -41,6 +43,7 @@ from va_contracts.rpc.v1 import (
     DEPOTS_CREATE,
     DEPOTS_EXPORT,
     DEPOTS_GET,
+    DEPOTS_HINTS,
     DEPOTS_LIST,
     DEPOTS_RESTORE,
     DEPOTS_UPDATE,
@@ -52,6 +55,7 @@ from va_contracts.rpc.v1 import (
     HOLDINGS_SAVE,
     DepotAnalysisReplyV1,
     DepotExportReplyV1,
+    DepotHintsReplyV1,
     DepotListReplyV1,
     DepotReplyV1,
     HistoryReplyV1,
@@ -63,6 +67,7 @@ from va_contracts.rpc.v1 import (
 
 from ..application.depots import ArchivedDepot, DepotNotFound
 from ..domain.depots import CashLine, DepotError, HoldingLine, VersionConflict
+from ..domain.hints import HINT_CATALOG
 
 if TYPE_CHECKING:
     from va_contracts.rpc.v1 import (
@@ -81,6 +86,7 @@ if TYPE_CHECKING:
 
     from ..application.depots import DepotService, DepotSummary, HistoryEntry, ImportPreview
     from ..domain.depots import Snapshot
+    from ..domain.hints import StoredRun
     from ..domain.valuation import DepotValue, PositionValue, Score
 
 
@@ -125,6 +131,34 @@ def _score(score: Score | None) -> PositionScoreV1 | None:
         value_trap_reason=score.value_trap_reason,  # type: ignore[arg-type]
         industry_rule=score.industry_rule,
         reason=score.reason,  # type: ignore[arg-type]
+    )
+
+
+def _hints(run: StoredRun | None) -> DepotHintsV1:
+    """D5.2: ein Lauf mit seinen Hinweisen, die Texte aus dem Katalog."""
+    if run is None:
+        return DepotHintsV1()
+    hints = []
+    for tracked in run.hints:
+        hint, entry = tracked.hint, HINT_CATALOG[tracked.hint.rule]
+        hints.append(
+            HintV1(
+                key=hint.key,
+                rule=hint.rule,  # type: ignore[arg-type]
+                subject=hint.subject,
+                severity=hint.severity,
+                status=tracked.status,
+                measured=hint.measured,
+                threshold=hint.threshold,
+                as_of=hint.as_of,
+                group=entry.group,
+                title=entry.title,
+                reason=entry.reason,
+                approach=entry.approach,
+            )
+        )
+    return DepotHintsV1(
+        analysis_run_id=run.id, computed_at=run.computed_at, version=run.version, hints=hints
     )
 
 
@@ -255,6 +289,14 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
 
         return _guarded(DepotAnalysisReplyV1, work)
 
+    def hints(request: DepotRefRequestV1) -> DepotHintsReplyV1:
+        return _guarded(
+            DepotHintsReplyV1,
+            lambda: DepotHintsReplyV1(
+                hints=_hints(service.hints(request.user_id, request.depot_id))
+            ),
+        )
+
     def get(request: DepotRefRequestV1) -> DepotReplyV1:
         return _guarded(
             DepotReplyV1,
@@ -381,4 +423,5 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         HOLDINGS_IMPORT: import_file,
         HOLDINGS_FILE: holdings_file,
         DEPOTS_ANALYSIS: analysis,
+        DEPOTS_HINTS: hints,
     }

@@ -22,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from va_contracts import Contract, Envelope, UnknownEventError, new_envelope, parse_envelope
 from va_contracts.events.v1 import (
+    ANALYSIS_COMPLETED,
     COVERAGE_CHANGED,
     COVERAGE_FETCHED,
     DEPOT_CHANGED,
@@ -39,6 +40,7 @@ from va_contracts.events.v1 import (
     SCORING_RUN_COMPLETED,
     SECURITIES_UPDATED,
     SNAPSHOT_COMPLETED,
+    AnalysisCompletedV1,
     CoverageChangedV1,
     CoverageFetchedV1,
     DepotChangedV1,
@@ -289,6 +291,9 @@ def _examples() -> dict[str, Contract]:
             fundamentals=funds[:1],
             isins={funds[0].symbol: "US0378331005"},
         ),
+        ANALYSIS_COMPLETED.type: AnalysisCompletedV1(
+            depot_id=3, owner_user_id=1, analysis_run_id=17, critical=1, warning=2, info=4, new=2
+        ),
         PLACEMENTS_UPDATED.type: PlacementsUpdatedV1(
             scoring_run_id=3, as_of=date(2026, 11, 27), placements=[_apple_placement()]
         ),
@@ -418,6 +423,7 @@ class TestEventCatalog:
             # D4.6: neue Aktie sofort einordnen
             "marketdata.coverage.fetched",
             "scoring.placements.updated",
+            "portfolio.analysis.completed",  # D5.2: nur IDs und Zahlen
         }
         for event_type, spec in EVENTS.items():
             assert spec.type == event_type
@@ -1007,3 +1013,22 @@ class TestPlacingRightAway:
         assert PLACEMENTS_UPDATED.max_age == timedelta(days=7)
         assert COVERAGE_FETCHED.subject == "va.marketdata.coverage.fetched"
         assert not COVERAGE_FETCHED.private
+
+
+class TestAnalysisCompleted:
+    """D5.2: nur IDs und Zahlen, das Event liegt 24 h im Stream."""
+
+    def test_only_ids_and_counts(self):
+        assert set(AnalysisCompletedV1.model_fields) == {
+            "depot_id",
+            "owner_user_id",
+            "analysis_run_id",
+            "critical",
+            "warning",
+            "info",
+            "new",
+        }
+
+    def test_a_day(self):
+        assert ANALYSIS_COMPLETED.max_age == timedelta(hours=24)
+        assert ANALYSIS_COMPLETED.subject == "va.portfolio.analysis.completed"

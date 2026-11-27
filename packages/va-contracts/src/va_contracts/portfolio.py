@@ -409,6 +409,38 @@ class HintParamsV1(Contract):
         return self
 
 
+# D5.2: Status gegen den vorherigen Lauf (HIN-03)
+HintStatus = Literal["new", "existing", "resolved"]
+
+
+class HintV1(Contract):
+    """Ein Hinweis (D5.2) mit den Texten seines Katalogeintrags, damit das web-api den Katalog
+    nicht kennen muss. ``measured``/``threshold``: Anteile als Bruchteil, TER und Kurs in Prozent,
+    Tage und Handelstage als Zahl; ``as_of``: Datenstand."""
+
+    key: str
+    rule: HintRuleId
+    subject: str
+    severity: HintSeverity
+    status: HintStatus
+    measured: float | None = None
+    threshold: float | None = None
+    as_of: date | None = None
+    group: str
+    title: str
+    reason: str
+    approach: str
+
+
+class DepotHintsV1(Contract):
+    """Die Hinweise des juengsten Laufs; ``analysis_run_id`` leer ohne Lauf (ohne Marktdaten)."""
+
+    analysis_run_id: PositiveId | None = None
+    computed_at: datetime | None = None
+    version: int = Field(default=0, ge=0)  # Depotstand des Laufs
+    hints: list[HintV1] = Field(default_factory=list)
+
+
 __all__ = [
     "MAX_FILE_BYTES",
     "MAX_LINES",
@@ -424,6 +456,7 @@ __all__ = [
     "DataQualityV1",
     "DepotAnalysisV1",
     "DepotExportV1",
+    "DepotHintsV1",
     "DepotKind",
     "DepotName",
     "DepotState",
@@ -433,6 +466,8 @@ __all__ = [
     "HintParamsV1",
     "HintRuleId",
     "HintSeverity",
+    "HintStatus",
+    "HintV1",
     "HistoryEntryV1",
     "HoldingLineV1",
     "HoldingUnit",

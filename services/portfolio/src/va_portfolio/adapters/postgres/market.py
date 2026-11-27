@@ -35,6 +35,14 @@ SELECT DISTINCT ON (isin) isin, trade_date, close, currency, percent_of_par, sou
 FROM portfolio.price_view WHERE isin = ANY(:isins)
 ORDER BY isin, trade_date DESC, id DESC
 """
+# D5.2: je ISIN der zweitjuengste Bewertungslauf, darin die zuletzt empfangene Zeile
+_PREVIOUS_SCORES = """
+SELECT DISTINCT ON (isin) isin, scoring_run_id, as_of, payload FROM (
+    SELECT *, dense_rank() OVER (PARTITION BY isin ORDER BY scoring_run_id DESC) AS run_rank
+    FROM portfolio.score_view WHERE isin = ANY(:isins)
+) ranked WHERE run_rank = 2
+ORDER BY isin, id DESC
+"""
 _PAYLOADS = """
 SELECT DISTINCT ON (isin) isin, payload
 FROM portfolio.security_view WHERE isin = ANY(:isins)
@@ -137,6 +145,14 @@ class PostgresMarketStore:
                     for score in scores
                 ],
             )
+
+    def previous_scores(self, isins: Collection[str]) -> dict[str, Score]:
+        wanted = sorted(set(isins))
+        if not wanted:
+            return {}
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(_PREVIOUS_SCORES), {"isins": wanted}).all()
+        return {r.isin: _score(r.isin, r.scoring_run_id, r.as_of, r.payload) for r in rows}
 
     def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
         wanted = sorted(set(isins))

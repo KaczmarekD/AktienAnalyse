@@ -24,20 +24,24 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
 from va_contracts import new_envelope
 from va_contracts.events.v1 import (
+    ANALYSIS_COMPLETED,
     COVERAGE_CHANGED,
     DEPOT_CHANGED,
+    AnalysisCompletedV1,
     CoverageChangedV1,
     DepotChange,
     DepotChangedV1,
 )
+from va_contracts.portfolio import DepotAnalysisV1, HintParamsV1
 
 from ..domain.analysis import DepotAnalysis, analyze
 from ..domain.depots import (
@@ -52,6 +56,7 @@ from ..domain.depots import (
     diff,
     next_version,
 )
+from ..domain.hints import Hint, HintInput, TrackedHint, evaluate, track
 from ..domain.holdings_file import (
     FileLine,
     ImportEntry,
@@ -61,12 +66,13 @@ from ..domain.holdings_file import (
     write_holdings,
 )
 from ..domain.valuation import DepotValue, value_depot
-from .analysis import analysis_input, fund_isins, securities
+from .analysis import analysis_input, fund_isins, fund_sizes, securities
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
     from va_contracts.portfolio import DepotKind, DepotState, HoldingUnit, SnapshotSource
 
+    from ..domain.hints import StoredRun
     from .market import MarketReader
 
 log = logging.getLogger(__name__)
@@ -147,6 +153,29 @@ class DepotStore(Protocol):
         """Wirft ``VersionConflict``, wenn die Version schon vergeben ist (gleichzeitig gespeichert)."""
         ...
 
+    # --- D5.2: Laeufe der Analyse mit Hinweisen ---
+
+    def active_depots(self) -> list[Depot]:
+        """Alle aktiven Depots und Beobachtungslisten, aller Nutzer."""
+        ...
+
+    def latest_run(self, depot_id: int) -> StoredRun | None: ...
+
+    def save_run(
+        self,
+        depot_id: int,
+        *,
+        version: int,
+        trigger: str,
+        fingerprint: str,
+        result: dict[str, Any],
+        hints: Sequence[TrackedHint],
+        at: datetime,
+        event: Callable[[int], Envelope[Any]],
+    ) -> int:
+        """Lauf, Hinweise und Event (mit der ID des Laufs) in einer Transaktion."""
+        ...
+
 
 @dataclass(frozen=True)
 class DepotSummary:
@@ -172,6 +201,45 @@ class HistoryEntry:
     created_by: int | None
     positions: int
     diff: Diff
+
+
+@dataclass(frozen=True)
+class Evaluated:
+    """D5.2: Analyse und Hinweise eines Depotstands, vor dem Speichern."""
+
+    version: int
+    analysis: DepotAnalysis
+    hints: list[Hint]
+
+
+def _fingerprint(version: int, result: dict[str, Any], hints: Sequence[Hint]) -> str:
+    """Gleich, wenn sich weder Depotstand noch Analyse noch Hinweise geaendert haben."""
+    payload = {"version": version, "analysis": result, "hints": [asdict(h) for h in hints]}
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _analysis_completed(depot: Depot, run_id: int, tracked: Sequence[TrackedHint]) -> Envelope[Any]:
+    """D5.2: nur IDs und Zahlen; erledigte Hinweise zaehlen nicht."""
+    active = [t for t in tracked if t.status != "resolved"]
+
+    def count(severity: str) -> int:
+        return sum(t.hint.severity == severity for t in active)
+
+    return new_envelope(
+        ANALYSIS_COMPLETED,
+        AnalysisCompletedV1(
+            depot_id=depot.id,
+            owner_user_id=depot.owner_user_id,
+            analysis_run_id=run_id,
+            critical=count("critical"),
+            warning=count("warning"),
+            info=count("info"),
+            new=sum(t.status == "new" for t in active),
+        ),
+        source=SOURCE,
+    )
 
 
 def _utcnow() -> datetime:
@@ -304,6 +372,11 @@ class DepotService:
         before = self._held()
         self._store.save_snapshot(snapshot, event=_changed(depot.id, user_id, "holdings", version))
         self._coverage_since(before)
+        # D5.2: der neue Depotstand bekommt gleich seine Analyse; ein Fehler kostet nur sie
+        try:
+            self._refresh(depot, "holdings")
+        except Exception:
+            log.warning("Analyse von Depot %s nicht gespeichert", depot.id, exc_info=True)
         self._after_write()
         return snapshot
 
@@ -454,7 +527,57 @@ class DepotService:
 
     def analysis(self, user_id: int, depot_id: int) -> DepotAnalysis | None:
         """D4.4: Analyse des neuesten Depotstands; ``None`` ohne lesbare Marktdaten."""
+        evaluated = self._evaluate(self._owned(user_id, depot_id))
+        return None if evaluated is None else evaluated.analysis
+
+    def hints(self, user_id: int, depot_id: int) -> StoredRun | None:
+        """D5.2: der juengste Lauf mit Hinweisen; ohne Lauf wird zuerst einer gerechnet."""
         depot = self._owned(user_id, depot_id)
+        if self._store.latest_run(depot.id) is None:
+            self._refresh(depot, "request")
+        return self._store.latest_run(depot.id)
+
+    def refresh_all(self, trigger: str) -> int:
+        """D5.2: alle aktiven Depots neu rechnen (neue Kurse, Scores, Stammdaten); wirft nicht."""
+        runs = 0
+        try:
+            depots = self._store.active_depots()
+        except Exception:
+            log.warning("Depots nicht lesbar - keine neue Analyse", exc_info=True)
+            return 0
+        for depot in depots:
+            try:
+                runs += self._refresh(depot, trigger) is not None
+            except Exception:
+                log.warning("Analyse von Depot %s nicht gespeichert", depot.id, exc_info=True)
+        if runs:
+            self._after_write()
+        return runs
+
+    def _refresh(self, depot: Depot, trigger: str) -> int | None:
+        """Ein neuer Lauf, wenn sich Analyse oder Hinweise geaendert haben; sonst ``None``."""
+        evaluated = self._evaluate(depot)
+        if evaluated is None:
+            return None
+        result = DepotAnalysisV1.model_validate(asdict(evaluated.analysis)).model_dump(mode="json")
+        fingerprint = _fingerprint(evaluated.version, result, evaluated.hints)
+        previous = self._store.latest_run(depot.id)
+        if previous is not None and previous.fingerprint == fingerprint:
+            return None
+        tracked = track(previous.hints if previous else [], evaluated.hints)
+        return self._store.save_run(
+            depot.id,
+            version=evaluated.version,
+            trigger=trigger,
+            fingerprint=fingerprint,
+            result=result,
+            hints=tracked,
+            at=self._clock(),
+            event=lambda run_id: _analysis_completed(depot, run_id, tracked),
+        )
+
+    def _evaluate(self, depot: Depot) -> Evaluated | None:
+        """Analyse und Hinweise des neuesten Depotstands; ``None`` ohne lesbare Marktdaten."""
         if self._market is None:
             return None
         snapshot = self._store.snapshot(depot.id) or Snapshot(depot.id, 0)
@@ -464,11 +587,22 @@ class DepotService:
             found = securities(self._market.security_payloads(isins))
             inside = fund_isins(found) - isins
             scores = {**market.scores, **(self._market.market(inside).scores if inside else {})}
+            previous = self._market.previous_scores(isins)
         except Exception:
             log.warning("Marktdaten nicht lesbar - Depot ohne Analyse", exc_info=True)
             return None
         value = value_depot(depot.kind, snapshot.lines, snapshot.cash, market)
-        return analyze(analysis_input(value, found, scores))
+        data = analysis_input(value, found, scores)
+        analysis = analyze(data)
+        source = HintInput(
+            data,
+            analysis,
+            self._clock().date(),
+            leis={i: s.lei for i, s in found.items() if s.lei},
+            fund_sizes=fund_sizes(found, market.fx),
+            previous_scores=previous,
+        )
+        return Evaluated(snapshot.version, analysis, evaluate(source, HintParamsV1()))
 
     def _summary(self, depot: Depot) -> DepotSummary:
         version, positions = self._store.summary(depot.id)
