@@ -364,6 +364,38 @@ class TestValuation:
         }
         assert bund["score"] is None
 
+    def test_the_analysis_of_the_own_depot(self, valued):
+        """D4.4: Analyse ueber RPC bei portfolio; die Anleihe hat ohne Stammdaten keine Rendite."""
+        depot_id = self._depot(valued)
+        response = valued.get(f"/api/v1/depots/{depot_id}/analysis")
+        assert response.status_code == 200, response.text
+        analysis = response.json()
+        assert analysis["value_eur"] == "2415.00"
+        assert set(analysis) == {
+            "value_eur",
+            "allocation",
+            "concentration",
+            "quality",
+            "costs",
+            "bonds",
+            "data",
+        }
+        assert analysis["concentration"]["largest"]["isin"] == SAP
+        assert analysis["quality"]["composite"] == 0.578  # nur SAP hat Scores
+        assert (analysis["data"]["positions"], analysis["data"]["valued"]) == (2, 1)
+
+    def test_the_analysis_of_a_foreign_depot_is_404(self, valued, identity, store):
+        depot_id = self._depot(valued)
+        other = _client(identity, store, "ben", MemoryMarketStore())
+        try:
+            assert other.get(f"/api/v1/depots/{depot_id}/analysis").status_code == 404
+        finally:
+            other.__exit__(None, None, None)
+
+    def test_without_market_data_no_analysis(self, anna):
+        depot_id = _create(anna)
+        assert anna.get(f"/api/v1/depots/{depot_id}/analysis").status_code == 503
+
     def test_without_market_data_no_valuation(self, anna):
         depot_id = _create(anna)
         assert anna.get(f"/api/v1/depots/{depot_id}").json()["valuation"] is None

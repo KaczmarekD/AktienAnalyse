@@ -129,6 +129,20 @@ class TestScoreCopy:
         assert (apple.reference, apple.rank) == ("outside", None)
         assert (tiny.reference, tiny.reason) == ("below_size_filter", "no_quality")
 
+    def test_the_sector_comes_along(self):
+        """D4.4: Sektor aus den Kennzahlen der Ranking-Zeile bzw. der Einordnung."""
+        bus, market, _ = _setup()
+        row = RankingRowV1(
+            fundamentals=FundamentalsV1(
+                identity=IdentityV1(symbol="SAP.DE", name="SAP", index="DAX", sector="Technology")
+            ),
+            rank_overall=1,
+            isin=SAP,
+        )
+        placed = PlacementV1(symbol="AAPL", isin=APPLE, sector="Technology")
+        bus.publish(_completed(8, FRIDAY, [row], [placed]))
+        assert (market.scores[SAP].sector, market.scores[APPLE].sector) == ("Technology",) * 2
+
     def test_a_ranking_row_without_composite_says_why(self):
         bus, market, _ = _setup()
         bank = _row("CBK.DE", "DE000CBK1001", 40, value_score=0.9)

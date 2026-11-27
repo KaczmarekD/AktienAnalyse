@@ -19,6 +19,7 @@ from ..portfolio import (
     MAX_FILE_BYTES,
     MAX_LINES,
     CashLineV1,
+    DepotAnalysisV1,
     DepotExportV1,
     DepotKind,
     DepotName,
@@ -274,6 +275,12 @@ class DepotReplyV1(RpcReplyV1):
     depot: DepotV1 | None = None
 
 
+class DepotAnalysisReplyV1(RpcReplyV1):
+    """D4.4: ``analysis`` leer, wenn portfolio keine Marktdaten lesen kann."""
+
+    analysis: DepotAnalysisV1 | None = None
+
+
 class HoldingsGetRequestV1(Contract):
     """``version`` leer: der aktuelle Depotstand."""
 
@@ -391,6 +398,8 @@ HOLDINGS_IMPORT_PREVIEW = RpcSpec(
 )
 HOLDINGS_IMPORT = RpcSpec("portfolio.holdings.import", HoldingsImportRequestV1, HoldingsReplyV1)
 HOLDINGS_FILE = RpcSpec("portfolio.holdings.file", HoldingsGetRequestV1, HoldingsFileReplyV1)
+# D4.4: Analyse eines Depots
+DEPOTS_ANALYSIS = RpcSpec("portfolio.depots.analysis", DepotRefRequestV1, DepotAnalysisReplyV1)
 
 RPCS: dict[str, RpcSpec[Any, Any]] = {
     spec.name: spec
@@ -418,10 +427,12 @@ RPCS: dict[str, RpcSpec[Any, Any]] = {
         HOLDINGS_IMPORT_PREVIEW,
         HOLDINGS_IMPORT,
         HOLDINGS_FILE,
+        DEPOTS_ANALYSIS,
     )
 }
 
 __all__ = [
+    "DEPOTS_ANALYSIS",
     "DEPOTS_ARCHIVE",
     "DEPOTS_CREATE",
     "DEPOTS_EXPORT",

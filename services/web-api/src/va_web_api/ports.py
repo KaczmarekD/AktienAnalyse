@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from va_contracts.events.v1.ranking import ValueTrapReason
     from va_contracts.portfolio import (
         CashLineV1,
+        DepotAnalysisV1,
         DepotExportV1,
         DepotKind,
         DepotV1,
@@ -194,6 +195,9 @@ class DepotDirectory(Protocol):
     def holdings_file(
         self, user_id: int, depot_id: int, version: int | None
     ) -> tuple[str, bytes]: ...
+
+    # D4.4: Analyse des neuesten Depotstands; ``None``, wenn portfolio keine Marktdaten hat
+    def analysis(self, user_id: int, depot_id: int) -> DepotAnalysisV1 | None: ...
 
 
 class ProfileConflict(Exception):

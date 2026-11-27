@@ -144,3 +144,12 @@ def test_unknown_payload_fields_are_ignored(market, engine):
             },
         )
     assert market.market([SAP]).scores[SAP] == _score(SAP, 8)
+
+
+def test_the_newest_whole_security_per_isin(market):
+    """D4.4: die ganzen Stammdaten fuer die Analyse, je ISIN die juengsten."""
+    market.record_securities([_copy(SAP, "SAP alt")], as_of=THURSDAY, at=T0)
+    market.record_securities([_copy(SAP, "SAP SE")], as_of=FRIDAY, at=T0)
+    market.record_securities([_copy(APPLE, "Apple")], as_of=FRIDAY, at=T0)
+    assert market.security_payloads([SAP]) == {SAP: {"isin": SAP, "name": "SAP SE"}}
+    assert market.security_payloads([]) == {}

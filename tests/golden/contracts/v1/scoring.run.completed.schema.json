@@ -353,6 +353,18 @@
           "default": null,
           "title": "Reason"
         },
+        "sector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sector"
+        },
         "symbol": {
           "title": "Symbol",
           "type": "string"

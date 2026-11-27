@@ -76,6 +76,7 @@ class TestCatalog:
             "portfolio.holdings.import.preview",
             "portfolio.holdings.import",
             "portfolio.holdings.file",
+            "portfolio.depots.analysis",  # D4.4: Analyse eines Depots
         }
         assert RPCS["scoring.preview"] is SCORING_PREVIEW
 

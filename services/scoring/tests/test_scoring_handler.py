@@ -304,6 +304,11 @@ def test_depot_stocks_are_placed_into_the_reference(bus, mock_universe_df):
     assert placements["SMALL.DE"].instrument_id is not None
     assert placements["AAPL"].composite_score is not None
     assert placements["AAPL"].factor_ranks
+    # D4.4: der Sektor der Kennzahlen, fuer die Allokation im Depot
+    assert (
+        placements["AAPL"].sector
+        == mock_universe_df.loc[mock_universe_df["symbol"] == "VAL.DE", "sector"].iloc[0]
+    )
     assert store.placements == [(20, data.placements)]
 
 

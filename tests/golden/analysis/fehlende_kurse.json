@@ -1,0 +1,161 @@
+{
+  "value_eur": "3587.50",
+  "allocation": {
+    "asset_class": [
+      {
+        "key": "equity",
+        "value_eur": "2112.50",
+        "weight": 0.58885
+      },
+      {
+        "key": "bond",
+        "value_eur": "975.00",
+        "weight": 0.271777
+      },
+      {
+        "key": "cash",
+        "value_eur": "500.00",
+        "weight": 0.139373
+      }
+    ],
+    "currency": [
+      {
+        "key": "EUR",
+        "value_eur": "3587.50",
+        "weight": 1.0
+      }
+    ],
+    "sector": [
+      {
+        "key": "Technology",
+        "value_eur": "2112.50",
+        "weight": 0.58885
+      },
+      {
+        "key": "bonds",
+        "value_eur": "975.00",
+        "weight": 0.271777
+      },
+      {
+        "key": "cash",
+        "value_eur": "500.00",
+        "weight": 0.139373
+      }
+    ],
+    "country": [
+      {
+        "key": "DE",
+        "value_eur": "3087.50",
+        "weight": 0.860627
+      },
+      {
+        "key": "cash",
+        "value_eur": "500.00",
+        "weight": 0.139373
+      }
+    ]
+  },
+  "concentration": {
+    "largest": {
+      "isin": "DE0007164600",
+      "name": "SAP SE",
+      "weight": 0.58885
+    },
+    "top": [
+      {
+        "isin": "DE0007164600",
+        "name": "SAP SE",
+        "weight": 0.58885
+      },
+      {
+        "isin": "DE0001102580",
+        "name": "Bund 2,6 % 2033",
+        "weight": 0.271777
+      }
+    ],
+    "top_weight": 0.860627,
+    "effective_positions": 1.760976,
+    "lower_bound": false
+  },
+  "quality": {
+    "equity_eur": "2112.50",
+    "covered": 1.0,
+    "composite": 0.46,
+    "value_score": 0.28,
+    "quality_score": 0.73,
+    "value_traps": 0,
+    "quintiles": [
+      {
+        "quintile": 1,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 2,
+        "count": 1,
+        "weight": 1.0
+      },
+      {
+        "quintile": 3,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 4,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 5,
+        "count": 0,
+        "weight": 0.0
+      }
+    ],
+    "funds": [
+      {
+        "isin": "IE00B4L5Y983",
+        "score": null,
+        "covered": 0.103,
+        "lower_bound": true
+      }
+    ]
+  },
+  "costs": {
+    "etf_eur": "0.00",
+    "covered": 0.0,
+    "ter": null,
+    "running_costs_eur": null
+  },
+  "bonds": {
+    "bond_eur": "975.00",
+    "covered": 1.0,
+    "ytm": 0.030145,
+    "modified_duration": 6.034057,
+    "maturities": [
+      {
+        "year": 2033,
+        "value_eur": "975.00"
+      }
+    ],
+    "positions": [
+      {
+        "isin": "DE0001102580",
+        "value_eur": "975.00",
+        "maturity": "2033-08-15",
+        "ytm": 0.030145,
+        "modified_duration": 6.034057,
+        "accrued": 0.690959,
+        "next_coupon": "2027-08-15",
+        "special": null
+      }
+    ]
+  },
+  "data": {
+    "positions": 4,
+    "valued": 2,
+    "look_through": null,
+    "oldest_price": "2026-11-20",
+    "oldest_score": "2026-11-20",
+    "oldest_fund_data": "2026-11-19"
+  }
+}

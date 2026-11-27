@@ -25,6 +25,9 @@ import type {
   CreateUserResponses,
   CurrentSessionData,
   CurrentSessionResponses,
+  DepotAnalysisData,
+  DepotAnalysisErrors,
+  DepotAnalysisResponses,
   DepotHistoryData,
   DepotHistoryErrors,
   DepotHistoryResponses,
@@ -151,6 +154,8 @@ import {
   zCreateUserBody,
   zCreateUserResponse,
   zCurrentSessionResponse,
+  zDepotAnalysisPath,
+  zDepotAnalysisResponse,
   zDepotHistoryPath,
   zDepotHistoryResponse,
   zDisableUserPath,
@@ -554,6 +559,29 @@ export const updateDepot = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Depot Analysis
+ *
+ * D4.4: Allokation, Konzentration, Qualitaet, Kosten, Anleihen und Datenlage; 503, wenn
+ * portfolio die Marktdaten nicht lesen kann.
+ */
+export const depotAnalysis = <ThrowOnError extends boolean = false>(
+  options: Options<DepotAnalysisData, ThrowOnError>,
+): RequestResult<DepotAnalysisResponses, DepotAnalysisErrors, ThrowOnError> =>
+  (options.client ?? client).get<DepotAnalysisResponses, DepotAnalysisErrors, ThrowOnError>({
+    requestValidator: async (data) =>
+      await z
+        .object({
+          body: z.never().optional(),
+          path: zDepotAnalysisPath,
+          query: z.never().optional(),
+        })
+        .parseAsync(data),
+    responseValidator: async (data) => await zDepotAnalysisResponse.parseAsync(data),
+    url: '/api/v1/depots/{depot_id}/analysis',
+    ...options,
   });
 
 /**

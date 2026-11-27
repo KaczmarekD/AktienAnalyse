@@ -147,6 +147,7 @@ class SnapshotCompletedHandler:
             below = frame[frame["market_cap"].fillna(0) < cfg.min_market_cap]
             candidates = pd.concat([covered, below], ignore_index=True)
             small = set(below["symbol"])
+            sectors = dict(zip(candidates["symbol"], candidates["sector"], strict=True))
             placed = place(scored, candidates, cfg)
         except Exception:
             log.warning(
@@ -163,6 +164,7 @@ class SnapshotCompletedHandler:
                         isin=_isin(snap.isins, symbol),
                         instrument_id=snap.instrument_ids.get(symbol),
                         below_size_filter=symbol in small,
+                        sector=sectors.get(symbol),
                     )
                 )
             except ValueError:

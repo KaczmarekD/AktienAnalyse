@@ -19,6 +19,8 @@ import type {
   CreateUserResponse,
   CurrentSessionData,
   CurrentSessionResponse,
+  DepotAnalysisData,
+  DepotAnalysisResponse,
   DepotHistoryData,
   DepotHistoryResponse,
   DisableUserData,
@@ -285,6 +287,22 @@ export const updateDepotRequest = <ThrowOnError extends boolean = false>(
     responseStyle: 'data',
     method: 'PUT',
     url: '/api/v1/depots/{depot_id}',
+    ...options,
+  });
+
+/**
+ * Depot Analysis
+ *
+ * D4.4: Allokation, Konzentration, Qualitaet, Kosten, Anleihen und Datenlage; 503, wenn
+ * portfolio die Marktdaten nicht lesen kann.
+ */
+export const depotAnalysisRequest = <ThrowOnError extends boolean = false>(
+  options: Options<DepotAnalysisData, ThrowOnError>,
+): HttpRequest<DepotAnalysisResponse> =>
+  (options?.client ?? client).requestOptions<DepotAnalysisResponse, ThrowOnError>({
+    responseStyle: 'data',
+    method: 'GET',
+    url: '/api/v1/depots/{depot_id}/analysis',
     ...options,
   });
 
@@ -909,6 +927,20 @@ export const updateDepotResource = <ThrowOnError extends boolean = false>(
   httpResource<UpdateDepotResponse>(() => {
     const opts = options ? options() : undefined;
     return opts ? updateDepotRequest(opts) : undefined;
+  });
+
+/**
+ * Depot Analysis
+ *
+ * D4.4: Allokation, Konzentration, Qualitaet, Kosten, Anleihen und Datenlage; 503, wenn
+ * portfolio die Marktdaten nicht lesen kann.
+ */
+export const depotAnalysisResource = <ThrowOnError extends boolean = false>(
+  options: () => Options<DepotAnalysisData, ThrowOnError> | undefined,
+) =>
+  httpResource<DepotAnalysisResponse>(() => {
+    const opts = options ? options() : undefined;
+    return opts ? depotAnalysisRequest(opts) : undefined;
   });
 
 /**

@@ -129,6 +129,8 @@ class PlacementV1(Contract):
     industry_rule: bool = False
     below_size_filter: bool = False
     reason: PlacementReason | None = None
+    # D4.4 (additiv): Sektor der Aktie (yfinance), fuer die Allokation des Depots
+    sector: str | None = None
 
     @classmethod
     def from_flat(
@@ -138,12 +140,14 @@ class PlacementV1(Contract):
         isin: str | None = None,
         instrument_id: int | None = None,
         below_size_filter: bool = False,
+        sector: str | None = None,
     ) -> PlacementV1:
         """Aus einer Zeile von ``place()``. NaN wird ``None``."""
         return cls(
             symbol=str(flat["symbol"]),
             isin=isin,
             instrument_id=instrument_id,
+            sector=missing_to_none(sector),
             value_trap_flag=bool(flat.get("value_trap_flag", False)),
             value_trap_reason=missing_to_none(flat.get("value_trap_reason")),
             industry_rule=bool(flat.get("industry_rule", False)),

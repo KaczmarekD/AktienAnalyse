@@ -1,0 +1,158 @@
+{
+  "value_eur": "10095.77",
+  "allocation": {
+    "asset_class": [
+      {
+        "key": "equity",
+        "value_eur": "8845.77",
+        "weight": 0.876186
+      },
+      {
+        "key": "cash",
+        "value_eur": "1250.00",
+        "weight": 0.123814
+      }
+    ],
+    "currency": [
+      {
+        "key": "EUR",
+        "value_eur": "8521.50",
+        "weight": 0.844066
+      },
+      {
+        "key": "USD",
+        "value_eur": "1574.27",
+        "weight": 0.155934
+      }
+    ],
+    "sector": [
+      {
+        "key": "Technology",
+        "value_eur": "4109.27",
+        "weight": 0.407029
+      },
+      {
+        "key": "Industrials",
+        "value_eur": "2976.00",
+        "weight": 0.294777
+      },
+      {
+        "key": "Financial Services",
+        "value_eur": "1760.50",
+        "weight": 0.17438
+      },
+      {
+        "key": "cash",
+        "value_eur": "1250.00",
+        "weight": 0.123814
+      }
+    ],
+    "country": [
+      {
+        "key": "DE",
+        "value_eur": "7271.50",
+        "weight": 0.720252
+      },
+      {
+        "key": "US",
+        "value_eur": "1574.27",
+        "weight": 0.155934
+      },
+      {
+        "key": "cash",
+        "value_eur": "1250.00",
+        "weight": 0.123814
+      }
+    ]
+  },
+  "concentration": {
+    "largest": {
+      "isin": "DE0007236101",
+      "name": "Siemens AG",
+      "weight": 0.294777
+    },
+    "top": [
+      {
+        "isin": "DE0007236101",
+        "name": "Siemens AG",
+        "weight": 0.294777
+      },
+      {
+        "isin": "DE0007164600",
+        "name": "SAP SE",
+        "weight": 0.251095
+      },
+      {
+        "isin": "DE0008404005",
+        "name": "Allianz SE",
+        "weight": 0.17438
+      },
+      {
+        "isin": "US0378331005",
+        "name": "Apple Inc.",
+        "weight": 0.155934
+      }
+    ],
+    "top_weight": 0.876186,
+    "effective_positions": 3.750998,
+    "lower_bound": false
+  },
+  "quality": {
+    "equity_eur": "8845.77",
+    "covered": 0.800978,
+    "composite": 0.536335,
+    "value_score": 0.449833,
+    "quality_score": 0.770725,
+    "value_traps": 0,
+    "quintiles": [
+      {
+        "quintile": 1,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 2,
+        "count": 1,
+        "weight": 0.357785
+      },
+      {
+        "quintile": 3,
+        "count": 1,
+        "weight": 0.222189
+      },
+      {
+        "quintile": 4,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 5,
+        "count": 1,
+        "weight": 0.420026
+      }
+    ],
+    "funds": []
+  },
+  "costs": {
+    "etf_eur": "0.00",
+    "covered": 0.0,
+    "ter": null,
+    "running_costs_eur": null
+  },
+  "bonds": {
+    "bond_eur": "0.00",
+    "covered": 0.0,
+    "ytm": null,
+    "modified_duration": null,
+    "maturities": [],
+    "positions": []
+  },
+  "data": {
+    "positions": 4,
+    "valued": 4,
+    "look_through": null,
+    "oldest_price": "2026-11-19",
+    "oldest_score": "2026-11-20",
+    "oldest_fund_data": null
+  }
+}

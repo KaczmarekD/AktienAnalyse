@@ -1,0 +1,274 @@
+{
+  "value_eur": "17972.80",
+  "allocation": {
+    "asset_class": [
+      {
+        "key": "bond",
+        "value_eur": "9672.00",
+        "weight": 0.538147
+      },
+      {
+        "key": "etf",
+        "value_eur": "4332.80",
+        "weight": 0.241075
+      },
+      {
+        "key": "equity",
+        "value_eur": "3968.00",
+        "weight": 0.220778
+      }
+    ],
+    "currency": [
+      {
+        "key": "EUR",
+        "value_eur": "13640.00",
+        "weight": 0.758925
+      },
+      {
+        "key": "USD",
+        "value_eur": "4332.80",
+        "weight": 0.241075
+      }
+    ],
+    "sector": [
+      {
+        "key": "bonds",
+        "value_eur": "9672.00",
+        "weight": 0.538147
+      },
+      {
+        "key": "Industrials",
+        "value_eur": "4439.80",
+        "weight": 0.247029
+      },
+      {
+        "key": "Technology",
+        "value_eur": "1173.02",
+        "weight": 0.065266
+      },
+      {
+        "key": "Financial Services",
+        "value_eur": "701.21",
+        "weight": 0.039015
+      },
+      {
+        "key": "Healthcare",
+        "value_eur": "450.16",
+        "weight": 0.025047
+      },
+      {
+        "key": "Consumer Cyclical",
+        "value_eur": "437.18",
+        "weight": 0.024324
+      },
+      {
+        "key": "Communication Services",
+        "value_eur": "354.93",
+        "weight": 0.019748
+      },
+      {
+        "key": "Consumer Defensive",
+        "value_eur": "255.38",
+        "weight": 0.014209
+      },
+      {
+        "key": "Energy",
+        "value_eur": "155.82",
+        "weight": 0.00867
+      },
+      {
+        "key": "Basic Materials",
+        "value_eur": "138.51",
+        "weight": 0.007707
+      },
+      {
+        "key": "Utilities",
+        "value_eur": "112.54",
+        "weight": 0.006262
+      },
+      {
+        "key": "Real Estate",
+        "value_eur": "82.24",
+        "weight": 0.004576
+      }
+    ],
+    "country": [
+      {
+        "key": "DE",
+        "value_eur": "11731.32",
+        "weight": 0.652726
+      },
+      {
+        "key": "US",
+        "value_eur": "3115.28",
+        "weight": 0.173333
+      },
+      {
+        "key": "XS",
+        "value_eur": "2004.00",
+        "weight": 0.111502
+      },
+      {
+        "key": "unknown",
+        "value_eur": "740.91",
+        "weight": 0.041224
+      },
+      {
+        "key": "JP",
+        "value_eur": "233.97",
+        "weight": 0.013018
+      },
+      {
+        "key": "GB",
+        "value_eur": "147.32",
+        "weight": 0.008197
+      }
+    ]
+  },
+  "concentration": {
+    "largest": {
+      "isin": "DE0001102580",
+      "name": "Bund 2,6 % 2033",
+      "weight": 0.271243
+    },
+    "top": [
+      {
+        "isin": "DE0001102580",
+        "name": "Bund 2,6 % 2033",
+        "weight": 0.271243
+      },
+      {
+        "isin": "DE0007236101",
+        "name": "Siemens AG",
+        "weight": 0.220778
+      },
+      {
+        "isin": "DE0001102333",
+        "name": "Bund 1,7 % 2032",
+        "weight": 0.155401
+      },
+      {
+        "isin": "XS2000000009",
+        "name": "Floater 2029",
+        "weight": 0.111502
+      },
+      {
+        "isin": "US0378331005",
+        "name": "APPLE INC",
+        "weight": 0.012295
+      }
+    ],
+    "top_weight": 0.771219,
+    "effective_positions": 4.607967,
+    "lower_bound": true
+  },
+  "quality": {
+    "equity_eur": "3968.00",
+    "covered": 1.0,
+    "composite": 0.61,
+    "value_score": 0.55,
+    "quality_score": 0.7,
+    "value_traps": 0,
+    "quintiles": [
+      {
+        "quintile": 1,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 2,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 3,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 4,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 5,
+        "count": 1,
+        "weight": 1.0
+      }
+    ],
+    "funds": [
+      {
+        "isin": "IE00B4L5Y983",
+        "score": null,
+        "covered": 0.103,
+        "lower_bound": true
+      }
+    ]
+  },
+  "costs": {
+    "etf_eur": "4332.80",
+    "covered": 1.0,
+    "ter": 0.2,
+    "running_costs_eur": "8.67"
+  },
+  "bonds": {
+    "bond_eur": "9672.00",
+    "covered": 0.792804,
+    "ytm": 0.030194,
+    "modified_duration": 5.772806,
+    "maturities": [
+      {
+        "year": 2029,
+        "value_eur": "2004.00"
+      },
+      {
+        "year": 2032,
+        "value_eur": "2793.00"
+      },
+      {
+        "year": 2033,
+        "value_eur": "4875.00"
+      }
+    ],
+    "positions": [
+      {
+        "isin": "DE0001102580",
+        "value_eur": "4875.00",
+        "maturity": "2033-08-15",
+        "ytm": 0.030145,
+        "modified_duration": 6.034057,
+        "accrued": 0.690959,
+        "next_coupon": "2027-08-15",
+        "special": null
+      },
+      {
+        "isin": "DE0001102333",
+        "value_eur": "2793.00",
+        "maturity": "2032-08-15",
+        "ytm": 0.030279,
+        "modified_duration": 5.316809,
+        "accrued": 0.451781,
+        "next_coupon": "2027-08-15",
+        "special": null
+      },
+      {
+        "isin": "XS2000000009",
+        "value_eur": "2004.00",
+        "maturity": "2029-04-10",
+        "ytm": null,
+        "modified_duration": null,
+        "accrued": null,
+        "next_coupon": null,
+        "special": "floating"
+      }
+    ]
+  },
+  "data": {
+    "positions": 5,
+    "valued": 5,
+    "look_through": 1.0,
+    "oldest_price": "2026-11-20",
+    "oldest_score": "2026-11-20",
+    "oldest_fund_data": "2026-11-19"
+  }
+}

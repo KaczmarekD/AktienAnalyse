@@ -30,6 +30,7 @@ from va_contracts.events.v1 import (
     ProfileSavedV1,
 )
 from va_contracts.rpc.v1 import (
+    DEPOTS_ANALYSIS,
     DEPOTS_ARCHIVE,
     DEPOTS_CREATE,
     DEPOTS_EXPORT,
@@ -108,6 +109,7 @@ if TYPE_CHECKING:
     from va_contracts import Contract, Envelope
     from va_contracts.portfolio import (
         CashLineV1,
+        DepotAnalysisV1,
         DepotExportV1,
         DepotKind,
         DepotV1,
@@ -368,6 +370,10 @@ class RemoteDepots:
         if reply.filename is None or reply.content is None:  # pragma: no cover
             raise DepotNotFound(str(depot_id))
         return reply.filename, reply.content
+
+    def analysis(self, user_id: int, depot_id: int) -> DepotAnalysisV1 | None:
+        request = DepotRefRequestV1(user_id=user_id, depot_id=depot_id)
+        return self._call(DEPOTS_ANALYSIS, request).analysis
 
 
 def _raise(reply: RpcReplyV1) -> None:

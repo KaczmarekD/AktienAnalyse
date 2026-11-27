@@ -43,6 +43,49 @@ export const zActiveProfileRef = z.object({
 });
 
 /**
+ * AllocationSlice
+ *
+ * ``key``: Anlageklasse, Waehrung, Sektor (wie bei yfinance) oder Land (ISO 3166); ohne
+ * Zuordnung ``cash``, ``bonds``, ``unknown`` oder ``no_look_through`` (ETF ohne Daten).
+ */
+export const zAllocationSlice = z.object({
+  key: z.string(),
+  value_eur: z.string().regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/),
+  weight: z.number(),
+});
+
+/**
+ * Allocation
+ *
+ * Sektor und Land mit Durchschau durch die ETFs; Aktien nach ISIN-Land.
+ */
+export const zAllocation = z.object({
+  asset_class: z.array(zAllocationSlice),
+  country: z.array(zAllocationSlice),
+  currency: z.array(zAllocationSlice),
+  sector: z.array(zAllocationSlice),
+});
+
+/**
+ * BondPosition
+ *
+ * Kennzahlen zum letzten Kurs; ohne Rendite nennt ``special`` den Grund.
+ */
+export const zBondPosition = z.object({
+  accrued: z.number().nullable(),
+  isin: z.string(),
+  maturity: z.iso.date().nullable(),
+  modified_duration: z.number().nullable(),
+  next_coupon: z.iso.date().nullable(),
+  special: z.string().nullable(),
+  value_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  ytm: z.number().nullable(),
+});
+
+/**
  * BondTerms
  *
  * Ausstattung einer Anleihe aus ESMA FIRDS.
@@ -81,12 +124,60 @@ export const zCashLineOutput = z.object({
 });
 
 /**
+ * ConcentrationTitle
+ */
+export const zConcentrationTitle = z.object({
+  isin: z.string(),
+  name: z.string().nullable(),
+  weight: z.number(),
+});
+
+/**
+ * Concentration
+ *
+ * Mit Durchschau; ``lower_bound``: mindestens ein ETF kennt nur seine groessten Positionen
+ * oder keine (dann "mindestens"). ``effective_positions`` = 1 / Summe Gewicht^2.
+ */
+export const zConcentration = z.object({
+  effective_positions: z.number().nullable(),
+  largest: zConcentrationTitle.nullable(),
+  lower_bound: z.boolean(),
+  top: z.array(zConcentrationTitle),
+  top_weight: z.number(),
+});
+
+/**
  * CreateDepot
  */
 export const zCreateDepot = z.object({
   description: z.string().max(500).nullish(),
   kind: z.enum(['depot', 'watchlist']).optional().default('depot'),
   name: z.string().min(1).max(100),
+});
+
+/**
+ * DataQuality
+ */
+export const zDataQuality = z.object({
+  look_through: z.number().nullable(),
+  oldest_fund_data: z.iso.date().nullable(),
+  oldest_price: z.iso.date().nullable(),
+  oldest_score: z.iso.date().nullable(),
+  positions: z.int(),
+  valued: z.int(),
+});
+
+/**
+ * DepotCosts
+ */
+export const zDepotCosts = z.object({
+  covered: z.number(),
+  etf_eur: z.string().regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/),
+  running_costs_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
+  ter: z.number().nullable(),
 });
 
 /**
@@ -159,6 +250,18 @@ export const zFactor = z.object({
 export const zFactorRanks = z.object({
   ranks: z.record(z.string(), z.number().nullable()),
   scoring_run_id: z.int(),
+});
+
+/**
+ * FundQuality
+ *
+ * Look-through-Score eines ETF, erst ab 50 % bewertetem Gewicht (``covered``).
+ */
+export const zFundQuality = z.object({
+  covered: z.number(),
+  isin: z.string(),
+  lower_bound: z.boolean(),
+  score: z.number().nullable(),
 });
 
 /**
@@ -287,6 +390,26 @@ export const zListing = z.object({
 export const zLoginRequest = z.object({
   password: z.string().min(1).max(1024),
   username: z.string().min(1).max(64),
+});
+
+/**
+ * MaturityYear
+ */
+export const zMaturityYear = z.object({
+  value_eur: z.string().regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/),
+  year: z.int(),
+});
+
+/**
+ * DepotBonds
+ */
+export const zDepotBonds = z.object({
+  bond_eur: z.string().regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/),
+  covered: z.number(),
+  maturities: z.array(zMaturityYear),
+  modified_duration: z.number().nullable(),
+  positions: z.array(zBondPosition),
+  ytm: z.number().nullable(),
 });
 
 /**
@@ -646,6 +769,50 @@ export const zProfileDetail = z.object({
   latest_version: z.int().nullable(),
   name: z.string(),
   versions: z.array(zProfileVersion),
+});
+
+/**
+ * Quintile
+ */
+export const zQuintile = z.object({
+  count: z.int(),
+  quintile: z.int(),
+  weight: z.number(),
+});
+
+/**
+ * DepotQuality
+ *
+ * Wertgewichtet ueber die Aktien mit Score; ``covered``: Anteil ihres Werts mit Composite.
+ */
+export const zDepotQuality = z.object({
+  composite: z.number().nullable(),
+  covered: z.number(),
+  equity_eur: z.string().regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/),
+  funds: z.array(zFundQuality),
+  quality_score: z.number().nullable(),
+  quintiles: z.array(zQuintile),
+  value_score: z.number().nullable(),
+  value_traps: z.int(),
+});
+
+/**
+ * DepotAnalysis
+ *
+ * Analyse eines Depots (D4.4), bei jeder Anfrage aus dem neuesten Depotstand, den letzten
+ * Kursen, dem juengsten Bewertungslauf und den Stammdaten gerechnet.
+ */
+export const zDepotAnalysis = z.object({
+  allocation: zAllocation,
+  bonds: zDepotBonds,
+  concentration: zConcentration,
+  costs: zDepotCosts,
+  data: zDataQuality,
+  quality: zDepotQuality,
+  value_eur: z
+    .string()
+    .regex(/^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$/)
+    .nullable(),
 });
 
 /**
@@ -1075,6 +1242,15 @@ export const zUpdateDepotPath = z.object({
  * Successful Response
  */
 export const zUpdateDepotResponse = zDepot;
+
+export const zDepotAnalysisPath = z.object({
+  depot_id: z.int(),
+});
+
+/**
+ * Successful Response
+ */
+export const zDepotAnalysisResponse = zDepotAnalysis;
 
 export const zArchiveDepotPath = z.object({
   depot_id: z.int(),

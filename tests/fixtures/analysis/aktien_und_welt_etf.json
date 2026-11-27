@@ -1,0 +1,164 @@
+{
+  "name": "Aktien und Welt-ETF",
+  "kind": "depot",
+  "cash": "300.00",
+  "lines": [
+    {
+      "isin": "DE0007164600",
+      "quantity": "10",
+      "unit": "pieces"
+    },
+    {
+      "isin": "US5949181045",
+      "quantity": "4",
+      "unit": "pieces"
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "quantity": "85.4321",
+      "unit": "pieces"
+    }
+  ],
+  "securities": [
+    {
+      "isin": "DE0007164600",
+      "name": "SAP SE",
+      "asset_class": "equity",
+      "currency": "EUR"
+    },
+    {
+      "isin": "US5949181045",
+      "name": "Microsoft Corp.",
+      "asset_class": "equity",
+      "currency": "USD"
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "name": "iShares Core MSCI World UCITS ETF",
+      "asset_class": "etf",
+      "currency": "USD"
+    }
+  ],
+  "quotes": [
+    {
+      "isin": "DE0007164600",
+      "trade_date": "2026-11-20",
+      "close": "211.25",
+      "currency": "EUR",
+      "percent_of_par": false
+    },
+    {
+      "isin": "US5949181045",
+      "trade_date": "2026-11-19",
+      "close": "415.20",
+      "currency": "USD",
+      "percent_of_par": false
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "trade_date": "2026-11-20",
+      "close": "108.32",
+      "currency": "EUR",
+      "percent_of_par": false
+    }
+  ],
+  "fx": {
+    "USD": "0.8612"
+  },
+  "scores": [
+    {
+      "isin": "DE0007164600",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "SAP.DE",
+      "reference": "universe",
+      "composite_score": 0.46,
+      "value_score": 0.28,
+      "quality_score": 0.73,
+      "composite_percentile": 0.38,
+      "sector": "Technology",
+      "rank": 56
+    },
+    {
+      "isin": "US5949181045",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "MSFT",
+      "reference": "outside",
+      "composite_score": 0.34,
+      "value_score": 0.71,
+      "quality_score": 0.1,
+      "composite_percentile": 0.09,
+      "sector": "Technology",
+      "value_trap_flag": true,
+      "value_trap_reason": "quality"
+    }
+  ],
+  "etfs": {
+    "IE00B4L5Y983": {
+      "as_of": "2026-11-19",
+      "ter": 0.2,
+      "currency": "USD",
+      "complete": false,
+      "sectors": {
+        "IT": 27.1,
+        "Financials": 16.2,
+        "Health Care": 10.4,
+        "Industrials": 10.9,
+        "Consumer Discretionary": 10.1,
+        "Communication": 8.2,
+        "Consumer Staples": 5.9,
+        "Energy": 3.6,
+        "Materials": 3.2,
+        "Utilities": 2.6,
+        "Real Estate": 1.9
+      },
+      "countries": {
+        "Vereinigte Staaten": 71.9,
+        "Japan": 5.4,
+        "Vereinigtes Königreich": 3.4,
+        "Deutschland": 2.2
+      },
+      "holdings": [
+        [
+          "US0378331005",
+          5.1,
+          "APPLE INC"
+        ],
+        [
+          "US5949181045",
+          4.6,
+          "MICROSOFT CORP"
+        ],
+        [
+          "US67066G1040",
+          4.4,
+          "NVIDIA CORP"
+        ],
+        [
+          "DE0007164600",
+          0.6,
+          "SAP"
+        ],
+        [
+          null,
+          0.3,
+          "EUR CASH"
+        ]
+      ]
+    }
+  },
+  "bonds": {},
+  "composites": {
+    "DE0007164600": 0.46,
+    "DE0007236101": 0.61,
+    "US0378331005": 0.52,
+    "US5949181045": 0.34
+  },
+  "names": {
+    "US0378331005": "APPLE INC",
+    "US5949181045": "MICROSOFT CORP",
+    "US67066G1040": "NVIDIA CORP",
+    "DE0007164600": "SAP"
+  }
+}

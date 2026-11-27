@@ -4152,6 +4152,30 @@ und Replay-Regression bleiben gleich (Golden-Master, Replay-Fixtures).
     neuem Bewertungslauf, neuen Stammdaten.
   - `portfolio.analysis.completed` (ohne ISINs und Beträge); `GET /depots/{id}/analysis`.
 - **Review:** `/code-review high`, `/security-review` (neues Event, neue Endpunkte).
+- **Umgesetzt (27.11.2026), neu geschnitten:** `analyze()` in `va_portfolio.domain.analysis`,
+  RPC `portfolio.depots.analysis` (`DepotAnalysisV1`), `GET /depots/{id}/analysis` (echte Sitzung,
+  fremdes Depot 404, ohne Marktdaten 503), OpenAPI-Snapshot und TS-Client neu (nur hinzugefügt).
+  - **Verschoben nach D5:** `analysis_run` und `portfolio.analysis.completed`. Die Analyse
+    rechnet wie die Bewertung bei jeder Anfrage, ist also immer auf dem Stand von Depotstand,
+    Kursen, Bewertungslauf und Stammdaten (ANA-10). Gespeicherte Läufe und die Meldung an die
+    Tabs braucht erst der Lebenszyklus der Hinweise. So kommt D4.4 ohne Migration und ohne
+    neues Event aus.
+  - `PlacementV1.sector` (additiv, Schema-Golden `scoring.run.completed`) und `Score.sector`:
+    Sektor der Aktien außerhalb von DAX/MDAX für die Allokation.
+  - Eingabe aus `security_view` (ganzes `SecurityV1`, `MarketReader.security_payloads`):
+    ETF-Daten mit den zehn größten Positionen, Anleihe mit Kupon, Fälligkeit und CFI;
+    `va_portfolio.application.analysis`. Die Scores der Positionen der ETFs kommen aus
+    `score_view`, auch für Titel, die nicht im Depot stehen.
+  - Ein Test hält Dataclasses der Domain und `DepotAnalysisV1` feldgleich
+    (`services/portfolio/tests/test_depot_analysis_rpc.py`).
+  - Tests: `test_analysis.py` (von Hand nachgerechnetes Depot), `tests/test_golden_analysis.py`
+    (vier Beispieldepots unter `tests/fixtures/analysis/`, Golden-Files unter
+    `tests/golden/analysis/`), RPC, DB, API.
+  - **Review:** `/security-review` ohne Befund (Besitz geprüft wie bei `depots.get`, nur
+    gebundene Parameter, keine Daten anderer Depots, keine neuen NATS-Rechte).
+    `/code-review high`: behoben, dass eine Position eines ETF mit einer Kennung ohne die Form
+    einer ISIN (Futures, Kasse; `EtfHoldingV1.isin` ist nicht geprüft) die ganze Analyse mit
+    einem Validierungsfehler abgebrochen hätte; sie zählt jetzt wie ohne ISIN.
 
 **D4.5 Ansicht „Analyse“** (ANA-04, 05, 07, 08, 09)
 - **Test:** im Depot ein Bereich „Analyse“: Allokation, Konzentration, Qualität, Kosten,

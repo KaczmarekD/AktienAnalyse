@@ -171,6 +171,9 @@ class MemoryMarketStore:
             if known is None or known.scoring_run_id <= score.scoring_run_id:
                 self.scores[score.isin] = score
 
+    def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
+        return {i: p for i, p in self.payloads.items() if i in set(isins)}
+
     def market(self, isins: Collection[str]) -> Market:
         wanted = set(isins)
         return Market(

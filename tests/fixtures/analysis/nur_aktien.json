@@ -1,0 +1,150 @@
+{
+  "name": "Nur Aktien",
+  "kind": "depot",
+  "cash": "1250.00",
+  "lines": [
+    {
+      "isin": "DE0007164600",
+      "quantity": "12",
+      "unit": "pieces"
+    },
+    {
+      "isin": "DE0007236101",
+      "quantity": "15",
+      "unit": "pieces"
+    },
+    {
+      "isin": "DE0008404005",
+      "quantity": "5",
+      "unit": "pieces"
+    },
+    {
+      "isin": "US0378331005",
+      "quantity": "8",
+      "unit": "pieces"
+    }
+  ],
+  "securities": [
+    {
+      "isin": "DE0007164600",
+      "name": "SAP SE",
+      "asset_class": "equity",
+      "currency": "EUR"
+    },
+    {
+      "isin": "DE0007236101",
+      "name": "Siemens AG",
+      "asset_class": "equity",
+      "currency": "EUR"
+    },
+    {
+      "isin": "DE0008404005",
+      "name": "Allianz SE",
+      "asset_class": "equity",
+      "currency": "EUR"
+    },
+    {
+      "isin": "US0378331005",
+      "name": "Apple Inc.",
+      "asset_class": "equity",
+      "currency": "USD"
+    }
+  ],
+  "quotes": [
+    {
+      "isin": "DE0007164600",
+      "trade_date": "2026-11-20",
+      "close": "211.25",
+      "currency": "EUR",
+      "percent_of_par": false
+    },
+    {
+      "isin": "DE0007236101",
+      "trade_date": "2026-11-20",
+      "close": "198.40",
+      "currency": "EUR",
+      "percent_of_par": false
+    },
+    {
+      "isin": "DE0008404005",
+      "trade_date": "2026-11-20",
+      "close": "352.10",
+      "currency": "EUR",
+      "percent_of_par": false
+    },
+    {
+      "isin": "US0378331005",
+      "trade_date": "2026-11-19",
+      "close": "228.50",
+      "currency": "USD",
+      "percent_of_par": false
+    }
+  ],
+  "fx": {
+    "USD": "0.8612"
+  },
+  "scores": [
+    {
+      "isin": "DE0007164600",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "SAP.DE",
+      "reference": "universe",
+      "composite_score": 0.46,
+      "value_score": 0.28,
+      "quality_score": 0.73,
+      "composite_percentile": 0.38,
+      "sector": "Technology",
+      "rank": 56
+    },
+    {
+      "isin": "DE0007236101",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "SIE.DE",
+      "reference": "universe",
+      "composite_score": 0.61,
+      "value_score": 0.55,
+      "quality_score": 0.7,
+      "composite_percentile": 0.81,
+      "sector": "Industrials",
+      "rank": 17
+    },
+    {
+      "isin": "DE0008404005",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "ALV.DE",
+      "reference": "universe",
+      "composite_score": null,
+      "value_score": 0.82,
+      "quality_score": null,
+      "composite_percentile": null,
+      "sector": "Financial Services",
+      "rank": 80,
+      "industry_rule": true,
+      "reason": "no_quality"
+    },
+    {
+      "isin": "US0378331005",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "AAPL",
+      "reference": "outside",
+      "composite_score": 0.52,
+      "value_score": 0.12,
+      "quality_score": 0.97,
+      "composite_percentile": 0.58,
+      "sector": "Technology"
+    }
+  ],
+  "etfs": {},
+  "bonds": {},
+  "composites": {
+    "DE0007164600": 0.46,
+    "DE0007236101": 0.61,
+    "US0378331005": 0.52,
+    "US5949181045": 0.34
+  },
+  "names": {}
+}

@@ -81,6 +81,7 @@ class Score:
     value_trap_reason: str | None = None
     industry_rule: bool = False
     reason: str | None = None
+    sector: str | None = None  # D4.4: fuer die Allokation, Bezeichnung von yfinance
 
 
 def score_reason(value: float | None, quality: float | None) -> str | None:

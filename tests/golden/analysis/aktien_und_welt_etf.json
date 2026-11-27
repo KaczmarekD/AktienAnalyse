@@ -1,0 +1,225 @@
+{
+  "value_eur": "13096.79",
+  "allocation": {
+    "asset_class": [
+      {
+        "key": "etf",
+        "value_eur": "9254.01",
+        "weight": 0.706586
+      },
+      {
+        "key": "equity",
+        "value_eur": "3542.78",
+        "weight": 0.270508
+      },
+      {
+        "key": "cash",
+        "value_eur": "300.00",
+        "weight": 0.022906
+      }
+    ],
+    "currency": [
+      {
+        "key": "USD",
+        "value_eur": "10684.29",
+        "weight": 0.815795
+      },
+      {
+        "key": "EUR",
+        "value_eur": "2412.50",
+        "weight": 0.184205
+      }
+    ],
+    "sector": [
+      {
+        "key": "Technology",
+        "value_eur": "6048.11",
+        "weight": 0.461801
+      },
+      {
+        "key": "Financial Services",
+        "value_eur": "1497.65",
+        "weight": 0.114353
+      },
+      {
+        "key": "Industrials",
+        "value_eur": "1007.68",
+        "weight": 0.076941
+      },
+      {
+        "key": "Healthcare",
+        "value_eur": "961.46",
+        "weight": 0.073412
+      },
+      {
+        "key": "Consumer Cyclical",
+        "value_eur": "933.72",
+        "weight": 0.071294
+      },
+      {
+        "key": "Communication Services",
+        "value_eur": "758.07",
+        "weight": 0.057882
+      },
+      {
+        "key": "Consumer Defensive",
+        "value_eur": "545.44",
+        "weight": 0.041647
+      },
+      {
+        "key": "Energy",
+        "value_eur": "332.81",
+        "weight": 0.025412
+      },
+      {
+        "key": "cash",
+        "value_eur": "300.00",
+        "weight": 0.022906
+      },
+      {
+        "key": "Basic Materials",
+        "value_eur": "295.83",
+        "weight": 0.022588
+      },
+      {
+        "key": "Utilities",
+        "value_eur": "240.36",
+        "weight": 0.018353
+      },
+      {
+        "key": "Real Estate",
+        "value_eur": "175.65",
+        "weight": 0.013412
+      }
+    ],
+    "country": [
+      {
+        "key": "US",
+        "value_eur": "8083.91",
+        "weight": 0.617244
+      },
+      {
+        "key": "DE",
+        "value_eur": "2316.09",
+        "weight": 0.176844
+      },
+      {
+        "key": "unknown",
+        "value_eur": "1582.44",
+        "weight": 0.120826
+      },
+      {
+        "key": "JP",
+        "value_eur": "499.72",
+        "weight": 0.038156
+      },
+      {
+        "key": "GB",
+        "value_eur": "314.64",
+        "weight": 0.024024
+      },
+      {
+        "key": "cash",
+        "value_eur": "300.00",
+        "weight": 0.022906
+      }
+    ]
+  },
+  "concentration": {
+    "largest": {
+      "isin": "DE0007164600",
+      "name": "SAP SE",
+      "weight": 0.165539
+    },
+    "top": [
+      {
+        "isin": "DE0007164600",
+        "name": "SAP SE",
+        "weight": 0.165539
+      },
+      {
+        "isin": "US5949181045",
+        "name": "Microsoft Corp.",
+        "weight": 0.141711
+      },
+      {
+        "isin": "US0378331005",
+        "name": "APPLE INC",
+        "weight": 0.036036
+      },
+      {
+        "isin": "US67066G1040",
+        "name": "NVIDIA CORP",
+        "weight": 0.03109
+      }
+    ],
+    "top_weight": 0.374376,
+    "effective_positions": 1.777174,
+    "lower_bound": true
+  },
+  "quality": {
+    "equity_eur": "3542.78",
+    "covered": 1.0,
+    "composite": 0.411554,
+    "value_score": 0.453598,
+    "quality_score": 0.475658,
+    "value_traps": 1,
+    "quintiles": [
+      {
+        "quintile": 1,
+        "count": 1,
+        "weight": 0.403717
+      },
+      {
+        "quintile": 2,
+        "count": 1,
+        "weight": 0.596283
+      },
+      {
+        "quintile": 3,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 4,
+        "count": 0,
+        "weight": 0.0
+      },
+      {
+        "quintile": 5,
+        "count": 0,
+        "weight": 0.0
+      }
+    ],
+    "funds": [
+      {
+        "isin": "IE00B4L5Y983",
+        "score": null,
+        "covered": 0.103,
+        "lower_bound": true
+      }
+    ]
+  },
+  "costs": {
+    "etf_eur": "9254.01",
+    "covered": 1.0,
+    "ter": 0.2,
+    "running_costs_eur": "18.51"
+  },
+  "bonds": {
+    "bond_eur": "0.00",
+    "covered": 0.0,
+    "ytm": null,
+    "modified_duration": null,
+    "maturities": [],
+    "positions": []
+  },
+  "data": {
+    "positions": 3,
+    "valued": 3,
+    "look_through": 1.0,
+    "oldest_price": "2026-11-19",
+    "oldest_score": "2026-11-20",
+    "oldest_fund_data": "2026-11-19"
+  }
+}

@@ -554,6 +554,129 @@ class DepotValuation(_Model):
     positions: list[PositionValue]
 
 
+# --- Analyse (D4.4, docs/architecture/depot/analyse.md) ----------------------------------
+# Gewichte sind Bruchteile des Depotwerts (0,25 = 25 %), Betraege EUR auf Cent.
+
+
+class AllocationSlice(_Model):
+    """``key``: Anlageklasse, Waehrung, Sektor (wie bei yfinance) oder Land (ISO 3166); ohne
+    Zuordnung ``cash``, ``bonds``, ``unknown`` oder ``no_look_through`` (ETF ohne Daten)."""
+
+    key: str
+    value_eur: Decimal
+    weight: float
+
+
+class Allocation(_Model):
+    """Sektor und Land mit Durchschau durch die ETFs; Aktien nach ISIN-Land."""
+
+    asset_class: list[AllocationSlice]
+    currency: list[AllocationSlice]
+    sector: list[AllocationSlice]
+    country: list[AllocationSlice]
+
+
+class ConcentrationTitle(_Model):
+    isin: str
+    name: str | None
+    weight: float
+
+
+class Concentration(_Model):
+    """Mit Durchschau; ``lower_bound``: mindestens ein ETF kennt nur seine groessten Positionen
+    oder keine (dann "mindestens"). ``effective_positions`` = 1 / Summe Gewicht^2."""
+
+    largest: ConcentrationTitle | None
+    top: list[ConcentrationTitle]
+    top_weight: float
+    effective_positions: float | None
+    lower_bound: bool
+
+
+class Quintile(_Model):
+    quintile: int  # 1 = unterstes Fuenftel des Referenzuniversums, 5 = oberstes
+    count: int
+    weight: float
+
+
+class FundQuality(_Model):
+    """Look-through-Score eines ETF, erst ab 50 % bewertetem Gewicht (``covered``)."""
+
+    isin: str
+    score: float | None
+    covered: float
+    lower_bound: bool
+
+
+class DepotQuality(_Model):
+    """Wertgewichtet ueber die Aktien mit Score; ``covered``: Anteil ihres Werts mit Composite."""
+
+    equity_eur: Decimal
+    covered: float
+    composite: float | None
+    value_score: float | None
+    quality_score: float | None
+    value_traps: int
+    quintiles: list[Quintile]
+    funds: list[FundQuality]
+
+
+class DepotCosts(_Model):
+    etf_eur: Decimal
+    covered: float
+    ter: float | None  # Prozent pro Jahr, wertgewichtet
+    running_costs_eur: Decimal | None
+
+
+class BondPosition(_Model):
+    """Kennzahlen zum letzten Kurs; ohne Rendite nennt ``special`` den Grund."""
+
+    isin: str
+    value_eur: Decimal | None
+    maturity: date | None
+    ytm: float | None
+    modified_duration: float | None
+    accrued: float | None
+    next_coupon: date | None
+    special: str | None
+
+
+class MaturityYear(_Model):
+    year: int
+    value_eur: Decimal
+
+
+class DepotBonds(_Model):
+    bond_eur: Decimal
+    covered: float
+    ytm: float | None
+    modified_duration: float | None
+    maturities: list[MaturityYear]
+    positions: list[BondPosition]
+
+
+class DataQuality(_Model):
+    positions: int
+    valued: int
+    look_through: float | None
+    oldest_price: date | None
+    oldest_score: date | None
+    oldest_fund_data: date | None
+
+
+class DepotAnalysis(_Model):
+    """Analyse eines Depots (D4.4), bei jeder Anfrage aus dem neuesten Depotstand, den letzten
+    Kursen, dem juengsten Bewertungslauf und den Stammdaten gerechnet."""
+
+    value_eur: Decimal | None
+    allocation: Allocation
+    concentration: Concentration
+    quality: DepotQuality
+    costs: DepotCosts
+    bonds: DepotBonds
+    data: DataQuality
+
+
 class Depot(_Model):
     """Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
 

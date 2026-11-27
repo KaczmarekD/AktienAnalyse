@@ -217,19 +217,144 @@ class DepotExportV1(Contract):
     versions: list[HoldingsV1] = Field(default_factory=list)
 
 
+# --- D4.4: Analyse eines Depots (docs/architecture/depot/analyse.md, Abschnitt Depot) ---------
+# Gewichte sind Bruchteile des Depotwerts (0,25 = 25 %), Betraege EUR auf Cent. Die Felder
+# entsprechen va_portfolio.domain.analysis; ein Test haelt beide gleich.
+
+
+class SliceV1(Contract):
+    """Ein Teil der Allokation. ``key``: Anlageklasse, Waehrung, Sektor (wie bei yfinance) oder
+    Land (ISO 3166); ``cash``, ``bonds``, ``unknown``, ``no_look_through`` ohne Zuordnung."""
+
+    key: str
+    value_eur: Decimal
+    weight: float
+
+
+class AllocationV1(Contract):
+    asset_class: list[SliceV1] = Field(default_factory=list)
+    currency: list[SliceV1] = Field(default_factory=list)
+    sector: list[SliceV1] = Field(default_factory=list)
+    country: list[SliceV1] = Field(default_factory=list)
+
+
+class TitleV1(Contract):
+    isin: IsinStr
+    name: str | None = None
+    weight: float
+
+
+class ConcentrationV1(Contract):
+    """Mit Durchschau; ``lower_bound``: ein ETF kennt nur seine groessten Positionen oder keine.
+    ``effective_positions``: 1 / Summe Gewicht^2 ueber die Positionen (ETF als eine)."""
+
+    largest: TitleV1 | None = None
+    top: list[TitleV1] = Field(default_factory=list)
+    top_weight: float
+    effective_positions: float | None = None
+    lower_bound: bool
+
+
+class QuintileV1(Contract):
+    quintile: int = Field(ge=1, le=5)  # 1 = unterstes Fuenftel des Referenzuniversums
+    count: int = Field(ge=0)
+    weight: float
+
+
+class FundQualityV1(Contract):
+    isin: IsinStr
+    score: float | None = None  # Look-through-Score, erst ab 50 % bewertetem Gewicht
+    covered: float
+    lower_bound: bool
+
+
+class QualityV1(Contract):
+    """Wertgewichtet ueber die Aktien mit Score; ``covered`` = Anteil ihres Werts mit Composite."""
+
+    equity_eur: Decimal
+    covered: float
+    composite: float | None = None
+    value_score: float | None = None
+    quality_score: float | None = None
+    value_traps: int = Field(ge=0)
+    quintiles: list[QuintileV1] = Field(default_factory=list)
+    funds: list[FundQualityV1] = Field(default_factory=list)
+
+
+class CostsV1(Contract):
+    etf_eur: Decimal
+    covered: float
+    ter: float | None = None  # Prozent pro Jahr, wertgewichtet
+    running_costs_eur: Decimal | None = None
+
+
+class BondPositionV1(Contract):
+    isin: IsinStr
+    value_eur: Decimal | None = None
+    maturity: date | None = None
+    ytm: float | None = None
+    modified_duration: float | None = None
+    accrued: float | None = None  # je 100 Nennwert
+    next_coupon: date | None = None
+    special: str | None = None  # Grund ohne Rendite: floating, convertible, perpetual, ...
+
+
+class MaturityYearV1(Contract):
+    year: int
+    value_eur: Decimal
+
+
+class BondsV1(Contract):
+    bond_eur: Decimal
+    covered: float
+    ytm: float | None = None
+    modified_duration: float | None = None
+    maturities: list[MaturityYearV1] = Field(default_factory=list)
+    positions: list[BondPositionV1] = Field(default_factory=list)
+
+
+class DataQualityV1(Contract):
+    positions: int = Field(ge=0)
+    valued: int = Field(ge=0)
+    look_through: float | None = None
+    oldest_price: date | None = None
+    oldest_score: date | None = None
+    oldest_fund_data: date | None = None
+
+
+class DepotAnalysisV1(Contract):
+    """Analyse eines Depots (D4.4, ANA-08 bis 10), bei jeder Anfrage neu gerechnet."""
+
+    value_eur: Decimal | None = None
+    allocation: AllocationV1
+    concentration: ConcentrationV1
+    quality: QualityV1
+    costs: CostsV1
+    bonds: BondsV1
+    data: DataQualityV1
+
+
 __all__ = [
     "MAX_FILE_BYTES",
     "MAX_LINES",
     "MAX_NAME",
     "MAX_TEXT",
+    "AllocationV1",
     "Amount",
+    "BondPositionV1",
+    "BondsV1",
     "CashLineV1",
+    "ConcentrationV1",
+    "CostsV1",
+    "DataQualityV1",
+    "DepotAnalysisV1",
     "DepotExportV1",
     "DepotKind",
     "DepotName",
     "DepotState",
     "DepotV1",
     "DepotValuationV1",
+    "FundQualityV1",
     "HistoryEntryV1",
     "HoldingLineV1",
     "HoldingUnit",
@@ -237,10 +362,18 @@ __all__ = [
     "ImportEntryV1",
     "ImportPreviewV1",
     "ImportStatus",
+    "MaturityYearV1",
+    "PositionScoreV1",
     "PositionValueV1",
+    "QualityV1",
     "Quantity",
+    "QuintileV1",
     "RejectedRowV1",
+    "ScoreReason",
+    "ScoreReference",
+    "SliceV1",
     "SnapshotSource",
     "Text",
+    "TitleV1",
     "ValueMissing",
 ]

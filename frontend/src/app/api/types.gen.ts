@@ -87,6 +87,91 @@ export type ActiveProfileRef = {
 };
 
 /**
+ * Allocation
+ *
+ * Sektor und Land mit Durchschau durch die ETFs; Aktien nach ISIN-Land.
+ */
+export type Allocation = {
+  /**
+   * Asset Class
+   */
+  asset_class: Array<AllocationSlice>;
+  /**
+   * Country
+   */
+  country: Array<AllocationSlice>;
+  /**
+   * Currency
+   */
+  currency: Array<AllocationSlice>;
+  /**
+   * Sector
+   */
+  sector: Array<AllocationSlice>;
+};
+
+/**
+ * AllocationSlice
+ *
+ * ``key``: Anlageklasse, Waehrung, Sektor (wie bei yfinance) oder Land (ISO 3166); ohne
+ * Zuordnung ``cash``, ``bonds``, ``unknown`` oder ``no_look_through`` (ETF ohne Daten).
+ */
+export type AllocationSlice = {
+  /**
+   * Key
+   */
+  key: string;
+  /**
+   * Value Eur
+   */
+  value_eur: string;
+  /**
+   * Weight
+   */
+  weight: number;
+};
+
+/**
+ * BondPosition
+ *
+ * Kennzahlen zum letzten Kurs; ohne Rendite nennt ``special`` den Grund.
+ */
+export type BondPosition = {
+  /**
+   * Accrued
+   */
+  accrued: number | null;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Maturity
+   */
+  maturity: string | null;
+  /**
+   * Modified Duration
+   */
+  modified_duration: number | null;
+  /**
+   * Next Coupon
+   */
+  next_coupon: string | null;
+  /**
+   * Special
+   */
+  special: string | null;
+  /**
+   * Value Eur
+   */
+  value_eur: string | null;
+  /**
+   * Ytm
+   */
+  ytm: number | null;
+};
+
+/**
  * BondTerms
  *
  * Ausstattung einer Anleihe aus ESMA FIRDS.
@@ -144,6 +229,50 @@ export type CashLineOutput = {
    * Currency
    */
   currency?: 'EUR';
+};
+
+/**
+ * Concentration
+ *
+ * Mit Durchschau; ``lower_bound``: mindestens ein ETF kennt nur seine groessten Positionen
+ * oder keine (dann "mindestens"). ``effective_positions`` = 1 / Summe Gewicht^2.
+ */
+export type Concentration = {
+  /**
+   * Effective Positions
+   */
+  effective_positions: number | null;
+  largest: ConcentrationTitle | null;
+  /**
+   * Lower Bound
+   */
+  lower_bound: boolean;
+  /**
+   * Top
+   */
+  top: Array<ConcentrationTitle>;
+  /**
+   * Top Weight
+   */
+  top_weight: number;
+};
+
+/**
+ * ConcentrationTitle
+ */
+export type ConcentrationTitle = {
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Name
+   */
+  name: string | null;
+  /**
+   * Weight
+   */
+  weight: number;
 };
 
 /**
@@ -223,6 +352,36 @@ export type DataExport = {
 };
 
 /**
+ * DataQuality
+ */
+export type DataQuality = {
+  /**
+   * Look Through
+   */
+  look_through: number | null;
+  /**
+   * Oldest Fund Data
+   */
+  oldest_fund_data: string | null;
+  /**
+   * Oldest Price
+   */
+  oldest_price: string | null;
+  /**
+   * Oldest Score
+   */
+  oldest_score: string | null;
+  /**
+   * Positions
+   */
+  positions: number;
+  /**
+   * Valued
+   */
+  valued: number;
+};
+
+/**
  * Depot
  *
  * Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.
@@ -266,6 +425,77 @@ export type Depot = {
 };
 
 /**
+ * DepotAnalysis
+ *
+ * Analyse eines Depots (D4.4), bei jeder Anfrage aus dem neuesten Depotstand, den letzten
+ * Kursen, dem juengsten Bewertungslauf und den Stammdaten gerechnet.
+ */
+export type DepotAnalysis = {
+  allocation: Allocation;
+  bonds: DepotBonds;
+  concentration: Concentration;
+  costs: DepotCosts;
+  data: DataQuality;
+  quality: DepotQuality;
+  /**
+   * Value Eur
+   */
+  value_eur: string | null;
+};
+
+/**
+ * DepotBonds
+ */
+export type DepotBonds = {
+  /**
+   * Bond Eur
+   */
+  bond_eur: string;
+  /**
+   * Covered
+   */
+  covered: number;
+  /**
+   * Maturities
+   */
+  maturities: Array<MaturityYear>;
+  /**
+   * Modified Duration
+   */
+  modified_duration: number | null;
+  /**
+   * Positions
+   */
+  positions: Array<BondPosition>;
+  /**
+   * Ytm
+   */
+  ytm: number | null;
+};
+
+/**
+ * DepotCosts
+ */
+export type DepotCosts = {
+  /**
+   * Covered
+   */
+  covered: number;
+  /**
+   * Etf Eur
+   */
+  etf_eur: string;
+  /**
+   * Running Costs Eur
+   */
+  running_costs_eur: string | null;
+  /**
+   * Ter
+   */
+  ter: number | null;
+};
+
+/**
  * DepotExport
  *
  * Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).
@@ -276,6 +506,46 @@ export type DepotExport = {
    * Versions
    */
   versions: Array<Holdings>;
+};
+
+/**
+ * DepotQuality
+ *
+ * Wertgewichtet ueber die Aktien mit Score; ``covered``: Anteil ihres Werts mit Composite.
+ */
+export type DepotQuality = {
+  /**
+   * Composite
+   */
+  composite: number | null;
+  /**
+   * Covered
+   */
+  covered: number;
+  /**
+   * Equity Eur
+   */
+  equity_eur: string;
+  /**
+   * Funds
+   */
+  funds: Array<FundQuality>;
+  /**
+   * Quality Score
+   */
+  quality_score: number | null;
+  /**
+   * Quintiles
+   */
+  quintiles: Array<Quintile>;
+  /**
+   * Value Score
+   */
+  value_score: number | null;
+  /**
+   * Value Traps
+   */
+  value_traps: number;
 };
 
 /**
@@ -501,6 +771,30 @@ export type FactorRanks = {
    * Scoring Run Id
    */
   scoring_run_id: number;
+};
+
+/**
+ * FundQuality
+ *
+ * Look-through-Score eines ETF, erst ab 50 % bewertetem Gewicht (``covered``).
+ */
+export type FundQuality = {
+  /**
+   * Covered
+   */
+  covered: number;
+  /**
+   * Isin
+   */
+  isin: string;
+  /**
+   * Lower Bound
+   */
+  lower_bound: boolean;
+  /**
+   * Score
+   */
+  score: number | null;
 };
 
 /**
@@ -797,6 +1091,20 @@ export type LoginRequest = {
    * Username
    */
   username: string;
+};
+
+/**
+ * MaturityYear
+ */
+export type MaturityYear = {
+  /**
+   * Value Eur
+   */
+  value_eur: string;
+  /**
+   * Year
+   */
+  year: number;
 };
 
 /**
@@ -1472,6 +1780,24 @@ export type ProfileVersion = {
    * Version
    */
   version: number;
+};
+
+/**
+ * Quintile
+ */
+export type Quintile = {
+  /**
+   * Count
+   */
+  count: number;
+  /**
+   * Quintile
+   */
+  quintile: number;
+  /**
+   * Weight
+   */
+  weight: number;
 };
 
 /**
@@ -2710,6 +3036,48 @@ export type UpdateDepotResponses = {
 };
 
 export type UpdateDepotResponse = UpdateDepotResponses[keyof UpdateDepotResponses];
+
+export type DepotAnalysisData = {
+  body?: never;
+  path: {
+    /**
+     * Depot Id
+     */
+    depot_id: number;
+  };
+  query?: never;
+  url: '/api/v1/depots/{depot_id}/analysis';
+};
+
+export type DepotAnalysisErrors = {
+  /**
+   * Nicht angemeldet
+   */
+  401: unknown;
+  /**
+   * Nicht gefunden
+   */
+  404: unknown;
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+  /**
+   * portfolio nicht erreichbar
+   */
+  503: unknown;
+};
+
+export type DepotAnalysisError = DepotAnalysisErrors[keyof DepotAnalysisErrors];
+
+export type DepotAnalysisResponses = {
+  /**
+   * Successful Response
+   */
+  200: DepotAnalysis;
+};
+
+export type DepotAnalysisResponse = DepotAnalysisResponses[keyof DepotAnalysisResponses];
 
 export type ArchiveDepotData = {
   body?: never;

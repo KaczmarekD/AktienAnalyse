@@ -28,6 +28,7 @@ from va_contracts.portfolio import MAX_FILE_BYTES, CashLineV1, HoldingLineV1
 from ..models import (
     CreateDepot,
     Depot,
+    DepotAnalysis,
     HistoryEntry,
     Holdings,
     ImportFile,
@@ -141,6 +142,16 @@ def create_depot(user: DepotOwner, directory: Directory, body: CreateDepot) -> D
 @router.get("/depots/{depot_id}", responses={**NOT_FOUND, **UNAVAILABLE})
 def get_depot(user: DepotOwner, directory: Directory, depot_id: int) -> Depot:
     return _guarded(lambda: _depot(directory.get(user.id, depot_id)))
+
+
+@router.get("/depots/{depot_id}/analysis", responses={**NOT_FOUND, **UNAVAILABLE})
+def depot_analysis(user: DepotOwner, directory: Directory, depot_id: int) -> DepotAnalysis:
+    """D4.4: Allokation, Konzentration, Qualitaet, Kosten, Anleihen und Datenlage; 503, wenn
+    portfolio die Marktdaten nicht lesen kann."""
+    analysis = _guarded(lambda: directory.analysis(user.id, depot_id))
+    if analysis is None:
+        raise HTTPException(status_code=503, detail="Analyse ohne Marktdaten nicht moeglich")
+    return DepotAnalysis.model_validate(analysis.model_dump())
 
 
 @router.put("/depots/{depot_id}", responses={**NOT_FOUND, **UNAVAILABLE, **WRITE})

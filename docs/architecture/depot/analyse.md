@@ -5,7 +5,8 @@
 > [ADR-0013](../../adr/0013-depots-im-service-portfolio.md) (vorgeschlagen).
 > Umgesetzt: die Einordnung im Bewertungslauf (D4.1, `place()`, `placements[]`,
 > `scoring.placement`), die Scores je Aktie im Depot (D4.2, `score_view` in portfolio), die
-> Rechnungen für ETFs und Anleihen (D4.3, `va_portfolio.domain.funds` und `bonds`).
+> Rechnungen für ETFs und Anleihen (D4.3, `va_portfolio.domain.funds` und `bonds`), die
+> Analyse des Depots (D4.4, `va_portfolio.domain.analysis`, `GET /depots/{id}/analysis`).
 
 ## Grundsatz: bewertet wird gegen ein Referenzuniversum
 
@@ -204,6 +205,24 @@ Keine Renditeberechnung, keine Wertentwicklung, kein Benchmark-Vergleich. Das bl
 ([README](README.md#nicht-ziele)). Einstand und Differenz zum Wert zeigt das Depot als reine Anzeige
 (DEP-13).
 
+**Umgesetzt (27.11.2026, D4.4):** `analyze(AnalysisInput) -> DepotAnalysis` ohne die Teile der
+Hinweise (Vorlauf, Nachrichten, Zielallokation, Kenntnisnahmen kommen mit D5). Abweichungen:
+- Gerechnet wird bei jeder Anfrage aus dem neuesten Depotstand und den Kopien der Marktdaten,
+  wie die Bewertung. Damit ist die Analyse immer aktuell (ANA-10). `analysis_run` und
+  `portfolio.analysis.completed` kommen mit D5: Erst die Hinweise brauchen gespeicherte Läufe
+  (neu, besteht, erledigt) und eine Meldung an die Tabs.
+- Gewichte beziehen sich auf den Wert des Depots (bewertete Positionen plus Kasse). Positionen
+  ohne Kurs zählen nicht mit; die Datenlage nennt, wie viele es sind.
+- Sektor einer Aktie aus dem Bewertungslauf (`Score.sector`, seit D4.4 auch in `PlacementV1`), Land
+  aus den ersten zwei Zeichen der ISIN (Sitz). Die Sektoren und Länder der ETFs heißen je Quelle
+  anders; `SECTOR_KEYS` und `COUNTRY_CODES` am Kopf von `va_portfolio.domain.analysis` führen
+  sie auf die Sektoren von yfinance und ISO-Ländercodes zurück, unbekannte bleiben, wie sie sind.
+  Summieren sich die Gewichte eines ETF auf mehr als 100 %, werden sie gekürzt, ein Rest unter
+  100 % ist `unknown`.
+- Die effektive Zahl zählt Positionen (ein ETF ist eine), Größter und Top 5 rechnen mit
+  Durchschau. Ohne Stammdaten ist eine Position mit Score eine Aktie (Scores gibt es nur für Aktien).
+- Fünftel nach Composite-Perzentil: 1 = unterstes (bis 20 %), 5 = oberstes.
+
 ## Hinweise
 
 Hinweise sind regelbasierte Beobachtungen am Depot. Jede Regel ist eine reine Funktion mit
@@ -310,7 +329,7 @@ nachladen.
 
 | Methode und Pfad | Zweck |
 |---|---|
-| `GET /api/v1/depots/{id}/analysis` | jüngste Analyse |
+| `GET /api/v1/depots/{id}/analysis` | Analyse, bei jeder Anfrage gerechnet (seit D4.4) |
 | `GET /api/v1/depots/{id}/hints?status=` | Hinweise |
 | `POST /api/v1/depots/{id}/hints/{key}/ack` | zur Kenntnis nehmen |
 | `GET`/`PUT /api/v1/depots/{id}/hint-params` | Schwellen (mit `If-Match`) |

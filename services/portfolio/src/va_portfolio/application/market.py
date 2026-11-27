@@ -44,6 +44,10 @@ class MarketReader(Protocol):
         """Je ISIN die juengsten Stammdaten und Kurse, dazu der juengste Kurs jeder Waehrung."""
         ...
 
+    def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
+        """D4.4: je ISIN das juengste ganze ``SecurityV1`` (ETF- und Anleihedaten) als JSON."""
+        ...
+
 
 class MarketStore(MarketReader, Protocol):
     def record_securities(

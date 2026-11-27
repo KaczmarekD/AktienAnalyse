@@ -8,7 +8,7 @@ Nur ``INSERT`` und ``SELECT``. Gelesen wird je ISIN bzw. Waehrung die juengste Z
 from __future__ import annotations
 
 from dataclasses import asdict, fields
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import insert, text
 
@@ -34,6 +34,11 @@ _QUOTES = """
 SELECT DISTINCT ON (isin) isin, trade_date, close, currency, percent_of_par, source, symbol
 FROM portfolio.price_view WHERE isin = ANY(:isins)
 ORDER BY isin, trade_date DESC, id DESC
+"""
+_PAYLOADS = """
+SELECT DISTINCT ON (isin) isin, payload
+FROM portfolio.security_view WHERE isin = ANY(:isins)
+ORDER BY isin, as_of DESC, id DESC
 """
 _SCORES = """
 SELECT DISTINCT ON (isin) isin, scoring_run_id, as_of, payload
@@ -132,6 +137,14 @@ class PostgresMarketStore:
                     for score in scores
                 ],
             )
+
+    def security_payloads(self, isins: Collection[str]) -> dict[str, dict[str, Any]]:
+        wanted = sorted(set(isins))
+        if not wanted:
+            return {}
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(_PAYLOADS), {"isins": wanted}).all()
+        return {r.isin: r.payload for r in rows}
 
     def market(self, isins: Collection[str]) -> Market:
         wanted = sorted(set(isins))

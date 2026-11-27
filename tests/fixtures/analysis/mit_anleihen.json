@@ -1,0 +1,203 @@
+{
+  "name": "Mit Anleihen",
+  "kind": "depot",
+  "cash": "0",
+  "lines": [
+    {
+      "isin": "DE0007236101",
+      "quantity": "20",
+      "unit": "pieces"
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "quantity": "40",
+      "unit": "pieces"
+    },
+    {
+      "isin": "DE0001102580",
+      "quantity": "5000",
+      "unit": "nominal"
+    },
+    {
+      "isin": "DE0001102333",
+      "quantity": "3000",
+      "unit": "nominal"
+    },
+    {
+      "isin": "XS2000000009",
+      "quantity": "2000",
+      "unit": "nominal"
+    }
+  ],
+  "securities": [
+    {
+      "isin": "DE0007236101",
+      "name": "Siemens AG",
+      "asset_class": "equity",
+      "currency": "EUR"
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "name": "iShares Core MSCI World UCITS ETF",
+      "asset_class": "etf",
+      "currency": "USD"
+    },
+    {
+      "isin": "DE0001102580",
+      "name": "Bund 2,6 % 2033",
+      "asset_class": "bond",
+      "currency": "EUR"
+    },
+    {
+      "isin": "DE0001102333",
+      "name": "Bund 1,7 % 2032",
+      "asset_class": "bond",
+      "currency": "EUR"
+    },
+    {
+      "isin": "XS2000000009",
+      "name": "Floater 2029",
+      "asset_class": "bond",
+      "currency": "EUR"
+    }
+  ],
+  "quotes": [
+    {
+      "isin": "DE0007236101",
+      "trade_date": "2026-11-20",
+      "close": "198.40",
+      "currency": "EUR",
+      "percent_of_par": false
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "trade_date": "2026-11-20",
+      "close": "108.32",
+      "currency": "EUR",
+      "percent_of_par": false
+    },
+    {
+      "isin": "DE0001102580",
+      "trade_date": "2026-11-20",
+      "close": "97.50",
+      "currency": "EUR",
+      "percent_of_par": true
+    },
+    {
+      "isin": "DE0001102333",
+      "trade_date": "2026-11-20",
+      "close": "93.10",
+      "currency": "EUR",
+      "percent_of_par": true
+    },
+    {
+      "isin": "XS2000000009",
+      "trade_date": "2026-11-20",
+      "close": "100.20",
+      "currency": "EUR",
+      "percent_of_par": true
+    }
+  ],
+  "fx": {
+    "USD": "0.8612"
+  },
+  "scores": [
+    {
+      "isin": "DE0007236101",
+      "scoring_run_id": 12,
+      "as_of": "2026-11-20",
+      "symbol": "SIE.DE",
+      "reference": "universe",
+      "composite_score": 0.61,
+      "value_score": 0.55,
+      "quality_score": 0.7,
+      "composite_percentile": 0.81,
+      "sector": "Industrials",
+      "rank": 17
+    }
+  ],
+  "etfs": {
+    "IE00B4L5Y983": {
+      "as_of": "2026-11-19",
+      "ter": 0.2,
+      "currency": "USD",
+      "complete": false,
+      "sectors": {
+        "IT": 27.1,
+        "Financials": 16.2,
+        "Health Care": 10.4,
+        "Industrials": 10.9,
+        "Consumer Discretionary": 10.1,
+        "Communication": 8.2,
+        "Consumer Staples": 5.9,
+        "Energy": 3.6,
+        "Materials": 3.2,
+        "Utilities": 2.6,
+        "Real Estate": 1.9
+      },
+      "countries": {
+        "Vereinigte Staaten": 71.9,
+        "Japan": 5.4,
+        "Vereinigtes Königreich": 3.4,
+        "Deutschland": 2.2
+      },
+      "holdings": [
+        [
+          "US0378331005",
+          5.1,
+          "APPLE INC"
+        ],
+        [
+          "US5949181045",
+          4.6,
+          "MICROSOFT CORP"
+        ],
+        [
+          "US67066G1040",
+          4.4,
+          "NVIDIA CORP"
+        ],
+        [
+          "DE0007164600",
+          0.6,
+          "SAP"
+        ],
+        [
+          null,
+          0.3,
+          "EUR CASH"
+        ]
+      ]
+    }
+  },
+  "bonds": {
+    "DE0001102580": {
+      "coupon": 2.6,
+      "maturity": "2033-08-15",
+      "cfi": "DBFTFB"
+    },
+    "DE0001102333": {
+      "coupon": 1.7,
+      "maturity": "2032-08-15",
+      "cfi": "DBFTFB"
+    },
+    "XS2000000009": {
+      "coupon": 3.1,
+      "maturity": "2029-04-10",
+      "cfi": "DBVUFB",
+      "floating": true
+    }
+  },
+  "composites": {
+    "DE0007164600": 0.46,
+    "DE0007236101": 0.61,
+    "US0378331005": 0.52,
+    "US5949181045": 0.34
+  },
+  "names": {
+    "US0378331005": "APPLE INC",
+    "US5949181045": "MICROSOFT CORP",
+    "US67066G1040": "NVIDIA CORP",
+    "DE0007164600": "SAP"
+  }
+}

@@ -1,0 +1,730 @@
+{
+  "$defs": {
+    "AllocationV1": {
+      "properties": {
+        "asset_class": {
+          "items": {
+            "$ref": "#/$defs/SliceV1"
+          },
+          "title": "Asset Class",
+          "type": "array"
+        },
+        "country": {
+          "items": {
+            "$ref": "#/$defs/SliceV1"
+          },
+          "title": "Country",
+          "type": "array"
+        },
+        "currency": {
+          "items": {
+            "$ref": "#/$defs/SliceV1"
+          },
+          "title": "Currency",
+          "type": "array"
+        },
+        "sector": {
+          "items": {
+            "$ref": "#/$defs/SliceV1"
+          },
+          "title": "Sector",
+          "type": "array"
+        }
+      },
+      "title": "AllocationV1",
+      "type": "object"
+    },
+    "BondPositionV1": {
+      "properties": {
+        "accrued": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accrued"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "maturity": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maturity"
+        },
+        "modified_duration": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Modified Duration"
+        },
+        "next_coupon": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Coupon"
+        },
+        "special": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Special"
+        },
+        "value_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Eur"
+        },
+        "ytm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ytm"
+        }
+      },
+      "required": [
+        "isin"
+      ],
+      "title": "BondPositionV1",
+      "type": "object"
+    },
+    "BondsV1": {
+      "properties": {
+        "bond_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Bond Eur"
+        },
+        "covered": {
+          "title": "Covered",
+          "type": "number"
+        },
+        "maturities": {
+          "items": {
+            "$ref": "#/$defs/MaturityYearV1"
+          },
+          "title": "Maturities",
+          "type": "array"
+        },
+        "modified_duration": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Modified Duration"
+        },
+        "positions": {
+          "items": {
+            "$ref": "#/$defs/BondPositionV1"
+          },
+          "title": "Positions",
+          "type": "array"
+        },
+        "ytm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ytm"
+        }
+      },
+      "required": [
+        "bond_eur",
+        "covered"
+      ],
+      "title": "BondsV1",
+      "type": "object"
+    },
+    "ConcentrationV1": {
+      "description": "Mit Durchschau; ``lower_bound``: ein ETF kennt nur seine groessten Positionen oder keine.\n``effective_positions``: 1 / Summe Gewicht^2 ueber die Positionen (ETF als eine).",
+      "properties": {
+        "effective_positions": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Positions"
+        },
+        "largest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TitleV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "lower_bound": {
+          "title": "Lower Bound",
+          "type": "boolean"
+        },
+        "top": {
+          "items": {
+            "$ref": "#/$defs/TitleV1"
+          },
+          "title": "Top",
+          "type": "array"
+        },
+        "top_weight": {
+          "title": "Top Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "top_weight",
+        "lower_bound"
+      ],
+      "title": "ConcentrationV1",
+      "type": "object"
+    },
+    "CostsV1": {
+      "properties": {
+        "covered": {
+          "title": "Covered",
+          "type": "number"
+        },
+        "etf_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Etf Eur"
+        },
+        "running_costs_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Running Costs Eur"
+        },
+        "ter": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ter"
+        }
+      },
+      "required": [
+        "etf_eur",
+        "covered"
+      ],
+      "title": "CostsV1",
+      "type": "object"
+    },
+    "DataQualityV1": {
+      "properties": {
+        "look_through": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Look Through"
+        },
+        "oldest_fund_data": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oldest Fund Data"
+        },
+        "oldest_price": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oldest Price"
+        },
+        "oldest_score": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oldest Score"
+        },
+        "positions": {
+          "minimum": 0,
+          "title": "Positions",
+          "type": "integer"
+        },
+        "valued": {
+          "minimum": 0,
+          "title": "Valued",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "positions",
+        "valued"
+      ],
+      "title": "DataQualityV1",
+      "type": "object"
+    },
+    "DepotAnalysisV1": {
+      "description": "Analyse eines Depots (D4.4, ANA-08 bis 10), bei jeder Anfrage neu gerechnet.",
+      "properties": {
+        "allocation": {
+          "$ref": "#/$defs/AllocationV1"
+        },
+        "bonds": {
+          "$ref": "#/$defs/BondsV1"
+        },
+        "concentration": {
+          "$ref": "#/$defs/ConcentrationV1"
+        },
+        "costs": {
+          "$ref": "#/$defs/CostsV1"
+        },
+        "data": {
+          "$ref": "#/$defs/DataQualityV1"
+        },
+        "quality": {
+          "$ref": "#/$defs/QualityV1"
+        },
+        "value_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Eur"
+        }
+      },
+      "required": [
+        "allocation",
+        "concentration",
+        "quality",
+        "costs",
+        "bonds",
+        "data"
+      ],
+      "title": "DepotAnalysisV1",
+      "type": "object"
+    },
+    "FundQualityV1": {
+      "properties": {
+        "covered": {
+          "title": "Covered",
+          "type": "number"
+        },
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "lower_bound": {
+          "title": "Lower Bound",
+          "type": "boolean"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        }
+      },
+      "required": [
+        "isin",
+        "covered",
+        "lower_bound"
+      ],
+      "title": "FundQualityV1",
+      "type": "object"
+    },
+    "MaturityYearV1": {
+      "properties": {
+        "value_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Value Eur"
+        },
+        "year": {
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "year",
+        "value_eur"
+      ],
+      "title": "MaturityYearV1",
+      "type": "object"
+    },
+    "QualityV1": {
+      "description": "Wertgewichtet ueber die Aktien mit Score; ``covered`` = Anteil ihres Werts mit Composite.",
+      "properties": {
+        "composite": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite"
+        },
+        "covered": {
+          "title": "Covered",
+          "type": "number"
+        },
+        "equity_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity Eur"
+        },
+        "funds": {
+          "items": {
+            "$ref": "#/$defs/FundQualityV1"
+          },
+          "title": "Funds",
+          "type": "array"
+        },
+        "quality_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quality Score"
+        },
+        "quintiles": {
+          "items": {
+            "$ref": "#/$defs/QuintileV1"
+          },
+          "title": "Quintiles",
+          "type": "array"
+        },
+        "value_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Score"
+        },
+        "value_traps": {
+          "minimum": 0,
+          "title": "Value Traps",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "equity_eur",
+        "covered",
+        "value_traps"
+      ],
+      "title": "QualityV1",
+      "type": "object"
+    },
+    "QuintileV1": {
+      "properties": {
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "quintile": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Quintile",
+          "type": "integer"
+        },
+        "weight": {
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "quintile",
+        "count",
+        "weight"
+      ],
+      "title": "QuintileV1",
+      "type": "object"
+    },
+    "RpcErrorV1": {
+      "properties": {
+        "code": {
+          "enum": [
+            "no_data",
+            "unknown_profile",
+            "unknown_version",
+            "conflict",
+            "invalid",
+            "internal",
+            "not_found",
+            "archived"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Newest"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RpcErrorV1",
+      "type": "object"
+    },
+    "SliceV1": {
+      "description": "Ein Teil der Allokation. ``key``: Anlageklasse, Waehrung, Sektor (wie bei yfinance) oder\nLand (ISO 3166); ``cash``, ``bonds``, ``unknown``, ``no_look_through`` ohne Zuordnung.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "value_eur": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Value Eur"
+        },
+        "weight": {
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "key",
+        "value_eur",
+        "weight"
+      ],
+      "title": "SliceV1",
+      "type": "object"
+    },
+    "TitleV1": {
+      "properties": {
+        "isin": {
+          "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+          "title": "Isin",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "weight": {
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "isin",
+        "weight"
+      ],
+      "title": "TitleV1",
+      "type": "object"
+    }
+  },
+  "description": "D4.4: ``analysis`` leer, wenn portfolio keine Marktdaten lesen kann.",
+  "properties": {
+    "analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DepotAnalysisV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RpcErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "DepotAnalysisReplyV1",
+  "type": "object"
+}

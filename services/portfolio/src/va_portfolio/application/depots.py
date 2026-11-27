@@ -39,6 +39,7 @@ from va_contracts.events.v1 import (
     DepotChangedV1,
 )
 
+from ..domain.analysis import DepotAnalysis, analyze
 from ..domain.depots import (
     CashLine,
     Depot,
@@ -60,6 +61,7 @@ from ..domain.holdings_file import (
     write_holdings,
 )
 from ..domain.valuation import DepotValue, value_depot
+from .analysis import analysis_input, fund_isins, securities
 
 if TYPE_CHECKING:
     from va_contracts import Envelope
@@ -449,6 +451,24 @@ class DepotService:
             msg = f"Depot {depot_id} ist archiviert"
             raise ArchivedDepot(msg)
         return depot
+
+    def analysis(self, user_id: int, depot_id: int) -> DepotAnalysis | None:
+        """D4.4: Analyse des neuesten Depotstands; ``None`` ohne lesbare Marktdaten."""
+        depot = self._owned(user_id, depot_id)
+        if self._market is None:
+            return None
+        snapshot = self._store.snapshot(depot.id) or Snapshot(depot.id, 0)
+        isins = {line.isin for line in snapshot.lines}
+        try:
+            market = self._market.market(isins)
+            found = securities(self._market.security_payloads(isins))
+            inside = fund_isins(found) - isins
+            scores = {**market.scores, **(self._market.market(inside).scores if inside else {})}
+        except Exception:
+            log.warning("Marktdaten nicht lesbar - Depot ohne Analyse", exc_info=True)
+            return None
+        value = value_depot(depot.kind, snapshot.lines, snapshot.cash, market)
+        return analyze(analysis_input(value, found, scores))
 
     def _summary(self, depot: Depot) -> DepotSummary:
         version, positions = self._store.summary(depot.id)

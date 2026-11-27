@@ -135,6 +135,176 @@
         "title": "ActiveProfileRef",
         "type": "object"
       },
+      "Allocation": {
+        "additionalProperties": false,
+        "description": "Sektor und Land mit Durchschau durch die ETFs; Aktien nach ISIN-Land.",
+        "properties": {
+          "asset_class": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationSlice"
+            },
+            "title": "Asset Class",
+            "type": "array"
+          },
+          "country": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationSlice"
+            },
+            "title": "Country",
+            "type": "array"
+          },
+          "currency": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationSlice"
+            },
+            "title": "Currency",
+            "type": "array"
+          },
+          "sector": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationSlice"
+            },
+            "title": "Sector",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_class",
+          "currency",
+          "sector",
+          "country"
+        ],
+        "title": "Allocation",
+        "type": "object"
+      },
+      "AllocationSlice": {
+        "additionalProperties": false,
+        "description": "``key``: Anlageklasse, Waehrung, Sektor (wie bei yfinance) oder Land (ISO 3166); ohne\nZuordnung ``cash``, ``bonds``, ``unknown`` oder ``no_look_through`` (ETF ohne Daten).",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "value_eur": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value Eur",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "value_eur",
+          "weight"
+        ],
+        "title": "AllocationSlice",
+        "type": "object"
+      },
+      "BondPosition": {
+        "additionalProperties": false,
+        "description": "Kennzahlen zum letzten Kurs; ohne Rendite nennt ``special`` den Grund.",
+        "properties": {
+          "accrued": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accrued"
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "maturity": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maturity"
+          },
+          "modified_duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified Duration"
+          },
+          "next_coupon": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Coupon"
+          },
+          "special": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Special"
+          },
+          "value_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Eur"
+          },
+          "ytm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ytm"
+          }
+        },
+        "required": [
+          "isin",
+          "value_eur",
+          "maturity",
+          "ytm",
+          "modified_duration",
+          "accrued",
+          "next_coupon",
+          "special"
+        ],
+        "title": "BondPosition",
+        "type": "object"
+      },
       "BondTerms": {
         "additionalProperties": false,
         "description": "Ausstattung einer Anleihe aus ESMA FIRDS.",
@@ -248,6 +418,88 @@
           "amount"
         ],
         "title": "CashLine",
+        "type": "object"
+      },
+      "Concentration": {
+        "additionalProperties": false,
+        "description": "Mit Durchschau; ``lower_bound``: mindestens ein ETF kennt nur seine groessten Positionen\noder keine (dann \"mindestens\"). ``effective_positions`` = 1 / Summe Gewicht^2.",
+        "properties": {
+          "effective_positions": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Positions"
+          },
+          "largest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConcentrationTitle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lower_bound": {
+            "title": "Lower Bound",
+            "type": "boolean"
+          },
+          "top": {
+            "items": {
+              "$ref": "#/components/schemas/ConcentrationTitle"
+            },
+            "title": "Top",
+            "type": "array"
+          },
+          "top_weight": {
+            "title": "Top Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "largest",
+          "top",
+          "top_weight",
+          "effective_positions",
+          "lower_bound"
+        ],
+        "title": "Concentration",
+        "type": "object"
+      },
+      "ConcentrationTitle": {
+        "additionalProperties": false,
+        "properties": {
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "isin",
+          "name",
+          "weight"
+        ],
+        "title": "ConcentrationTitle",
         "type": "object"
       },
       "CreateDepot": {
@@ -373,6 +625,76 @@
         "title": "DataExport",
         "type": "object"
       },
+      "DataQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "look_through": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Look Through"
+          },
+          "oldest_fund_data": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Fund Data"
+          },
+          "oldest_price": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Price"
+          },
+          "oldest_score": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Score"
+          },
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "valued": {
+            "title": "Valued",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "positions",
+          "valued",
+          "look_through",
+          "oldest_price",
+          "oldest_score",
+          "oldest_fund_data"
+        ],
+        "title": "DataQuality",
+        "type": "object"
+      },
       "Depot": {
         "additionalProperties": false,
         "description": "Ein eigenes Depot; ``version`` 0 heisst: noch kein Depotstand gespeichert.\n\n``valuation`` (D3.4): fehlt, solange portfolio keine Marktdaten hat oder sie nicht lesbar sind.",
@@ -450,6 +772,158 @@
         "title": "Depot",
         "type": "object"
       },
+      "DepotAnalysis": {
+        "additionalProperties": false,
+        "description": "Analyse eines Depots (D4.4), bei jeder Anfrage aus dem neuesten Depotstand, den letzten\nKursen, dem juengsten Bewertungslauf und den Stammdaten gerechnet.",
+        "properties": {
+          "allocation": {
+            "$ref": "#/components/schemas/Allocation"
+          },
+          "bonds": {
+            "$ref": "#/components/schemas/DepotBonds"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/Concentration"
+          },
+          "costs": {
+            "$ref": "#/components/schemas/DepotCosts"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DataQuality"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/DepotQuality"
+          },
+          "value_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Eur"
+          }
+        },
+        "required": [
+          "value_eur",
+          "allocation",
+          "concentration",
+          "quality",
+          "costs",
+          "bonds",
+          "data"
+        ],
+        "title": "DepotAnalysis",
+        "type": "object"
+      },
+      "DepotBonds": {
+        "additionalProperties": false,
+        "properties": {
+          "bond_eur": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Bond Eur",
+            "type": "string"
+          },
+          "covered": {
+            "title": "Covered",
+            "type": "number"
+          },
+          "maturities": {
+            "items": {
+              "$ref": "#/components/schemas/MaturityYear"
+            },
+            "title": "Maturities",
+            "type": "array"
+          },
+          "modified_duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified Duration"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/BondPosition"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "ytm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ytm"
+          }
+        },
+        "required": [
+          "bond_eur",
+          "covered",
+          "ytm",
+          "modified_duration",
+          "maturities",
+          "positions"
+        ],
+        "title": "DepotBonds",
+        "type": "object"
+      },
+      "DepotCosts": {
+        "additionalProperties": false,
+        "properties": {
+          "covered": {
+            "title": "Covered",
+            "type": "number"
+          },
+          "etf_eur": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Etf Eur",
+            "type": "string"
+          },
+          "running_costs_eur": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Running Costs Eur"
+          },
+          "ter": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ter"
+          }
+        },
+        "required": [
+          "etf_eur",
+          "covered",
+          "ter",
+          "running_costs_eur"
+        ],
+        "title": "DepotCosts",
+        "type": "object"
+      },
       "DepotExport": {
         "additionalProperties": false,
         "description": "Ein Depot mit allen Depotstaenden, aelteste zuerst (Datenexport).",
@@ -470,6 +944,84 @@
           "versions"
         ],
         "title": "DepotExport",
+        "type": "object"
+      },
+      "DepotQuality": {
+        "additionalProperties": false,
+        "description": "Wertgewichtet ueber die Aktien mit Score; ``covered``: Anteil ihres Werts mit Composite.",
+        "properties": {
+          "composite": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite"
+          },
+          "covered": {
+            "title": "Covered",
+            "type": "number"
+          },
+          "equity_eur": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Equity Eur",
+            "type": "string"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundQuality"
+            },
+            "title": "Funds",
+            "type": "array"
+          },
+          "quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Score"
+          },
+          "quintiles": {
+            "items": {
+              "$ref": "#/components/schemas/Quintile"
+            },
+            "title": "Quintiles",
+            "type": "array"
+          },
+          "value_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Score"
+          },
+          "value_traps": {
+            "title": "Value Traps",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "equity_eur",
+          "covered",
+          "composite",
+          "value_score",
+          "quality_score",
+          "value_traps",
+          "quintiles",
+          "funds"
+        ],
+        "title": "DepotQuality",
         "type": "object"
       },
       "DepotValuation": {
@@ -907,6 +1459,43 @@
           "ranks"
         ],
         "title": "FactorRanks",
+        "type": "object"
+      },
+      "FundQuality": {
+        "additionalProperties": false,
+        "description": "Look-through-Score eines ETF, erst ab 50 % bewertetem Gewicht (``covered``).",
+        "properties": {
+          "covered": {
+            "title": "Covered",
+            "type": "number"
+          },
+          "isin": {
+            "title": "Isin",
+            "type": "string"
+          },
+          "lower_bound": {
+            "title": "Lower Bound",
+            "type": "boolean"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "isin",
+          "score",
+          "covered",
+          "lower_bound"
+        ],
+        "title": "FundQuality",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1512,6 +2101,26 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "MaturityYear": {
+        "additionalProperties": false,
+        "properties": {
+          "value_eur": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value Eur",
+            "type": "string"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "value_eur"
+        ],
+        "title": "MaturityYear",
         "type": "object"
       },
       "Me": {
@@ -2760,6 +3369,30 @@
           "active"
         ],
         "title": "ProfileVersion",
+        "type": "object"
+      },
+      "Quintile": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "quintile": {
+            "title": "Quintile",
+            "type": "integer"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "quintile",
+          "count",
+          "weight"
+        ],
+        "title": "Quintile",
         "type": "object"
       },
       "Ranking": {
@@ -4972,6 +5605,58 @@
           }
         },
         "summary": "Update Depot",
+        "tags": [
+          "depots"
+        ]
+      }
+    },
+    "/api/v1/depots/{depot_id}/analysis": {
+      "get": {
+        "description": "D4.4: Allokation, Konzentration, Qualitaet, Kosten, Anleihen und Datenlage; 503, wenn\nportfolio die Marktdaten nicht lesen kann.",
+        "operationId": "depot_analysis",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "depot_id",
+            "required": true,
+            "schema": {
+              "title": "Depot Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepotAnalysis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Nicht angemeldet"
+          },
+          "404": {
+            "description": "Nicht gefunden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "portfolio nicht erreichbar"
+          }
+        },
+        "summary": "Depot Analysis",
         "tags": [
           "depots"
         ]

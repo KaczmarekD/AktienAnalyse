@@ -17,10 +17,12 @@ Transport zu ``internal`` (``va_platform.nats.answer_request``).
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from va_contracts.portfolio import (
     CashLineV1,
+    DepotAnalysisV1,
     DepotExportV1,
     DepotV1,
     DepotValuationV1,
@@ -34,6 +36,7 @@ from va_contracts.portfolio import (
     RejectedRowV1,
 )
 from va_contracts.rpc.v1 import (
+    DEPOTS_ANALYSIS,
     DEPOTS_ARCHIVE,
     DEPOTS_CREATE,
     DEPOTS_EXPORT,
@@ -47,6 +50,7 @@ from va_contracts.rpc.v1 import (
     HOLDINGS_IMPORT,
     HOLDINGS_IMPORT_PREVIEW,
     HOLDINGS_SAVE,
+    DepotAnalysisReplyV1,
     DepotExportReplyV1,
     DepotListReplyV1,
     DepotReplyV1,
@@ -242,6 +246,15 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
             ),
         )
 
+    def analysis(request: DepotRefRequestV1) -> DepotAnalysisReplyV1:
+        def work() -> DepotAnalysisReplyV1:
+            result = service.analysis(request.user_id, request.depot_id)
+            return DepotAnalysisReplyV1(
+                analysis=None if result is None else DepotAnalysisV1.model_validate(asdict(result))
+            )
+
+        return _guarded(DepotAnalysisReplyV1, work)
+
     def get(request: DepotRefRequestV1) -> DepotReplyV1:
         return _guarded(
             DepotReplyV1,
@@ -367,4 +380,5 @@ def handlers(service: DepotService) -> dict[RpcSpec[Any, Any], Callable[[Any], R
         HOLDINGS_IMPORT_PREVIEW: import_preview,
         HOLDINGS_IMPORT: import_file,
         HOLDINGS_FILE: holdings_file,
+        DEPOTS_ANALYSIS: analysis,
     }

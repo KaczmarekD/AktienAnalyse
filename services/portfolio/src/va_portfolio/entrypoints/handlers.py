@@ -134,6 +134,7 @@ def _ranked(row: RankingRowV1, scoring_run_id: int, as_of: date) -> Score:
         value_trap_reason=row.value_trap_reason,
         industry_rule=row.industry_rule,
         reason=score_reason(row.value_score, row.quality_score),
+        sector=row.fundamentals.identity.sector,
     )
 
 
@@ -153,6 +154,7 @@ def _placed(placement: PlacementV1, scoring_run_id: int, as_of: date) -> Score:
         value_trap_reason=placement.value_trap_reason,
         industry_rule=placement.industry_rule,
         reason=placement.reason,
+        sector=placement.sector,
     )
 
 
