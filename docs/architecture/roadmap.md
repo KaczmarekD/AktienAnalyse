@@ -309,7 +309,7 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D5.4 Ansicht „Hinweise“ (`b279532`; Bereich „Hinweise“ im Depot mit Disclaimer, „Zur Kenntnis nehmen“, Dialoge „Schwellen“ und „Zielallokation“, `GET /hints/catalog`; behoben: Zeitpunkte mit Offset im API-Client, „Bearbeiten“ eines gespeicherten Depotstands seit D3.6; NAS: nichts Neues in der `.env`)
   - [x] D5.5 Prüfkandidaten (`800c91c`; bis zu drei Titel aus dem Ranking desselben Bewertungslaufs im selben Sektor, standardmäßig aus, `GET /depots/{id}/positions/{isin}/comparison`, „Zum Vergleich“ unter HIN-Q01/Q02; keine Migration; NAS: nichts Neues)
 - [ ] D6 News (geschnitten am 28.11.2026, Implementierungsplan)
-  - [ ] D6.1 yfinance 1.8
+  - [x] D6.1 yfinance 1.8 (`7e7b1b2`; yfinance 1.8.0, `curl_cffi` 0.17.0, kein Code geändert, live geprüft, J4125-Prüfung grün; NAS: neue Images mit `make pull`, sonst nichts)
   - [ ] D6.2 Normieren, Abgleich, Speicher
   - [ ] D6.3 Abruf alle vier Stunden
   - [ ] D6.4 News in portfolio und Hinweise
