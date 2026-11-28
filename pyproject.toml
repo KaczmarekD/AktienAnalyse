@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 authors = [{ name = "Dennis" }]
 license = { text = "Proprietary" }
 dependencies = [
-    "yfinance>=1.7,<2",       # ab 1.1 kompatibel mit pandas 3; curl_cffi bleibt Standard
+    "yfinance>=1.8,<2",       # ab 1.8 get_news ueber GraphQL (D6.1); curl_cffi bleibt Standard
     "pandas>=3.0,<4",
     "numpy>=2.3.2,<3",       # erste Version mit Wheels fuer Python 3.14
     "requests>=2.32,<3",

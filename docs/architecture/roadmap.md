@@ -308,7 +308,14 @@ Spezifikation: [depot/README.md](depot/README.md). Details:
   - [x] D5.3 Schwellen, Zielallokation, Kenntnisnahme (`e9de73b`; `hint_params`, `target_allocation`, `hint_ack` (Migration 0033), HIN-A01, `…/hint-params` und `…/target-allocation` mit `If-Match`, `…/hints/{key}/ack`, `/me/export` mit Schwellen, Zielen und Kenntnisnahmen; NAS: nichts Neues in der `.env`)
   - [x] D5.4 Ansicht „Hinweise“ (`b279532`; Bereich „Hinweise“ im Depot mit Disclaimer, „Zur Kenntnis nehmen“, Dialoge „Schwellen“ und „Zielallokation“, `GET /hints/catalog`; behoben: Zeitpunkte mit Offset im API-Client, „Bearbeiten“ eines gespeicherten Depotstands seit D3.6; NAS: nichts Neues in der `.env`)
   - [x] D5.5 Prüfkandidaten (`800c91c`; bis zu drei Titel aus dem Ranking desselben Bewertungslaufs im selben Sektor, standardmäßig aus, `GET /depots/{id}/positions/{isin}/comparison`, „Zum Vergleich“ unter HIN-Q01/Q02; keine Migration; NAS: nichts Neues)
-- [ ] D6 News
+- [ ] D6 News (geschnitten am 28.11.2026, Implementierungsplan)
+  - [ ] D6.1 yfinance 1.8
+  - [ ] D6.2 Normieren, Abgleich, Speicher
+  - [ ] D6.3 Abruf alle vier Stunden
+  - [ ] D6.4 News in portfolio und Hinweise
+  - [ ] D6.5 Endpunkte und Ansicht „News“
+  - [ ] D6.6 GDELT als Ersatzquelle (Soll)
+  - [ ] D6.7 EQS-Postfach per IMAP (Soll, braucht ein Postfach)
 - [ ] D7 Berichte mit eigenem Intervall
 - [ ] D8 depot-gateway, Port `DepotSource`, Datei-Adapter 🔒
 - [ ] D9 DKB über FinTS 🔒

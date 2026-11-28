@@ -298,6 +298,23 @@ ohne die Website nicht. Zurückgestellt.
 Emissionsvolumen, Kurs (in Prozent vom Nennwert), Rendite in %, Kurs plus Stückzinsen. November
 2026: 15 Blätter, je rund 85 Anleihen.
 
+## Live-Prüfung (28.11.2026, für D6.1)
+
+Mit den Adaptern von market-data und yfinance 1.8.0 (`curl_cffi` 0.17.0) gegen Yahoo. Alle Punkte
+**[B]** durch eigenen Abruf:
+
+- Fundamentaldaten SAP.DE (`fetch_one`): 37 von 38 Feldern gefüllt. Schlusskurse für SAP.DE und
+  ALV.DE vom 27.11.2026 (`yf.download`, `threads=False`). Suche „Allianz“ findet ALV.DE zuerst.
+  Konsens (sechs Tabellen), Quartale und `funds_data` (EUNL.DE, zehn Positionen) wie unter 1.7.
+- `get_news(count=5, tab="news")` für SAP.DE: fünf Meldungen. Je Meldung `content` mit `id`,
+  `title`, `summary`, `description`, `pubDate`, `displayTime`, `provider`, `canonicalUrl`,
+  `clickThroughUrl`, `contentType`, `finance`, `isHosted`, `previewUrl`, `thumbnail`.
+  `finance.stockTickers` nennt ein Symbol teils doppelt (`SAP`, `SAP`): Die Relevanzregel
+  (NEWS-13) zählt verschiedene Titel, nicht Einträge.
+- Release-Notes 1.8.0: kein Bruch. `get_news` über GraphQL, Ergebnis je `count` und `tab`
+  zwischengespeichert; `yf.download` ohne `multitasking`; Dividenden bei gescheitertem Abruf eine
+  leere Reihe statt `None`. Eine Fassung 1.8.1 gibt es noch nicht.
+
 ## Empfehlungen
 
 Stand nach der Live-Prüfung vom 06.11.2026.

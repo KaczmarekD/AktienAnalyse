@@ -4372,3 +4372,88 @@ zeigen den Disclaimer.
     übersprang (h4 statt h3).
 
 **Fertig, wenn:** jede Regel des Katalogs getestet und im UI sichtbar ist.
+
+#### Stufe D6 – News
+
+Spezifikation: [depot/news.md](depot/news.md), Quellen:
+[Recherche 11/2026](../research/2026-11-depot-datenquellen-und-bankzugang.md#news). Geschnitten am
+28.11.2026 in sieben Pakete; D6.6 und D6.7 sind Soll.
+
+- **Ausgangslage im Code:** yfinance ist auf 1.7.0 gesperrt; `get_news` nutzt dort einen Endpunkt,
+  den Yahoo abgeschaltet hat (1.8.0 vom 03.11.2026 nutzt GraphQL und verlangt `curl_cffi>=0.17`).
+  Die Abdeckung in market-data (`coverage_item`) enthält seit D3.3 alle ISINs der Depots mit
+  ihren Listings, auch die Titel aus DAX/MDAX; erst der Wochenlauf filtert sie heraus. Sie ist die
+  Liste für den News-Abruf. Live-Updates im UI laufen über `user:<id>`, nicht über `depot:<id>`
+  wie im Entwurf von news.md.
+- **Migrationen:** D6.2 nimmt 0034, D6.4 die nächste freie, beide vorher mit Track F abstimmen.
+- **Kein Volltext:** Gespeichert werden Schlagzeile, Quelle, Zeitpunkt, Link, Art, Sprache und
+  höchstens 300 Zeichen Auszug (§ 87g UrhG, siehe Recherche). Fixtures der Tests sind
+  nachgebaute Antworten mit eigenen Texten, keine kopierten Artikel.
+
+**D6.1 yfinance 1.8** (Voraussetzung, keine neue Funktion)
+- **Test:** die bestehenden Adapter-Tests (gepatchte HTTP-Schicht `YfData`, Fakes) grün mit
+  yfinance 1.8 und `curl_cffi` 0.17; `make check-j4125` in der CI grün (kein AVX); Kurse,
+  Konsens, Quartale und `funds_data` unverändert.
+- **Code:** `yfinance>=1.8,<2` in `pyproject.toml`, `make lock`; geänderte Stellen nur in den
+  Tabellen am Kopf von `adapters/yahoo.py`.
+- **Review:** `/code-review high`.
+- **Umgesetzt (28.11.2026):** yfinance 1.8.0 (neueste Fassung), dazu `curl_cffi` 0.17.0, `cffi`
+  2.1.1, `certifi` 2026.11.20; `multitasking` entfällt. Kein Code geändert: Die Release-Notes nennen
+  keinen Bruch, `yf.download` läuft bei uns mit `threads=False` (neues Thread-Backend ohne
+  Wirkung), Dividenden kommen aus der Spalte `Dividends` von `history`. Live geprüft
+  (Live-Prüfung 28.11.2026 in der Recherche): Fundamentaldaten, Schlusskurse, Suche, Konsens,
+  Quartale, `funds_data` und `get_news`. Die J4125-Prüfung macht die CI.
+
+**D6.2 Normieren, Abgleich, Speicher** (NEWS-01, 02, 04, 05, 06, 13)
+- **Test:** reine Funktionen in `va_market_data.domain.news`:
+  - Normieren je Quelle: Schlagzeile, Quelle, Zeitpunkt, kanonische URL, Auszug auf 300 Zeichen,
+    Art (`press`, `company`, später `adhoc`, `directors_dealings`, `voting_rights`), Sprache.
+  - Duplikate: gleiche kanonische URL (`url_hash`) oder gleiche Schlagzeile, Quelle und Tag; aus
+    zwei Quellen eine Zeile mit zwei Zuordnungen.
+  - Zuordnung über alle Listings einer ISIN (`finance.stockTickers` nennt SAP als `SAP`),
+    Herkunft `source_symbol`.
+  - Relevanz (NEWS-13): Hauptthema bei höchstens zwei Titeln oder Name in der Schlagzeile, sonst
+    Erwähnung.
+  - Port `NewsProvider` (wirft nie, Fehler je Wertpapier im Ergebnis), Adapter yfinance mit
+    `NEWS_FIELDS` am Kopf von `adapters/yahoo.py`, Anwendungsfall `collect_news` (Abdeckung,
+    Quellen, Speicher; Status `partial`, wenn eine Quelle ausfällt).
+  - Tabellen `market_data.news_fetch_run`, `news_item`, `news_link` (Migration, nur anfügen,
+    Abschluss des Laufs wie `fetch_run`); Test, dass `snippet` höchstens 300 Zeichen hat.
+- **Review:** `/code-review high`.
+
+**D6.3 Abruf alle vier Stunden** (NEWS-03)
+- **Test:** `NewsScheduler` im web-api (`WEB_API_NEWS_SCHEDULE`, Standard alle 4 h von 6 bis 22
+  Uhr, `Europe/Berlin`), Event `marketdata.news.requested`, Handler in market-data, Event
+  `marketdata.news.collected` (Meldungen mit Zuordnungen, nur über Wertpapiere, nichts über
+  Nutzer); `nats.conf`, `events.md`, docker-compose.
+- **Review:** `/code-review high`.
+
+**D6.4 News in portfolio und Hinweise** (HIN-N01, HIN-N02, NEWS-07 teilweise)
+- **Test:** Consumer `portfolio` mit `news.collected` → `portfolio.news_view` (nur gehaltene
+  ISINs), `news_read_marker` je Nutzer und Depot; HIN-N01 (Ad-hoc, 7 Tage) und HIN-N02
+  (Eigengeschäfte, 30 Tage) nur aus Hauptthemen; neu gerechnet nach neuen News; Event an
+  `user:<id>` mit Zahlen; RPCs für die Liste und die Marke „gelesen bis“; `erase_user` deckt die
+  neuen Tabellen ab.
+- **Review:** `/code-review high`, `/security-review` (persönliche Daten, neue RPCs).
+
+**D6.5 Endpunkte und Ansicht „News“** (NEWS-07, 08)
+- **Test:** `GET /depots/{id}/news?kind=&since=&limit=`, `GET /securities/{isin}/news` (nur mit
+  dem Wertpapier in einem eigenen Depot), `POST /depots/{id}/news/read`; Bereich „News“ im Depot:
+  Hauptthemen zuerst, Erwähnungen eingeklappt, Filter nach Art, Quelle und Zeitraum, „neu seit dem
+  letzten Besuch“, Namensabgleich gekennzeichnet, Link „Weitere News suchen“ (Google-News-Suche,
+  vom System nicht abgerufen); Playwright mit axe.
+- **Review:** `/code-review high`, `/security-review` (externe Links, Texte aus fremden Quellen).
+
+**D6.6 GDELT als Ersatzquelle** (NEWS-10, Soll)
+- **Test:** Adapter GDELT DOC 2.0 (höchstens eine Anfrage je 5 s, Sprachen Deutsch und Englisch,
+  Quellenangabe) nur für Wertpapiere ohne Treffer bei yfinance; Namensabgleich (`matched_by =
+  name`): „SAP“ trifft nicht „SAPPI“, kurze oder allgemeine Namen brauchen Kürzel oder ISIN im
+  Text.
+- **Review:** `/code-review high`.
+
+**D6.7 EQS-Postfach per IMAP** (NEWS-09, Soll, 🔒 braucht ein eigenes Postfach vom User)
+- **Test:** Adapter, der ein eigenes Postfach per IMAP nur liest; Mails von EQS ergeben Ad-hoc,
+  Eigengeschäfte und Stimmrechte (`matched_by = disclosure`); Zugang aus Settings, nie im Log.
+- **Review:** `/code-review high`, `/security-review` (Zugangsdaten, fremde Mails).
+
+**Fertig, wenn:** ein Depot die News seiner Positionen zeigt (mit D6.5).
